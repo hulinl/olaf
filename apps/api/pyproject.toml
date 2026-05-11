@@ -5,7 +5,8 @@ exclude = [".venv", "migrations", "staticfiles", "media"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "DJ", "SIM", "RUF"]
-ignore = ["E501"]
+# RUF012 fights Django idioms (REQUIRED_FIELDS, Meta.ordering, choices tuples).
+ignore = ["E501", "RUF012"]
 
 [tool.ruff.lint.per-file-ignores]
 "settings.py" = ["E402"]

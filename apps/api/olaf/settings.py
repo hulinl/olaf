@@ -6,8 +6,8 @@ production deploy.
 """
 from pathlib import Path
 
-import environ
 import dj_database_url
+import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -38,7 +38,11 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_celery_beat",
     "django_celery_results",
+    # OLAF
+    "accounts",
 ]
+
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -57,7 +61,7 @@ ROOT_URLCONF = "olaf.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -86,7 +90,9 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
 SESSION_SAVE_EVERY_REQUEST = True
-CSRF_COOKIE_HTTPONLY = True
+# CSRF cookie must be readable by JS so the SPA can echo it in X-CSRFToken header.
+# The session cookie (HTTP-only) is what protects against XSS stealing the session.
+CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
 
@@ -141,8 +147,12 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+    "DEFAULT_THROTTLE_RATES": {
+        "register": "5/h",
+        "login": "5/15m",
+        "password_reset": "5/h",
+    },
 }
 
-# Auth rate-limit thresholds (PRD §7) — implemented in Slice 1 via django-ratelimit.
-AUTH_RATE_LIMIT = "5/15m"
-REGISTER_RATE_LIMIT = "5/h"
+# Frontend base URL — embedded in email links (verification, password reset).
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
