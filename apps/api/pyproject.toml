@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [".venv", "migrations", "staticfiles", "media"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "DJ", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"settings.py" = ["E402"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "olaf.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]

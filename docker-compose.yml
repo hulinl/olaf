@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: olaf
+      POSTGRES_PASSWORD: olaf
+      POSTGRES_DB: olaf
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U olaf"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  api:
+    build: ./apps/api
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./apps/api:/app
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+  worker:
+    build: ./apps/api
+    command: celery -A olaf worker -l info
+    volumes:
+      - ./apps/api:/app
+    env_file: .env
+    depends_on:
+      - api
+      - redis
+
+  beat:
+    build: ./apps/api
+    command: celery -A olaf beat -l info
+    volumes:
+      - ./apps/api:/app
+    env_file: .env
+    depends_on:
+      - api
+      - redis
+
+  web:
+    build: ./apps/web
+    command: npm run dev
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
