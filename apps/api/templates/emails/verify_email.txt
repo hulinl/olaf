@@ -1,0 +1,11 @@
+Hi {{ user.first_name }},
+
+Welcome to OLAF — where adventures begin.
+
+Confirm your email address by clicking the link below:
+
+  {{ link }}
+
+This link expires in {{ expires_hours }} hours. If you didn't create an OLAF account, you can ignore this email.
+
+— The OLAF team
