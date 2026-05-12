@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
+import { AuthShell } from "@/components/ui/auth-shell";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/card";
+import { Field, Input } from "@/components/ui/field";
 import { ApiError, auth } from "@/lib/api";
 
 export default function SignupPage() {
@@ -39,99 +43,104 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <main className="flex flex-1 items-center justify-center px-4 py-16">
-        <div className="w-full max-w-md text-center">
-          <h1 className="text-2xl font-semibold">Check your email</h1>
-          <p className="mt-3 text-zinc-600 dark:text-zinc-400">
-            We sent a verification link to <strong>{email}</strong>. Click it to
-            activate your account.
-          </p>
-          <Link
-            href="/login"
-            className="mt-8 inline-block text-sm text-zinc-900 underline dark:text-zinc-100"
-          >
+      <AuthShell
+        title="Check your email"
+        subtitle={
+          <>
+            We sent a verification link to <strong>{email}</strong>. Click it
+            to activate your account.
+          </>
+        }
+        footer={
+          <Link href="/login" className="underline">
             Back to log in
           </Link>
-        </div>
-      </main>
+        }
+      >
+        <p className="text-sm text-ink-500">
+          The link expires in 24 hours. If you don&apos;t see the email, check
+          your spam folder.
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md">
-        <h1 className="text-2xl font-semibold">Create your OLAF account</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+    <AuthShell
+      title="Create your account"
+      subtitle="Join the crew. RSVP to your first event in minutes."
+      footer={
+        <>
           Already have an account?{" "}
-          <Link href="/login" className="underline">
+          <Link href="/login" className="font-medium text-ink-900 underline">
             Log in
           </Link>
-          .
-        </p>
-
-        <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1 text-sm">
-              First name
-              <input
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Last name
-              <input
-                type="text"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-            </label>
-          </div>
-          <label className="flex flex-col gap-1 text-sm">
-            Email
-            <input
-              type="email"
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="First name" htmlFor="first_name">
+            <Input
+              id="first_name"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Password
-            <input
-              type="password"
+          </Field>
+          <Field label="Last name" htmlFor="last_name">
+            <Input
+              id="last_name"
+              type="text"
               required
-              minLength={10}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
             />
-            <span className="text-xs text-zinc-500">
-              At least 10 characters, with a letter and a digit.
-            </span>
-          </label>
+          </Field>
+        </div>
 
-          {error && (
-            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-              {error}
-            </p>
-          )}
+        <Field label="Email" htmlFor="email">
+          <Input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="h-11 rounded-md bg-zinc-900 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            {submitting ? "Creating account…" : "Create account"}
-          </button>
-        </form>
-      </div>
-    </main>
+        <Field
+          label="Password"
+          htmlFor="password"
+          hint="At least 10 characters, with a letter and a digit."
+        >
+          <Input
+            id="password"
+            type="password"
+            required
+            minLength={10}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+
+        {error && <Alert variant="danger">{error}</Alert>}
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={submitting}
+        >
+          {submitting ? "Creating account…" : "Create account"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

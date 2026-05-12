@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
+import { AuthShell } from "@/components/ui/auth-shell";
+import { LinkButton } from "@/components/ui/button";
 import { ApiError, auth } from "@/lib/api";
 
 type Status = "pending" | "success" | "error";
@@ -14,7 +16,9 @@ export default function VerifyEmailPage({
 }) {
   const { token } = use(params);
   const [status, setStatus] = useState<Status>("pending");
-  const [message, setMessage] = useState<string>("Verifying your email…");
+  const [message, setMessage] = useState<string>(
+    "Hold on a sec — confirming your email.",
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +27,7 @@ export default function VerifyEmailPage({
         await auth.verifyEmail(token);
         if (cancelled) return;
         setStatus("success");
-        setMessage("Email verified. You can now log in.");
+        setMessage("Email verified. You can now sign in.");
       } catch (err) {
         if (cancelled) return;
         setStatus("error");
@@ -39,24 +43,38 @@ export default function VerifyEmailPage({
     };
   }, [token]);
 
+  const title =
+    status === "pending"
+      ? "Verifying your email…"
+      : status === "success"
+        ? "All set"
+        : "Verification failed";
+
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md text-center">
-        <h1 className="text-2xl font-semibold">
-          {status === "pending" && "Verifying…"}
-          {status === "success" && "All set"}
-          {status === "error" && "Verification failed"}
-        </h1>
-        <p className="mt-3 text-zinc-600 dark:text-zinc-400">{message}</p>
-        {status !== "pending" && (
+    <AuthShell
+      title={title}
+      subtitle={message}
+      footer={
+        status === "error" ? (
           <Link
-            href="/login"
-            className="mt-8 inline-flex h-11 items-center justify-center rounded-md bg-zinc-900 px-6 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+            href="/signup"
+            className="font-medium text-ink-900 underline"
           >
-            Go to login
+            Try signing up again
           </Link>
-        )}
-      </div>
-    </main>
+        ) : null
+      }
+    >
+      {status === "pending" && (
+        <div className="flex justify-center py-2">
+          <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+        </div>
+      )}
+      {status === "success" && (
+        <LinkButton href="/login" variant="primary" size="lg" fullWidth>
+          Go to login
+        </LinkButton>
+      )}
+    </AuthShell>
   );
 }

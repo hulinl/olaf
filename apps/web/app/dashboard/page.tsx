@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { AppHeader } from "@/components/ui/app-header";
+import { LinkButton } from "@/components/ui/button";
+import { Card, CardSection } from "@/components/ui/card";
 import { ApiError, User, auth } from "@/lib/api";
 
 export default function DashboardPage() {
@@ -18,11 +21,13 @@ export default function DashboardPage() {
         const me = await auth.me();
         if (!cancelled) setUser(me);
       } catch (err) {
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        if (
+          err instanceof ApiError &&
+          (err.status === 401 || err.status === 403)
+        ) {
           router.replace("/login");
           return;
         }
-        if (!cancelled) setLoading(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -43,53 +48,117 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="flex flex-1 items-center justify-center px-4 py-16">
-        <p className="text-sm text-zinc-500">Loading…</p>
+      <main className="flex flex-1 items-center justify-center">
+        <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
       </main>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
-    <main className="flex flex-1 flex-col px-4 py-12">
-      <header className="mx-auto flex w-full max-w-3xl items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">OLAF</h1>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          disabled={signingOut}
-          className="text-sm text-zinc-600 underline disabled:opacity-50 dark:text-zinc-400"
-        >
-          {signingOut ? "Signing out…" : "Sign out"}
-        </button>
-      </header>
+    <>
+      <AppHeader
+        user={user}
+        onSignOut={handleSignOut}
+        signingOut={signingOut}
+      />
 
-      <section className="mx-auto mt-16 w-full max-w-3xl">
-        <h2 className="text-3xl font-semibold tracking-tight">
-          Welcome, {user.first_name}.
-        </h2>
-        <p className="mt-3 text-zinc-600 dark:text-zinc-400">
-          Your workspace and communities will live here. Slice 2 wires up the
-          workspace shell next.
-        </p>
-        <dl className="mt-8 grid gap-3 rounded-md border border-zinc-200 bg-white p-5 text-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="flex justify-between">
-            <dt className="text-zinc-500">Email</dt>
-            <dd>{user.email}</dd>
+      <main className="flex flex-1 flex-col">
+        <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-12">
+          <header className="mb-10">
+            <p className="text-sm font-medium text-brand">Dashboard</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+              Welcome, {user.first_name}.
+            </h1>
+            <p className="mt-2 max-w-xl text-ink-500">
+              Your workspace and communities will live here. Next slice wires
+              up the workspace shell.
+            </p>
+          </header>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Communities" value="—" hint="Coming in Slice 3" />
+            <StatCard
+              label="Upcoming events"
+              value="—"
+              hint="Coming in Slice 4"
+            />
+            <StatCard label="Pending approvals" value="—" hint="—" />
           </div>
-          <div className="flex justify-between">
-            <dt className="text-zinc-500">Email verified</dt>
-            <dd>{user.email_verified ? "Yes" : "No"}</dd>
+
+          <Card className="mt-8">
+            <CardSection>
+              <h2 className="text-lg font-semibold text-ink-900">
+                Your account
+              </h2>
+              <p className="mt-1 text-sm text-ink-500">
+                Profile editing lands in the settings slice. For now, here's
+                what we have.
+              </p>
+              <dl className="mt-6 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                <Row label="Email" value={user.email} />
+                <Row
+                  label="Email verified"
+                  value={user.email_verified ? "Yes" : "No"}
+                />
+                <Row label="Full name" value={user.full_name} />
+                <Row
+                  label="Member since"
+                  value={new Date(user.date_joined).toLocaleDateString()}
+                />
+              </dl>
+            </CardSection>
+          </Card>
+
+          <div className="mt-10 rounded-lg border border-dashed border-border-strong bg-surface-muted/50 p-8 text-center">
+            <h3 className="text-base font-semibold text-ink-900">
+              No communities yet
+            </h3>
+            <p className="mt-1 text-sm text-ink-500">
+              Once Slice 2 lands, you'll be able to spin up a workspace and
+              start inviting members.
+            </p>
+            <LinkButton
+              href="/dashboard"
+              variant="secondary"
+              size="md"
+              className="mt-4"
+            >
+              View roadmap
+            </LinkButton>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-zinc-500">Member since</dt>
-            <dd>{new Date(user.date_joined).toLocaleDateString()}</dd>
-          </div>
-        </dl>
-      </section>
-    </main>
+        </section>
+      </main>
+    </>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <Card>
+      <CardSection>
+        <p className="text-sm font-medium text-ink-500">{label}</p>
+        <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
+        {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
+      </CardSection>
+    </Card>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border py-2 last:border-0">
+      <dt className="text-sm text-ink-500">{label}</dt>
+      <dd className="text-sm font-medium text-ink-900">{value}</dd>
+    </div>
   );
 }
