@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OLAF — Where adventures begin",
+  title: "olaf — where adventures begin",
   description:
     "A community-and-event platform for adventure organizers, sports communities, and corporate event hosts.",
 };

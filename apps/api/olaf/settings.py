@@ -122,6 +122,15 @@ CORS_ALLOWED_ORIGINS = (
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF — Django's CsrfViewMiddleware checks the Origin header against this list
+# for cross-origin POST/DELETE etc. DRF's SessionAuthentication only enforces CSRF
+# for authenticated requests, so anon signups slip through without this setting,
+# but authenticated logout / write endpoints hit it.
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=["http://localhost:3000"] if DEBUG else [],
+)
+
 # Email — MailHog locally, ACS Email in production.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = env("EMAIL_HOST", default="mailhog")

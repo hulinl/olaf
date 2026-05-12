@@ -13,7 +13,7 @@ interface BaseProps {
 
 const VARIANT: Record<Variant, string> = {
   primary:
-    "bg-brand text-ink-inverse hover:bg-brand-hover active:bg-brand-active disabled:opacity-50",
+    "bg-brand text-brand-ink hover:bg-brand-hover active:bg-brand-active disabled:opacity-50",
   secondary:
     "bg-surface text-ink-900 border border-border-strong hover:bg-surface-muted disabled:opacity-50",
   ghost:

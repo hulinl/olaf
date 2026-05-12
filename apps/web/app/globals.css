@@ -1,39 +1,52 @@
 @import "tailwindcss";
 
 /* -----------------------------------------------------------------------------
- * Design tokens — single source of truth for OLAF V0.
- * To re-skin the platform later: change the values here, not the components.
+ * olaf design tokens — single source of truth.
+ *
+ * Brand v1 (2026-05-12): user-supplied palette matching olafadventures.com
+ *   #ffc719  warm amber  — accent (CTAs + text highlights only; minimalist)
+ *   #ffffff  white       — canvas
+ *   #000000  black       — text
+ *   #dcdcdc  gray        — borders / dividers
+ *
+ * Wordmark "olaf" is always lowercase. The mark (mountain-in-circle) uses
+ * currentColor so it adapts to its container.
+ *
+ * Reskin = change the values here, not the components.
  * --------------------------------------------------------------------------- */
 
 :root {
-  /* Surfaces — light mode is warm off-white, not pure white. */
-  --canvas: oklch(0.985 0.003 90);
+  /* Surfaces */
+  --canvas: #ffffff;
   --canvas-elevated: #ffffff;
   --surface: #ffffff;
-  --surface-muted: oklch(0.97 0.003 90);
-  --surface-strong: oklch(0.945 0.004 90);
+  --surface-muted: #fafafa;
+  --surface-strong: #f4f4f5;
 
   /* Borders */
-  --border: oklch(0.92 0.004 90);
-  --border-strong: oklch(0.85 0.006 90);
+  --border: #dcdcdc;
+  --border-strong: #bdbdbd;
 
   /* Ink (text) */
-  --ink-900: oklch(0.22 0.012 250);
-  --ink-700: oklch(0.42 0.014 250);
-  --ink-500: oklch(0.55 0.012 250);
-  --ink-300: oklch(0.74 0.008 250);
+  --ink-900: #000000;
+  --ink-700: #2a2a2a;
+  --ink-500: #6b6b6b;
+  --ink-300: #9c9c9c;
   --ink-inverse: #ffffff;
 
-  /* Brand — deep teal. Calm, reads on both modes, distinct from common SaaS blues. */
-  --brand: #0d9488;
-  --brand-hover: #0f766e;
-  --brand-active: #115e59;
-  --brand-soft: oklch(0.96 0.04 178);
-  --brand-ring: oklch(0.65 0.13 178 / 0.35);
+  /* Brand — warm amber. Calm, distinctive, ties to the Olaf Adventures palette. */
+  --brand: #ffc719;
+  --brand-hover: #f0b80f;
+  --brand-active: #d9a40a;
+  --brand-soft: #fff4cc;
+  --brand-ring: rgb(255 199 25 / 0.45);
+  /* Text colour that reads on top of the brand background.
+   * White fails contrast on #ffc719 (~1.6:1); black is AAA (~12:1). */
+  --brand-ink: #000000;
 
   /* Status */
   --danger: #dc2626;
-  --danger-soft: oklch(0.96 0.05 25);
+  --danger-soft: #fee2e2;
   --success: #059669;
   --warning: #d97706;
 
@@ -45,49 +58,50 @@
   --radius-full: 999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04);
-  --shadow-md: 0 6px 18px -4px rgb(15 23 42 / 0.08), 0 2px 4px rgb(15 23 42 / 0.04);
-  --shadow-lg: 0 20px 50px -12px rgb(15 23 42 / 0.18);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 6px 18px -4px rgb(0 0 0 / 0.08), 0 2px 4px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: oklch(0.135 0.006 250);
-    --canvas-elevated: oklch(0.165 0.006 250);
-    --surface: oklch(0.18 0.006 250);
-    --surface-muted: oklch(0.205 0.006 250);
-    --surface-strong: oklch(0.235 0.007 250);
+    --canvas: #0a0a0a;
+    --canvas-elevated: #121212;
+    --surface: #141414;
+    --surface-muted: #1a1a1a;
+    --surface-strong: #232323;
 
-    --border: oklch(0.26 0.008 250);
-    --border-strong: oklch(0.34 0.011 250);
+    --border: #2a2a2a;
+    --border-strong: #3a3a3a;
 
-    --ink-900: oklch(0.97 0.003 90);
-    --ink-700: oklch(0.82 0.005 90);
-    --ink-500: oklch(0.62 0.006 90);
-    --ink-300: oklch(0.42 0.006 90);
-    --ink-inverse: oklch(0.16 0.006 250);
+    --ink-900: #ffffff;
+    --ink-700: #d4d4d4;
+    --ink-500: #9c9c9c;
+    --ink-300: #6b6b6b;
+    --ink-inverse: #000000;
 
-    --brand: oklch(0.74 0.13 178);
-    --brand-hover: oklch(0.80 0.13 178);
-    --brand-active: oklch(0.68 0.13 178);
-    --brand-soft: oklch(0.28 0.07 178);
-    --brand-ring: oklch(0.74 0.13 178 / 0.45);
+    --brand: #ffc719;
+    --brand-hover: #ffd24d;
+    --brand-active: #f0b80f;
+    --brand-soft: #3a2e08;
+    --brand-ring: rgb(255 199 25 / 0.55);
+    --brand-ink: #000000;
 
-    --danger: oklch(0.70 0.18 25);
-    --danger-soft: oklch(0.30 0.08 25);
-    --success: oklch(0.74 0.15 160);
-    --warning: oklch(0.78 0.15 75);
+    --danger: #f87171;
+    --danger-soft: #3f1d1d;
+    --success: #34d399;
+    --warning: #fbbf24;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
-    --shadow-md: 0 6px 18px -4px rgb(0 0 0 / 0.5), 0 2px 4px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.6);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 6px 18px -4px rgb(0 0 0 / 0.55), 0 2px 4px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.65);
   }
 }
 
 /* -----------------------------------------------------------------------------
  * Tailwind 4 @theme — map our tokens to utility class names.
- * Lets us write bg-canvas, text-ink-700, border-border, ring-brand etc.
- * Values reference the :root vars so dark-mode override flows through.
+ * Components write bg-canvas, text-ink-700, border-border, ring-brand etc.
+ * Values reference :root vars so dark-mode override flows through.
  * --------------------------------------------------------------------------- */
 
 @theme {
@@ -111,6 +125,7 @@
   --color-brand-active: var(--brand-active);
   --color-brand-soft: var(--brand-soft);
   --color-brand-ring: var(--brand-ring);
+  --color-brand-ink: var(--brand-ink);
 
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
@@ -148,8 +163,8 @@ body {
 }
 
 ::selection {
-  background: var(--brand-soft);
-  color: var(--brand-active);
+  background: var(--brand);
+  color: var(--brand-ink);
 }
 
 /* Focus ring used across all interactive primitives. */

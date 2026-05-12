@@ -48,15 +48,14 @@ export default function Home() {
         <section className="relative overflow-hidden">
           <TopographyBg />
           <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-24 text-center sm:py-32">
-            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-700">
-              <span className="size-1.5 rounded-full bg-brand" />
-              Now in private beta
+            <span className="mb-6 inline-flex items-center rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-500">
+              now in private beta
             </span>
             <h1 className="text-balance text-5xl font-semibold leading-[1.05] tracking-tight text-ink-900 sm:text-6xl">
               Where adventures begin.
             </h1>
             <p className="mt-5 max-w-xl text-balance text-lg text-ink-500">
-              OLAF gives organizers and crews one place to plan, RSVP, sign,
+              olaf gives organizers and crews one place to plan, RSVP, sign,
               and show up — built for outdoor communities and corporate teams
               alike.
             </p>
@@ -91,7 +90,7 @@ export default function Home() {
 
         <footer className="border-t border-border">
           <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-8 text-sm text-ink-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>© {new Date().getFullYear()} OLAF — Where adventures begin.</span>
+            <span>© {new Date().getFullYear()} olaf — where adventures begin.</span>
             <span className="text-ink-300">EU-hosted · GDPR-clean · PWA-first</span>
           </div>
         </footer>

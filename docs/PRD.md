@@ -632,6 +632,17 @@ Each slice ships as one PR with model + API + UI + tests. Nothing starts until t
 
 ## 13. Appendix
 
-**Naming.** Platform name: **OLAF** (lowercase in code, URLs, identifiers; uppercase in branding). Primary domain: `olaf.events`. Working tagline: *"Where adventures begin."*
+**Naming.** Platform name: **olaf** (always lowercase — in code, URLs, identifiers, marketing copy, email subjects, and the wordmark itself; never "OLAF"). Primary domain: `olaf.events`. Working tagline: *"Where adventures begin."*
 
-**Sibling project.** OLAF follows Slotly under the same author; both EU-hosted, GDPR-clean, PWA-first. Slotly's stack inspired OLAF's but the two share no code.
+**Brand v1** (2026-05-12, user-supplied, matches `olafadventures.com` palette):
+
+| Token | Hex | Usage |
+|---|---|---|
+| Accent | `#ffc719` | Primary CTAs and text highlights only. Minimalist — never decorative. White text fails contrast; primary buttons render **black** text on amber (encoded as `--brand-ink`). |
+| Canvas | `#ffffff` | Light-mode background. |
+| Text | `#000000` | Primary text. |
+| Border / divider | `#dcdcdc` | All borders and rule lines. |
+
+Logo / mark: a topographic peak inside an open circle (`apps/web/components/ui/logo.tsx`). Used everywhere the brand needs to identify itself — header, auth pages, dashboard, favicon. Wordmark beside the mark is lowercase `olaf` in Geist Sans.
+
+**Sibling project.** olaf follows Slotly under the same author; both EU-hosted, GDPR-clean, PWA-first. Slotly's stack inspired olaf's but the two share no code.

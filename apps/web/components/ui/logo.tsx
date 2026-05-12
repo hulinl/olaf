@@ -9,9 +9,13 @@ interface LogoProps {
 }
 
 /**
- * OLAF V0 mark — a topographic "O" with a peak inside, suggesting
- * routes and ascents. Placeholder identity until a brand pass lands;
- * swap this single file when the proper logo arrives.
+ * olaf mark — a topographic peak inside an open circle.
+ * The "O" doubles as a horizon; the peak inside suggests routes and ascents.
+ * Wordmark stays lowercase "olaf" — never uppercase.
+ *
+ * Uses currentColor so it adapts to wherever placed:
+ *   on white → black mark
+ *   on dark canvas → white mark
  */
 export function Logo({
   className = "",
