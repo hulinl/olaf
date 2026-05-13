@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     # olaf
     "accounts",
     "workspaces",
+    "events",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
