@@ -1,6 +1,13 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+/** Build an absolute URL for an asset served by the API (e.g. /media/xxx). */
+export function assetUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${API_URL}${path}`;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -16,6 +23,20 @@ export interface User {
   bio: string;
   email_verified: boolean;
   date_joined: string;
+}
+
+export interface Workspace {
+  slug: string;
+  name: string;
+  bio: string;
+  location: string;
+  social_links: Record<string, string>;
+  accent_color: string;
+  logo_url: string | null;
+  cover_url: string | null;
+  visibility: "public" | "unlisted" | "private";
+  default_tz: string;
+  created_at: string;
 }
 
 export class ApiError extends Error {
@@ -91,6 +112,12 @@ export async function apiFetch<T>(
   if (!res.ok) throw new ApiError(res.status, data);
   return data as unknown as T;
 }
+
+export const workspaces = {
+  byPublicSlug: (slug: string) =>
+    apiFetch<Workspace>(`/api/workspaces/${slug}/`),
+  mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
+};
 
 export const auth = {
   signup: (payload: {

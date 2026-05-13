@@ -47,6 +47,17 @@ class User(AbstractBaseUser, PermissionsMixin):
     sport_tags = models.JSONField(default=list, blank=True)
     bio = models.TextField(blank=True)
 
+    # Workspace context — which workspace is the user currently "in".
+    # Multi-workspace switching is V1.5; in V1 this defaults to the user's
+    # only workspace (if any).
+    active_workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
     # Auth + lifecycle
     email_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)

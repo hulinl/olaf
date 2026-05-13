@@ -1,4 +1,4 @@
-.PHONY: help dev down build rebuild logs migrate makemigrations shell test lint install web-install
+.PHONY: help dev down build rebuild logs migrate makemigrations shell test lint install web-install seed superuser
 
 help:
 	@echo "OLAF — common dev commands"
@@ -15,6 +15,8 @@ help:
 	@echo "  make lint            run ruff on the backend"
 	@echo "  make install         create local venv + install backend deps"
 	@echo "  make web-install     install frontend deps locally"
+	@echo "  make superuser       create a Django superuser"
+	@echo "  make seed            seed Olaf Adventures workspace (run after superuser)"
 
 dev:
 	docker compose up
@@ -52,3 +54,9 @@ install:
 
 web-install:
 	cd apps/web && npm install
+
+superuser:
+	docker compose exec api python manage.py createsuperuser
+
+seed:
+	docker compose exec api python manage.py seed_olaf_adventures
