@@ -1,11 +1,11 @@
 Hi {{ user.first_name }},
 
-Welcome to OLAF — where adventures begin.
+Welcome to olaf — where adventures begin.
 
 Confirm your email address by clicking the link below:
 
   {{ link }}
 
-This link expires in {{ expires_hours }} hours. If you didn't create an OLAF account, you can ignore this email.
+This link expires in {{ expires_hours }} hours. If you didn't create an olaf account, you can ignore this email.
 
-— The OLAF team
+— The olaf team

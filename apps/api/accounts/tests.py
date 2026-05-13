@@ -27,7 +27,7 @@ class SignupTests(TestCase):
         self.assertTrue(user.check_password("alpine-hike-2026"))
         self.assertEqual(EmailVerificationToken.objects.filter(user=user).count(), 1)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("Verify your OLAF account", mail.outbox[0].subject)
+        self.assertIn("Verify your olaf account", mail.outbox[0].subject)
 
     def test_rejects_short_password(self) -> None:
         self.payload["password"] = "short1"
@@ -141,7 +141,7 @@ class PasswordResetTests(TestCase):
         resp = self.client.post(self.request_url, {"email": "marta@example.com"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("Reset your OLAF password", mail.outbox[0].subject)
+        self.assertIn("Reset your olaf password", mail.outbox[0].subject)
         self.assertEqual(PasswordResetToken.objects.filter(user=self.user).count(), 1)
 
     def test_reset_request_for_unknown_email_returns_200(self) -> None:

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OLAF — Where adventures begin",
+  title: "olaf — where adventures begin",
   description:
     "A community-and-event platform for adventure organizers, sports communities, and corporate event hosts.",
 };
@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-100">
+      <body className="min-h-full flex flex-col bg-canvas text-ink-900">
         {children}
       </body>
     </html>

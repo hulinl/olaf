@@ -17,7 +17,7 @@ def send_verification_email(user: User, token: EmailVerificationToken) -> None:
         {"user": user, "link": link, "expires_hours": 24},
     )
     send_mail(
-        subject="Verify your OLAF account",
+        subject="Verify your olaf account",
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
@@ -32,7 +32,7 @@ def send_password_reset_email(user: User, token: PasswordResetToken) -> None:
         {"user": user, "link": link, "expires_hours": 1},
     )
     send_mail(
-        subject="Reset your OLAF password",
+        subject="Reset your olaf password",
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],

@@ -1,26 +1,175 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* -----------------------------------------------------------------------------
+ * olaf design tokens — single source of truth.
+ *
+ * Brand v1 (2026-05-12): user-supplied palette matching olafadventures.com
+ *   #ffc719  warm amber  — accent (CTAs + text highlights only; minimalist)
+ *   #ffffff  white       — canvas
+ *   #000000  black       — text
+ *   #dcdcdc  gray        — borders / dividers
+ *
+ * Wordmark "olaf" is always lowercase. The mark (mountain-in-circle) uses
+ * currentColor so it adapts to its container.
+ *
+ * Reskin = change the values here, not the components.
+ * --------------------------------------------------------------------------- */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  /* Surfaces */
+  --canvas: #ffffff;
+  --canvas-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #fafafa;
+  --surface-strong: #f4f4f5;
+
+  /* Borders */
+  --border: #dcdcdc;
+  --border-strong: #bdbdbd;
+
+  /* Ink (text) */
+  --ink-900: #000000;
+  --ink-700: #2a2a2a;
+  --ink-500: #6b6b6b;
+  --ink-300: #9c9c9c;
+  --ink-inverse: #ffffff;
+
+  /* Brand — warm amber. Calm, distinctive, ties to the Olaf Adventures palette. */
+  --brand: #ffc719;
+  --brand-hover: #f0b80f;
+  --brand-active: #d9a40a;
+  --brand-soft: #fff4cc;
+  --brand-ring: rgb(255 199 25 / 0.45);
+  /* Text colour that reads on top of the brand background.
+   * White fails contrast on #ffc719 (~1.6:1); black is AAA (~12:1). */
+  --brand-ink: #000000;
+
+  /* Status */
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --success: #059669;
+  --warning: #d97706;
+
+  /* Radii */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 6px 18px -4px rgb(0 0 0 / 0.08), 0 2px 4px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --canvas: #0a0a0a;
+    --canvas-elevated: #121212;
+    --surface: #141414;
+    --surface-muted: #1a1a1a;
+    --surface-strong: #232323;
+
+    --border: #2a2a2a;
+    --border-strong: #3a3a3a;
+
+    --ink-900: #ffffff;
+    --ink-700: #d4d4d4;
+    --ink-500: #9c9c9c;
+    --ink-300: #6b6b6b;
+    --ink-inverse: #000000;
+
+    --brand: #ffc719;
+    --brand-hover: #ffd24d;
+    --brand-active: #f0b80f;
+    --brand-soft: #3a2e08;
+    --brand-ring: rgb(255 199 25 / 0.55);
+    --brand-ink: #000000;
+
+    --danger: #f87171;
+    --danger-soft: #3f1d1d;
+    --success: #34d399;
+    --warning: #fbbf24;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 6px 18px -4px rgb(0 0 0 / 0.55), 0 2px 4px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.65);
   }
 }
 
+/* -----------------------------------------------------------------------------
+ * Tailwind 4 @theme — map our tokens to utility class names.
+ * Components write bg-canvas, text-ink-700, border-border, ring-brand etc.
+ * Values reference :root vars so dark-mode override flows through.
+ * --------------------------------------------------------------------------- */
+
+@theme {
+  --color-canvas: var(--canvas);
+  --color-canvas-elevated: var(--canvas-elevated);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-strong: var(--surface-strong);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-300: var(--ink-300);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-active: var(--brand-active);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ring: var(--brand-ring);
+  --color-brand-ink: var(--brand-ink);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --font-display: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* -----------------------------------------------------------------------------
+ * Base
+ * --------------------------------------------------------------------------- */
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink-900);
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+/* Focus ring used across all interactive primitives. */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--brand-ring);
+  border-color: var(--brand);
 }
