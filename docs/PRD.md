@@ -630,7 +630,128 @@ Each slice ships as one PR with model + API + UI + tests. Nothing starts until t
 
 ---
 
-## 13. Appendix
+## 13. Risk Management Checklist (V2 feature)
+
+Added 2026-05-14 per user direction. **Not in V1 scope** — documented here so it's not lost. Implementation lands in V2 alongside the Paid Events + Owner Event Editor work.
+
+### Purpose
+
+When creating an event the organiser is offered a generated checklist of risks relevant to the specific event parameters. Goal: not to surface every possible risk, but to nudge the organiser on what they should think about for *this* trek / camp / corporate retreat. Each risk can be confirmed, edited, dismissed as "not relevant", and have prevention + crisis-response plans attached.
+
+### Event-side inputs
+
+The risk engine reads:
+
+| Field | Notes |
+|---|---|
+| `type` | `trek` / `tour` / `workshop` / `corporate` / `expedition` / … |
+| `location`, `country` | strings |
+| `start_date`, `end_date`, `duration_days` | derived |
+| `participant_count` | integer |
+| `difficulty` | 1–5 |
+| `environment` | multi-select: city / mountains / water / tropics / snow / desert / … |
+| `is_outdoor`, `is_multiday`, `is_abroad`, `has_sleepover`, `has_transport`, `has_water_crossing`, `has_altitude`, `has_remote_area`, `requires_special_equipment` | booleans |
+| `max_altitude` | integer, optional |
+| `notes` | free text |
+
+These extend the V1 `Event` model. Most are nullable — older events default to all-false.
+
+### Risk library
+
+Categories:
+
+| Category | Examples |
+|---|---|
+| Plánování | bad difficulty estimate, no plan B |
+| Počasí | rain, storm, fog, extreme temperatures |
+| Terén | falls, slipping, rockfall, unstable slope |
+| Voda | water shortage, fording, swollen creek |
+| Zdraví a kondice | fatigue, injury, dehydration, altitude sickness |
+| Psychika | stress, panic, performance pressure |
+| Skupina | tempo differences, conflict, group split |
+| Výbava | wrong shoes, no headlamp, dead phone |
+| Logistika | delay, lost luggage, accommodation issue |
+| Pravidla a zákony | permits, insurance, entry ban |
+| Kultura a etika | local customs, respect for nature, waste |
+| Bezpečnost | theft, lost documents, fraud |
+| Záchrana | no signal, evacuation, emergency contacts |
+
+### Selection rules (engine)
+
+Rules fire when the relevant boolean / enum is set on the event:
+
+- **Outdoor**: weather, terrain, gear, health, navigation, rescue.
+- **Multi-day**: fatigue, regeneration, supply, hygiene, psyche, group dynamics.
+- **Mountains**: elevation, falls, rockfall, navigation loss, sudden weather change, altitude sickness, limited rescue access.
+- **Abroad**: documents, insurance, local laws, language barrier, cultural context, health advisories, transport.
+- **Tropics**: heat, humidity, dehydration, heatstroke, monsoon rains, contaminated water, insects, infection.
+- **Snow / winter**: hypothermia, avalanche, ice, frostbite, short day, specialised winter gear.
+- **Water / fording**: strong current, flood, drowning, gear submersion, hypothermia, no safe crossing.
+- **>6 participants**: tempo differences, group communication, group split, conflict, harder coordination.
+- **Difficulty ≥ 3/5**: overestimated fitness, fatigue, injury, insufficient prep, mental exhaustion, plan change.
+
+Rules are additive — an outdoor mountain camp at 1800 m for 12 people, difficulty 4, abroad, with water fording, snow, multi-day stacks up most of the library.
+
+### Data model
+
+```
+RiskCategory
+  id (UUID), name, description, order
+
+Risk
+  id, category_id (FK RiskCategory),
+  name, description,
+  default_probability (1–5), default_severity (1–5),
+  triggers (jsonb — boolean expression over Event fields),
+  prevention_tips (jsonb list of strings),
+  response_tips (jsonb list of strings),
+  checklist_questions (jsonb list of strings),
+  is_active (bool)
+
+EventRisk                              (per-event materialisation)
+  id, event_id (FK Event), risk_id (FK Risk),
+  probability (1–5), severity (1–5),
+  score (computed = probability × severity),
+  status (pending / reviewed / mitigated / not_relevant),
+  prevention_plan (text — concrete actions for THIS event),
+  response_plan (text — crisis plan for THIS event),
+  owner_user_id (FK User — responsible person, nullable),
+  notes (text),
+  created_at, updated_at
+```
+
+### Scoring
+
+Probability 1–5 (`very unlikely` → `very likely`) × Severity 1–5 (`minor` → `fatal / multi-person`). Score 1–25. Thresholds for "low / medium / high / critical" are an open question — likely 1–4 / 5–9 / 10–14 / 15–25, to confirm during implementation.
+
+### UI sketch (V2)
+
+- During event create, after the basic fields, a "Risk checklist" step generates the relevant rows from the engine.
+- Each row: risk name + category, probability/severity sliders, status toggle (pending / reviewed / mitigated / not_relevant), expandable section for prevention + response plans, owner assignment.
+- Export to PDF or shareable read-only URL for the team.
+- Dashboard widget summarising the highest-score risks across an organiser's upcoming events.
+
+### Open questions
+
+- Should risks be tenant-scoped (each workspace edits its own library) or platform-shared (every Creator gets the same starter library, optionally customisable per workspace)? Default proposal: **platform-shared starter library, per-workspace overrides + additions**.
+- Should EventRisk rows be auto-regenerated when the Event parameters change (re-run the engine), or stay sticky once created? Default proposal: **engine produces a diff suggesting new rows but never overwrites existing rows**.
+- Localisation of the risk library (CZ vs EN content) — copy lives per-language in the Risk row.
+
+### Canonical example (ground truth)
+
+The user maintains a real risk analysis for an upcoming personal trek — the 15-day crossing of Réunion island (30 April – 15 May 2026, 9 participants, difficulty 3/5, tropical + mountain + volcanic + abroad + water crossings + multi-day). The document covers profile, destination context, climate, volcanic-zone procedures, top-risks scoring table, prevention measures (before / during), critical gear, crisis scenarios (terrain injury, bad weather, group falling behind, psychological crisis, dangerous fording, route closure), guide role + daily briefing / debriefing prompts, and group rules.
+
+That document **is** what a high-quality output of the Risk Management engine should look like for an event stacking every rule in the library. When implementing:
+
+1. Use its top-13 risks table as a sanity check that the engine ranks the right risks.
+2. Use its crisis-scenarios chapter as templates for the per-risk `response_plan` text.
+3. The group-rules block ("Nikdo nejde sám", "tempo se přizpůsobuje nejslabšímu článku", "rozhodnutí průvodce je závazné", …) is reusable across events — likely a workspace-level template attached to each event rather than re-typed.
+
+Source PDF lives at `/Users/hulin/Desktop/Reunion trek.pdf` (not committed to the repo — proprietary content; treat as reference material).
+
+---
+
+## 14. Appendix
 
 **Naming.** Platform name: **olaf** (always lowercase — in code, URLs, identifiers, marketing copy, email subjects, and the wordmark itself; never "OLAF"). Primary domain: `olaf.events`. Working tagline: *"Where adventures begin."*
 
