@@ -59,3 +59,22 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
         recipient_list=[rsvp.user.email],
         fail_silently=False,
     )
+
+
+def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
+    """Notify a participant that the event they RSVP-ed to was cancelled."""
+    event = rsvp.event
+    context = {
+        "user": rsvp.user,
+        "event": event,
+        "reason": reason,
+        "workspace": event.workspace,
+    }
+    body = render_to_string("emails/event_cancelled.txt", context)
+    send_mail(
+        subject=f"Cancelled: {event.title}",
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[rsvp.user.email],
+        fail_silently=False,
+    )

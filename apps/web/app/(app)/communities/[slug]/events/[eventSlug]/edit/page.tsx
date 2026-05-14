@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { EventDangerZone } from "@/components/event-danger-zone";
 import { EventForm } from "@/components/event-form";
 import { Alert } from "@/components/ui/card";
 import {
@@ -115,6 +116,14 @@ export default function EditEventPage({ params }: Props) {
           }
           submitLabel="Uložit změny"
         />
+
+        <div className="mt-10 border-t border-border pt-10">
+          <EventDangerZone
+            event={event}
+            workspaceSlug={slug}
+            onCancelled={(updated) => setEvent(updated)}
+          />
+        </div>
       </section>
     </main>
   );

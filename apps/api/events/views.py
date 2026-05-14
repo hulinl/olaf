@@ -24,7 +24,10 @@ from .serializers import (
     RSVPCreateSerializer,
     RSVPSerializer,
 )
-from .tasks import send_rsvp_confirmation_task
+from .tasks import (
+    fan_out_event_cancellation_task,
+    send_rsvp_confirmation_task,
+)
 
 
 def _load_published_event(workspace_slug: str, event_slug: str):
@@ -290,6 +293,34 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
         )
 
     event = serializer.save()
+    return Response(EventPublicSerializer(event).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cancel_event(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner-only cancel. Fan-outs cancellation email to active RSVPs."""
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, event.workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if event.status == Event.STATUS_CANCELLED:
+        return Response(EventPublicSerializer(event).data)
+
+    reason = (request.data.get("reason") or "").strip()
+    event.status = Event.STATUS_CANCELLED
+    event.cancellation_reason = reason
+    event.save(update_fields=["status", "cancellation_reason", "updated_at"])
+
+    fan_out_event_cancellation_task.delay(event.pk, reason)
     return Response(EventPublicSerializer(event).data)
 
 

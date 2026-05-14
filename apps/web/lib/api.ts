@@ -273,6 +273,11 @@ export const events = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  cancel: (workspaceSlug: string, eventSlug: string, reason: string) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/cancel/`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 export const auth = {
