@@ -196,3 +196,49 @@ class MyRSVPSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = fields
+
+
+class EventWriteSerializer(serializers.ModelSerializer):
+    """Used for both create + update by workspace Owners."""
+
+    class Meta:
+        model = Event
+        fields = (
+            "slug",
+            "title",
+            "description",
+            "starts_at",
+            "ends_at",
+            "tz",
+            "location_text",
+            "meeting_point_text",
+            "location_url",
+            "capacity",
+            "waitlist_enabled",
+            "visibility",
+            "status",
+            "requires_approval",
+            "highlights",
+            "included",
+            "program",
+            "price_text",
+            "cancellation_reason",
+        )
+
+    def validate(self, attrs):
+        starts = attrs.get("starts_at") or getattr(self.instance, "starts_at", None)
+        ends = attrs.get("ends_at") or getattr(self.instance, "ends_at", None)
+        if starts and ends and ends < starts:
+            raise serializers.ValidationError(
+                {"ends_at": "Konec nemůže být dřív než začátek."}
+            )
+        return attrs
+
+    def validate_slug(self, value):
+        from .models import validate_event_slug
+
+        try:
+            validate_event_slug(value)
+        except Exception as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return value

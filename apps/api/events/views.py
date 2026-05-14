@@ -19,6 +19,7 @@ from .permissions import is_workspace_owner
 from .serializers import (
     EventPublicSerializer,
     EventSummarySerializer,
+    EventWriteSerializer,
     MyRSVPSerializer,
     RSVPCreateSerializer,
     RSVPSerializer,
@@ -223,6 +224,73 @@ def owner_events(request: Request) -> Response:
     )
     serializer = EventSummarySerializer(events, many=True)
     return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_event(request: Request, workspace_slug: str) -> Response:
+    """Owner-only create. The workspace is identified by URL slug."""
+    from workspaces.models import Workspace
+
+    try:
+        workspace = Workspace.objects.get(slug=workspace_slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    serializer = EventWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    # Reject slug collision within workspace explicitly (nicer than IntegrityError).
+    if Event.objects.filter(
+        workspace=workspace, slug=serializer.validated_data["slug"]
+    ).exists():
+        return Response(
+            {"slug": "Event s tímto slug už ve workspace existuje."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    event = serializer.save(workspace=workspace)
+    return Response(
+        EventPublicSerializer(event).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_event(request: Request, workspace_slug: str, event_slug: str) -> Response:
+    """Owner-only update."""
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, event.workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    serializer = EventWriteSerializer(event, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+
+    new_slug = serializer.validated_data.get("slug")
+    if (
+        new_slug
+        and new_slug != event.slug
+        and Event.objects.filter(workspace=event.workspace, slug=new_slug)
+        .exclude(pk=event.pk)
+        .exists()
+    ):
+        return Response(
+            {"slug": "Event s tímto slug už ve workspace existuje."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    event = serializer.save()
+    return Response(EventPublicSerializer(event).data)
 
 
 @api_view(["GET"])

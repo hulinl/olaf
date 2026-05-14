@@ -140,10 +140,14 @@ export default function DashboardPage() {
                 <EmptyState
                   title="Zatím žádný event"
                   body="Vytvoř první event v Django adminu a uvidíš ho tady."
-                  cta={{
-                    label: "Vytvořit event",
-                    href: "http://localhost:8000/admin/events/event/add/",
-                  }}
+                  cta={
+                    myWorkspaces && myWorkspaces.length > 0
+                      ? {
+                          label: "Vytvořit event",
+                          href: `/communities/${myWorkspaces[0].slug}/events/new`,
+                        }
+                      : undefined
+                  }
                 />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">

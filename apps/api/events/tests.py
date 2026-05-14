@@ -300,3 +300,106 @@ class OwnerEventListTests(TestCase):
         )
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CreateUpdateEventTests(TestCase):
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.ws = Workspace.objects.create(slug="olafadventures", name="Olaf Adventures")
+        self.owner = User.objects.create_user(
+            email="owner@example.com", password="pass-abcdef-1234",
+            first_name="O", last_name="Wner", email_verified=True,
+        )
+        WorkspaceMember.objects.create(
+            workspace=self.ws, user=self.owner, role=WorkspaceMember.ROLE_OWNER
+        )
+        self.outsider = User.objects.create_user(
+            email="out@example.com", password="pass-abcdef-1234",
+            first_name="O", last_name="Ut", email_verified=True,
+        )
+
+    def _create_payload(self) -> dict:
+        return {
+            "slug": "podzimni-kemp-2026",
+            "title": "Podzimní kemp 2026",
+            "description": "Beskydy, multi-day camp.",
+            "starts_at": (timezone.now() + timedelta(days=60)).isoformat(),
+            "ends_at": (timezone.now() + timedelta(days=63)).isoformat(),
+            "tz": "Europe/Prague",
+            "location_text": "Beskydy",
+            "capacity": 10,
+            "waitlist_enabled": True,
+            "visibility": Event.VISIBILITY_PUBLIC,
+            "status": Event.STATUS_PUBLISHED,
+            "price_text": "2 950 Kč",
+            "highlights": ["technika", "regenerace"],
+            "included": ["3 noci", "snídaně"],
+            "program": [],
+        }
+
+    def test_owner_can_create_event(self) -> None:
+        self.client.force_authenticate(self.owner)
+        url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
+        resp = self.client.post(url, self._create_payload(), format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
+        self.assertEqual(resp.json()["slug"], "podzimni-kemp-2026")
+        self.assertEqual(resp.json()["workspace_slug"], "olafadventures")
+
+    def test_non_owner_blocked_from_create(self) -> None:
+        self.client.force_authenticate(self.outsider)
+        url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
+        resp = self.client.post(url, self._create_payload(), format="json")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_anonymous_blocked_from_create(self) -> None:
+        url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
+        resp = self.client.post(url, self._create_payload(), format="json")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_duplicate_slug_rejected(self) -> None:
+        _build_event(self.ws, slug="podzimni-kemp-2026", title="exists")
+        self.client.force_authenticate(self.owner)
+        url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
+        resp = self.client.post(url, self._create_payload(), format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("slug", resp.json())
+
+    def test_create_rejects_inverted_dates(self) -> None:
+        self.client.force_authenticate(self.owner)
+        payload = self._create_payload()
+        payload["ends_at"] = (timezone.now() + timedelta(days=10)).isoformat()
+        payload["starts_at"] = (timezone.now() + timedelta(days=20)).isoformat()
+        url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
+        resp = self.client.post(url, payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_owner_can_update_event(self) -> None:
+        event = _build_event(self.ws, slug="upravit-me-2026", title="Old title")
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "events:update",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "upravit-me-2026",
+            },
+        )
+        resp = self.client.patch(
+            url, {"title": "New title", "capacity": 20}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        event.refresh_from_db()
+        self.assertEqual(event.title, "New title")
+        self.assertEqual(event.capacity, 20)
+
+    def test_non_owner_blocked_from_update(self) -> None:
+        _build_event(self.ws, slug="upravit-me-2026", title="Old title")
+        self.client.force_authenticate(self.outsider)
+        url = reverse(
+            "events:update",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "upravit-me-2026",
+            },
+        )
+        resp = self.client.patch(url, {"title": "Hack"}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)

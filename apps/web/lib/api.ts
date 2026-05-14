@@ -214,6 +214,28 @@ export const workspaces = {
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
 };
 
+export interface EventWritePayload {
+  slug: string;
+  title: string;
+  description?: string;
+  starts_at: string;
+  ends_at: string;
+  tz?: string;
+  location_text?: string;
+  meeting_point_text?: string;
+  location_url?: string;
+  capacity?: number | null;
+  waitlist_enabled?: boolean;
+  visibility?: "public" | "invite_only";
+  status?: "draft" | "published" | "closed" | "cancelled" | "completed";
+  requires_approval?: boolean;
+  highlights?: string[];
+  included?: string[];
+  program?: ProgramDay[];
+  price_text?: string;
+  cancellation_reason?: string;
+}
+
 export const events = {
   publicEvent: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/`),
@@ -237,6 +259,20 @@ export const events = {
     apiFetch<RSVPRecord[]>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/`,
     ),
+  create: (workspaceSlug: string, payload: EventWritePayload) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/create/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  update: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: Partial<EventWritePayload>,
+  ) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/update/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const auth = {
