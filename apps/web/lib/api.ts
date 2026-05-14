@@ -121,6 +121,11 @@ export interface EventSummary {
   waitlist_count: number;
 }
 
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
 export interface Event extends EventSummary {
   description: string;
   meeting_point_text: string;
@@ -129,6 +134,14 @@ export interface Event extends EventSummary {
   requires_approval: boolean;
   highlights: string[];
   included: string[];
+  not_included: string[];
+  additional_cost_note: string;
+  difficulty_level: number; // 0 = unset; 1..5
+  difficulty_note: string;
+  transport_info: string;
+  accommodation_info: string;
+  gear_info: string;
+  faq: FaqItem[];
   program: ProgramDay[];
   price_text: string;
   enabled_questionnaire_sections: QuestionnaireSection[];
@@ -137,6 +150,7 @@ export interface Event extends EventSummary {
   workspace_accent_color: string;
   is_open_for_rsvp: boolean;
   is_at_capacity: boolean;
+  remaining_capacity: number | null;
   cancellation_reason: string;
   my_rsvp?: MyRSVP | null;
 }
@@ -292,6 +306,14 @@ export interface EventWritePayload {
   requires_approval?: boolean;
   highlights?: string[];
   included?: string[];
+  not_included?: string[];
+  additional_cost_note?: string;
+  difficulty_level?: number;
+  difficulty_note?: string;
+  transport_info?: string;
+  accommodation_info?: string;
+  gear_info?: string;
+  faq?: FaqItem[];
   program?: ProgramDay[];
   price_text?: string;
   enabled_questionnaire_sections?: QuestionnaireSection[];

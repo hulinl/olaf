@@ -139,6 +139,26 @@ export default async function EventLandingPage({ params }: Props) {
                 ZRUŠENO
               </span>
             )}
+            {!cancelled && event.is_open_for_rsvp && event.capacity != null && (
+              (() => {
+                const remaining = event.remaining_capacity ?? 0;
+                if (remaining === 0) {
+                  return (
+                    <span className="mb-4 inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
+                      VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
+                    </span>
+                  );
+                }
+                if (remaining <= 3) {
+                  return (
+                    <span className="mb-4 inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
+                      POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
+                    </span>
+                  );
+                }
+                return null;
+              })()
+            )}
             <h1 className="max-w-3xl bg-ink-900 px-3 py-2 text-3xl font-semibold leading-tight tracking-tight text-ink-inverse sm:text-5xl">
               {event.workspace_name.toUpperCase()} — {event.title.toUpperCase()}
             </h1>
@@ -250,20 +270,124 @@ export default async function EventLandingPage({ params }: Props) {
           </section>
         )}
 
-        {/* CO JE V CENĚ */}
-        {event.included.length > 0 && (
+        {/* CO JE V CENĚ + CO NENÍ V CENĚ */}
+        {(event.included.length > 0 || event.not_included.length > 0) && (
           <section className="border-t border-border">
+            <div className="mx-auto grid max-w-5xl gap-10 px-4 py-16 md:grid-cols-2">
+              {event.included.length > 0 && (
+                <div>
+                  <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
+                    CO JE V CENĚ
+                  </h2>
+                  <ul className="space-y-4 border-l-2 border-brand pl-6">
+                    {event.included.map((item, i) => (
+                      <li key={i} className="text-ink-900">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {event.not_included.length > 0 && (
+                <div>
+                  <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
+                    CO NENÍ V CENĚ
+                  </h2>
+                  <ul className="space-y-4 border-l-2 border-border-strong pl-6">
+                    {event.not_included.map((item, i) => (
+                      <li key={i} className="text-ink-700">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  {event.additional_cost_note && (
+                    <p className="mt-5 rounded-md border border-border bg-surface-muted/60 px-3 py-2 text-sm text-ink-700">
+                      <strong>Odhad navíc:</strong> {event.additional_cost_note}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* NÁROČNOST */}
+        {(event.difficulty_level > 0 || event.difficulty_note) && (
+          <section className="border-t border-border bg-surface-muted/40">
             <div className="mx-auto max-w-5xl px-4 py-16">
               <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                CO JE V CENĚ
+                NÁROČNOST
               </h2>
-              <ul className="space-y-4 border-l-2 border-brand pl-6">
-                {event.included.map((item, i) => (
-                  <li key={i} className="text-ink-900">
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              {event.difficulty_level > 0 && (
+                <div className="mb-5 flex items-baseline gap-4">
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <span
+                        key={n}
+                        className={[
+                          "h-8 w-8 rounded-md border flex items-center justify-center text-sm font-semibold",
+                          n <= event.difficulty_level
+                            ? "bg-brand border-brand text-brand-ink"
+                            : "bg-surface border-border text-ink-300",
+                        ].join(" ")}
+                      >
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-sm text-ink-500">
+                    {event.difficulty_level} z 5
+                  </span>
+                </div>
+              )}
+              {event.difficulty_note && (
+                <p className="max-w-2xl text-ink-700">{event.difficulty_note}</p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* DOPRAVA / UBYTOVÁNÍ / VÝBAVA */}
+        {(event.transport_info ||
+          event.accommodation_info ||
+          event.gear_info) && (
+          <section className="border-t border-border">
+            <div className="mx-auto max-w-5xl px-4 py-16">
+              <h2 className="mb-8 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
+                PRAKTICKÉ INFO
+              </h2>
+              <div className="grid gap-6 sm:grid-cols-3">
+                {event.transport_info && (
+                  <div>
+                    <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900">
+                      Doprava
+                    </h3>
+                    <p className="mt-2 whitespace-pre-line text-ink-700">
+                      {event.transport_info}
+                    </p>
+                  </div>
+                )}
+                {event.accommodation_info && (
+                  <div>
+                    <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900">
+                      Ubytování a strava
+                    </h3>
+                    <p className="mt-2 whitespace-pre-line text-ink-700">
+                      {event.accommodation_info}
+                    </p>
+                  </div>
+                )}
+                {event.gear_info && (
+                  <div>
+                    <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900">
+                      Výbava
+                    </h3>
+                    <p className="mt-2 whitespace-pre-line text-ink-700">
+                      {event.gear_info}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}
@@ -285,6 +409,29 @@ export default async function EventLandingPage({ params }: Props) {
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* FAQ */}
+        {event.faq.length > 0 && (
+          <section className="border-t border-border bg-surface-muted/40">
+            <div className="mx-auto max-w-3xl px-4 py-16">
+              <h2 className="mb-8 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
+                ČASTÉ DOTAZY
+              </h2>
+              <dl className="space-y-6">
+                {event.faq.map((f, i) => (
+                  <div key={i}>
+                    <dt className="text-base font-semibold text-ink-900">
+                      {f.question}
+                    </dt>
+                    <dd className="mt-2 whitespace-pre-line text-ink-700">
+                      {f.answer}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           </section>
         )}

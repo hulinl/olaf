@@ -47,7 +47,23 @@ class EventAdmin(admin.ModelAdmin):
             "Questionnaire",
             {"fields": ("enabled_questionnaire_sections",)},
         ),
-        ("Sections (lists)", {"fields": ("highlights", "included", "program")}),
+        (
+            "Sections (lists)",
+            {"fields": ("highlights", "included", "not_included", "program", "faq")},
+        ),
+        (
+            "Additional info",
+            {
+                "fields": (
+                    "additional_cost_note",
+                    "difficulty_level",
+                    "difficulty_note",
+                    "transport_info",
+                    "accommodation_info",
+                    "gear_info",
+                )
+            },
+        ),
         (
             "When + where",
             {

@@ -160,6 +160,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     )
     is_open_for_rsvp = serializers.BooleanField(read_only=True)
     is_at_capacity = serializers.BooleanField(read_only=True)
+    remaining_capacity = serializers.IntegerField(read_only=True)
 
     enabled_questionnaire_sections = serializers.SerializerMethodField()
 
@@ -183,6 +184,14 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "requires_approval",
             "highlights",
             "included",
+            "not_included",
+            "additional_cost_note",
+            "difficulty_level",
+            "difficulty_note",
+            "transport_info",
+            "accommodation_info",
+            "gear_info",
+            "faq",
             "program",
             "price_text",
             "enabled_questionnaire_sections",
@@ -193,6 +202,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "confirmed_count",
             "is_open_for_rsvp",
             "is_at_capacity",
+            "remaining_capacity",
             "cancellation_reason",
             "created_at",
         )
@@ -327,6 +337,14 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "requires_approval",
             "highlights",
             "included",
+            "not_included",
+            "additional_cost_note",
+            "difficulty_level",
+            "difficulty_note",
+            "transport_info",
+            "accommodation_info",
+            "gear_info",
+            "faq",
             "program",
             "price_text",
             "enabled_questionnaire_sections",
@@ -342,6 +360,27 @@ class EventWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Neznámá sekce: {bad}. Povolené: {sorted(valid_keys)}."
             )
+        return value
+
+    def validate_difficulty_level(self, value):
+        if value not in (0, 1, 2, 3, 4, 5):
+            raise serializers.ValidationError(
+                "Náročnost musí být v rozsahu 0-5 (0 = nezadáno)."
+            )
+        return value
+
+    def validate_faq(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("FAQ musí být seznam.")
+        for i, item in enumerate(value):
+            if not isinstance(item, dict):
+                raise serializers.ValidationError(
+                    f"FAQ položka {i} musí být objekt."
+                )
+            if "question" not in item or "answer" not in item:
+                raise serializers.ValidationError(
+                    f"FAQ položka {i} musí mít pole 'question' a 'answer'."
+                )
         return value
 
     def validate(self, attrs):
