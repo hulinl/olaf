@@ -18,12 +18,63 @@ export interface User {
   phone: string;
   dob: string | null;
   avatar_blob_id: string;
+  address: string;
+  // Activity & performance
   fitness_level: "" | "beginner" | "intermediate" | "advanced";
+  fitness_note: string;
+  pace_10k: string;
+  weekly_km: number | null;
+  longest_run: string;
   sport_tags: string[];
   bio: string;
+  // Diet
+  diet: "" | "omnivore" | "vegetarian" | "vegan" | "other";
+  diet_note: string;
+  // Apparel
+  tshirt_size: string;
+  // Emergency
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+  // System
   email_verified: boolean;
   date_joined: string;
 }
+
+export type QuestionnaireSection =
+  | "tshirt_size"
+  | "diet"
+  | "fitness"
+  | "health_notes"
+  | "emergency_contact"
+  | "photo_consent";
+
+export const QUESTIONNAIRE_SECTION_ORDER: QuestionnaireSection[] = [
+  "tshirt_size",
+  "diet",
+  "fitness",
+  "health_notes",
+  "emergency_contact",
+  "photo_consent",
+];
+
+export const QUESTIONNAIRE_SECTION_LABELS: Record<QuestionnaireSection, string> = {
+  tshirt_size: "Velikost trika",
+  diet: "Strava a alergie",
+  fitness: "Kondice a výkonnost",
+  health_notes: "Zdravotní poznámky",
+  emergency_contact: "Emergency kontakt",
+  photo_consent: "Souhlas s fotkami",
+};
+
+export const QUESTIONNAIRE_SECTION_HINTS: Record<QuestionnaireSection, string> = {
+  tshirt_size: "Pro akce, kde rozdáváš tričko.",
+  diet: "Strava a alergie z profilu + per-event poznámka.",
+  fitness: "Fitness level, 10K time, týdenní km, nejdelší běh — pro řízení tempa.",
+  health_notes: "Citlivé info — uchováno 90 dní po akci.",
+  emergency_contact: "Důležité pro outdoor akce.",
+  photo_consent: "GDPR best practice.",
+};
 
 export interface Workspace {
   slug: string;
@@ -80,6 +131,7 @@ export interface Event extends EventSummary {
   included: string[];
   program: ProgramDay[];
   price_text: string;
+  enabled_questionnaire_sections: QuestionnaireSection[];
   workspace_name: string;
   workspace_logo_url: string | null;
   workspace_accent_color: string;
@@ -90,15 +142,24 @@ export interface Event extends EventSummary {
 }
 
 export interface RSVPAnswers {
-  tshirt_size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
-  diet: "omnivore" | "vegetarian" | "vegan" | "other";
+  // Tshirt section
+  tshirt_size?: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  // Diet section
+  diet?: "omnivore" | "vegetarian" | "vegan" | "other";
   diet_note?: string;
-  fitness_level: "beginner" | "intermediate" | "advanced";
+  // Fitness section (expanded)
+  fitness_level?: "beginner" | "intermediate" | "advanced";
   fitness_note?: string;
+  pace_10k?: string;
+  weekly_km?: number | null;
+  longest_run?: string;
+  // Health section
   health_notes?: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  photo_consent: boolean;
+  // Emergency
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  // Photo
+  photo_consent?: boolean;
 }
 
 export interface RSVPAccount {
@@ -233,6 +294,7 @@ export interface EventWritePayload {
   included?: string[];
   program?: ProgramDay[];
   price_text?: string;
+  enabled_questionnaire_sections?: QuestionnaireSection[];
   cancellation_reason?: string;
 }
 
@@ -307,6 +369,11 @@ export const auth = {
       method: "POST",
     }),
   me: () => apiFetch<User>("/api/auth/me/"),
+  updateMe: (patch: Partial<User>) =>
+    apiFetch<User>("/api/auth/me/", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
   requestPasswordReset: (email: string) =>
     apiFetch<{ detail: string }>("/api/auth/password/reset/request/", {
       method: "POST",

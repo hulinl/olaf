@@ -109,11 +109,21 @@ def logout_view(request: Request) -> Response:
     return Response({"detail": "Logged out."})
 
 
-@api_view(["GET"])
+@api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def me(request: Request) -> Response:
-    """Return the current authenticated user."""
-    return Response(UserSerializer(request.user).data)
+    """Return or update the current authenticated user.
+
+    PATCH respects the serializer's read_only fields (id, email,
+    email_verified, date_joined cannot be changed here).
+    """
+    if request.method == "GET":
+        return Response(UserSerializer(request.user).data)
+
+    serializer = UserSerializer(request.user, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
 
 
 @api_view(["GET"])

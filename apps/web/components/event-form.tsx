@@ -10,6 +10,10 @@ import {
   type Event as OlafEvent,
   type EventWritePayload,
   type ProgramDay,
+  QUESTIONNAIRE_SECTION_HINTS,
+  QUESTIONNAIRE_SECTION_LABELS,
+  QUESTIONNAIRE_SECTION_ORDER,
+  type QuestionnaireSection,
 } from "@/lib/api";
 
 interface Props {
@@ -97,6 +101,10 @@ export function EventForm({
     initial?.program ?? [],
   );
 
+  const [enabledSections, setEnabledSections] = useState<QuestionnaireSection[]>(
+    initial?.enabled_questionnaire_sections ?? [...QUESTIONNAIRE_SECTION_ORDER],
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,6 +157,7 @@ export function EventForm({
         program: program.filter(
           (d) => d.day.trim() || d.title.trim() || d.body.trim(),
         ),
+        enabled_questionnaire_sections: enabledSections,
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -448,6 +457,51 @@ export function EventForm({
                 </div>
               )}
             </div>
+          </div>
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">
+            Co chceš na přihlášce
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Vyber, které sekce přihlašovacího formuláře se účastníkům
+            zobrazí. Stabilní údaje (kondice, dieta, tričko, emergency
+            kontakt) se předvyplní z jejich profilu.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-2">
+            {QUESTIONNAIRE_SECTION_ORDER.map((section) => {
+              const checked = enabledSections.includes(section);
+              return (
+                <label
+                  key={section}
+                  className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setEnabledSections((prev) =>
+                        prev.includes(section)
+                          ? prev.filter((s) => s !== section)
+                          : [...prev, section],
+                      )
+                    }
+                    className="mt-0.5 size-4 accent-brand"
+                  />
+                  <span className="flex flex-col">
+                    <span className="font-medium text-ink-900">
+                      {QUESTIONNAIRE_SECTION_LABELS[section]}
+                    </span>
+                    <span className="text-xs text-ink-500">
+                      {QUESTIONNAIRE_SECTION_HINTS[section]}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </CardSection>
       </Card>
