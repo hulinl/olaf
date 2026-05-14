@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Logo } from "@/components/ui/logo";
+import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { assetUrl, type Event } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -109,12 +110,7 @@ export default async function EventLandingPage({ params }: Props) {
             )}
             <span className="text-sm font-medium">{event.workspace_name}</span>
           </Link>
-          <Link
-            href="/"
-            className="text-sm text-ink-500 transition-colors hover:text-ink-900"
-          >
-            <Logo size={20} />
-          </Link>
+          <PublicAuthIndicator />
         </div>
       </header>
 
