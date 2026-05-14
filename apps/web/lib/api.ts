@@ -37,6 +37,10 @@ export interface Workspace {
   visibility: "public" | "unlisted" | "private";
   default_tz: string;
   created_at: string;
+  /** Present on /workspaces/mine/ + /workspaces/{slug}/detail/ for auth'd members. */
+  my_role?: "owner" | null;
+  /** Present on /workspaces/{slug}/detail/. */
+  member_count?: number;
 }
 
 export interface ProgramDay {
@@ -203,6 +207,10 @@ export async function apiFetch<T>(
 export const workspaces = {
   byPublicSlug: (slug: string) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/`),
+  detail: (slug: string) =>
+    apiFetch<Workspace>(`/api/workspaces/${slug}/detail/`),
+  eventsFor: (slug: string) =>
+    apiFetch<EventSummary[]>(`/api/workspaces/${slug}/events/`),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
 };
 
