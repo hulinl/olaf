@@ -39,6 +39,93 @@ export interface Workspace {
   created_at: string;
 }
 
+export interface ProgramDay {
+  day: string;
+  title: string;
+  body: string;
+}
+
+export interface EventSummary {
+  slug: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  tz: string;
+  location_text: string;
+  cover_url: string | null;
+  capacity: number | null;
+  status:
+    | "draft"
+    | "published"
+    | "closed"
+    | "cancelled"
+    | "completed";
+  visibility: "public" | "invite_only";
+  workspace_slug: string;
+  confirmed_count: number;
+  waitlist_count: number;
+}
+
+export interface Event extends EventSummary {
+  description: string;
+  meeting_point_text: string;
+  location_url: string;
+  waitlist_enabled: boolean;
+  requires_approval: boolean;
+  highlights: string[];
+  included: string[];
+  program: ProgramDay[];
+  price_text: string;
+  workspace_name: string;
+  workspace_logo_url: string | null;
+  workspace_accent_color: string;
+  is_open_for_rsvp: boolean;
+  is_at_capacity: boolean;
+  cancellation_reason: string;
+  my_rsvp?: MyRSVP | null;
+}
+
+export interface RSVPAnswers {
+  tshirt_size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  diet: "omnivore" | "vegetarian" | "vegan" | "other";
+  diet_note?: string;
+  fitness_level: "beginner" | "intermediate" | "advanced";
+  fitness_note?: string;
+  health_notes?: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  photo_consent: boolean;
+}
+
+export interface RSVPAccount {
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+}
+
+export interface MyRSVP {
+  id: number;
+  status:
+    | "yes"
+    | "maybe"
+    | "no"
+    | "waitlist"
+    | "pending_approval"
+    | "cancelled";
+  questionnaire_answers: RSVPAnswers | Record<string, never>;
+  waitlist_position: number | null;
+  created_at: string;
+}
+
+export interface RSVPRecord extends MyRSVP {
+  user_email: string;
+  user_full_name: string;
+  user_phone: string;
+  attended: boolean | null;
+  updated_at: string;
+}
+
 export class ApiError extends Error {
   status: number;
   data: Record<string, unknown>;
@@ -117,6 +204,31 @@ export const workspaces = {
   byPublicSlug: (slug: string) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/`),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
+};
+
+export const events = {
+  publicEvent: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/`),
+  rsvp: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: { answers: RSVPAnswers; account?: RSVPAccount },
+  ) =>
+    apiFetch<MyRSVP>(`/api/events/${workspaceSlug}/${eventSlug}/rsvp/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  cancelMyRsvp: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<MyRSVP>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/cancel/`,
+      { method: "POST" },
+    ),
+  mine: () => apiFetch<EventSummary[]>("/api/events/mine/"),
+  owner: () => apiFetch<EventSummary[]>("/api/events/owner/"),
+  rsvpList: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<RSVPRecord[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/`,
+    ),
 };
 
 export const auth = {

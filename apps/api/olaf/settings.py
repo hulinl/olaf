@@ -4,10 +4,13 @@ Django settings for the OLAF backend.
 Single-file settings for V1; split into base/local/prod once we have a real
 production deploy.
 """
+import sys
 from pathlib import Path
 
 import dj_database_url
 import environ
+
+TESTING = "test" in sys.argv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -151,6 +154,10 @@ CELERY_RESULT_BACKEND = "django-db"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
+# In tests, run tasks synchronously so mail.outbox + DB assertions just work.
+if TESTING:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

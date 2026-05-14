@@ -1,6 +1,7 @@
-"""Event model — the unit of "something happening at a time and place" (PRD §4.5)."""
+"""Event + RSVP models (PRD §4.5, §4.6, §8)."""
+from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from workspaces.managers import TenantScopedModel
@@ -106,6 +107,39 @@ class Event(TenantScopedModel):
     )
     cancellation_reason = models.TextField(blank=True)
 
+    # V1 simplification (per shipping path): camp-specific structured copy
+    # the public landing page renders without a rich-text editor or a per-event
+    # questionnaire builder. Free-form lists; the frontend renders bullets.
+    highlights = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            'Bullet list of "what we\'ll focus on" (e.g. ["technika běhu", '
+            '"regenerace", "výživa", "výbava"]).'
+        ),
+    )
+    included = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Bullet list of what's included in the price "
+            '(["3 noci ubytování", "tréninky", "fotky", "snídaně + večeře"]).'
+        ),
+    )
+    program = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Day-by-day program for the public landing page. Each entry is "
+            '{"day": "Čtvrtek", "title": "Příjezd", "body": "Přijeď..."}.'
+        ),
+    )
+    price_text = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='Free-form price string for the landing page, e.g. "2 450 Kč".',
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -131,3 +165,159 @@ class Event(TenantScopedModel):
     @property
     def is_open_for_rsvp(self) -> bool:
         return self.status == self.STATUS_PUBLISHED
+
+    @property
+    def confirmed_rsvp_count(self) -> int:
+        return self.rsvps.filter(status=RSVP.STATUS_YES).count()
+
+    @property
+    def waitlist_count(self) -> int:
+        return self.rsvps.filter(status=RSVP.STATUS_WAITLIST).count()
+
+    @property
+    def is_at_capacity(self) -> bool:
+        if self.capacity is None:
+            return False
+        return self.confirmed_rsvp_count >= self.capacity
+
+
+class RSVP(models.Model):
+    """A participant's registration for an event (PRD §4.6)."""
+
+    STATUS_YES = "yes"
+    STATUS_MAYBE = "maybe"
+    STATUS_NO = "no"
+    STATUS_WAITLIST = "waitlist"
+    STATUS_PENDING_APPROVAL = "pending_approval"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_YES, "Confirmed"),
+        (STATUS_MAYBE, "Maybe"),
+        (STATUS_NO, "Declined"),
+        (STATUS_WAITLIST, "On waitlist"),
+        (STATUS_PENDING_APPROVAL, "Pending creator approval"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="rsvps"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="rsvps",
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_YES
+    )
+    questionnaire_answers = models.JSONField(default=dict, blank=True)
+    waitlist_position = models.PositiveIntegerField(null=True, blank=True)
+    attended = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Set by the Creator after the event.",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_rsvp"
+        ordering = ["created_at"]
+        unique_together = [("event", "user")]
+        indexes = [
+            models.Index(fields=["event", "status"]),
+            models.Index(fields=["event", "status", "waitlist_position"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} → {self.event.slug} ({self.status})"
+
+    # ---- waitlist mechanics -------------------------------------------------
+
+    @classmethod
+    @transaction.atomic
+    def create_for_event(
+        cls,
+        *,
+        event: Event,
+        user,
+        questionnaire_answers: dict,
+    ) -> "RSVP":
+        """Create or update an RSVP applying capacity + waitlist rules.
+
+        Returns the (created or updated) RSVP. Callers can check `rsvp.status`
+        to decide whether the participant is confirmed, waitlisted, or pending.
+        """
+        # Lock the event row to serialise capacity decisions across concurrent
+        # registrations.
+        locked_event = Event.objects.select_for_update().get(pk=event.pk)
+
+        # A brand-new RSVP starts in a placeholder state so that is_at_capacity
+        # doesn't accidentally count *this* RSVP as confirmed.
+        rsvp, created = cls.objects.select_for_update().get_or_create(
+            event=locked_event,
+            user=user,
+            defaults={
+                "questionnaire_answers": questionnaire_answers,
+                "status": cls.STATUS_NO,
+            },
+        )
+        rsvp.questionnaire_answers = questionnaire_answers
+        previous_status = rsvp.status if not created else None
+
+        if locked_event.requires_approval:
+            rsvp.status = cls.STATUS_PENDING_APPROVAL
+            rsvp.waitlist_position = None
+        elif previous_status == cls.STATUS_YES:
+            # Already confirmed; idempotent re-submit just refreshes answers.
+            rsvp.waitlist_position = None
+        elif previous_status == cls.STATUS_WAITLIST:
+            # Keep them on the waitlist at their current position.
+            pass
+        elif locked_event.is_at_capacity and locked_event.waitlist_enabled:
+            rsvp.status = cls.STATUS_WAITLIST
+            rsvp.waitlist_position = cls._next_waitlist_position(locked_event)
+        elif locked_event.is_at_capacity and not locked_event.waitlist_enabled:
+            raise ValidationError(
+                "Event is at capacity and waitlist is disabled."
+            )
+        else:
+            rsvp.status = cls.STATUS_YES
+            rsvp.waitlist_position = None
+
+        rsvp.save()
+        return rsvp
+
+    @staticmethod
+    def _next_waitlist_position(event: Event) -> int:
+        last = (
+            RSVP.objects.filter(event=event, status=RSVP.STATUS_WAITLIST)
+            .order_by("-waitlist_position")
+            .values_list("waitlist_position", flat=True)
+            .first()
+        )
+        return (last or 0) + 1
+
+    @transaction.atomic
+    def cancel(self) -> None:
+        """Cancel this RSVP and FIFO-promote the head of the waitlist."""
+        if self.status == self.STATUS_CANCELLED:
+            return
+
+        was_confirmed = self.status == self.STATUS_YES
+        self.status = self.STATUS_CANCELLED
+        self.waitlist_position = None
+        self.save(update_fields=["status", "waitlist_position", "updated_at"])
+
+        if was_confirmed and self.event.waitlist_enabled:
+            head = (
+                RSVP.objects.select_for_update()
+                .filter(event=self.event, status=self.STATUS_WAITLIST)
+                .order_by("waitlist_position")
+                .first()
+            )
+            if head is not None:
+                head.status = self.STATUS_YES
+                head.waitlist_position = None
+                head.save(update_fields=["status", "waitlist_position", "updated_at"])
+                # Email fan-out lives in the view layer; we return None here.

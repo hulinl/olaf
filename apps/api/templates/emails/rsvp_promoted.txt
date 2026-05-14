@@ -1,0 +1,14 @@
+Hi {{ user.first_name }},
+
+Great news — a spot opened up at "{{ event.title }}" and you've been promoted from the waitlist. You're now confirmed.
+
+Event page:
+  {{ event_url }}
+
+{% if event.starts_at %}When: {{ event.starts_at|date:"l, j F Y, H:i" }}{% endif %}{% if event.location_text %}
+Where: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
+Meeting point: {{ event.meeting_point_text }}{% endif %}
+
+If you can no longer make it, please open the event page and cancel your RSVP so the next person on the waitlist gets a chance.
+
+— {{ workspace.name }} via olaf

@@ -1,0 +1,17 @@
+Hi {{ user.first_name }},
+
+{% if status == 'yes' %}You're confirmed for "{{ event.title }}". See you there.
+{% elif status == 'waitlist' %}You're on the waitlist for "{{ event.title }}". We'll email you as soon as a spot opens up.
+{% elif status == 'pending_approval' %}Your registration for "{{ event.title }}" is pending {{ workspace.name }}'s approval — you'll hear back shortly.
+{% else %}Your RSVP for "{{ event.title }}" was recorded.
+{% endif %}
+Event page:
+  {{ event_url }}
+
+{% if event.starts_at %}When: {{ event.starts_at|date:"l, j F Y, H:i" }}{% endif %}{% if event.location_text %}
+Where: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
+Meeting point: {{ event.meeting_point_text }}{% endif %}
+
+You can review your registration anytime by visiting the event page above. If anything changes (or you need to cancel), just open the page and update your RSVP.
+
+— {{ workspace.name }} via olaf
