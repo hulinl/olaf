@@ -564,6 +564,106 @@ class ConfigurableQuestionnaireTests(TestCase):
             {"tshirt_size": "L", "photo_consent": True},
         )
 
+    def _make_owner_and_applicant(self):
+        owner = User.objects.create_user(
+            email="owner@example.com", password="pass-abcdef-1234",
+            first_name="O", last_name="Wner", email_verified=True,
+        )
+        WorkspaceMember.objects.create(
+            workspace=self.ws, user=owner, role=WorkspaceMember.ROLE_OWNER
+        )
+        applicant = User.objects.create_user(
+            email="a@example.com", password="pass-abcdef-1234",
+            first_name="A", last_name="One", email_verified=True,
+        )
+        return owner, applicant
+
+    def test_owner_can_approve_pending_rsvp(self) -> None:
+        self.event.requires_approval = True
+        self.event.save()
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.assertEqual(rsvp.status, RSVP.STATUS_PENDING_APPROVAL)
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-approve",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        rsvp.refresh_from_db()
+        self.assertEqual(rsvp.status, RSVP.STATUS_YES)
+
+    def test_owner_can_reject_pending_rsvp(self) -> None:
+        self.event.requires_approval = True
+        self.event.save()
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-reject",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        rsvp.refresh_from_db()
+        self.assertEqual(rsvp.status, RSVP.STATUS_CANCELLED)
+
+    def test_approve_not_pending_returns_400(self) -> None:
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.assertEqual(rsvp.status, RSVP.STATUS_YES)
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-approve",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_owner_blocked_from_approve(self) -> None:
+        outsider = User.objects.create_user(
+            email="x@example.com", password="pass-abcdef-1234",
+            first_name="X", last_name="Y", email_verified=True,
+        )
+        _, applicant = self._make_owner_and_applicant()
+        self.event.requires_approval = True
+        self.event.save()
+        # Re-fetch RSVP via the applicant who needs pending status.
+        RSVP.objects.filter(event=self.event, user=applicant).delete()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.client.force_authenticate(outsider)
+        url = reverse(
+            "events:rsvp-approve",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_event_payload_exposes_effective_sections(self) -> None:
         self.event.enabled_questionnaire_sections = ["tshirt_size", "diet"]
         self.event.save()
