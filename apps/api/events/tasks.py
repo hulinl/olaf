@@ -3,8 +3,12 @@ from __future__ import annotations
 
 from celery import shared_task
 
-from .emails import send_rsvp_confirmation, send_waitlist_promotion
-from .models import RSVP
+from .emails import (
+    send_event_cancellation,
+    send_rsvp_confirmation,
+    send_waitlist_promotion,
+)
+from .models import RSVP, Event
 
 
 @shared_task(name="events.send_rsvp_confirmation")
@@ -27,3 +31,17 @@ def send_waitlist_promotion_task(rsvp_id: int) -> None:
     except RSVP.DoesNotExist:
         return
     send_waitlist_promotion(rsvp)
+
+
+@shared_task(name="events.fan_out_event_cancellation")
+def fan_out_event_cancellation_task(event_id: int, reason: str = "") -> None:
+    """Send cancellation email to every active RSVP for an event."""
+    try:
+        event = Event.objects.select_related("workspace").get(pk=event_id)
+    except Event.DoesNotExist:
+        return
+    affected = event.rsvps.select_related("user").exclude(
+        status__in=[RSVP.STATUS_NO, RSVP.STATUS_CANCELLED]
+    )
+    for rsvp in affected:
+        send_event_cancellation(rsvp, reason)

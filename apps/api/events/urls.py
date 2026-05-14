@@ -23,6 +23,11 @@ urlpatterns = [
         name="update",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/cancel/",
+        views.cancel_event,
+        name="cancel",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/",
         views.rsvp_event,
         name="rsvp",

@@ -403,3 +403,86 @@ class CreateUpdateEventTests(TestCase):
         )
         resp = self.client.patch(url, {"title": "Hack"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CancelEventTests(TestCase):
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.ws = Workspace.objects.create(slug="olafadventures", name="Olaf Adventures")
+        self.event = _build_event(self.ws)
+        self.owner = User.objects.create_user(
+            email="owner@example.com", password="pass-abcdef-1234",
+            first_name="O", last_name="Wner", email_verified=True,
+        )
+        WorkspaceMember.objects.create(
+            workspace=self.ws, user=self.owner, role=WorkspaceMember.ROLE_OWNER
+        )
+        # Two RSVPs to fan-out to
+        u1 = User.objects.create_user(
+            email="p1@example.com", password="pass-abcdef-1234",
+            first_name="P", last_name="One", email_verified=True,
+        )
+        u2 = User.objects.create_user(
+            email="p2@example.com", password="pass-abcdef-1234",
+            first_name="P", last_name="Two", email_verified=True,
+        )
+        RSVP.create_for_event(event=self.event, user=u1, questionnaire_answers={})
+        RSVP.create_for_event(event=self.event, user=u2, questionnaire_answers={})
+        # One declined RSVP that should NOT receive the cancellation email
+        u3 = User.objects.create_user(
+            email="p3@example.com", password="pass-abcdef-1234",
+            first_name="P", last_name="Three", email_verified=True,
+        )
+        RSVP.objects.create(
+            event=self.event, user=u3, status=RSVP.STATUS_NO,
+            questionnaire_answers={},
+        )
+        self.url = reverse(
+            "events:cancel",
+            kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+        )
+
+    def test_owner_can_cancel_with_reason(self) -> None:
+        mail.outbox.clear()
+        self.client.force_authenticate(self.owner)
+        resp = self.client.post(
+            self.url, {"reason": "Storm coming in."}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, Event.STATUS_CANCELLED)
+        self.assertEqual(self.event.cancellation_reason, "Storm coming in.")
+        # 2 active RSVPs got emailed, the 'no' RSVP did not
+        self.assertEqual(len(mail.outbox), 2)
+        recipients = {m.to[0] for m in mail.outbox}
+        self.assertEqual(recipients, {"p1@example.com", "p2@example.com"})
+        for m in mail.outbox:
+            self.assertIn("Cancelled", m.subject)
+            self.assertIn("Storm coming in", m.body)
+
+    def test_cancel_without_reason_still_works(self) -> None:
+        mail.outbox.clear()
+        self.client.force_authenticate(self.owner)
+        resp = self.client.post(self.url, {}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_non_owner_blocked_from_cancel(self) -> None:
+        outsider = User.objects.create_user(
+            email="x@example.com", password="pass-abcdef-1234",
+            first_name="X", last_name="Y", email_verified=True,
+        )
+        self.client.force_authenticate(outsider)
+        resp = self.client.post(self.url, {"reason": "no"}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_double_cancel_idempotent(self) -> None:
+        self.client.force_authenticate(self.owner)
+        self.client.post(self.url, {"reason": "first"}, format="json")
+        mail.outbox.clear()
+        resp = self.client.post(self.url, {"reason": "second"}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.event.refresh_from_db()
+        # Reason from first cancel sticks; no second fan-out.
+        self.assertEqual(self.event.cancellation_reason, "first")
+        self.assertEqual(len(mail.outbox), 0)
