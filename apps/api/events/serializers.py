@@ -5,31 +5,126 @@ from rest_framework import serializers
 
 from .models import RSVP, Event
 
-# Hardcoded V1 questionnaire field set (per shipping path + camp reference).
-# Frontend renders these as the registration form; backend validates the
-# submitted payload has the expected shape.
+# Max-set questionnaire fields. Owner picks which sections appear on RSVP via
+# Event.enabled_questionnaire_sections; serializer below validates dynamically.
 
 T_SHIRT_SIZES = ("XS", "S", "M", "L", "XL", "XXL")
 DIET_OPTIONS = ("omnivore", "vegetarian", "vegan", "other")
 FITNESS_OPTIONS = ("beginner", "intermediate", "advanced")
 
-REQUIRED_ANSWER_KEYS = {
-    "tshirt_size",
-    "diet",
-    "fitness_level",
-    "emergency_contact_name",
-    "emergency_contact_phone",
-    "photo_consent",
+# Section → list of question keys that section covers.
+SECTION_FIELDS: dict[str, list[str]] = {
+    "tshirt_size": ["tshirt_size"],
+    "diet": ["diet", "diet_note"],
+    "fitness": [
+        "fitness_level",
+        "fitness_note",
+        "pace_10k",
+        "weekly_km",
+        "longest_run",
+    ],
+    "health_notes": ["health_notes"],
+    "emergency_contact": [
+        "emergency_contact_name",
+        "emergency_contact_phone",
+    ],
+    "photo_consent": ["photo_consent"],
 }
 
 
+def build_questionnaire_serializer(enabled_sections: list[str]):
+    """Return a Serializer class that validates only the enabled sections.
+
+    Fields outside enabled sections are silently dropped from the payload so a
+    stale client posting full data doesn't get rejected, but their values are
+    not persisted.
+    """
+
+    enabled = set(enabled_sections or list(SECTION_FIELDS.keys()))
+    allowed_fields: set[str] = set()
+    for s, fields in SECTION_FIELDS.items():
+        if s in enabled:
+            allowed_fields.update(fields)
+
+    class _Dynamic(serializers.Serializer):
+        # Define all fields; we'll trim in __init__.
+        tshirt_size = serializers.ChoiceField(
+            choices=T_SHIRT_SIZES, required=False, allow_blank=True
+        )
+        diet = serializers.ChoiceField(
+            choices=DIET_OPTIONS, required=False, allow_blank=True
+        )
+        diet_note = serializers.CharField(
+            max_length=400, required=False, allow_blank=True
+        )
+        fitness_level = serializers.ChoiceField(
+            choices=FITNESS_OPTIONS, required=False, allow_blank=True
+        )
+        fitness_note = serializers.CharField(
+            max_length=500, required=False, allow_blank=True
+        )
+        pace_10k = serializers.CharField(
+            max_length=20, required=False, allow_blank=True
+        )
+        weekly_km = serializers.IntegerField(
+            required=False, allow_null=True, min_value=0
+        )
+        longest_run = serializers.CharField(
+            max_length=50, required=False, allow_blank=True
+        )
+        health_notes = serializers.CharField(
+            max_length=1000, required=False, allow_blank=True
+        )
+        emergency_contact_name = serializers.CharField(
+            max_length=200, required=False, allow_blank=True
+        )
+        emergency_contact_phone = serializers.CharField(
+            max_length=30, required=False, allow_blank=True
+        )
+        photo_consent = serializers.BooleanField(required=False, default=False)
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            for key in list(self.fields.keys()):
+                if key not in allowed_fields:
+                    self.fields.pop(key)
+                    continue
+                # Make section-required fields required again.
+                if key in {
+                    "tshirt_size",
+                    "diet",
+                    "fitness_level",
+                    "emergency_contact_name",
+                    "emergency_contact_phone",
+                    "photo_consent",
+                }:
+                    self.fields[key].required = True
+                    if hasattr(self.fields[key], "allow_blank"):
+                        self.fields[key].allow_blank = False
+
+        def validate(self, attrs):
+            if (
+                "diet" in allowed_fields
+                and attrs.get("diet") == "other"
+                and not attrs.get("diet_note")
+            ):
+                raise serializers.ValidationError(
+                    {"diet_note": 'Při volbě „Jiné" prosím doplň poznámku.'}
+                )
+            return attrs
+
+    return _Dynamic
+
+
 class QuestionnaireAnswersSerializer(serializers.Serializer):
-    """Validates the JSONB payload stored on RSVP.questionnaire_answers."""
+    """Backward-compat: legacy serializer used by some tests. Validates all
+    fields as required. New code should call build_questionnaire_serializer().
+    """
 
     tshirt_size = serializers.ChoiceField(choices=T_SHIRT_SIZES)
     diet = serializers.ChoiceField(choices=DIET_OPTIONS)
     diet_note = serializers.CharField(
-        max_length=200, required=False, allow_blank=True
+        max_length=400, required=False, allow_blank=True
     )
     fitness_level = serializers.ChoiceField(choices=FITNESS_OPTIONS)
     fitness_note = serializers.CharField(
@@ -45,7 +140,7 @@ class QuestionnaireAnswersSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs.get("diet") == "other" and not attrs.get("diet_note"):
             raise serializers.ValidationError(
-                {"diet_note": 'Please describe your diet when selecting "Other".'}
+                {"diet_note": 'Při volbě „Jiné" prosím doplň poznámku.'}
             )
         return attrs
 
@@ -65,6 +160,8 @@ class EventPublicSerializer(serializers.ModelSerializer):
     )
     is_open_for_rsvp = serializers.BooleanField(read_only=True)
     is_at_capacity = serializers.BooleanField(read_only=True)
+
+    enabled_questionnaire_sections = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -88,6 +185,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "included",
             "program",
             "price_text",
+            "enabled_questionnaire_sections",
             "workspace_slug",
             "workspace_name",
             "workspace_logo_url",
@@ -107,6 +205,9 @@ class EventPublicSerializer(serializers.ModelSerializer):
         if obj.workspace.logo:
             return obj.workspace.logo.url
         return None
+
+    def get_enabled_questionnaire_sections(self, obj: Event) -> list[str]:
+        return obj.effective_questionnaire_sections
 
 
 class EventSummarySerializer(serializers.ModelSerializer):
@@ -145,16 +246,22 @@ class EventSummarySerializer(serializers.ModelSerializer):
 class RSVPCreateSerializer(serializers.Serializer):
     """Anonymous or authenticated registration submission.
 
-    If anonymous, the embedded `account` block is used to create a verified
-    light-registration user before applying RSVP rules.
+    Pass `event_sections=[...]` in context for dynamic field validation.
+    Falls back to the legacy serializer if no sections supplied.
     """
 
-    answers = QuestionnaireAnswersSerializer()
-    # Anonymous flow — light registration.
+    answers = serializers.DictField()
     account = serializers.DictField(
         child=serializers.CharField(allow_blank=True),
         required=False,
     )
+
+    def validate_answers(self, value):
+        enabled = (self.context or {}).get("event_sections")
+        validator_cls = build_questionnaire_serializer(enabled or list(SECTION_FIELDS.keys()))
+        inner = validator_cls(data=value)
+        inner.is_valid(raise_exception=True)
+        return inner.validated_data
 
 
 class RSVPSerializer(serializers.ModelSerializer):
@@ -222,8 +329,20 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "included",
             "program",
             "price_text",
+            "enabled_questionnaire_sections",
             "cancellation_reason",
         )
+
+    def validate_enabled_questionnaire_sections(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Musí být seznam.")
+        valid_keys = set(SECTION_FIELDS.keys())
+        bad = [v for v in value if v not in valid_keys]
+        if bad:
+            raise serializers.ValidationError(
+                f"Neznámá sekce: {bad}. Povolené: {sorted(valid_keys)}."
+            )
+        return value
 
     def validate(self, attrs):
         starts = attrs.get("starts_at") or getattr(self.instance, "starts_at", None)

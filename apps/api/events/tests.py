@@ -486,3 +486,95 @@ class CancelEventTests(TestCase):
         # Reason from first cancel sticks; no second fan-out.
         self.assertEqual(self.event.cancellation_reason, "first")
         self.assertEqual(len(mail.outbox), 0)
+
+
+class ConfigurableQuestionnaireTests(TestCase):
+    """Owner picks which sections appear on RSVP; serializer validates only those."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.ws = Workspace.objects.create(slug="olafadventures", name="OA")
+        self.event = _build_event(self.ws)
+
+    def _rsvp_url(self) -> str:
+        return reverse(
+            "events:rsvp",
+            kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+        )
+
+    def test_default_event_requires_all_sections(self) -> None:
+        # No sections configured = all enabled = full set required.
+        resp = self.client.post(
+            self._rsvp_url(),
+            {
+                "answers": {"tshirt_size": "M"},
+                "account": {
+                    "email": "p@example.com",
+                    "first_name": "P", "last_name": "One",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_minimal_sections_let_rsvp_through(self) -> None:
+        # Only photo_consent required.
+        self.event.enabled_questionnaire_sections = ["photo_consent"]
+        self.event.save()
+        resp = self.client.post(
+            self._rsvp_url(),
+            {
+                "answers": {"photo_consent": True},
+                "account": {
+                    "email": "p@example.com",
+                    "first_name": "P", "last_name": "One",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
+        # Disabled fields not stored.
+        rsvp = RSVP.objects.get(user__email="p@example.com")
+        self.assertEqual(rsvp.questionnaire_answers, {"photo_consent": True})
+
+    def test_disabled_fields_in_payload_silently_dropped(self) -> None:
+        self.event.enabled_questionnaire_sections = ["tshirt_size", "photo_consent"]
+        self.event.save()
+        resp = self.client.post(
+            self._rsvp_url(),
+            {
+                "answers": {
+                    "tshirt_size": "L",
+                    "photo_consent": True,
+                    # These shouldn't be persisted:
+                    "diet": "vegan",
+                    "health_notes": "secret",
+                },
+                "account": {
+                    "email": "p@example.com",
+                    "first_name": "P", "last_name": "One",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
+        rsvp = RSVP.objects.get(user__email="p@example.com")
+        self.assertEqual(
+            rsvp.questionnaire_answers,
+            {"tshirt_size": "L", "photo_consent": True},
+        )
+
+    def test_event_payload_exposes_effective_sections(self) -> None:
+        self.event.enabled_questionnaire_sections = ["tshirt_size", "diet"]
+        self.event.save()
+        resp = self.client.get(
+            reverse(
+                "events:public",
+                kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+            )
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            resp.json()["enabled_questionnaire_sections"],
+            ["tshirt_size", "diet"],
+        )

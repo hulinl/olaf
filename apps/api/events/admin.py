@@ -43,6 +43,10 @@ class EventAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("workspace", "title", "slug", "status", "visibility")}),
         ("Landing content", {"fields": ("description", "cover", "price_text")}),
+        (
+            "Questionnaire",
+            {"fields": ("enabled_questionnaire_sections",)},
+        ),
         ("Sections (lists)", {"fields": ("highlights", "included", "program")}),
         (
             "When + where",

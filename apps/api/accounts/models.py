@@ -47,6 +47,46 @@ class User(AbstractBaseUser, PermissionsMixin):
     sport_tags = models.JSONField(default=list, blank=True)
     bio = models.TextField(blank=True)
 
+    # Performance metrics (used by RSVP forms for prefill).
+    pace_10k = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text='Čas na 10 km na rovince, např. "55:00".',
+    )
+    weekly_km = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Průměrný týdenní objem v km."
+    )
+    longest_run = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='Nejdelší souvislý běh, např. "21 km", "půlmaraton".',
+    )
+    fitness_note = models.TextField(
+        blank=True,
+        help_text="Krátká poznámka — cíl na sezónu, oblíbený typ běhání, …",
+    )
+
+    # Diet (used by RSVP forms for prefill).
+    DIET_OMNIVORE = "omnivore"
+    DIET_VEGETARIAN = "vegetarian"
+    DIET_VEGAN = "vegan"
+    DIET_OTHER = "other"
+    DIET_CHOICES = [
+        (DIET_OMNIVORE, "Omnivore"),
+        (DIET_VEGETARIAN, "Vegetarian"),
+        (DIET_VEGAN, "Vegan"),
+        (DIET_OTHER, "Other"),
+    ]
+    diet = models.CharField(max_length=20, choices=DIET_CHOICES, blank=True)
+    diet_note = models.TextField(blank=True, help_text="Alergie, intolerance, …")
+
+    # Apparel (used by RSVP forms for prefill).
+    tshirt_size = models.CharField(
+        max_length=8,
+        blank=True,
+        help_text="XS / S / M / L / XL / XXL",
+    )
+
     # Workspace context — which workspace is the user currently "in".
     # Multi-workspace switching is V1.5; in V1 this defaults to the user's
     # only workspace (if any).

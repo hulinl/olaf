@@ -132,7 +132,10 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    serializer = RSVPCreateSerializer(data=request.data)
+    serializer = RSVPCreateSerializer(
+        data=request.data,
+        context={"event_sections": event.effective_questionnaire_sections},
+    )
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 

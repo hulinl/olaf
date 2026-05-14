@@ -68,9 +68,25 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "dob",
             "avatar_blob_id",
+            "address",
+            # Activity & performance
             "fitness_level",
+            "fitness_note",
+            "pace_10k",
+            "weekly_km",
+            "longest_run",
             "sport_tags",
             "bio",
+            # Diet
+            "diet",
+            "diet_note",
+            # Apparel
+            "tshirt_size",
+            # Emergency contact
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "emergency_contact_relationship",
+            # System
             "email_verified",
             "date_joined",
         )

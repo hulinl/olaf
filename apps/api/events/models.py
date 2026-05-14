@@ -140,6 +140,32 @@ class Event(TenantScopedModel):
         help_text='Free-form price string for the landing page, e.g. "2 450 Kč".',
     )
 
+    # Configurable RSVP questionnaire — which max-set sections appear on the
+    # RSVP form. Owner picks per-event. Empty default = all enabled for
+    # backwards compat with existing events.
+    QUESTIONNAIRE_SECTION_TSHIRT = "tshirt_size"
+    QUESTIONNAIRE_SECTION_DIET = "diet"
+    QUESTIONNAIRE_SECTION_FITNESS = "fitness"
+    QUESTIONNAIRE_SECTION_HEALTH = "health_notes"
+    QUESTIONNAIRE_SECTION_EMERGENCY = "emergency_contact"
+    QUESTIONNAIRE_SECTION_PHOTO = "photo_consent"
+    QUESTIONNAIRE_SECTIONS_ALL = [
+        QUESTIONNAIRE_SECTION_TSHIRT,
+        QUESTIONNAIRE_SECTION_DIET,
+        QUESTIONNAIRE_SECTION_FITNESS,
+        QUESTIONNAIRE_SECTION_HEALTH,
+        QUESTIONNAIRE_SECTION_EMERGENCY,
+        QUESTIONNAIRE_SECTION_PHOTO,
+    ]
+    enabled_questionnaire_sections = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Which questionnaire sections appear on this event's RSVP form. "
+            "Empty list = all sections enabled (backwards compat)."
+        ),
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -165,6 +191,13 @@ class Event(TenantScopedModel):
     @property
     def is_open_for_rsvp(self) -> bool:
         return self.status == self.STATUS_PUBLISHED
+
+    @property
+    def effective_questionnaire_sections(self) -> list[str]:
+        """Empty list defaults to all sections enabled."""
+        if not self.enabled_questionnaire_sections:
+            return list(self.QUESTIONNAIRE_SECTIONS_ALL)
+        return list(self.enabled_questionnaire_sections)
 
     @property
     def confirmed_rsvp_count(self) -> int:
