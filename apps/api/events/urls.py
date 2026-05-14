@@ -42,4 +42,14 @@ urlpatterns = [
         views.event_rsvps,
         name="rsvps",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/approve/",
+        views.approve_rsvp,
+        name="rsvp-approve",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/reject/",
+        views.reject_rsvp,
+        name="rsvp-reject",
+    ),
 ]

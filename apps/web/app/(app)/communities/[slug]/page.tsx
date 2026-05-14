@@ -324,12 +324,20 @@ function EventCard({
             )}
           </div>
           {showStatus && (
-            <Link
-              href={`/communities/${workspaceSlug}/events/${event.slug}/edit`}
-              className="text-xs text-ink-500 hover:text-ink-900"
-            >
-              Upravit
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/communities/${workspaceSlug}/events/${event.slug}/rsvps`}
+                className="text-xs text-ink-500 hover:text-ink-900"
+              >
+                Přihlášení
+              </Link>
+              <Link
+                href={`/communities/${workspaceSlug}/events/${event.slug}/edit`}
+                className="text-xs text-ink-500 hover:text-ink-900"
+              >
+                Upravit
+              </Link>
+            </div>
           )}
         </div>
       </CardSection>

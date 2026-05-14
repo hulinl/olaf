@@ -327,6 +327,81 @@ def cancel_event(
     return Response(EventPublicSerializer(event).data)
 
 
+def _owner_event_or_403(request, workspace_slug: str, event_slug: str):
+    """Resolve event + verify owner. Returns (event, None) on success or (None, Response)."""
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return None, Response(status=status.HTTP_404_NOT_FOUND)
+    if not is_workspace_owner(request.user, event.workspace):
+        return None, Response(status=status.HTTP_403_FORBIDDEN)
+    return event, None
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def approve_rsvp(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Approve a pending_approval RSVP — moves to yes, or waitlist if full."""
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        rsvp = RSVP.objects.select_related("user").get(pk=rsvp_id, event=event)
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if rsvp.status != RSVP.STATUS_PENDING_APPROVAL:
+        return Response(
+            {"detail": "RSVP není ve stavu pending_approval."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Capacity-aware: if at capacity AND waitlist enabled, send to waitlist.
+    if event.is_at_capacity and event.waitlist_enabled:
+        rsvp.status = RSVP.STATUS_WAITLIST
+        rsvp.waitlist_position = RSVP._next_waitlist_position(event)
+    elif event.is_at_capacity:
+        return Response(
+            {"detail": "Akce je naplněná a waitlist není povolený."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    else:
+        rsvp.status = RSVP.STATUS_YES
+        rsvp.waitlist_position = None
+    rsvp.save(update_fields=["status", "waitlist_position", "updated_at"])
+
+    send_rsvp_confirmation_task.delay(rsvp.pk)
+    return Response(RSVPSerializer(rsvp).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def reject_rsvp(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Reject a pending_approval RSVP — moves to cancelled."""
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        rsvp = RSVP.objects.get(pk=rsvp_id, event=event)
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if rsvp.status != RSVP.STATUS_PENDING_APPROVAL:
+        return Response(
+            {"detail": "RSVP není ve stavu pending_approval."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    rsvp.cancel()
+    return Response(RSVPSerializer(rsvp).data)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Response:

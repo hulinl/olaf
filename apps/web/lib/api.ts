@@ -340,6 +340,16 @@ export const events = {
       method: "POST",
       body: JSON.stringify({ reason }),
     }),
+  approveRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
+    apiFetch<RSVPRecord>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/approve/`,
+      { method: "POST" },
+    ),
+  rejectRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
+    apiFetch<RSVPRecord>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,
+      { method: "POST" },
+    ),
 };
 
 export const auth = {
