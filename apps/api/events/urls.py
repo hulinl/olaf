@@ -8,9 +8,19 @@ urlpatterns = [
     path("mine/", views.my_events, name="mine"),
     path("owner/", views.owner_events, name="owner"),
     path(
+        "<slug:workspace_slug>/create/",
+        views.create_event,
+        name="create",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/",
         views.public_event,
         name="public",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/update/",
+        views.update_event,
+        name="update",
     ),
     path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/",

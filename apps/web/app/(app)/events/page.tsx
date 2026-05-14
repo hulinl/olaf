@@ -62,8 +62,8 @@ export default function EventsPage() {
               Tvoje akce
             </h1>
             <p className="mt-2 max-w-xl text-ink-500">
-              Eventy ve workspaces, kde jsi Owner. Zatím se nové eventy
-              vytvářejí v Django admin — UI pro Owner tvorbu přijde brzy.
+              Akce ve workspaces, kde jsi Owner. Klikni na konkrétní komunitu
+              pro detail a tvorbu nových akcí.
             </p>
           </div>
         </header>
@@ -84,16 +84,16 @@ export default function EventsPage() {
                   Žádné akce zatím
                 </h2>
                 <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                  Až vytvoříš první event (v Django adminu), uvidíš ho tady
-                  spolu s počtem přihlášených.
+                  Vytvoř první akci v některé ze svých komunit a uvidíš ji
+                  tady spolu s počtem přihlášených.
                 </p>
                 <LinkButton
-                  href="http://localhost:8000/admin/events/event/add/"
+                  href="/communities"
                   variant="secondary"
                   size="md"
                   className="mt-5"
                 >
-                  Otevřít Django admin
+                  Otevřít komunity
                 </LinkButton>
               </div>
             </CardSection>

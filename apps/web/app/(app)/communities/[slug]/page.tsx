@@ -165,7 +165,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
             </LinkButton>
             {isOwner && (
               <LinkButton
-                href="http://localhost:8000/admin/events/event/add/"
+                href={`/communities/${workspace.slug}/events/new`}
                 variant="primary"
                 size="md"
               >
@@ -202,7 +202,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
             </h2>
             {isOwner && upcoming.length > 0 && (
               <LinkButton
-                href="http://localhost:8000/admin/events/event/add/"
+                href={`/communities/${workspace.slug}/events/new`}
                 variant="ghost"
                 size="md"
               >
@@ -219,12 +219,12 @@ export default function WorkspaceDetailPage({ params }: Props) {
                   </h3>
                   <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
                     {isOwner
-                      ? "Vytvoř event v Django adminu a uvidíš ho tady."
+                      ? "Vytvoř první akci a uvidíš ji tady."
                       : "Tato komunita zatím neplánuje žádnou veřejnou akci."}
                   </p>
                   {isOwner && (
                     <LinkButton
-                      href="http://localhost:8000/admin/events/event/add/"
+                      href={`/communities/${workspace.slug}/events/new`}
                       variant="primary"
                       size="md"
                       className="mt-5"
@@ -278,6 +278,7 @@ function EventCard({
 }: {
   event: EventSummary;
   workspaceSlug: string;
+  /** Owner view? Shows status label + edit link. */
   showStatus: boolean;
 }) {
   const starts = new Date(event.starts_at);
@@ -290,7 +291,7 @@ function EventCard({
               {STATUS_LABELS[event.status]}
             </span>
           )}
-          <span className={showStatus ? "text-xs text-ink-500" : "text-xs text-ink-500"}>
+          <span className="text-xs text-ink-500">
             {starts.toLocaleDateString("cs-CZ", {
               day: "numeric",
               month: "short",
@@ -309,15 +310,26 @@ function EventCard({
         {event.location_text && (
           <p className="mt-1 text-sm text-ink-500">{event.location_text}</p>
         )}
-        <div className="mt-4 flex items-baseline gap-4 text-sm">
-          <span className="text-ink-900">
-            <strong>{event.confirmed_count}</strong>
-            {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
-          </span>
-          {event.waitlist_count > 0 && (
-            <span className="text-ink-500">
-              +{event.waitlist_count} waitlist
+        <div className="mt-4 flex items-baseline justify-between gap-3 text-sm">
+          <div className="flex items-baseline gap-4">
+            <span className="text-ink-900">
+              <strong>{event.confirmed_count}</strong>
+              {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
+              přihlášeno
             </span>
+            {event.waitlist_count > 0 && (
+              <span className="text-ink-500">
+                +{event.waitlist_count} waitlist
+              </span>
+            )}
+          </div>
+          {showStatus && (
+            <Link
+              href={`/communities/${workspaceSlug}/events/${event.slug}/edit`}
+              className="text-xs text-ink-500 hover:text-ink-900"
+            >
+              Upravit
+            </Link>
           )}
         </div>
       </CardSection>
