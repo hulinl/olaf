@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>olaf — Brand Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #000000;
+    --canvas: #ffffff;
+    --amber: #ffc719;
+    --rule: #dcdcdc;
+    --muted: #6b6359;
+    --paper: #fafaf7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 88px 80px;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--rule);
+    page-break-after: always;
+  }
+  .page:last-child { border-bottom: none; }
+  .page.amber  { background: var(--amber); color: var(--ink); }
+  .page.ink    { background: var(--ink);    color: var(--canvas); }
+  .page.ink .muted { color: #999; }
+  .page.ink .rule  { border-color: #2a2a2a; }
+  .page.ink .label { color: #999; }
+
+  /* Section number + label */
+  .section-head {
+    display: flex; align-items: baseline; gap: 14px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 56px;
+  }
+  .page.ink .section-head { border-bottom-color: #2a2a2a; }
+  .section-num {
+    font-family: "Geist Mono", monospace;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .section-title {
+    font-size: 38px; font-weight: 600; letter-spacing: -0.025em;
+    margin: 0; line-height: 1;
+  }
+  .lead {
+    font-size: 19px; line-height: 1.55; max-width: 640px;
+    color: var(--ink); font-weight: 400;
+    letter-spacing: -0.005em;
+    margin-bottom: 56px;
+  }
+  .page.ink .lead { color: #ddd; }
+  .body p { font-size: 15px; color: #1a1a1a; max-width: 620px; line-height: 1.6; }
+  .page.ink .body p { color: #ccc; }
+  .body p + p { margin-top: 16px; }
+  .body strong { font-weight: 600; color: var(--ink); }
+  .page.ink .body strong { color: #fff; }
+  code, .mono { font-size: 0.95em; }
+  .body code { background: #f3f1ec; padding: 2px 6px; border-radius: 4px; font-family: "Geist Mono", monospace; font-size: 13px; }
+  .page.ink .body code { background: #1f1f1f; color: #ddd; }
+  .muted { color: var(--muted); }
+  .label {
+    font-family: "Geist Mono", monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* Cover */
+  .cover {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 88px 80px;
+    background: var(--canvas);
+    position: relative;
+  }
+  .cover .meta-top {
+    display: flex; justify-content: space-between;
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cover .mark-block {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    gap: 28px; align-items: flex-start;
+  }
+  .cover h1 {
+    font-size: 92px; font-weight: 600; letter-spacing: -0.04em;
+    margin: 0; line-height: 0.95;
+  }
+  .cover .subtitle {
+    font-size: 22px; color: var(--muted); font-weight: 400;
+    letter-spacing: -0.01em; max-width: 540px;
+  }
+  .cover .meta-bottom {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cover .meta-bottom .tag { display: flex; gap: 28px; }
+
+  /* TOC */
+  .toc { list-style: none; padding: 0; margin: 0; }
+  .toc li {
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 17px;
+  }
+  .toc li:last-child { border-bottom: none; }
+  .toc .n {
+    font-family: "Geist Mono", monospace; font-size: 12px;
+    color: var(--muted); flex: 0 0 36px;
+  }
+  .toc .t { flex: 1; font-weight: 500; }
+  .toc .pg {
+    font-family: "Geist Mono", monospace; font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Big hero blocks */
+  .hero-mark {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 80px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+  }
+  .hero-mark.dark { background: var(--ink); border-color: transparent; }
+  .hero-mark.amber { background: var(--amber); border-color: transparent; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+  .cell {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 36px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 14px;
+    min-height: 200px;
+    justify-content: center;
+  }
+  .cell.dark { background: var(--ink); border-color: transparent; color: #fff; }
+  .cell.amber { background: var(--amber); border-color: transparent; }
+  .cell .caption {
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cell.dark .caption { color: #888; }
+  .cell.amber .caption { color: rgba(0,0,0,0.6); }
+
+  /* Color swatches */
+  .palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .swatch { border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+  .swatch .chip { height: 220px; }
+  .swatch .info {
+    padding: 18px 20px;
+    background: var(--canvas);
+    border-top: 1px solid var(--rule);
+  }
+  .swatch .info .role {
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .swatch .info .name { font-weight: 600; font-size: 17px; margin-bottom: 14px; }
+  .swatch .info .codes {
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    color: #1a1a1a; line-height: 1.7;
+  }
+  .swatch .info .codes span { color: var(--muted); display: inline-block; width: 36px; }
+
+  /* Type spec */
+  .type-block { border-top: 1px solid var(--rule); padding: 36px 0; }
+  .type-block:first-child { padding-top: 0; border-top: none; }
+  .type-block .sample { font-family: "Geist", sans-serif; color: var(--ink); }
+  .type-spec {
+    display: flex; gap: 36px; margin-top: 16px;
+    font-family: "Geist Mono", monospace; font-size: 12px;
+    color: var(--muted);
+  }
+  .type-spec b { color: var(--ink); font-weight: 500; }
+
+  /* Clear space diagram */
+  .clearspace {
+    position: relative;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 60px;
+    display: flex; justify-content: center; align-items: center;
+  }
+  .clearspace .frame {
+    position: relative;
+    padding: 64px;
+    outline: 1px dashed #c4bdb1;
+  }
+  .clearspace .inner {
+    padding: 32px;
+    outline: 1px dashed var(--amber);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .clearspace .annotation {
+    position: absolute;
+    font-family: "Geist Mono", monospace;
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  /* Min-size scale */
+  .min-size { display: flex; align-items: flex-end; gap: 36px; padding: 40px 0; flex-wrap: wrap; }
+  .min-size .step { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .min-size .step .px {
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 0.1em;
+  }
+
+  /* Do/Don't grid */
+  .rules { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .rule {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 28px;
+  }
+  .rule .tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: "Geist Mono", monospace; font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 4px;
+    margin-bottom: 18px;
+  }
+  .rule .tag.do { background: var(--amber); color: var(--ink); }
+  .rule .tag.dont { background: var(--ink); color: var(--canvas); }
+  .rule .visual {
+    background: var(--canvas);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 36px;
+    display: flex; justify-content: center; align-items: center;
+    height: 160px;
+    margin-bottom: 14px;
+  }
+  .rule .visual.dont { position: relative; }
+  .rule .visual.dont::after {
+    content: '';
+    position: absolute; inset: 12px;
+    background: linear-gradient(135deg, transparent 49%, rgba(200,30,30,0.5) 49%, rgba(200,30,30,0.5) 51%, transparent 51%);
+    pointer-events: none;
+  }
+  .rule p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* Token table */
+  table.tokens {
+    width: 100%; border-collapse: collapse;
+    font-family: "Geist Mono", monospace; font-size: 13px;
+  }
+  table.tokens th, table.tokens td {
+    text-align: left; padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.tokens th {
+    font-family: "Geist", sans-serif;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+  }
+  table.tokens .chip-mini {
+    display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+    vertical-align: middle; margin-right: 10px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+  }
+
+  /* Header running across pages */
+  .pageframe {
+    display: flex; justify-content: space-between;
+    font-family: "Geist Mono", monospace; font-size: 10px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 56px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .page.ink .pageframe { border-bottom-color: #2a2a2a; color: #777; }
+
+  /* App icon row */
+  .icon-row { display: flex; gap: 28px; align-items: flex-end; flex-wrap: wrap; }
+  .icon-row .item { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .icon-row .item .px {
+    font-family: "Geist Mono", monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 0.08em;
+  }
+
+  @media print {
+    body { background: white; }
+    .page, .cover { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<div id="root"></div>
+
+<script type="text/babel" src="logos.jsx"></script>
+
+<script type="text/babel">
+
+// ─── DON'T variants — for the rules page ─────────────────────────────────
+function MarkRotated({ size = 100, tone = 'black' }) {
+  return <div style={{ transform: 'rotate(15deg)' }}><MarkB1 size={size} tone={tone} /></div>;
+}
+function MarkStretched({ size = 100, tone = 'black' }) {
+  return <div style={{ transform: 'scaleX(1.4)' }}><MarkB1 size={size} tone={tone} /></div>;
+}
+function MarkOnGradient({ size = 100 }) {
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #ff6b6b, #4ecdc4)', padding: 20, borderRadius: 8 }}>
+      <MarkB1 size={size} />
+    </div>
+  );
+}
+function MarkRecolored({ size = 100 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="44" fill="none" stroke="#e91e63" strokeWidth="6" />
+      <circle cx="64" cy="34" r="6.5" fill="#00bcd4" />
+      <polyline points="22,68 38,48 47,58 62,38 78,68" fill="none" stroke="#9c27b0" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── Pages ────────────────────────────────────────────────────────────────
+
+function Cover() {
+  return (
+    <div className="cover">
+      <div className="meta-top">
+        <span>olaf · brand manual</span>
+        <span>v1.0 · 2026-05-16</span>
+      </div>
+      <div className="mark-block">
+        <MarkB1 size={180} />
+        <h1>olaf<span style={{color:'var(--amber)'}}>.</span></h1>
+        <div className="subtitle">A community-and-event platform for adventure organisers, sports communities, and corporate hosts.</div>
+      </div>
+      <div className="meta-bottom">
+        <div className="tag">
+          <span>brand v1</span>
+          <span>internal</span>
+        </div>
+        <span>where adventures begin</span>
+      </div>
+    </div>
+  );
+}
+
+function TOC() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>02 — contents</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">00 / Contents</div>
+          <h2 className="section-title">What's in here</h2>
+        </div>
+      </div>
+      <ol className="toc">
+        <li><span className="n">01</span><span className="t">Brand essence</span><span className="pg">p. 04</span></li>
+        <li><span className="n">02</span><span className="t">The mark</span><span className="pg">p. 05</span></li>
+        <li><span className="n">03</span><span className="t">Construction & geometry</span><span className="pg">p. 06</span></li>
+        <li><span className="n">04</span><span className="t">Clear space & minimum size</span><span className="pg">p. 07</span></li>
+        <li><span className="n">05</span><span className="t">Lockups</span><span className="pg">p. 08</span></li>
+        <li><span className="n">06</span><span className="t">Colour</span><span className="pg">p. 09</span></li>
+        <li><span className="n">07</span><span className="t">Typography</span><span className="pg">p. 10</span></li>
+        <li><span className="n">08</span><span className="t">App icon & favicon</span><span className="pg">p. 11</span></li>
+        <li><span className="n">09</span><span className="t">Surface states</span><span className="pg">p. 12</span></li>
+        <li><span className="n">10</span><span className="t">Do's & don'ts</span><span className="pg">p. 13</span></li>
+        <li><span className="n">11</span><span className="t">Voice</span><span className="pg">p. 14</span></li>
+        <li><span className="n">12</span><span className="t">Design tokens</span><span className="pg">p. 15</span></li>
+      </ol>
+    </div>
+  );
+}
+
+function Essence() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>01 — essence</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">01 / Essence</div>
+          <h2 className="section-title">What olaf is</h2>
+        </div>
+      </div>
+      <p className="lead">olaf is one place to plan a journey and live it together — communities, events, gear lists, GPX, waivers, reminders, all in a tool small enough to feel personal.</p>
+      <div className="body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
+        <div>
+          <div className="label">Promise</div>
+          <p>Great events happen when a tight-knit crew shares both the planning <em>and</em> the journey. olaf gives organisers one trusted tool, and members one place to be ready.</p>
+        </div>
+        <div>
+          <div className="label">Tone</div>
+          <p>Calm. Practical. Hand-built. We are not a marketing platform; we are the kit you check before you leave the trailhead. Quiet competence beats noisy enthusiasm.</p>
+        </div>
+        <div>
+          <div className="label">Heritage</div>
+          <p>olaf is the platform that grew from <strong>Olaf Adventures</strong> — an outdoor community built around real treks, not spreadsheets. The mark carries that origin forward.</p>
+        </div>
+        <div>
+          <div className="label">Tagline</div>
+          <p style={{ fontSize: 19, fontWeight: 500, color: 'var(--ink)' }}>Where adventures begin.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarkPage() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>02 — the mark</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">02 / The mark</div>
+          <h2 className="section-title">A sunrise over the peak</h2>
+        </div>
+      </div>
+      <p className="lead">A sharp two-peak horizon inside an open circle, with an amber sun cresting over the higher peak. The literal reading of <em>where adventures begin</em>.</p>
+      <div className="hero-mark"><MarkB1 size={360} /></div>
+      <div className="body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, marginTop: 32 }}>
+        <div>
+          <div className="label">What it says</div>
+          <p>The <strong>open ring</strong> is a window — not a wall. olaf is invite-warm, not gated. The <strong>peaks</strong> are the journey ahead. The <strong>amber sun</strong> is the moment a trip turns from plan into kit-on-your-back. Together: dawn, in one symbol.</p>
+        </div>
+        <div>
+          <div className="label">How it behaves</div>
+          <p>The mark is geometric, not illustrative. It is built from one circle, one polyline, and one filled dot — no gradients, no textures, no rendered light. It must read at <strong>16 px</strong> as crisply as at 360 px.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Construction() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>03 — construction</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">03 / Construction</div>
+          <h2 className="section-title">Geometry</h2>
+        </div>
+      </div>
+      <p className="lead">The mark lives in a 100×100 grid. Every element is locked to that grid so the symbol stays consistent at any rendered size.</p>
+      <div className="grid-2" style={{ alignItems: 'stretch' }}>
+        <div className="cell" style={{ padding: 50 }}>
+          <ConstructionDiagram />
+          <div className="caption">100 × 100 grid · ring r=44 · stroke 6</div>
+        </div>
+        <div style={{ padding: '0 8px' }}>
+          <div className="label">Specifications</div>
+          <table className="tokens">
+            <tbody>
+              <tr><th>Element</th><th>Value</th></tr>
+              <tr><td>Canvas</td><td>100 × 100</td></tr>
+              <tr><td>Ring centre</td><td>(50, 50)</td></tr>
+              <tr><td>Ring radius</td><td>44</td></tr>
+              <tr><td>Stroke width</td><td>6</td></tr>
+              <tr><td>Stroke caps</td><td>round, round join</td></tr>
+              <tr><td>Sun centre</td><td>(64, 34)</td></tr>
+              <tr><td>Sun radius</td><td>6.5</td></tr>
+              <tr><td>Peak path</td><td>22,68 → 38,48 → 47,58 → 62,38 → 78,68</td></tr>
+            </tbody>
+          </table>
+          <p className="muted" style={{ fontSize: 12, marginTop: 24, lineHeight: 1.6 }}>
+            The mark must always be redrawn from these coordinates — never warped or re-traced from a raster. Source SVG ships at <code style={{background:'#f3f1ec',padding:'1px 5px',borderRadius:3,fontFamily:'Geist Mono, monospace'}}>apps/web/components/ui/logo.tsx</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConstructionDiagram() {
+  return (
+    <svg width="320" height="320" viewBox="0 0 100 100">
+      {/* grid */}
+      <defs>
+        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+          <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#dcdcdc" strokeWidth="0.25" />
+        </pattern>
+      </defs>
+      <rect width="100" height="100" fill="url(#grid)" />
+      {/* construction guides */}
+      <circle cx="50" cy="50" r="44" fill="none" stroke="#dcdcdc" strokeWidth="0.4" strokeDasharray="1 1" />
+      <line x1="50" y1="0" x2="50" y2="100" stroke="#dcdcdc" strokeWidth="0.4" strokeDasharray="1 1" />
+      <line x1="0" y1="50" x2="100" y2="50" stroke="#dcdcdc" strokeWidth="0.4" strokeDasharray="1 1" />
+      {/* the mark itself */}
+      <circle cx="50" cy="50" r="44" fill="none" stroke="#000" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="64" cy="34" r="6.5" fill="#ffc719" />
+      <polyline points="22,68 38,48 47,58 62,38 78,68" fill="none" stroke="#000" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      {/* annotation dots */}
+      <circle cx="64" cy="34" r="0.8" fill="#c81e1e" />
+      <circle cx="50" cy="50" r="0.8" fill="#c81e1e" />
+    </svg>
+  );
+}
+
+function ClearSpace() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>04 — clear space</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">04 / Clear space & minimum size</div>
+          <h2 className="section-title">Breathing room</h2>
+        </div>
+      </div>
+      <p className="lead">Reserve a margin equal to <strong>one quarter of the ring diameter</strong> on all sides of the mark. Nothing — text, other logos, photographic edges — enters that zone.</p>
+
+      <div className="grid-2" style={{ alignItems: 'stretch', marginBottom: 56 }}>
+        <div className="clearspace">
+          <div className="frame">
+            <div className="inner">
+              <MarkB1 size={160} />
+            </div>
+            <span className="annotation" style={{ top: -24, left: 0 }}>¼ × Ø</span>
+            <span className="annotation" style={{ bottom: -24, right: 0, color: '#bf9700' }}>safety zone</span>
+          </div>
+        </div>
+        <div style={{ padding: '0 8px' }}>
+          <div className="label">Why</div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: '#1a1a1a', maxWidth: 'none' }}>
+            The mark is built around an open ring. If anything crowds that ring, the gesture of <em>openness</em> collapses and the symbol reads as just a generic badge.
+          </p>
+          <div className="label" style={{ marginTop: 28 }}>The rule, simply</div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: '#1a1a1a', maxWidth: 'none' }}>
+            If the mark is <strong>64 px</strong> wide, leave <strong>16 px</strong> of empty space on every side.
+          </p>
+        </div>
+      </div>
+
+      <div className="label">Minimum size</div>
+      <p style={{ fontSize: 14, color: '#1a1a1a', maxWidth: 620, marginBottom: 28 }}>
+        16 px is the floor for digital surfaces (favicon, tab bar). Below that the peaks fuse and the amber sun bleeds into the ring.
+      </p>
+      <div className="min-size">
+        <div className="step"><MarkB1 size={120} /><div className="px">120 px</div></div>
+        <div className="step"><MarkB1 size={72} /><div className="px">72 px</div></div>
+        <div className="step"><MarkB1 size={48} /><div className="px">48 px</div></div>
+        <div className="step"><MarkB1 size={32} /><div className="px">32 px</div></div>
+        <div className="step"><MarkB1 size={24} /><div className="px">24 px</div></div>
+        <div className="step"><MarkB1 size={16} /><div className="px">16 px · min</div></div>
+      </div>
+    </div>
+  );
+}
+
+function Lockups() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>05 — lockups</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">05 / Lockups</div>
+          <h2 className="section-title">Mark + wordmark</h2>
+        </div>
+      </div>
+      <p className="lead">The wordmark is <strong>always lowercase</strong>, set in Geist Sans 700 with -0.04em tracking. The horizontal lockup is the default; the stacked lockup is for square spaces.</p>
+
+      <div className="grid-2" style={{ marginBottom: 28 }}>
+        <div className="cell" style={{ padding: '48px 36px', minHeight: 220 }}>
+          <Lockup Mark={MarkB1} markSize={84} wordSize={66} gap={20} />
+          <div className="caption">Horizontal · primary</div>
+        </div>
+        <div className="cell" style={{ padding: '32px 36px', minHeight: 220 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <MarkB1 size={88} />
+            <Wordmark size={36} />
+          </div>
+          <div className="caption">Stacked · square spaces</div>
+        </div>
+      </div>
+
+      <div className="label" style={{ marginTop: 32 }}>Sizes</div>
+      <div className="cell" style={{ minHeight: 0, padding: '32px 40px', alignItems: 'flex-start', gap: 28 }}>
+        <Lockup Mark={MarkB1} markSize={64} wordSize={50} gap={16} />
+        <Lockup Mark={MarkB1} markSize={40} wordSize={32} gap={11} />
+        <Lockup Mark={MarkB1} markSize={28} wordSize={22} gap={9} />
+        <Lockup Mark={MarkB1} markSize={18} wordSize={14} gap={6} />
+        <div className="caption" style={{ marginTop: 8 }}>The lockup scales cleanly from 16 px to any size. Wordmark stays at ~78 % of the mark's height.</div>
+      </div>
+    </div>
+  );
+}
+
+function ColorPage() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>06 — colour</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">06 / Colour</div>
+          <h2 className="section-title">One accent. No gradients.</h2>
+        </div>
+      </div>
+      <p className="lead">Four tokens. Amber is the only colour with personality; everything else is structure. Amber is never decorative — it earns its place by carrying a primary action, a highlight, or the sun in the mark.</p>
+
+      <div className="palette">
+        <div className="swatch">
+          <div className="chip" style={{ background: '#000000' }}></div>
+          <div className="info">
+            <div className="role">Primary</div>
+            <div className="name">Ink</div>
+            <div className="codes">
+              <span>HEX</span> #000000<br/>
+              <span>RGB</span> 0 · 0 · 0<br/>
+              <span>USE</span> body text, strokes
+            </div>
+          </div>
+        </div>
+        <div className="swatch">
+          <div className="chip" style={{ background: '#ffffff', borderBottom: '1px solid var(--rule)' }}></div>
+          <div className="info">
+            <div className="role">Surface</div>
+            <div className="name">Canvas</div>
+            <div className="codes">
+              <span>HEX</span> #ffffff<br/>
+              <span>RGB</span> 255 · 255 · 255<br/>
+              <span>USE</span> light backgrounds
+            </div>
+          </div>
+        </div>
+        <div className="swatch">
+          <div className="chip" style={{ background: '#ffc719' }}></div>
+          <div className="info">
+            <div className="role">Accent</div>
+            <div className="name">Amber</div>
+            <div className="codes">
+              <span>HEX</span> #ffc719<br/>
+              <span>RGB</span> 255 · 199 · 25<br/>
+              <span>USE</span> CTAs, highlight only
+            </div>
+          </div>
+        </div>
+        <div className="swatch">
+          <div className="chip" style={{ background: '#dcdcdc' }}></div>
+          <div className="info">
+            <div className="role">Structure</div>
+            <div className="name">Rule</div>
+            <div className="codes">
+              <span>HEX</span> #dcdcdc<br/>
+              <span>RGB</span> 220 · 220 · 220<br/>
+              <span>USE</span> borders, dividers
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="body" style={{ marginTop: 48, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
+        <div>
+          <div className="label">Amber rules</div>
+          <p>On amber buttons, the text is <strong>black</strong> (encoded as <code>--brand-ink</code>). White on amber fails WCAG contrast. Amber is never used as a body-text colour, a large-area background for prose, or in a gradient.</p>
+        </div>
+        <div>
+          <div className="label">Contrast</div>
+          <p>Ink on Canvas: 21:1 ✓. Amber on Canvas (text): 1.97:1 ✗ — never use amber as text on white. Black on Amber: 10.7:1 ✓.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TypographyPage() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>07 — typography</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">07 / Typography</div>
+          <h2 className="section-title">Geist, only Geist</h2>
+        </div>
+      </div>
+      <p className="lead">One family for everything: <strong>Geist Sans</strong> for UI and prose, <strong>Geist Mono</strong> for labels, code, timestamps, and identifiers. No third typeface.</p>
+
+      <div className="type-block">
+        <div className="sample" style={{ fontSize: 92, fontWeight: 600, letterSpacing: '-0.035em', lineHeight: 1 }}>olaf</div>
+        <div className="type-spec">
+          <span><b>Wordmark</b></span>
+          <span>Geist Sans</span>
+          <span>700 · 92px · -0.04em · lowercase, always</span>
+        </div>
+      </div>
+
+      <div className="type-block">
+        <div className="sample" style={{ fontSize: 48, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1 }}>Where adventures begin</div>
+        <div className="type-spec">
+          <span><b>Display</b></span>
+          <span>Geist Sans</span>
+          <span>600 · 48px · -0.025em</span>
+        </div>
+      </div>
+
+      <div className="type-block">
+        <div className="sample" style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.01em', lineHeight: 1.35 }}>Pick a community, see what's coming up, RSVP, and arrive with the right gear.</div>
+        <div className="type-spec">
+          <span><b>Lead</b></span>
+          <span>Geist Sans</span>
+          <span>500 · 22px · -0.01em</span>
+        </div>
+      </div>
+
+      <div className="type-block">
+        <div className="sample" style={{ fontSize: 16, fontWeight: 400, lineHeight: 1.55 }}>Body copy lives at 16px in Geist Sans 400. Line-height stays at 1.55 for comfortable reading; tracking is the type's default. Plain, calm, technical-document register — olaf never sounds like a marketing landing page.</div>
+        <div className="type-spec">
+          <span><b>Body</b></span>
+          <span>Geist Sans</span>
+          <span>400 · 16px · 1.55 leading</span>
+        </div>
+      </div>
+
+      <div className="type-block">
+        <div className="sample mono" style={{ fontSize: 13, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Trail · 24 km · 1 400 m ↑ · 6 participants</div>
+        <div className="type-spec">
+          <span><b>Meta / labels</b></span>
+          <span>Geist Mono</span>
+          <span>500 · 13px · 0.12em · UPPERCASE</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppIcons() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>08 — app icon</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">08 / App icon & favicon</div>
+          <h2 className="section-title">On the home screen</h2>
+        </div>
+      </div>
+      <p className="lead">The canonical home-screen icon is white-on-ink. Squircle radius is 22.5 % of the icon side (iOS / Material parity). The mark occupies 62 % of the tile.</p>
+
+      <div className="grid-3" style={{ marginBottom: 36 }}>
+        <div className="cell"><AppIcon Mark={MarkB1} size={200} bg="#000" markTone="white" /><div className="caption">Canonical · on ink</div></div>
+        <div className="cell"><AppIcon Mark={MarkB1} size={200} bg="#fff" markTone="black" /><div className="caption">Light · on canvas</div></div>
+        <div className="cell"><AppIcon Mark={MarkB1} size={200} bg="#ffc719" markTone="black" /><div className="caption">Accent · on amber</div></div>
+      </div>
+
+      <div className="label">Favicon scale</div>
+      <div className="icon-row">
+        <div className="item"><AppIcon Mark={MarkB1} size={120} bg="#000" markTone="white" /><div className="px">512 px · PWA</div></div>
+        <div className="item"><AppIcon Mark={MarkB1} size={88} bg="#000" markTone="white" /><div className="px">192 px · Android</div></div>
+        <div className="item"><AppIcon Mark={MarkB1} size={56} bg="#000" markTone="white" /><div className="px">180 px · Apple touch</div></div>
+        <div className="item"><AppIcon Mark={MarkB1} size={32} bg="#000" markTone="white" /><div className="px">32 px · favicon</div></div>
+        <div className="item"><AppIcon Mark={MarkB1} size={16} bg="#000" markTone="white" /><div className="px">16 px · tab</div></div>
+      </div>
+    </div>
+  );
+}
+
+function SurfaceStates() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>09 — surface states</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">09 / Surface states</div>
+          <h2 className="section-title">On every brand surface</h2>
+        </div>
+      </div>
+      <p className="lead">The logo has three rendered states: ink-on-canvas (default), white-on-ink (dark mode, photo overlay), and ink-on-amber (the only chromatic state). No other combinations exist.</p>
+
+      <div className="grid-3">
+        <div className="hero-mark" style={{ padding: 48, margin: 0 }}>
+          <Lockup Mark={MarkB1} markSize={68} wordSize={54} gap={18} />
+        </div>
+        <div className="hero-mark dark" style={{ padding: 48, margin: 0 }}>
+          <Lockup Mark={MarkB1} markSize={68} wordSize={54} gap={18} tone="white" />
+        </div>
+        <div className="hero-mark amber" style={{ padding: 48, margin: 0 }}>
+          <Lockup Mark={MarkB1} markSize={68} wordSize={54} gap={18} />
+        </div>
+      </div>
+      <div className="grid-3" style={{ marginTop: 8 }}>
+        <div className="caption mono" style={{ color: 'var(--muted)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', textAlign: 'left' }}>on canvas · default</div>
+        <div className="caption mono" style={{ color: 'var(--muted)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', textAlign: 'left' }}>on ink · dark / photo</div>
+        <div className="caption mono" style={{ color: 'var(--muted)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', textAlign: 'left' }}>on amber · highlight</div>
+      </div>
+
+      <div className="body" style={{ marginTop: 48 }}>
+        <div className="label">Special note · on amber</div>
+        <p>When the mark sits on the amber background, the sun is rendered <strong>black</strong> (not white) — it merges with the rest of the geometry so the mark stays one-colour. This is the only context where the amber dot disappears.</p>
+      </div>
+    </div>
+  );
+}
+
+function DosDonts() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>10 — rules</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">10 / Do's & don'ts</div>
+          <h2 className="section-title">How to use the mark</h2>
+        </div>
+      </div>
+
+      <div className="rules">
+        <div className="rule">
+          <div className="tag do">Do · respect clear space</div>
+          <div className="visual"><MarkB1 size={90} /></div>
+          <p>Always leave ¼ ring-diameter of empty room on every side.</p>
+        </div>
+        <div className="rule">
+          <div className="tag dont">Don't · rotate</div>
+          <div className="visual dont"><MarkRotated size={90} /></div>
+          <p>The horizon line is horizontal. Never tilt the mark.</p>
+        </div>
+        <div className="rule">
+          <div className="tag do">Do · use approved surfaces</div>
+          <div className="visual" style={{ background: 'var(--ink)' }}><MarkB1 size={90} tone="white" /></div>
+          <p>Ink, canvas, or amber. Three states, end of list.</p>
+        </div>
+        <div className="rule">
+          <div className="tag dont">Don't · stretch or skew</div>
+          <div className="visual dont"><MarkStretched size={70} /></div>
+          <p>Always uniform scale. The ring is a circle, not an oval.</p>
+        </div>
+        <div className="rule">
+          <div className="tag do">Do · stand alone</div>
+          <div className="visual"><MarkB1 size={90} /></div>
+          <p>Give the mark its own space; never trap it inside another container.</p>
+        </div>
+        <div className="rule">
+          <div className="tag dont">Don't · recolour</div>
+          <div className="visual dont"><MarkRecolored size={90} /></div>
+          <p>The palette is the palette. No new colours, ever.</p>
+        </div>
+        <div className="rule">
+          <div className="tag do">Do · pair with Geist</div>
+          <div className="visual" style={{ background: 'var(--paper)' }}><Lockup Mark={MarkB1} markSize={56} wordSize={44} gap={14} /></div>
+          <p>The wordmark is lowercase Geist Sans 700. Always.</p>
+        </div>
+        <div className="rule">
+          <div className="tag dont">Don't · place over busy imagery</div>
+          <div className="visual dont"><MarkOnGradient size={90} /></div>
+          <p>No gradients, photographs, or textured backgrounds.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Voice() {
+  return (
+    <div className="page ink">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>11 — voice</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">11 / Voice</div>
+          <h2 className="section-title">How olaf speaks</h2>
+        </div>
+      </div>
+      <p className="lead" style={{ color: '#ddd' }}>Plain. Direct. A little wry. We are competent friends who organise good trips, not a marketing department.</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, marginTop: 24 }}>
+        <div>
+          <div className="label" style={{ color: '#ffc719' }}>WE SOUND LIKE</div>
+          <div className="body" style={{ display: 'grid', gap: 24, marginTop: 18 }}>
+            <div style={{ borderLeft: '2px solid #ffc719', paddingLeft: 18 }}>
+              <p style={{ color: '#fff', fontSize: 17, fontWeight: 500, maxWidth: 'none' }}>"Spring Camp starts tomorrow. Meeting point: Trojanovice trailhead, 07:30. GPX attached. Bring the headlamp this time."</p>
+            </div>
+            <div style={{ borderLeft: '2px solid #ffc719', paddingLeft: 18 }}>
+              <p style={{ color: '#fff', fontSize: 17, fontWeight: 500, maxWidth: 'none' }}>"Storm rolling in. Camp cancelled. Refunds aren't a thing yet but coffee on us next time."</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div className="label" style={{ color: '#888' }}>WE NEVER SOUND LIKE</div>
+          <div className="body" style={{ display: 'grid', gap: 24, marginTop: 18 }}>
+            <div style={{ borderLeft: '2px solid #555', paddingLeft: 18, opacity: 0.7 }}>
+              <p style={{ color: '#999', fontSize: 17, fontWeight: 400, maxWidth: 'none', textDecoration: 'line-through', textDecorationColor: '#555' }}>"Unlock unforgettable adventures with our cutting-edge community platform!"</p>
+            </div>
+            <div style={{ borderLeft: '2px solid #555', paddingLeft: 18, opacity: 0.7 }}>
+              <p style={{ color: '#999', fontSize: 17, fontWeight: 400, maxWidth: 'none', textDecoration: 'line-through', textDecorationColor: '#555' }}>"We sincerely apologise for any inconvenience that may have occurred…"</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rule" style={{ marginTop: 56, paddingTop: 32, borderTop: '1px solid #2a2a2a', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 36 }}>
+        <div>
+          <div className="label" style={{ color: '#888' }}>Always</div>
+          <p style={{ color: '#ddd', fontSize: 14, lineHeight: 1.6, maxWidth: 'none' }}>Specific. Times, places, distances, names. "Tomorrow at 07:30" beats "soon".</p>
+        </div>
+        <div>
+          <div className="label" style={{ color: '#888' }}>Often</div>
+          <p style={{ color: '#ddd', fontSize: 14, lineHeight: 1.6, maxWidth: 'none' }}>Wry. We can be dry. The wink is allowed when nobody's stress level changes.</p>
+        </div>
+        <div>
+          <div className="label" style={{ color: '#888' }}>Never</div>
+          <p style={{ color: '#ddd', fontSize: 14, lineHeight: 1.6, maxWidth: 'none' }}>Corporate. No "leverage", no "unlock", no "passionate about". Strike on sight.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tokens() {
+  return (
+    <div className="page">
+      <div className="pageframe"><span>olaf · brand manual · v1.0</span><span>12 — tokens</span></div>
+      <div className="section-head">
+        <div>
+          <div className="section-num">12 / Design tokens</div>
+          <h2 className="section-title">For the codebase</h2>
+        </div>
+      </div>
+      <p className="lead">Drop these into <code style={{background:'#f3f1ec',padding:'2px 6px',borderRadius:3,fontFamily:'Geist Mono, monospace',fontSize:13}}>app/globals.css</code> or your token JSON. Names are stable; numbers are the source of truth.</p>
+
+      <div className="label">Colour</div>
+      <table className="tokens" style={{ marginBottom: 36 }}>
+        <thead><tr><th>Token</th><th>Hex</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td><span className="chip-mini" style={{background:'#000'}}></span>--brand-ink</td><td>#000000</td><td>Text, strokes, primary surfaces (dark)</td></tr>
+          <tr><td><span className="chip-mini" style={{background:'#fff'}}></span>--brand-canvas</td><td>#ffffff</td><td>Light backgrounds</td></tr>
+          <tr><td><span className="chip-mini" style={{background:'#ffc719'}}></span>--brand-amber</td><td>#ffc719</td><td>Accent only · CTAs · highlight</td></tr>
+          <tr><td><span className="chip-mini" style={{background:'#dcdcdc'}}></span>--brand-rule</td><td>#dcdcdc</td><td>Borders, dividers</td></tr>
+        </tbody>
+      </table>
+
+      <div className="label">Typography</div>
+      <table className="tokens" style={{ marginBottom: 36 }}>
+        <thead><tr><th>Token</th><th>Family · Weight</th><th>Size · Tracking</th></tr></thead>
+        <tbody>
+          <tr><td>--type-wordmark</td><td>Geist Sans · 700</td><td>contextual · -0.04em</td></tr>
+          <tr><td>--type-display</td><td>Geist Sans · 600</td><td>48px · -0.025em</td></tr>
+          <tr><td>--type-lead</td><td>Geist Sans · 500</td><td>22px · -0.01em</td></tr>
+          <tr><td>--type-body</td><td>Geist Sans · 400</td><td>16px · 0</td></tr>
+          <tr><td>--type-meta</td><td>Geist Mono · 500</td><td>13px · 0.12em · UPPER</td></tr>
+        </tbody>
+      </table>
+
+      <div className="label">Logo geometry (SVG)</div>
+      <pre style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 6, padding: 20, fontFamily: 'Geist Mono, monospace', fontSize: 12, color: '#333', lineHeight: 1.7, overflow: 'auto' }}>{`<svg width="100" height="100" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="44" fill="none" stroke="#000"
+          stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="64" cy="34" r="6.5" fill="#ffc719" />
+  <polyline points="22,68 38,48 47,58 62,38 78,68"
+            fill="none" stroke="#000" stroke-width="6"
+            stroke-linecap="round" stroke-linejoin="round" />
+</svg>`}</pre>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 80, paddingTop: 32, borderTop: '1px solid var(--rule)' }}>
+        <div>
+          <Lockup Mark={MarkB1} markSize={40} wordSize={32} gap={12} />
+        </div>
+        <div className="mono" style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+          end · brand manual v1.0
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <>
+      <Cover />
+      <TOC />
+      <Essence />
+      <MarkPage />
+      <Construction />
+      <ClearSpace />
+      <Lockups />
+      <ColorPage />
+      <TypographyPage />
+      <AppIcons />
+      <SurfaceStates />
+      <DosDonts />
+      <Voice />
+      <Tokens />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
