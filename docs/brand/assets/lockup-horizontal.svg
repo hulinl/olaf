@@ -1,0 +1,6 @@
+<svg width="240" height="100" viewBox="0 0 240 100" xmlns="http://www.w3.org/2000/svg" font-family="Geist, system-ui, sans-serif">
+  <circle cx="50" cy="50" r="44" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></circle>
+  <circle cx="64" cy="34" r="6.5" fill="#ffc719"></circle>
+  <polyline points="22,68 38,48 47,58 62,38 78,68" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+  <text x="118" y="68" fill="#000000" font-size="62" font-weight="700" letter-spacing="-2.5">olaf</text>
+</svg>
