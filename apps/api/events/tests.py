@@ -664,6 +664,78 @@ class ConfigurableQuestionnaireTests(TestCase):
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_blocks_default_to_empty(self) -> None:
+        self.assertEqual(self.event.blocks, [])
+
+    def test_event_payload_exposes_blocks(self) -> None:
+        from events.blocks import validate_blocks
+
+        good = [
+            {
+                "id": "abc",
+                "type": "hero",
+                "payload": {
+                    "cover_url": "https://example.com/foo.jpg",
+                    "eyebrow": "Rakousko · Tyrolské Alpy",
+                    "subtitle": "Čtyři dny v Alpách.",
+                    "meta": [
+                        {"k": "Délka", "v": "4 dny"},
+                        {"k": "Náročnost", "v": "3 / 5"},
+                    ],
+                },
+            },
+            {
+                "id": "def",
+                "type": "stats",
+                "payload": {
+                    "tiles": [
+                        {"label": "denní trek", "value": "4"},
+                        {"label": "horské chaty", "value": "3"},
+                    ],
+                },
+            },
+        ]
+        validate_blocks(good)
+        self.event.blocks = good
+        self.event.save()
+        resp = self.client.get(
+            reverse(
+                "events:public",
+                kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+            )
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertEqual(len(body["blocks"]), 2)
+        self.assertEqual(body["blocks"][0]["type"], "hero")
+
+    def test_block_validator_rejects_unknown_type(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [{"id": "x", "type": "bogus", "payload": {}}]
+            )
+
+    def test_block_validator_rejects_duplicate_id(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [
+                    {"id": "same", "type": "prose", "payload": {"heading": "x", "body": "y"}},
+                    {"id": "same", "type": "prose", "payload": {"heading": "a", "body": "b"}},
+                ]
+            )
+
+    def test_block_validator_requires_stats_tiles(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [{"id": "x", "type": "stats", "payload": {"tiles": []}}]
+            )
+
     def test_event_payload_exposes_effective_sections(self) -> None:
         self.event.enabled_questionnaire_sections = ["tshirt_size", "diet"]
         self.event.save()

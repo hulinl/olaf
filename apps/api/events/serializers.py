@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from .blocks import BlockValidationError, validate_blocks
 from .models import RSVP, Event
 
 # Max-set questionnaire fields. Owner picks which sections appear on RSVP via
@@ -194,6 +195,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "faq",
             "program",
             "price_text",
+            "blocks",
             "enabled_questionnaire_sections",
             "workspace_slug",
             "workspace_name",
@@ -347,6 +349,7 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "faq",
             "program",
             "price_text",
+            "blocks",
             "enabled_questionnaire_sections",
             "cancellation_reason",
         )
@@ -381,6 +384,13 @@ class EventWriteSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f"FAQ položka {i} musí mít pole 'question' a 'answer'."
                 )
+        return value
+
+    def validate_blocks(self, value):
+        try:
+            validate_blocks(value)
+        except BlockValidationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         return value
 
     def validate(self, attrs):

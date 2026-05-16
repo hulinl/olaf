@@ -52,6 +52,17 @@ class EventAdmin(admin.ModelAdmin):
             {"fields": ("highlights", "included", "not_included", "program", "faq")},
         ),
         (
+            "Landing blocks (V2 builder — raw JSON)",
+            {
+                "fields": ("blocks",),
+                "description": (
+                    "Ordered list of landing-page content blocks. When non-empty, "
+                    "the public page renders these blocks instead of the legacy "
+                    "structured fields above. See events/blocks.py for the schema."
+                ),
+            },
+        ),
+        (
             "Additional info",
             {
                 "fields": (
