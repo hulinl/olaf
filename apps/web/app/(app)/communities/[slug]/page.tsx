@@ -332,6 +332,12 @@ function EventCard({
                 Přihlášení
               </Link>
               <Link
+                href={`/communities/${workspaceSlug}/events/${event.slug}/blocks`}
+                className="text-xs text-ink-500 hover:text-ink-900"
+              >
+                Bloky
+              </Link>
+              <Link
                 href={`/communities/${workspaceSlug}/events/${event.slug}/edit`}
                 className="text-xs text-ink-500 hover:text-ink-900"
               >
