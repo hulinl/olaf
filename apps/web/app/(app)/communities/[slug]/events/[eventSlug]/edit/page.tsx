@@ -105,6 +105,13 @@ export default function EditEventPage({ params }: Props) {
             </Link>
             {" · "}
             <Link
+              href={`/communities/${slug}/events/${eventSlug}/blocks`}
+              className="underline hover:text-ink-900"
+            >
+              Bloky stránky
+            </Link>
+            {" · "}
+            <Link
               href={`/communities/${slug}/events/${eventSlug}/rsvps`}
               className="underline hover:text-ink-900"
             >

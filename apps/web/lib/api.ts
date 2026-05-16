@@ -319,6 +319,7 @@ export interface EventWritePayload {
   faq?: FaqItem[];
   program?: ProgramDay[];
   price_text?: string;
+  blocks?: EventBlock[];
   enabled_questionnaire_sections?: QuestionnaireSection[];
   cancellation_reason?: string;
 }
