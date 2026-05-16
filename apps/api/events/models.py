@@ -139,6 +139,47 @@ class Event(TenantScopedModel):
         blank=True,
         help_text='Free-form price string for the landing page, e.g. "2 450 Kč".',
     )
+    not_included = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of bullet items NOT covered by the price.",
+    )
+    additional_cost_note = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='Rough estimate of extra costs, e.g. "~12 500 Kč/osoba navíc na ubytování a permity".',
+    )
+
+    # Difficulty — 0 = nezadáno; 1-5 = bezpečně-velmi náročné
+    difficulty_level = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="0 = nezadáno, 1-5 = lehké → velmi náročné.",
+    )
+    difficulty_note = models.TextField(
+        blank=True,
+        help_text=(
+            "Co konkrétně náročnost na této akci znamená — počet km/den, "
+            "hodin chůze, převýšení, požadovaná kondice."
+        ),
+    )
+
+    transport_info = models.TextField(
+        blank=True,
+        help_text="Jak se na akci dostat, sraz, co se používá za dopravu během akce.",
+    )
+    accommodation_info = models.TextField(
+        blank=True,
+        help_text="Kde se spí, typ ubytování, polopenze/snídaně, co je v ceně.",
+    )
+    gear_info = models.TextField(
+        blank=True,
+        help_text="Co si vzít, co půjčíme/poskytneme, povinná vs. doporučená výbava.",
+    )
+    faq = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of {"question": str, "answer": str} items.',
+    )
 
     # Configurable RSVP questionnaire — which max-set sections appear on the
     # RSVP form. Owner picks per-event. Empty default = all enabled for
@@ -212,6 +253,13 @@ class Event(TenantScopedModel):
         if self.capacity is None:
             return False
         return self.confirmed_rsvp_count >= self.capacity
+
+    @property
+    def remaining_capacity(self) -> int | None:
+        """How many confirmed slots are still open. None if unlimited."""
+        if self.capacity is None:
+            return None
+        return max(0, self.capacity - self.confirmed_rsvp_count)
 
 
 class RSVP(models.Model):

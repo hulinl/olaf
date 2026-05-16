@@ -3,6 +3,7 @@ import Link from "next/link";
 import { TopographyBg } from "@/components/marketing/topography-bg";
 import { LinkButton } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
+import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 
 const FEATURES = [
   {
@@ -30,17 +31,7 @@ export default function Home() {
           >
             <Logo size={26} />
           </Link>
-          <nav className="flex items-center gap-2 text-sm">
-            <Link
-              href="/login"
-              className="rounded-md px-3 py-1.5 font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
-            >
-              Log in
-            </Link>
-            <LinkButton href="/signup" variant="primary" size="md">
-              Get started
-            </LinkButton>
-          </nav>
+          <PublicAuthIndicator />
         </div>
       </header>
 

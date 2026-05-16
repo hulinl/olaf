@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Logo } from "@/components/ui/logo";
+import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { assetUrl, type Workspace } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -59,12 +60,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
           >
             <Logo size={26} />
           </Link>
-          <Link
-            href="/login"
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
-          >
-            Log in
-          </Link>
+          <PublicAuthIndicator />
         </div>
       </header>
 
