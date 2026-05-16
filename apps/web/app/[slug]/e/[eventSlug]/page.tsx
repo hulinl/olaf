@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BlockRenderer } from "@/components/event-blocks/block-renderer";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { assetUrl, type Event } from "@/lib/api";
@@ -115,6 +116,49 @@ export default async function EventLandingPage({ params }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col">
+        {event.blocks && event.blocks.length > 0 && (() => {
+          const heroBadge = cancelled ? (
+            <span className="mb-4 inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
+              ZRUŠENO
+            </span>
+          ) : event.is_open_for_rsvp && event.capacity != null ? (
+            (() => {
+              const remaining = event.remaining_capacity ?? 0;
+              if (remaining === 0) {
+                return (
+                  <span className="mb-4 inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
+                    VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
+                  </span>
+                );
+              }
+              if (remaining <= 3) {
+                return (
+                  <span className="mb-4 inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
+                    POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
+                  </span>
+                );
+              }
+              return null;
+            })()
+          ) : null;
+          const heroIndex = event.blocks.findIndex((b) => b.type === "hero");
+          return (
+            <>
+              {event.blocks.map((b, i) => (
+                <BlockRenderer
+                  key={b.id}
+                  block={b}
+                  fallbackTitle={`${event.workspace_name} — ${event.title}`}
+                  fallbackCtaHref={cta_href}
+                  heroBadge={i === heroIndex ? heroBadge : undefined}
+                />
+              ))}
+            </>
+          );
+        })()}
+
+        {event.blocks && event.blocks.length > 0 ? null : (
+        <>
         {/* Hero */}
         <section className="relative min-h-[420px] overflow-hidden">
           <div
@@ -463,6 +507,8 @@ export default async function EventLandingPage({ params }: Props) {
             )}
           </div>
         </section>
+        </>
+        )}
 
         <footer className="border-t border-border">
           <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-8 text-sm text-ink-500 sm:flex-row sm:items-center sm:justify-between">

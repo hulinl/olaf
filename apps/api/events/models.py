@@ -181,6 +181,15 @@ class Event(TenantScopedModel):
         help_text='List of {"question": str, "answer": str} items.',
     )
 
+    # Block-based landing — ordered list of content blocks rendered by the
+    # public landing page (see events/blocks.py for schema). Empty list = use
+    # legacy structured-field rendering (hero/details/program/included/etc).
+    blocks = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of {id, type, payload} content blocks. See events/blocks.py.",
+    )
+
     # Configurable RSVP questionnaire — which max-set sections appear on the
     # RSVP form. Owner picks per-event. Empty default = all enabled for
     # backwards compat with existing events.

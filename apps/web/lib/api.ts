@@ -1,3 +1,5 @@
+import type { EventBlock } from "./event-blocks";
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -144,6 +146,7 @@ export interface Event extends EventSummary {
   faq: FaqItem[];
   program: ProgramDay[];
   price_text: string;
+  blocks: EventBlock[];
   enabled_questionnaire_sections: QuestionnaireSection[];
   workspace_name: string;
   workspace_logo_url: string | null;

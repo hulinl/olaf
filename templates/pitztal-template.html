@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pitztal – přechod po chatách | 4denní trek v srdci Tyrolských Alp</title>
+<meta name="description" content="Čtyřdenní přechod po chatách v Pitztalu. Nalehko, bez ferrat, s výhledem na ledovce. Pro sportovně založené turisty bez alpských zkušeností." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fbfaf7;
+    --ink:#0e1a26;
+    --ink-2:#384859;
+    --muted:#6b7886;
+    --line:#e7e2d8;
+    --card:#ffffff;
+    --accent:#0b6e6e;       /* glacier teal */
+    --accent-2:#e07a2b;     /* sunset orange */
+    --accent-soft:#eaf3f2;
+    --warn:#fff7e8;
+    --warn-ink:#7a4b00;
+    --shadow: 0 10px 30px rgba(14,26,38,.08);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  h1,h2,h3,h4{font-family:'Fraunces',Georgia,serif;letter-spacing:-.02em;line-height:1.1;color:var(--ink);margin:0 0 .4em}
+  h1{font-size:clamp(2.4rem,5.2vw,4.4rem);font-weight:700}
+  h2{font-size:clamp(1.8rem,3.2vw,2.6rem);font-weight:700;margin-bottom:.6em}
+  h3{font-size:1.25rem;font-weight:600;font-family:'Inter',sans-serif;letter-spacing:0}
+  p{margin:0 0 1em;color:var(--ink-2)}
+  .container{max-width:1180px;margin:0 auto;padding:0 24px}
+
+  /* NAV */
+  .nav{position:sticky;top:0;z-index:50;background:rgba(251,250,247,.85);backdrop-filter:saturate(140%) blur(10px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;max-width:1180px;margin:0 auto}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em}
+  .logo svg{width:26px;height:26px}
+  .nav-links{display:flex;gap:28px;font-size:.95rem;color:var(--ink-2)}
+  .nav-links a:hover{color:var(--accent)}
+  .nav-cta{padding:9px 16px;border-radius:999px;background:var(--ink);color:#fff;font-size:.9rem;font-weight:500}
+  @media (max-width:780px){.nav-links{display:none}}
+
+  /* HERO */
+  .hero{position:relative;min-height:88vh;display:flex;align-items:flex-end;color:#fff;overflow:hidden;isolation:isolate}
+  .hero::before{
+    content:"";position:absolute;inset:0;
+    background-image:linear-gradient(180deg,rgba(14,26,38,.15) 0%,rgba(14,26,38,.25) 40%,rgba(14,26,38,.85) 100%),
+                     url('https://upload.wikimedia.org/wikipedia/commons/7/79/Tirol_-_Panorama_Pitztaler_Gletscher_und_Wildspitze.jpg');
+    background-size:cover;background-position:center;
+    z-index:-1;
+  }
+  .hero-inner{padding:120px 0 60px;width:100%}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.85rem;text-transform:uppercase;letter-spacing:.18em;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);padding:7px 14px;border-radius:999px;margin-bottom:18px}
+  .hero h1{color:#fff;max-width:18ch}
+  .hero-sub{font-size:1.15rem;color:rgba(255,255,255,.85);max-width:55ch;margin-top:10px}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:30px;margin-top:36px;padding-top:28px;border-top:1px solid rgba(255,255,255,.18)}
+  .hero-meta div{min-width:130px}
+  .hero-meta .k{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:rgba(255,255,255,.65)}
+  .hero-meta .v{font-size:1.4rem;font-family:'Fraunces',serif;font-weight:500;margin-top:4px}
+  .hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:14px 22px;border-radius:999px;font-weight:600;font-size:1rem;transition:transform .15s ease, box-shadow .15s ease;border:none;cursor:pointer}
+  .btn-primary{background:var(--accent-2);color:#fff}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 30px rgba(224,122,43,.4)}
+  .btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(6px)}
+  .btn-ghost:hover{background:rgba(255,255,255,.2)}
+  .btn-dark{background:var(--ink);color:#fff}
+  .btn-dark:hover{transform:translateY(-1px);box-shadow:0 12px 30px rgba(14,26,38,.25)}
+
+  /* SECTIONS */
+  section{padding:96px 0}
+  .section-eyebrow{font-size:.82rem;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);font-weight:600;margin-bottom:14px}
+  .lead{font-size:1.2rem;color:var(--ink-2);max-width:62ch}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+  @media(max-width:880px){.grid-2{grid-template-columns:1fr;gap:36px}}
+
+  /* STATS BAR */
+  .stats{background:var(--ink);color:#fff;padding:50px 0}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:30px;text-align:center}
+  .stats .v{font-family:'Fraunces',serif;font-size:2.4rem;font-weight:600;color:#fff}
+  .stats .k{font-size:.78rem;text-transform:uppercase;letter-spacing:.18em;color:rgba(255,255,255,.6);margin-top:6px}
+  @media(max-width:780px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:36px}}
+
+  /* DAY MAP EMBED */
+  .day-map{margin-top:22px;border-top:1px dashed var(--line);padding-top:18px}
+  .day-map-frame{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#eef2f5;aspect-ratio:16/9;width:100%}
+  .day-map-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+  .day-map-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.9rem;pointer-events:none}
+  .day-map-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:.88rem;color:var(--muted)}
+  .day-map-foot a{color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .day-map-foot a:hover{text-decoration:underline}
+  .day-map-foot svg{width:14px;height:14px}
+
+  /* GALLERY */
+  .gallery{padding:60px 0 0}
+  .gallery-grid{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:200px 200px;gap:12px;height:412px}
+  .gallery-grid .g{background-size:cover;background-position:center;border-radius:12px;overflow:hidden;position:relative;cursor:pointer;transition:transform .3s ease}
+  .gallery-grid .g:hover{transform:scale(1.01)}
+  .gallery-grid .g::after{content:attr(data-caption);position:absolute;left:14px;bottom:12px;color:#fff;font-size:.82rem;background:rgba(0,0,0,.5);padding:4px 10px;border-radius:999px;backdrop-filter:blur(4px)}
+  .gallery-grid .g1{grid-row:1 / 3}
+  @media(max-width:780px){.gallery-grid{grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,160px);height:auto}.gallery-grid .g1{grid-row:auto;grid-column:1 / 3}}
+
+  /* DAYS */
+  .days{display:grid;gap:24px}
+  .day{display:grid;grid-template-columns:200px 1fr;gap:0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  .day-cover{background:#0e1a26;color:#fff;padding:32px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;min-height:240px}
+  .day-cover::after{content:"";position:absolute;inset:0;background-size:cover;background-position:center;opacity:.4;z-index:0}
+  .day:nth-child(1) .day-cover::after{background-image:url('https://upload.wikimedia.org/wikipedia/commons/3/36/Taschachferner_Zunge.jpg')}
+  .day:nth-child(2) .day-cover::after{background-image:url('https://upload.wikimedia.org/wikipedia/commons/d/da/Rifflsee_2013.jpg')}
+  .day:nth-child(3) .day-cover::after{background-image:url('https://upload.wikimedia.org/wikipedia/commons/8/87/WatzespitzeVonKaunergrath%C3%BCtte.jpg')}
+  .day:nth-child(4) .day-cover::after{background-image:url('https://upload.wikimedia.org/wikipedia/commons/b/b8/%C3%96tztal_Alps.jpg')}
+  .day-cover > *{position:relative;z-index:1}
+  .day-num{font-family:'Fraunces',serif;font-size:3rem;font-weight:600;line-height:1}
+  .day-label{font-size:.78rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+  .day-body{padding:32px 36px}
+  .day-body h3{font-family:'Fraunces',serif;font-size:1.5rem;font-weight:600;margin-bottom:8px}
+  .day-route{font-size:.95rem;color:var(--muted);margin-bottom:16px}
+  .day-params{display:flex;flex-wrap:wrap;gap:18px;margin-top:18px;padding-top:18px;border-top:1px dashed var(--line)}
+  .day-params span{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-2);font-weight:500}
+  .day-params span svg{width:16px;height:16px;opacity:.6}
+  @media(max-width:780px){.day{grid-template-columns:1fr}.day-cover{min-height:180px}}
+
+  /* HIGHLIGHTS */
+  .highlights{background:linear-gradient(180deg,var(--accent-soft),#fff)}
+  .highlight-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:40px}
+  .hl-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:28px;transition:transform .2s ease,box-shadow .2s ease}
+  .hl-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+  .hl-card .icon{width:42px;height:42px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .hl-card .icon svg{width:22px;height:22px;color:var(--accent)}
+  .hl-card h4{font-family:'Inter',sans-serif;font-size:1rem;font-weight:600;margin:0 0 6px}
+  .hl-card p{font-size:.92rem;margin:0;color:var(--muted)}
+  @media(max-width:880px){.highlight-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.highlight-grid{grid-template-columns:1fr}}
+
+  /* HUTS */
+  .huts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px}
+  .hut{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .hut-img{height:180px;background-size:cover;background-position:center}
+  .hut-body{padding:24px}
+  .hut .tag{display:inline-block;background:var(--accent-soft);color:var(--accent);font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;padding:4px 10px;border-radius:999px;margin-bottom:10px;font-weight:600}
+  .hut h4{font-family:'Fraunces',serif;font-size:1.3rem;font-weight:600;margin:0 0 4px}
+  .hut .alt{color:var(--muted);font-size:.9rem;margin-bottom:14px}
+  .hut ul{list-style:none;padding:0;margin:0;font-size:.92rem;color:var(--ink-2)}
+  .hut ul li{padding:6px 0;border-bottom:1px dashed var(--line)}
+  .hut ul li:last-child{border:none}
+  .hut ul strong{color:var(--ink);font-weight:600}
+  @media(max-width:880px){.huts-grid{grid-template-columns:1fr}}
+
+  /* INCLUDED */
+  .included{background:#0e1a26;color:#fff}
+  .included h2{color:#fff}
+  .inc-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:40px}
+  .inc-list{list-style:none;padding:0;margin:0}
+  .inc-list li{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.85)}
+  .inc-list .check,.inc-list .cross{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+  .inc-list .check{background:rgba(11,110,110,.3);color:#5fd0c2}
+  .inc-list .cross{background:rgba(255,255,255,.08);color:rgba(255,255,255,.55)}
+  .inc-list svg{width:13px;height:13px}
+  .inc-list .label{font-weight:500;color:#fff}
+  .inc-list .desc{display:block;font-size:.85rem;color:rgba(255,255,255,.55);margin-top:2px}
+  @media(max-width:780px){.inc-grid{grid-template-columns:1fr;gap:30px}}
+
+  /* PRICE */
+  .price-card{background:linear-gradient(135deg,#0e1a26,#1a2c3e);color:#fff;border-radius:var(--radius);padding:48px;display:grid;grid-template-columns:1.2fr 1fr;gap:50px;align-items:center;margin-top:40px;box-shadow:var(--shadow)}
+  .price-card h3{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:600;color:#fff;margin-bottom:14px}
+  .price-card p{color:rgba(255,255,255,.75)}
+  .price-figure{text-align:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:32px}
+  .price-figure .v{font-family:'Fraunces',serif;font-size:3rem;font-weight:600;color:#fff}
+  .price-figure .v small{font-size:1.2rem;color:rgba(255,255,255,.6);font-weight:400}
+  .price-figure .k{font-size:.82rem;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.15em;margin-top:6px}
+  .price-figure .note{font-size:.85rem;color:rgba(255,255,255,.55);margin-top:14px}
+  @media(max-width:780px){.price-card{grid-template-columns:1fr;padding:32px;gap:24px}}
+
+  /* GEAR */
+  .gear-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px}
+  .gear-col h4{font-family:'Inter',sans-serif;font-size:.85rem;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);font-weight:700;padding-bottom:12px;border-bottom:2px solid var(--accent);margin-bottom:16px}
+  .gear-col ul{list-style:none;padding:0;margin:0}
+  .gear-col li{padding:8px 0;font-size:.95rem;color:var(--ink-2);border-bottom:1px dashed var(--line)}
+  .gear-col li:last-child{border:none}
+  .gear-col li strong{color:var(--ink)}
+  @media(max-width:880px){.gear-grid{grid-template-columns:1fr}}
+
+  /* FAQ / NOTES */
+  .notes{background:var(--warn);border-left:4px solid var(--accent-2);padding:24px 28px;border-radius:0 var(--radius) var(--radius) 0;margin-top:30px}
+  .notes h4{margin:0 0 8px;color:var(--warn-ink);font-family:'Inter',sans-serif;font-size:1rem}
+  .notes p{margin:0;color:var(--warn-ink);font-size:.95rem}
+
+  /* CTA FINAL */
+  .cta-final{background:linear-gradient(135deg,var(--accent),#0a5252);color:#fff;text-align:center;padding:100px 0}
+  .cta-final h2{color:#fff;max-width:20ch;margin:0 auto 16px}
+  .cta-final p{color:rgba(255,255,255,.85);max-width:55ch;margin:0 auto 32px;font-size:1.1rem}
+
+  /* FOOTER */
+  footer{background:var(--ink);color:rgba(255,255,255,.7);padding:60px 0 30px;font-size:.92rem}
+  .foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px}
+  footer h5{color:#fff;font-family:'Inter',sans-serif;font-size:.85rem;text-transform:uppercase;letter-spacing:.15em;margin:0 0 14px}
+  footer ul{list-style:none;padding:0;margin:0}
+  footer li{padding:4px 0}
+  footer a:hover{color:#fff}
+  .foot-bottom{border-top:1px solid rgba(255,255,255,.1);padding-top:24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:.85rem;color:rgba(255,255,255,.5)}
+  @media(max-width:780px){.foot-grid{grid-template-columns:1fr 1fr;gap:30px}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20 L9 8 L13 14 L17 6 L21 20 Z" /><circle cx="16" cy="5" r="1.5" fill="currentColor"/></svg>
+      Pitztal Trek
+    </a>
+    <div class="nav-links">
+      <a href="#program">Program</a>
+      <a href="#chaty">Chaty</a>
+      <a href="#cena">Cena</a>
+      <a href="#vybaveni">Vybavení</a>
+      <a href="#info">Informace</a>
+    </div>
+    <a href="#prihlasit" class="nav-cta">Přihlásit se</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="container hero-inner">
+    <span class="eyebrow">● Rakousko · Tyrolské Alpy · 2026</span>
+    <h1>Pitztal – přechod po chatách</h1>
+    <p class="hero-sub">Čtyři dny v srdci Tyrolských Alp. Nalehko, bez ferrat, s výhledem na ledovce. Trek pro sportovně založené turisty, kteří chtějí vidět Alpy „z blízka“.</p>
+
+    <div class="hero-cta">
+      <a href="#prihlasit" class="btn btn-primary">Chci vyrazit →</a>
+      <a href="#info" class="btn btn-ghost">Zeptat se na informace</a>
+    </div>
+
+    <div class="hero-meta">
+      <div><div class="k">Délka</div><div class="v">4 dny</div></div>
+      <div><div class="k">Vzdálenost</div><div class="v">~39 km</div></div>
+      <div><div class="k">Převýšení</div><div class="v">+2 445 m</div></div>
+      <div><div class="k">Nejvyšší bod</div><div class="v">2 817 m</div></div>
+      <div><div class="k">Náročnost</div><div class="v">3 / 5</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- INTRO -->
+<section>
+  <div class="container grid-2">
+    <div>
+      <div class="section-eyebrow">O výpravě</div>
+      <h2>Jeden z nejkrásnějších přechodů Pitztalu</h2>
+      <p class="lead">Čtyři dny chůze po značených turistických cestách, přírodou, která vás dostane – bez technických úseků, bez ferrat, ale s plným adrenalinem z výhledů a výšky přes 2 800 metrů.</p>
+      <p>Trasa zůstává příjemná i pro sportovně založené turisty bez alpských zkušeností, ale odmění vás panoramaty, které v Čechách neseženete. Spíme na třech horských chatách, putujeme nalehko – stačí jen batoh a spacák.</p>
+    </div>
+    <div>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/Pitztal_from_Mittagskogel_01.jpg" alt="Pohled do Pitztalu z Mittagskogelu" style="border-radius:var(--radius);box-shadow:var(--shadow);aspect-ratio:4/5;object-fit:cover" />
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats" style="padding:60px 0">
+  <div class="container">
+    <div class="stats-grid">
+      <div><div class="v">4</div><div class="k">denní trek</div></div>
+      <div><div class="v">3</div><div class="k">horské chaty</div></div>
+      <div><div class="v">2 817 m</div><div class="k">vrchol trasy</div></div>
+      <div><div class="v">Bez ferrat</div><div class="k">značené cesty</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- HIGHLIGHTS -->
+<section class="highlights">
+  <div class="container">
+    <div class="section-eyebrow">Co vás čeká</div>
+    <h2 style="max-width:18ch">Ledovce, alpská jezera<br/>a panoramata nad 3 700 m</h2>
+    <div class="highlight-grid">
+      <div class="hl-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20 L8 10 L12 16 L17 6 L21 20 Z"/></svg></div>
+        <h4>Ledovec Taschachferner</h4>
+        <p>Jeden z největších ledovců Ötztaler Alp – výhled už první den.</p>
+      </div>
+      <div class="hl-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 18 Q6 14 10 18 T18 18 T22 18"/><path d="M2 13 Q6 9 10 13 T18 13 T22 13"/></svg></div>
+        <h4>Rifflsee</h4>
+        <p>Největší jezero Ötztaler Alp. Krystalicky čistá voda, koupání druhý den.</p>
+      </div>
+      <div class="hl-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20 L7 12 L11 16 L15 8 L19 14 L21 20 Z"/></svg></div>
+        <h4>Wildspitze 3 772 m</h4>
+        <p>Nejvyšší hora Tyrolska – panorama z Taschachhaus.</p>
+      </div>
+      <div class="hl-card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18 L8 8 L13 14 L18 4 L21 18 Z"/><circle cx="18" cy="4" r="1.5" fill="currentColor"/></svg></div>
+        <h4>Kaunergrat</h4>
+        <p>Panoramatický hřeben s desítkami čtyřtisícovek.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section class="gallery">
+  <div class="container">
+    <div class="gallery-grid">
+      <div class="g g1" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/3/36/Taschachferner_Zunge.jpg')" data-caption="Ledovec Taschachferner"></div>
+      <div class="g" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/d/da/Rifflsee_2013.jpg')" data-caption="Jezero Rifflsee"></div>
+      <div class="g" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/8/87/WatzespitzeVonKaunergrath%C3%BCtte.jpg')" data-caption="Pohled z Kaunergrathütte"></div>
+      <div class="g" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/9/98/Pitztal_mit_Alpenrosen.jpg')" data-caption="Údolí Pitztal"></div>
+      <div class="g" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/9/96/Taschachhaus_Taschachferner02.JPG')" data-caption="Taschachhaus u ledovce"></div>
+    </div>
+  </div>
+</section>
+
+<!-- DAYS -->
+<section id="program">
+  <div class="container">
+    <div class="section-eyebrow">Den po dni</div>
+    <h2>Program výpravy</h2>
+    <p class="lead" style="margin-bottom:50px">Čtyři dny, tři noci na chatách, jedna lanovka a žádný úsek, kde by bylo potřeba lano nebo ferratová sada.</p>
+
+    <div class="days">
+
+      <article class="day">
+        <div class="day-cover">
+          <div class="day-label">Den 1 / Středa</div>
+          <div class="day-num">01</div>
+          <div class="day-label">Příchod do hor</div>
+        </div>
+        <div class="day-body">
+          <h3>Plangeroß → Taschachhaus</h3>
+          <div class="day-route">1 612 m → 2 434 m · údolí Taschachtal</div>
+          <p>Sraz 9:00 na parkovišti v Plangeroß. Výstup značenou turistickou cestou údolím Taschachtal až k chatě Taschachhaus. Cestou výhled na obrovský ledovec Taschachferner. První krok nad 2 000 metrů, první výhled, který vás přenese.</p>
+          <div class="day-params">
+            <span>⏱ 6,5 h</span>
+            <span>↔ 11,2 km</span>
+            <span>↑ 825 m</span>
+            <span>↓ 18 m</span>
+          </div>
+          <div class="day-map">
+            <div class="day-map-frame">
+              <div class="day-map-loading">Načítám mapu…</div>
+              <iframe loading="lazy" src="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9ZvWYxIO2P9Z764x4t6N&amp;rs=coor&amp;rs=osm&amp;ri=&amp;ri=136109328&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;rwp=1%3B9ZvUIxIOlkKsda3Xx32EN4ekl3Vja.icv718cfQrdiJfPi3rB&amp;rut=1&amp;x=10.8133035&amp;y=46.9488256&amp;z=13&amp;frame=1" title="Mapa Den 1"></iframe>
+            </div>
+            <div class="day-map-foot">
+              <span>Plangeroß → Taschachhaus</span>
+              <a href="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9ZvWYxIO2P9Z764x4t6N&amp;rs=coor&amp;rs=osm&amp;ri=&amp;ri=136109328&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;rwp=1%3B9ZvUIxIOlkKsda3Xx32EN4ekl3Vja.icv718cfQrdiJfPi3rB&amp;rut=1&amp;x=10.8133035&amp;y=46.9488256&amp;z=13" target="_blank" rel="noopener">Otevřít v Mapy.cz <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 L17 7"/><polyline points="8 7 17 7 17 16"/></svg></a>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="day">
+        <div class="day-cover">
+          <div class="day-label">Den 2 / Čtvrtek</div>
+          <div class="day-num">02</div>
+          <div class="day-label">Fuldaer Höhenweg & jezero</div>
+        </div>
+        <div class="day-body">
+          <h3>Taschachhaus → Riffelseehütte</h3>
+          <div class="day-route">2 434 m → 2 293 m · Fuldaer Höhenweg</div>
+          <p>Příjemná etapa po hřebeni Fuldaer Höhenweg s výhledy na ledovcové panorama. Bez exponovaných úseků, žádné ferraty. Po příchodu na Riffelseehütte můžete skočit do alpského jezera Rifflsee – krystalicky čistá voda, silný zážitek.</p>
+          <div class="day-params">
+            <span>⏱ 6 h</span>
+            <span>↔ 11,2 km</span>
+            <span>↑ 250 m</span>
+            <span>↓ 400 m</span>
+          </div>
+          <div class="day-map">
+            <div class="day-map-frame">
+              <div class="day-map-loading">Načítám mapu…</div>
+              <iframe loading="lazy" src="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9Z764x4t6Nja0xII3ag-0hDw56l3Uc&amp;rs=osm&amp;rs=osm&amp;rs=coor&amp;rs=osm&amp;ri=136109328&amp;ri=20366469&amp;ri=&amp;ri=1074668117&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;rut=1&amp;x=10.8201729&amp;y=46.9504778&amp;z=14&amp;frame=1" title="Mapa Den 2"></iframe>
+            </div>
+            <div class="day-map-foot">
+              <span>Taschachhaus → Riffelseehütte</span>
+              <a href="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9Z764x4t6Nja0xII3ag-0hDw56l3Uc&amp;rs=osm&amp;rs=osm&amp;rs=coor&amp;rs=osm&amp;ri=136109328&amp;ri=20366469&amp;ri=&amp;ri=1074668117&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;rut=1&amp;x=10.8201729&amp;y=46.9504778&amp;z=14" target="_blank" rel="noopener">Otevřít v Mapy.cz <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 L17 7"/><polyline points="8 7 17 7 17 16"/></svg></a>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="day">
+        <div class="day-cover">
+          <div class="day-label">Den 3 / Pátek</div>
+          <div class="day-num">03</div>
+          <div class="day-label">Lanovka a velký výstup</div>
+        </div>
+        <div class="day-body">
+          <h3>Riffelseehütte → Mandarfen → Kaunergrathütte</h3>
+          <div class="day-route">2 293 m → 1 736 m → 2 817 m · nejvýše položená chata trasy</div>
+          <p>Sjedeme lanovkou Rifflseebahn do údolí, krátký přesun údolím a pak hlavní výstup dne na Kaunergrathütte – nejvýše položenou chatu trasy. Náročný, ale nejvděčnější den. Výhledy na hory z údolí i z hřebene současně.</p>
+          <div class="day-params">
+            <span>⏱ 6 h + lanovka</span>
+            <span>↔ 9,2 km</span>
+            <span>↑ 1 220 m</span>
+          </div>
+          <div class="day-map">
+            <div class="day-map-frame">
+              <div class="day-map-loading">Načítám mapu…</div>
+              <iframe loading="lazy" src="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9ZvruxIJkMf42lxzdnNZR1e85EA&amp;rs=coor&amp;rs=coor&amp;rs=coor&amp;rs=osm&amp;ri=&amp;ri=&amp;ri=&amp;ri=6539364&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;rut=1&amp;x=10.8456704&amp;y=46.9830545&amp;z=13&amp;frame=1" title="Mapa Den 3"></iframe>
+            </div>
+            <div class="day-map-foot">
+              <span>Riffelseehütte → Mandarfen → Kaunergrathütte</span>
+              <a href="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9ZvruxIJkMf42lxzdnNZR1e85EA&amp;rs=coor&amp;rs=coor&amp;rs=coor&amp;rs=osm&amp;ri=&amp;ri=&amp;ri=&amp;ri=6539364&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;rut=1&amp;x=10.8456704&amp;y=46.9830545&amp;z=13" target="_blank" rel="noopener">Otevřít v Mapy.cz <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 L17 7"/><polyline points="8 7 17 7 17 16"/></svg></a>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="day">
+        <div class="day-cover">
+          <div class="day-label">Den 4 / Sobota</div>
+          <div class="day-num">04</div>
+          <div class="day-label">Sestup domů</div>
+        </div>
+        <div class="day-body">
+          <h3>Kaunergrathütte → Plangeroß</h3>
+          <div class="day-route">2 817 m → 1 612 m · údolí Plangeroßtal</div>
+          <p>Poslední den přináší krásné výhledy zpět na hřeben Kaunergrat a pomalý sestup údolím zpět k autům. Předpokládaný příchod 15:00, odjezd domů s hlavou plnou zážitků.</p>
+          <div class="day-params">
+            <span>⏱ 5,5 h</span>
+            <span>↔ 7,2 km</span>
+            <span>↑ 150 m</span>
+            <span>↓ 1 354 m</span>
+          </div>
+          <div class="day-map">
+            <div class="day-map-frame">
+              <div class="day-map-loading">Načítám mapu…</div>
+              <iframe loading="lazy" src="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9ZmSexIRzc5dI8pjrY37JiiQe-7&amp;rs=osm&amp;rs=coor&amp;rs=coor&amp;rs=coor&amp;ri=6539364&amp;ri=&amp;ri=&amp;ri=&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;x=10.8370000&amp;y=46.9781259&amp;z=14&amp;frame=1" title="Mapa Den 4"></iframe>
+            </div>
+            <div class="day-map-foot">
+              <span>Kaunergrathütte → Plangeroß</span>
+              <a href="https://mapy.com/cs/turisticka?planovani-trasy&amp;rc=9ZmSexIRzc5dI8pjrY37JiiQe-7&amp;rs=osm&amp;rs=coor&amp;rs=coor&amp;rs=coor&amp;ri=6539364&amp;ri=&amp;ri=&amp;ri=&amp;mrp=%7B%22c%22%3A132%2C%22dt%22%3A%22%22%2C%22d%22%3Atrue%7D&amp;xc=%5B%5D&amp;x=10.8370000&amp;y=46.9781259&amp;z=14" target="_blank" rel="noopener">Otevřít v Mapy.cz <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 L17 7"/><polyline points="8 7 17 7 17 16"/></svg></a>
+            </div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- HUTS -->
+<section id="chaty" style="background:#f4f0e8">
+  <div class="container">
+    <div class="section-eyebrow">Ubytování</div>
+    <h2>Tři horské chaty</h2>
+    <p class="lead">Spíme v matratzenlagerech (společných ložnicích s matracemi). Vlastní spacák je potřeba, ručník na chatách neseženete.</p>
+
+    <div class="huts-grid">
+
+      <div class="hut">
+        <div class="hut-img" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/8/82/Taschachhaus04.JPG')"></div>
+        <div class="hut-body">
+          <span class="tag">Den 1 · 2 434 m</span>
+          <h4>Taschachhaus</h4>
+          <div class="alt">U ledovce Taschachferner</div>
+          <ul>
+            <li><strong>Matratzenlager</strong> €26</li>
+            <li><strong>Pokoj</strong> €42</li>
+            <li><strong>Sezóna 2026</strong> 4. 6. – 14. 9.</li>
+            <li style="color:var(--accent-2);font-weight:600">⚠ Platba pouze hotově</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="hut">
+        <div class="hut-img" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/5/54/Riffelseeh%C3%BCtte-SW.jpg')"></div>
+        <div class="hut-body">
+          <span class="tag">Den 2 · 2 293 m</span>
+          <h4>Riffelseehütte</h4>
+          <div class="alt">U jezera Rifflsee</div>
+          <ul>
+            <li><strong>Matratzenlager</strong> €26</li>
+            <li><strong>Mehrbett</strong> €32</li>
+            <li><strong>2-lůžko</strong> €42</li>
+            <li><strong>Sezóna 2026</strong> pol. 6. – pol. 9.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="hut">
+        <div class="hut-img" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/c/cf/Watzespitze_Ostgrat.jpg')"></div>
+        <div class="hut-body">
+          <span class="tag">Den 3 · 2 817 m</span>
+          <h4>Kaunergrathütte</h4>
+          <div class="alt">Nejvýše položená chata trasy</div>
+          <ul>
+            <li><strong>Matratzenlager</strong> €26</li>
+            <li><strong>Snídaně</strong> €18</li>
+            <li><strong>Sezóna 2026</strong> 2. 7. – 12. 9.</li>
+            <li style="color:var(--accent-2);font-weight:600">⚠ Rezervace pouze online + kartou</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- INCLUDED -->
+<section class="included" id="cena">
+  <div class="container">
+    <div class="section-eyebrow" style="color:#5fd0c2">Co je v ceně</div>
+    <h2>Co dostanete od nás<br/>a co si platíte sami</h2>
+
+    <div class="inc-grid">
+      <div>
+        <h3 style="color:#fff;margin-bottom:20px">✓ Zahrnuto v ceně</h3>
+        <ul class="inc-list">
+          <li>
+            <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div>
+              <span class="label">Certifikovaný horský průvodce</span>
+              <span class="desc">Po celou dobu trasy, plánování trasy, bezpečnostní zázemí</span>
+            </div>
+          </li>
+          <li>
+            <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div>
+              <span class="label">Předjednání ubytování na chatách</span>
+              <span class="desc">Rezervace všech tří chat, koordinace</span>
+            </div>
+          </li>
+          <li>
+            <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div>
+              <span class="label">GPS data trasy</span>
+              <span class="desc">GPX soubory celého přechodu, body zájmu</span>
+            </div>
+          </li>
+          <li>
+            <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <div>
+              <span class="label">Fotodokumentace</span>
+              <span class="desc">Sdílený album z výpravy</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 style="color:#fff;margin-bottom:20px">× Hradíte sami</h3>
+        <ul class="inc-list">
+          <li>
+            <span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+            <div>
+              <span class="label">Ubytování na chatách · ~€78</span>
+              <span class="desc">Matratzenlager × 3 noci, platba na místě</span>
+            </div>
+          </li>
+          <li>
+            <span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+            <div>
+              <span class="label">Strava na chatách · ~€150</span>
+              <span class="desc">Polopenze (snídaně + večeře) a obědy na trase</span>
+            </div>
+          </li>
+          <li>
+            <span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+            <div>
+              <span class="label">Lanovka Rifflseebahn · €24</span>
+              <span class="desc">Zdarma s Pitztal Gästekarte (přespání den předem v oblasti)</span>
+            </div>
+          </li>
+          <li>
+            <span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+            <div>
+              <span class="label">Doprava z ČR a zpět</span>
+              <span class="desc">Cca 7 h jízdy, doporučujeme spolujízdu mezi účastníky</span>
+            </div>
+          </li>
+          <li>
+            <span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+            <div>
+              <span class="label">Horské pojištění</span>
+              <span class="desc">Doporučujeme s asistenční službou v horách</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- PRICE -->
+    <div class="price-card" id="prihlasit">
+      <div>
+        <h3>Cena výpravy</h3>
+        <p>Cena zahrnuje služby průvodce a organizaci výpravy. Náklady na chatách a stravu platíte přímo na místě (cca €252 / os.). Minimální počet účastníků: 5.</p>
+        <a href="mailto:info@pitztal-trek.cz" class="btn btn-primary" style="margin-top:8px">Rezervovat místo →</a>
+      </div>
+      <div class="price-figure">
+        <div class="v">11 000 <small>Kč</small></div>
+        <div class="k">při 8 účastnících</div>
+        <div class="note">+ ~€252 na místě (chaty + strava)<br/>Celkem ~17 500 Kč / os.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GEAR -->
+<section id="vybaveni">
+  <div class="container">
+    <div class="section-eyebrow">Co si vzít s sebou</div>
+    <h2>Vybavení a check-list</h2>
+    <p class="lead">Cestujeme nalehko – jen jeden batoh na čtyři dny. Vše ostatní je na chatách.</p>
+
+    <div class="gear-grid">
+      <div class="gear-col">
+        <h4>Vybavení a oblečení</h4>
+        <ul>
+          <li><strong>Turistické boty</strong> – kotníčkové, Vibram podrážka</li>
+          <li><strong>Batoh 35–40 l</strong> – na celý trek</li>
+          <li>Softshell nebo fleece + větrovka (Gore-Tex)</li>
+          <li><strong>Nepromokavá bunda</strong> – v údolí může pršet</li>
+          <li>T-shirty + sportovní krátké / leggíny</li>
+          <li>Teplá vrstva na noc (ve 2 800 m i 5 °C)</li>
+          <li>Čepice + lehké rukavice</li>
+        </ul>
+      </div>
+      <div class="gear-col">
+        <h4>Bezpečnost a hygiena</h4>
+        <ul>
+          <li><strong>Lehká lékárnička</strong> – osobní léky, náplasti</li>
+          <li>Opalovací krém SPF 50+</li>
+          <li>Sluneční brýle kategorie 3–4</li>
+          <li>Čelovka s náhradními bateriemi</li>
+          <li><strong>Mapová aplikace offline</strong> (Mapy.cz)</li>
+          <li>Powerbanka</li>
+        </ul>
+      </div>
+      <div class="gear-col">
+        <h4>Na chaty</h4>
+        <ul>
+          <li><strong>Vlastní spacák</strong> – povinné na chatách</li>
+          <li>Ručník – na chatách nebývá</li>
+          <li>Hygienické potřeby (chaty mají sociální zázemí)</li>
+          <li><strong>Hotovost</strong> – min. €78 (Taschachhaus jen hotově)</li>
+          <li>Doklady + kartička pojištění</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h4>Tip: Pitztal Gästekarte</h4>
+      <p>Pokud přespíte den předem v ubytování v Pitztalu (Plangeroß nebo St. Leonhard), dostanete kartu se slevami včetně <strong>zdarma jízdy lanovkou</strong>. Doporučujeme – cesta z ČR trvá ~7 hodin.</p>
+    </div>
+  </div>
+</section>
+
+<!-- INFO / FAQ -->
+<section id="info" style="background:#f4f0e8">
+  <div class="container">
+    <div class="section-eyebrow">Praktické informace</div>
+    <h2>Časté otázky</h2>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:40px">
+      <div style="background:#fff;border-radius:var(--radius);padding:28px;border:1px solid var(--line)">
+        <h3 style="font-family:'Fraunces',serif;font-size:1.25rem;font-weight:600;color:var(--ink);margin-bottom:10px">Pro koho je výlet určen?</h3>
+        <p style="margin:0">Sportovně založení turisté, kteří chtějí vidět Alpy „z blízka“. Délka tras není extrémní, ale spíme až ve 2 800 m. Vhodné pro lidi bez alpských zkušeností, kteří mají dobrou kondici.</p>
+      </div>
+      <div style="background:#fff;border-radius:var(--radius);padding:28px;border:1px solid var(--line)">
+        <h3 style="font-family:'Fraunces',serif;font-size:1.25rem;font-weight:600;color:var(--ink);margin-bottom:10px">Jak je řešena doprava?</h3>
+        <p style="margin:0">Doprava není v ceně – řešíte individuálně. Z ČR je to cca 7 hodin jízdy. Doporučujeme spolujízdu mezi účastníky. Sraz 9:00 na parkovišti v Plangeroß (zdarma).</p>
+      </div>
+      <div style="background:#fff;border-radius:var(--radius);padding:28px;border:1px solid var(--line)">
+        <h3 style="font-family:'Fraunces',serif;font-weight:600;font-size:1.25rem;color:var(--ink);margin-bottom:10px">Jaká je obtížnost?</h3>
+        <p style="margin:0">Jdeme po značených turistických cestách, které nevyžadují horolezeckou výzbroj. Nejnáročnější je Den 3 (1 220 m převýšení) a délka Dne 1 a 2 (11 km). Žádné ferraty, žádné ledovce pod nohama.</p>
+      </div>
+      <div style="background:#fff;border-radius:var(--radius);padding:28px;border:1px solid var(--line)">
+        <h3 style="font-family:'Fraunces',serif;font-weight:600;font-size:1.25rem;color:var(--ink);margin-bottom:10px">Co když se zhorší počasí?</h3>
+        <p style="margin:0">Máme záložní sestupové trasy pro každý den. V případě zhoršení nevystupujeme na vyšší pozice, můžeme přespat v údolí. Kaunergrathütte má Winterraum pro nouzové přespání.</p>
+      </div>
+      <div style="background:#fff;border-radius:var(--radius);padding:28px;border:1px solid var(--line)">
+        <h3 style="font-family:'Fraunces',serif;font-weight:600;font-size:1.25rem;color:var(--ink);margin-bottom:10px">Kolik si vzít hotovosti?</h3>
+        <p style="margin:0">Minimálně €78 v hotovosti na Taschachhaus (přijímá pouze hotově). Zbytek ubytování a stravy lze na ostatních chatách platit kartou. Počítejte celkem ~€250 na chatách a stravě.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-final">
+  <div class="container">
+    <h2>Chcete vyrazit s námi?</h2>
+    <p>Sezóna 2026 začíná v červenci. Skupina maximálně 8 účastníků, místa rychle mizí. Napište nám a domluvíme termín.</p>
+    <a href="mailto:info@pitztal-trek.cz" class="btn btn-primary">Rezervovat místo →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="foot-grid">
+      <div>
+        <div class="logo" style="color:#fff;margin-bottom:14px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20 L9 8 L13 14 L17 6 L21 20 Z"/><circle cx="16" cy="5" r="1.5" fill="currentColor"/></svg>
+          Pitztal Trek
+        </div>
+        <p style="margin:0;max-width:35ch;color:rgba(255,255,255,.55)">Čtyřdenní přechod po horských chatách v rakouských Tyrolských Alpách.</p>
+      </div>
+      <div>
+        <h5>Výprava</h5>
+        <ul>
+          <li><a href="#program">Program</a></li>
+          <li><a href="#chaty">Chaty</a></li>
+          <li><a href="#cena">Cena</a></li>
+          <li><a href="#vybaveni">Vybavení</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Informace</h5>
+        <ul>
+          <li><a href="#info">FAQ</a></li>
+          <li><a href="#">Smluvní podmínky</a></li>
+          <li><a href="#">Pojištění</a></li>
+          <li><a href="#">GDPR</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Kontakt</h5>
+        <ul>
+          <li><a href="mailto:info@pitztal-trek.cz">info@pitztal-trek.cz</a></li>
+          <li>+420 ___ ___ ___</li>
+          <li>Instagram</li>
+          <li>Facebook</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Pitztal Trek. Všechna práva vyhrazena.</span>
+      <span>Cestovní kancelář</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
