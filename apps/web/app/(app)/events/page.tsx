@@ -149,7 +149,7 @@ function EventRow({ event }: { event: EventSummary }) {
         </div>
         <h3 className="mt-2 text-base font-semibold text-ink-900">
           <Link
-            href={`/${event.workspace_slug}/e/${event.slug}`}
+            href={`/communities/${event.workspace_slug}/events/${event.slug}`}
             className="hover:underline"
           >
             {event.title}

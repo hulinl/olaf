@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
 import { Logo } from "@/components/ui/logo";
+import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
+import { SectionHead } from "@/components/ui/section-head";
 import { assetUrl, type Event } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -111,7 +113,13 @@ export default async function EventLandingPage({ params }: Props) {
             )}
             <span className="text-sm font-medium">{event.workspace_name}</span>
           </Link>
-          <PublicAuthIndicator />
+          <div className="flex items-center gap-3">
+            <OwnerCockpitLink
+              workspaceSlug={event.workspace_slug}
+              eventSlug={event.slug}
+            />
+            <PublicAuthIndicator />
+          </div>
         </div>
       </header>
 
@@ -160,22 +168,39 @@ export default async function EventLandingPage({ params }: Props) {
         {event.blocks && event.blocks.length > 0 ? null : (
         <>
         {/* Hero */}
-        <section className="relative min-h-[420px] overflow-hidden">
+        <section
+          className={[
+            "relative overflow-hidden",
+            cover ? "min-h-[520px]" : "border-b border-border",
+          ].join(" ")}
+        >
+          {cover && (
+            <>
+              <div
+                className="absolute inset-0 -z-10"
+                style={{
+                  backgroundImage: `url(${cover})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
+              <div
+                className="absolute inset-0 -z-10"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.75) 100%)",
+                }}
+              />
+            </>
+          )}
           <div
-            className="absolute inset-0 -z-10 bg-surface-strong"
-            style={
-              cover
-                ? {
-                    backgroundImage: `linear-gradient(rgba(0,0,0,0.05), rgba(0,0,0,0.05)), url(${cover})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }
-                : undefined
-            }
-          />
-          <div className="mx-auto flex max-w-5xl flex-col items-start px-4 py-20 sm:py-28">
+            className={[
+              "mx-auto flex max-w-5xl flex-col items-start gap-6 px-4",
+              cover ? "py-24 sm:py-32" : "py-20 sm:py-24",
+            ].join(" ")}
+          >
             {cancelled && (
-              <span className="mb-4 inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
+              <span className="inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
                 ZRUŠENO
               </span>
             )}
@@ -184,39 +209,74 @@ export default async function EventLandingPage({ params }: Props) {
                 const remaining = event.remaining_capacity ?? 0;
                 if (remaining === 0) {
                   return (
-                    <span className="mb-4 inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
-                      VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
+                    <span className="inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
+                      Vyprodáno{event.waitlist_enabled ? " · waitlist otevřený" : ""}
                     </span>
                   );
                 }
                 if (remaining <= 3) {
                   return (
-                    <span className="mb-4 inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
-                      POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
+                    <span className="inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
+                      Poslední {remaining} míst{remaining === 1 ? "o" : "a"}
                     </span>
                   );
                 }
                 return null;
               })()
             )}
-            <h1 className="max-w-3xl bg-ink-900 px-3 py-2 text-3xl font-semibold leading-tight tracking-tight text-ink-inverse sm:text-5xl">
-              {event.workspace_name.toUpperCase()} — {event.title.toUpperCase()}
+
+            <p
+              className={[
+                "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
+                cover ? "text-white/80" : "text-ink-500",
+              ].join(" ")}
+            >
+              {event.workspace_name} · {dateRange}
+            </p>
+
+            <h1
+              className={[
+                "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
+                cover ? "text-ink-inverse" : "text-ink-900",
+              ].join(" ")}
+              style={{ letterSpacing: "-0.035em" }}
+            >
+              {event.title}
             </h1>
+
             {event.description && (
-              <p className="mt-5 max-w-2xl bg-ink-900 px-3 py-2 text-sm leading-relaxed text-ink-inverse sm:text-base">
+              <p
+                className={[
+                  "max-w-2xl text-lg sm:text-xl",
+                  cover ? "text-white/90" : "text-ink-700",
+                ].join(" ")}
+                style={{
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.4,
+                  fontWeight: 500,
+                }}
+              >
                 {event.description.split("\n")[0]}
               </p>
             )}
-            <div className="mt-8">
+
+            <div className="mt-2">
               {event.is_open_for_rsvp ? (
                 <Link
                   href={cta_href}
-                  className="inline-flex h-12 items-center justify-center rounded-md bg-ink-900 px-6 text-base font-semibold text-ink-inverse transition-colors hover:bg-ink-700 focus-ring"
+                  className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-6 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
                 >
                   Přihlásit na akci
                 </Link>
               ) : (
-                <span className="inline-flex h-12 items-center justify-center rounded-md bg-ink-900/60 px-6 text-base font-semibold text-ink-inverse">
+                <span
+                  className={[
+                    "inline-flex h-12 items-center justify-center rounded-md px-6 text-base font-semibold",
+                    cover
+                      ? "bg-white/15 text-ink-inverse"
+                      : "bg-surface-strong text-ink-500",
+                  ].join(" ")}
+                >
                   {cancelled
                     ? "Akce zrušena"
                     : event.status === "closed"
@@ -228,23 +288,20 @@ export default async function EventLandingPage({ params }: Props) {
           </div>
         </section>
 
-        {/* DETAILY */}
-        <section className="border-t border-border bg-surface-muted/40">
-          <div className="mx-auto max-w-5xl px-4 py-16">
-            <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-              DETAILY AKCE
-            </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <DetailCard label="TERMÍN" value={dateRange} />
-              <DetailCard
-                label="MÍSTO"
-                value={event.location_text || "—"}
-                link={event.location_url || undefined}
+        {/* DETAILY — meta row in brand style */}
+        <section className="border-t border-border bg-canvas">
+          <div className="mx-auto max-w-5xl px-4 py-12 sm:py-14">
+            <dl className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+              <MetaPair k="Termín" v={dateRange} />
+              <MetaPair
+                k="Místo"
+                v={event.location_text || "—"}
+                href={event.location_url || undefined}
               />
               {event.capacity != null && (
-                <DetailCard
-                  label="KAPACITA"
-                  value={`${event.capacity} míst${
+                <MetaPair
+                  k="Kapacita"
+                  v={`${event.capacity} míst${
                     event.confirmed_count > 0
                       ? ` · ${event.confirmed_count} přihlášeno`
                       : ""
@@ -252,21 +309,22 @@ export default async function EventLandingPage({ params }: Props) {
                 />
               )}
               {event.price_text && (
-                <DetailCard label="CENA" value={event.price_text} />
+                <MetaPair k="Cena" v={event.price_text} />
               )}
-            </div>
+            </dl>
           </div>
         </section>
 
         {/* O AKCI + foto */}
         {event.description && (
-          <section className="border-t border-border">
-            <div className="mx-auto grid max-w-5xl gap-10 px-4 py-16 md:grid-cols-2">
+          <section className="border-t border-border bg-canvas">
+            <div className="mx-auto grid max-w-5xl gap-12 px-4 py-16 sm:py-20 md:grid-cols-2 md:items-start">
               <div>
-                <h2 className="mb-4 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                  O AKCI
-                </h2>
-                <div className="space-y-4 text-ink-900">
+                <SectionHead eyebrow="O akci" title="Proč jet" />
+                <div
+                  className="space-y-4 text-ink-700"
+                  style={{ fontSize: 16, lineHeight: 1.6 }}
+                >
                   {event.description.split("\n\n").map((para, i) => (
                     <p key={i}>{para}</p>
                   ))}
@@ -277,7 +335,7 @@ export default async function EventLandingPage({ params }: Props) {
                 <img
                   src={cover}
                   alt={event.title}
-                  className="aspect-square w-full rounded-lg object-cover"
+                  className="aspect-square w-full rounded-md object-cover"
                 />
               )}
             </div>
@@ -286,22 +344,34 @@ export default async function EventLandingPage({ params }: Props) {
 
         {/* PROGRAM */}
         {event.program.length > 0 && (
-          <section className="border-t border-border bg-surface-muted/40">
-            <div className="mx-auto max-w-5xl px-4 py-16">
-              <h2 className="mb-10 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                PROGRAM
-              </h2>
+          <section className="border-t border-border bg-surface-muted">
+            <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+              <SectionHead eyebrow="Program" title="Den po dni" />
               <ol className="space-y-8">
                 {event.program.map((d, i) => (
-                  <li key={i} className="flex gap-4 sm:gap-6">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-base font-bold text-brand-ink sm:h-12 sm:w-12 sm:text-lg">
-                      {i + 1}
+                  <li key={i} className="flex gap-5">
+                    <span
+                      className="shrink-0 font-mono text-4xl font-semibold leading-none text-ink-300 sm:text-5xl"
+                      style={{ letterSpacing: "-0.03em" }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
                     </span>
                     <div className="flex-1">
-                      <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900 sm:text-lg">
-                        {d.day} — {d.title}
+                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-500">
+                        {d.day}
+                      </p>
+                      <h3
+                        className="mt-1 text-xl font-semibold text-ink-900 sm:text-2xl"
+                        style={{ letterSpacing: "-0.02em" }}
+                      >
+                        {d.title}
                       </h3>
-                      <p className="mt-2 text-ink-700">{d.body}</p>
+                      <p
+                        className="mt-3 whitespace-pre-line text-ink-700"
+                        style={{ fontSize: 16, lineHeight: 1.6 }}
+                      >
+                        {d.body}
+                      </p>
                     </div>
                   </li>
                 ))}
@@ -312,76 +382,83 @@ export default async function EventLandingPage({ params }: Props) {
 
         {/* CO JE V CENĚ + CO NENÍ V CENĚ */}
         {(event.included.length > 0 || event.not_included.length > 0) && (
-          <section className="border-t border-border">
-            <div className="mx-auto grid max-w-5xl gap-10 px-4 py-16 md:grid-cols-2">
-              {event.included.length > 0 && (
-                <div>
-                  <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                    CO JE V CENĚ
-                  </h2>
-                  <ul className="space-y-4 border-l-2 border-brand pl-6">
-                    {event.included.map((item, i) => (
-                      <li key={i} className="text-ink-900">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {event.not_included.length > 0 && (
-                <div>
-                  <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                    CO NENÍ V CENĚ
-                  </h2>
-                  <ul className="space-y-4 border-l-2 border-border-strong pl-6">
-                    {event.not_included.map((item, i) => (
-                      <li key={i} className="text-ink-700">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  {event.additional_cost_note && (
-                    <p className="mt-5 rounded-md border border-border bg-surface-muted/60 px-3 py-2 text-sm text-ink-700">
-                      <strong>Odhad navíc:</strong> {event.additional_cost_note}
+          <section className="border-t border-border bg-canvas">
+            <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+              <SectionHead eyebrow="Cena" title="Co dostaneš a za co platíš" />
+              <div className="grid gap-12 md:grid-cols-2">
+                {event.included.length > 0 && (
+                  <div>
+                    <p className="mb-5 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-900">
+                      V ceně
                     </p>
-                  )}
-                </div>
-              )}
+                    <ul className="space-y-3 border-l-2 border-brand pl-6">
+                      {event.included.map((item, i) => (
+                        <li
+                          key={i}
+                          className="text-ink-900"
+                          style={{ fontSize: 16, lineHeight: 1.55 }}
+                        >
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {event.not_included.length > 0 && (
+                  <div>
+                    <p className="mb-5 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-500">
+                      Hradíš sám
+                    </p>
+                    <ul className="space-y-3 border-l-2 border-border-strong pl-6">
+                      {event.not_included.map((item, i) => (
+                        <li
+                          key={i}
+                          className="text-ink-700"
+                          style={{ fontSize: 16, lineHeight: 1.55 }}
+                        >
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                    {event.additional_cost_note && (
+                      <p className="mt-5 border-l-2 border-border pl-6 text-sm text-ink-500">
+                        Odhad navíc · {event.additional_cost_note}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}
 
         {/* NÁROČNOST */}
         {(event.difficulty_level > 0 || event.difficulty_note) && (
-          <section className="border-t border-border bg-surface-muted/40">
-            <div className="mx-auto max-w-5xl px-4 py-16">
-              <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                NÁROČNOST
-              </h2>
+          <section className="border-t border-border bg-surface-muted">
+            <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+              <SectionHead eyebrow="Náročnost" title={`${event.difficulty_level || "—"} z 5`} />
               {event.difficulty_level > 0 && (
-                <div className="mb-5 flex items-baseline gap-4">
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <span
-                        key={n}
-                        className={[
-                          "h-8 w-8 rounded-md border flex items-center justify-center text-sm font-semibold",
-                          n <= event.difficulty_level
-                            ? "bg-brand border-brand text-brand-ink"
-                            : "bg-surface border-border text-ink-300",
-                        ].join(" ")}
-                      >
-                        {n}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-sm text-ink-500">
-                    {event.difficulty_level} z 5
-                  </span>
+                <div className="mb-6 flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <span
+                      key={n}
+                      className={[
+                        "h-2 w-12 rounded-full",
+                        n <= event.difficulty_level
+                          ? "bg-brand"
+                          : "bg-border",
+                      ].join(" ")}
+                    />
+                  ))}
                 </div>
               )}
               {event.difficulty_note && (
-                <p className="max-w-2xl text-ink-700">{event.difficulty_note}</p>
+                <p
+                  className="max-w-2xl text-ink-700"
+                  style={{ fontSize: 16, lineHeight: 1.6 }}
+                >
+                  {event.difficulty_note}
+                </p>
               )}
             </div>
           </section>
@@ -391,41 +468,21 @@ export default async function EventLandingPage({ params }: Props) {
         {(event.transport_info ||
           event.accommodation_info ||
           event.gear_info) && (
-          <section className="border-t border-border">
-            <div className="mx-auto max-w-5xl px-4 py-16">
-              <h2 className="mb-8 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                PRAKTICKÉ INFO
-              </h2>
-              <div className="grid gap-6 sm:grid-cols-3">
+          <section className="border-t border-border bg-canvas">
+            <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+              <SectionHead eyebrow="Praktické info" title="Doprava, spaní, výbava" />
+              <div className="grid gap-10 sm:grid-cols-3">
                 {event.transport_info && (
-                  <div>
-                    <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900">
-                      Doprava
-                    </h3>
-                    <p className="mt-2 whitespace-pre-line text-ink-700">
-                      {event.transport_info}
-                    </p>
-                  </div>
+                  <PracticalCol title="Doprava" body={event.transport_info} />
                 )}
                 {event.accommodation_info && (
-                  <div>
-                    <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900">
-                      Ubytování a strava
-                    </h3>
-                    <p className="mt-2 whitespace-pre-line text-ink-700">
-                      {event.accommodation_info}
-                    </p>
-                  </div>
+                  <PracticalCol
+                    title="Ubytování a strava"
+                    body={event.accommodation_info}
+                  />
                 )}
                 {event.gear_info && (
-                  <div>
-                    <h3 className="text-base font-semibold uppercase tracking-wide text-ink-900">
-                      Výbava
-                    </h3>
-                    <p className="mt-2 whitespace-pre-line text-ink-700">
-                      {event.gear_info}
-                    </p>
-                  </div>
+                  <PracticalCol title="Výbava" body={event.gear_info} />
                 )}
               </div>
             </div>
@@ -434,39 +491,42 @@ export default async function EventLandingPage({ params }: Props) {
 
         {/* HIGHLIGHTS — Na co se zaměříme */}
         {event.highlights.length > 0 && (
-          <section className="border-t border-border bg-surface-muted/40">
-            <div className="mx-auto max-w-5xl px-4 py-16">
-              <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                NA CO SE ZAMĚŘÍME
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+          <section className="border-t border-border bg-surface-muted">
+            <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+              <SectionHead eyebrow="Highlights" title="Na co se zaměříme" />
+              <ul className="grid gap-3 sm:grid-cols-2">
                 {event.highlights.map((h, i) => (
-                  <div
+                  <li
                     key={i}
-                    className="rounded-md border border-border bg-surface p-4 text-ink-900"
+                    className="border-l-2 border-brand pl-5 text-ink-900"
+                    style={{ fontSize: 16, lineHeight: 1.55 }}
                   >
                     {h}
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </section>
         )}
 
         {/* FAQ */}
         {event.faq.length > 0 && (
-          <section className="border-t border-border bg-surface-muted/40">
-            <div className="mx-auto max-w-3xl px-4 py-16">
-              <h2 className="mb-8 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-                ČASTÉ DOTAZY
-              </h2>
-              <dl className="space-y-6">
+          <section className="border-t border-border bg-canvas">
+            <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
+              <SectionHead eyebrow="FAQ" title="Časté dotazy" />
+              <dl className="divide-y divide-border border-y border-border">
                 {event.faq.map((f, i) => (
-                  <div key={i}>
-                    <dt className="text-base font-semibold text-ink-900">
+                  <div key={i} className="py-6">
+                    <dt
+                      className="text-lg font-semibold text-ink-900"
+                      style={{ letterSpacing: "-0.015em" }}
+                    >
                       {f.question}
                     </dt>
-                    <dd className="mt-2 whitespace-pre-line text-ink-700">
+                    <dd
+                      className="mt-3 whitespace-pre-line text-ink-700"
+                      style={{ fontSize: 16, lineHeight: 1.6 }}
+                    >
                       {f.answer}
                     </dd>
                   </div>
@@ -477,51 +537,50 @@ export default async function EventLandingPage({ params }: Props) {
         )}
 
         {/* CTA */}
-        <section className="border-t border-border">
-          <div className="mx-auto max-w-5xl px-4 py-16">
-            <h2 className="mb-4 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-              PŘIHLAS SE
-            </h2>
-            <p className="max-w-2xl text-ink-700">
-              {event.is_open_for_rsvp
-                ? event.capacity != null
-                  ? `Místa jsou omezená — kapacita je ${event.capacity}. Přihlas se co nejdřív a zajisti si své místo.`
-                  : "Registrace jsou otevřené. Připoj se k nám."
-                : cancelled
-                  ? `Akce byla zrušena${
-                      event.cancellation_reason
-                        ? `: ${event.cancellation_reason}`
-                        : "."
-                    }`
-                  : "Registrace na tuto akci nejsou momentálně otevřené."}
-            </p>
+        <section className="border-t border-border bg-canvas">
+          <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+            <SectionHead
+              eyebrow="Přihlášení"
+              title={event.is_open_for_rsvp ? "Pojedeš s námi?" : "Přihlášení zavřená"}
+              lead={
+                event.is_open_for_rsvp
+                  ? event.capacity != null
+                    ? `Kapacita je ${event.capacity} a místa zaplníme. Pošli RSVP a zajisti si své místo.`
+                    : "Registrace jsou otevřené. Připoj se k nám."
+                  : cancelled
+                    ? `Akce byla zrušena${
+                        event.cancellation_reason
+                          ? `: ${event.cancellation_reason}`
+                          : "."
+                      }`
+                    : "Registrace na tuto akci nejsou momentálně otevřené."
+              }
+            />
             {event.is_open_for_rsvp && (
-              <div className="mt-8">
-                <Link
-                  href={cta_href}
-                  className="inline-flex h-12 items-center justify-center rounded-md bg-ink-900 px-6 text-base font-semibold text-ink-inverse transition-colors hover:bg-ink-700 focus-ring"
-                >
-                  Přihlásit na akci
-                </Link>
-              </div>
+              <Link
+                href={cta_href}
+                className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-6 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
+              >
+                Přihlásit na akci
+              </Link>
             )}
           </div>
         </section>
         </>
         )}
 
-        <footer className="border-t border-border">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-8 text-sm text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="border-t border-border bg-canvas">
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
             <span>
               © {new Date().getFullYear()} {event.workspace_name} ·{" "}
               <Link
                 href={`/${event.workspace_slug}`}
                 className="underline hover:text-ink-900"
               >
-                profil
+                Profil
               </Link>
             </span>
-            <span className="text-ink-300">
+            <span>
               <Link href="/" className="hover:text-ink-900">
                 olaf
               </Link>{" "}
@@ -534,33 +593,54 @@ export default async function EventLandingPage({ params }: Props) {
   );
 }
 
-function DetailCard({
-  label,
-  value,
-  link,
+function MetaPair({
+  k,
+  v,
+  href,
 }: {
-  label: string;
-  value: string;
-  link?: string;
+  k: string;
+  v: string;
+  href?: string;
 }) {
-  const valueNode = link ? (
+  const valueNode = href ? (
     <a
-      href={link}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       className="text-ink-900 underline hover:no-underline"
     >
-      {value}
+      {v}
     </a>
   ) : (
-    value
+    v
   );
   return (
-    <div className="rounded-md bg-brand p-5 text-brand-ink">
-      <span className="inline-block bg-ink-900 px-2 py-1 text-xs font-semibold tracking-wide text-ink-inverse">
-        {label}
-      </span>
-      <p className="mt-3 text-lg font-semibold">{valueNode}</p>
+    <div>
+      <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-500">
+        {k}
+      </dt>
+      <dd
+        className="mt-2 text-lg font-semibold text-ink-900"
+        style={{ letterSpacing: "-0.015em" }}
+      >
+        {valueNode}
+      </dd>
+    </div>
+  );
+}
+
+function PracticalCol({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-500">
+        {title}
+      </p>
+      <p
+        className="mt-3 whitespace-pre-line text-ink-700"
+        style={{ fontSize: 16, lineHeight: 1.6 }}
+      >
+        {body}
+      </p>
     </div>
   );
 }

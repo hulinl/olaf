@@ -1,5 +1,6 @@
 import { assetUrl } from "@/lib/api";
 import type { ProseBlockPayload } from "@/lib/event-blocks";
+import { SectionHead } from "@/components/ui/section-head";
 
 interface Props {
   payload: ProseBlockPayload;
@@ -15,11 +16,11 @@ export function ProseBlock({ payload }: Props) {
   }
 
   return (
-    <section className="border-t border-border">
+    <section className="border-t border-border bg-canvas">
       <div
         className={[
-          "mx-auto max-w-5xl px-4 py-16",
-          image ? "grid gap-10 md:grid-cols-2" : "",
+          "mx-auto max-w-5xl px-4 py-16 sm:py-20",
+          image ? "grid gap-12 md:grid-cols-2 md:items-start" : "",
         ].join(" ")}
       >
         {image && side === "left" && (
@@ -27,21 +28,20 @@ export function ProseBlock({ payload }: Props) {
           <img
             src={image}
             alt=""
-            className="aspect-[4/5] w-full rounded-lg object-cover"
+            className="aspect-[4/5] w-full rounded-md object-cover"
           />
         )}
         <div>
-          {payload.eyebrow && (
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-brand">
-              {payload.eyebrow}
-            </p>
+          {(payload.eyebrow || payload.heading) && (
+            <SectionHead
+              eyebrow={payload.eyebrow}
+              title={payload.heading ?? ""}
+            />
           )}
-          {payload.heading && (
-            <h2 className="mb-6 inline-block bg-ink-900 px-3 py-1.5 text-xl font-semibold text-ink-inverse">
-              {payload.heading}
-            </h2>
-          )}
-          <div className="space-y-4 text-ink-700">
+          <div
+            className="space-y-4 text-ink-700"
+            style={{ fontSize: 16, lineHeight: 1.6 }}
+          >
             {paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
@@ -52,7 +52,7 @@ export function ProseBlock({ payload }: Props) {
           <img
             src={image}
             alt=""
-            className="aspect-[4/5] w-full rounded-lg object-cover"
+            className="aspect-[4/5] w-full rounded-md object-cover"
           />
         )}
       </div>

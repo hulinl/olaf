@@ -12,35 +12,36 @@ export function StatsBlock({ payload }: Props) {
   return (
     <section
       className={[
-        "border-t border-border py-14",
+        "border-t py-16 sm:py-20",
         dark
-          ? "bg-ink-900 text-ink-inverse"
-          : "bg-surface-muted/40 text-ink-900",
+          ? "border-transparent bg-ink-900 text-ink-inverse"
+          : "border-border bg-canvas text-ink-900",
       ].join(" ")}
     >
       <div className="mx-auto max-w-5xl px-4">
-        <div className="grid grid-cols-2 gap-8 text-center sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
           {payload.tiles.map((t, i) => (
             <div key={i}>
-              <p
+              <dt
                 className={[
-                  "text-3xl font-semibold tracking-tight sm:text-4xl",
-                  dark ? "text-ink-inverse" : "text-ink-900",
-                ].join(" ")}
-              >
-                {t.value}
-              </p>
-              <p
-                className={[
-                  "mt-2 text-xs font-medium uppercase tracking-widest",
-                  dark ? "text-ink-inverse/70" : "text-ink-500",
+                  "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
+                  dark ? "text-white/60" : "text-ink-500",
                 ].join(" ")}
               >
                 {t.label}
-              </p>
+              </dt>
+              <dd
+                className={[
+                  "mt-2 text-4xl font-semibold sm:text-5xl",
+                  dark ? "text-ink-inverse" : "text-ink-900",
+                ].join(" ")}
+                style={{ letterSpacing: "-0.035em", lineHeight: 1 }}
+              >
+                {t.value}
+              </dd>
             </div>
           ))}
-        </div>
+        </dl>
       </div>
     </section>
   );

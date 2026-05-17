@@ -301,7 +301,11 @@ function EventCard({
         </div>
         <h3 className="mt-2 text-base font-semibold text-ink-900">
           <Link
-            href={`/${workspaceSlug}/e/${event.slug}`}
+            href={
+              showStatus
+                ? `/communities/${workspaceSlug}/events/${event.slug}`
+                : `/${workspaceSlug}/e/${event.slug}`
+            }
             className="hover:underline"
           >
             {event.title}
@@ -310,40 +314,16 @@ function EventCard({
         {event.location_text && (
           <p className="mt-1 text-sm text-ink-500">{event.location_text}</p>
         )}
-        <div className="mt-4 flex items-baseline justify-between gap-3 text-sm">
-          <div className="flex items-baseline gap-4">
-            <span className="text-ink-900">
-              <strong>{event.confirmed_count}</strong>
-              {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
-              přihlášeno
+        <div className="mt-4 flex items-baseline gap-4 text-sm">
+          <span className="text-ink-900">
+            <strong>{event.confirmed_count}</strong>
+            {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
+            přihlášeno
+          </span>
+          {event.waitlist_count > 0 && (
+            <span className="text-ink-500">
+              +{event.waitlist_count} waitlist
             </span>
-            {event.waitlist_count > 0 && (
-              <span className="text-ink-500">
-                +{event.waitlist_count} waitlist
-              </span>
-            )}
-          </div>
-          {showStatus && (
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/communities/${workspaceSlug}/events/${event.slug}/rsvps`}
-                className="text-xs text-ink-500 hover:text-ink-900"
-              >
-                Přihlášení
-              </Link>
-              <Link
-                href={`/communities/${workspaceSlug}/events/${event.slug}/blocks`}
-                className="text-xs text-ink-500 hover:text-ink-900"
-              >
-                Bloky
-              </Link>
-              <Link
-                href={`/communities/${workspaceSlug}/events/${event.slug}/edit`}
-                className="text-xs text-ink-500 hover:text-ink-900"
-              >
-                Upravit
-              </Link>
-            </div>
           )}
         </div>
       </CardSection>

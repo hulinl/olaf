@@ -69,15 +69,26 @@ export default function DashboardPage() {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-        <header className="mb-10">
-          <p className="text-sm font-medium text-brand">Dashboard</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Ahoj, {user.first_name}.
-          </h1>
-          <p className="mt-2 max-w-xl text-ink-500">
-            Přehled tvých komunit a akcí — vytvoř event, sleduj přihlášené,
-            nebo se podívej, na co ses zaregistroval/a.
-          </p>
+        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-brand">Dashboard</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+              Ahoj, {user.first_name}.
+            </h1>
+            <p className="mt-2 max-w-xl text-ink-500">
+              Přehled tvých komunit a akcí — vytvoř event, sleduj přihlášené,
+              nebo se podívej, na co ses zaregistroval/a.
+            </p>
+          </div>
+          {myWorkspaces && myWorkspaces.some((ws) => ws.my_role === "owner") && (
+            <LinkButton
+              href={`/communities/${myWorkspaces.find((ws) => ws.my_role === "owner")!.slug}/events/new`}
+              variant="primary"
+              size="md"
+            >
+              + Nový event
+            </LinkButton>
+          )}
         </header>
 
         {loading && (
@@ -152,7 +163,11 @@ export default function DashboardPage() {
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {upcomingOwned.slice(0, 4).map((e) => (
-                    <EventMini key={`${e.workspace_slug}/${e.slug}`} event={e} />
+                    <EventMini
+                      key={`${e.workspace_slug}/${e.slug}`}
+                      event={e}
+                      ownerView
+                    />
                   ))}
                 </div>
               )}
@@ -162,7 +177,10 @@ export default function DashboardPage() {
               <Section title="Tvoje nadcházející akce">
                 <div className="grid gap-3 sm:grid-cols-2">
                   {upcomingRsvped.slice(0, 4).map((e) => (
-                    <EventMini key={`${e.workspace_slug}/${e.slug}`} event={e} />
+                    <EventMini
+                      key={`${e.workspace_slug}/${e.slug}`}
+                      event={e}
+                    />
                   ))}
                 </div>
               </Section>
@@ -297,11 +315,20 @@ function WorkspaceMini({ workspace }: { workspace: Workspace }) {
   );
 }
 
-function EventMini({ event }: { event: EventSummary }) {
+function EventMini({
+  event,
+  ownerView = false,
+}: {
+  event: EventSummary;
+  ownerView?: boolean;
+}) {
   const starts = new Date(event.starts_at);
+  const href = ownerView
+    ? `/communities/${event.workspace_slug}/events/${event.slug}`
+    : `/${event.workspace_slug}/e/${event.slug}`;
   return (
     <Link
-      href={`/${event.workspace_slug}/e/${event.slug}`}
+      href={href}
       className="block rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
     >
       <p className="text-xs text-ink-500">
