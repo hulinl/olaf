@@ -147,10 +147,10 @@ export default function RSVPAdminPage({ params }: Props) {
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
         <p className="text-sm text-ink-500">
           <Link
-            href={`/communities/${slug}`}
+            href={`/communities/${slug}/events/${eventSlug}`}
             className="hover:text-ink-900"
           >
-            ← {workspace.name}
+            ← {event.title}
           </Link>
         </p>
 

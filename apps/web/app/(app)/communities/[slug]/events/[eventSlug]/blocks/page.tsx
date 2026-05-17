@@ -115,10 +115,10 @@ export default function EventBlocksPage({ params }: Props) {
       <section className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:py-12">
         <p className="text-sm text-ink-500">
           <Link
-            href={`/communities/${slug}/events/${eventSlug}/edit`}
+            href={`/communities/${slug}/events/${eventSlug}`}
             className="hover:text-ink-900"
           >
-            ← Úprava akce
+            ← {event.title}
           </Link>
         </p>
 

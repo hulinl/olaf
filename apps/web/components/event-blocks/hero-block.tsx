@@ -24,52 +24,109 @@ export function HeroBlock({
   const title = payload.title_override || fallbackTitle;
   const ctaLabel = payload.cta_label || fallbackCtaLabel;
   const ctaHref = payload.cta_href || fallbackCtaHref;
+  const onPhoto = Boolean(cover);
 
   return (
-    <section className="relative min-h-[420px] overflow-hidden">
+    <section
+      className={[
+        "relative overflow-hidden",
+        onPhoto ? "min-h-[520px]" : "border-b border-border",
+      ].join(" ")}
+    >
+      {onPhoto && (
+        <>
+          <div
+            className="absolute inset-0 -z-10"
+            style={{
+              backgroundImage: `url(${cover})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+          <div
+            className="absolute inset-0 -z-10"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.75) 100%)",
+            }}
+          />
+        </>
+      )}
+
       <div
-        className="absolute inset-0 -z-10 bg-surface-strong"
-        style={
-          cover
-            ? {
-                backgroundImage: `linear-gradient(rgba(0,0,0,0.05), rgba(0,0,0,0.05)), url(${cover})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
-      />
-      <div className="mx-auto flex max-w-5xl flex-col items-start px-4 py-20 sm:py-28">
+        className={[
+          "mx-auto flex max-w-5xl flex-col items-start gap-6 px-4",
+          onPhoto ? "py-24 sm:py-32" : "py-20 sm:py-24",
+        ].join(" ")}
+      >
         {badge}
+
         {payload.eyebrow && (
-          <span className="mb-4 inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-ink-inverse backdrop-blur">
+          <p
+            className={[
+              "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
+              onPhoto ? "text-white/80" : "text-ink-500",
+            ].join(" ")}
+          >
             {payload.eyebrow}
-          </span>
+          </p>
         )}
-        <h1 className="max-w-3xl bg-ink-900 px-3 py-2 text-3xl font-semibold leading-tight tracking-tight text-ink-inverse sm:text-5xl">
-          {title.toUpperCase()}
+
+        <h1
+          className={[
+            "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
+            onPhoto ? "text-ink-inverse" : "text-ink-900",
+          ].join(" ")}
+          style={{ letterSpacing: "-0.035em" }}
+        >
+          {title}
         </h1>
+
         {payload.subtitle && (
-          <p className="mt-5 max-w-2xl bg-ink-900 px-3 py-2 text-sm leading-relaxed text-ink-inverse sm:text-base">
+          <p
+            className={[
+              "max-w-2xl text-lg sm:text-xl",
+              onPhoto ? "text-white/90" : "text-ink-700",
+            ].join(" ")}
+            style={{ letterSpacing: "-0.01em", lineHeight: 1.4, fontWeight: 500 }}
+          >
             {payload.subtitle}
           </p>
         )}
-        <div className="mt-8">
+
+        <div className="mt-2">
           <Link
             href={ctaHref}
-            className="inline-flex h-12 items-center justify-center rounded-md bg-ink-900 px-6 text-base font-semibold text-ink-inverse transition-colors hover:bg-ink-700 focus-ring"
+            className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-6 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
           >
             {ctaLabel}
           </Link>
         </div>
+
         {payload.meta && payload.meta.length > 0 && (
-          <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-5 border-t border-white/30 pt-7">
+          <dl
+            className={[
+              "mt-6 flex flex-wrap gap-x-10 gap-y-5 border-t pt-7",
+              onPhoto ? "border-white/20" : "border-border",
+            ].join(" ")}
+          >
             {payload.meta.map((m, i) => (
               <div key={i} className="min-w-[120px]">
-                <dt className="text-[10px] font-medium uppercase tracking-widest text-ink-inverse/70">
+                <dt
+                  className={[
+                    "font-mono text-[10px] font-medium uppercase tracking-[0.14em]",
+                    onPhoto ? "text-white/65" : "text-ink-500",
+                  ].join(" ")}
+                >
                   {m.k}
                 </dt>
-                <dd className="mt-1 text-lg font-semibold text-ink-inverse sm:text-xl">
+                <dd
+                  className={[
+                    "mt-1 text-xl font-semibold sm:text-2xl",
+                    onPhoto ? "text-ink-inverse" : "text-ink-900",
+                  ].join(" ")}
+                  style={{ letterSpacing: "-0.02em" }}
+                >
                   {m.v}
                 </dd>
               </div>

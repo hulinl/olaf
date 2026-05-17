@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
-import { EventDangerZone } from "@/components/event-danger-zone";
 import { EventForm } from "@/components/event-form";
 import { Alert } from "@/components/ui/card";
 import {
@@ -83,10 +82,10 @@ export default function EditEventPage({ params }: Props) {
       <section className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:py-12">
         <p className="text-sm text-ink-500">
           <Link
-            href={`/communities/${slug}`}
+            href={`/communities/${slug}/events/${eventSlug}`}
             className="hover:text-ink-900"
           >
-            ← {workspace.name}
+            ← {event.title}
           </Link>
         </p>
 
@@ -96,27 +95,7 @@ export default function EditEventPage({ params }: Props) {
             {event.title}
           </h1>
           <p className="mt-2 text-ink-500">
-            Změny se projeví okamžitě po uložení.{" "}
-            <Link
-              href={`/${slug}/e/${eventSlug}`}
-              className="underline hover:text-ink-900"
-            >
-              Otevřít veřejnou stránku
-            </Link>
-            {" · "}
-            <Link
-              href={`/communities/${slug}/events/${eventSlug}/blocks`}
-              className="underline hover:text-ink-900"
-            >
-              Bloky stránky
-            </Link>
-            {" · "}
-            <Link
-              href={`/communities/${slug}/events/${eventSlug}/rsvps`}
-              className="underline hover:text-ink-900"
-            >
-              Přihlášení
-            </Link>
+            Změny se projeví okamžitě po uložení.
           </p>
         </header>
 
@@ -125,18 +104,10 @@ export default function EditEventPage({ params }: Props) {
           initial={event}
           onSubmit={(payload) => events.update(slug, eventSlug, payload)}
           onSuccess={(updated) =>
-            router.push(`/${slug}/e/${updated.slug}`)
+            router.push(`/communities/${slug}/events/${updated.slug}`)
           }
           submitLabel="Uložit změny"
         />
-
-        <div className="mt-10 border-t border-border pt-10">
-          <EventDangerZone
-            event={event}
-            workspaceSlug={slug}
-            onCancelled={(updated) => setEvent(updated)}
-          />
-        </div>
       </section>
     </main>
   );
