@@ -5,17 +5,19 @@ interface Props {
   tone?: BlockTone;
 }
 
-export function StatsBlock({ payload, tone = "canvas" }: Props) {
+export function StatsBlock({ payload, tone: _tone = "canvas" }: Props) {
   if (!payload.tiles || payload.tiles.length === 0) return null;
 
-  // Tone drives the appearance now. The legacy `payload.dark` is kept in the
-  // schema for backward compat but ignored — the page assigns tones by index.
-  const dark = tone === "ink";
+  // Stats is the single intentional dark statement on the public landing
+  // (Pitztal-style: warm/light page with one ink accent that carries the
+  // numbers). The `tone` prop and the legacy `payload.dark` are accepted
+  // for forward compat but the block always renders ink.
+  const dark = true;
 
   return (
     <section
       className={[
-        "border-t py-16 sm:py-20",
+        "border-t py-24 sm:py-28",
         dark
           ? "border-transparent bg-ink-900 text-ink-inverse"
           : "border-border bg-canvas text-ink-900",

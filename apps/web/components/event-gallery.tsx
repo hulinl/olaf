@@ -109,7 +109,7 @@ export function EventGallery({ images, chrome = true, tone = "canvas" }: Props) 
         dark ? "border-transparent bg-ink-900" : "border-border bg-canvas",
       ].join(" ")}
     >
-      <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+      <div className="mx-auto max-w-5xl px-4 py-24 sm:py-28">
         <SectionHead
           eyebrow="Galerie"
           title="Z minulých kempů"
