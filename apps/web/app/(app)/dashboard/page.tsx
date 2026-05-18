@@ -243,7 +243,7 @@ function EventMini({
 }) {
   const starts = new Date(event.starts_at);
   const href = ownerView
-    ? `/events/${event.workspace_slug}/${event.slug}`
+    ? `/admin/eventy/${event.workspace_slug}/${event.slug}`
     : `/${event.workspace_slug}/e/${event.slug}`;
   return (
     <Link

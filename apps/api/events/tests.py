@@ -301,6 +301,39 @@ class OwnerEventListTests(TestCase):
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_anonymous_gets_401_on_rsvp_list(self) -> None:
+        # Important: anonymous must get 401 (not 403) so the frontend can
+        # distinguish "log in" from "not your event" and route to /login.
+        url = reverse(
+            "events:rsvps",
+            kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+        )
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_anonymous_gets_401_on_owner_events(self) -> None:
+        resp = self.client.get(reverse("events:owner"))
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_rsvp_list_404_for_missing_event(self) -> None:
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "events:rsvps",
+            kwargs={"workspace_slug": "olafadventures", "event_slug": "does-not-exist"},
+        )
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_owner_events_excludes_other_workspaces(self) -> None:
+        # Owner of olafadventures must not see events from a workspace they don't own.
+        other_ws = Workspace.objects.create(slug="other-ws", name="Other")
+        _build_event(other_ws, slug="other-event", title="Other Event")
+        self.client.force_authenticate(self.owner)
+        resp = self.client.get(reverse("events:owner"))
+        slugs = [e["slug"] for e in resp.json()]
+        self.assertIn("letni-kemp-2026", slugs)
+        self.assertNotIn("other-event", slugs)
+
 
 class CreateUpdateEventTests(TestCase):
     def setUp(self) -> None:
@@ -350,7 +383,7 @@ class CreateUpdateEventTests(TestCase):
     def test_anonymous_blocked_from_create(self) -> None:
         url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
         resp = self.client.post(url, self._create_payload(), format="json")
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_duplicate_slug_rejected(self) -> None:
         _build_event(self.ws, slug="podzimni-kemp-2026", title="exists")

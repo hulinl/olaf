@@ -61,6 +61,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "workspaces.middleware.TenantResolverMiddleware",
+    "olaf.session_debug.SessionDebugMiddleware",
 ]
 
 ROOT_URLCONF = "olaf.urls"
@@ -162,7 +163,7 @@ if TESTING:
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "olaf.authentication.SessionAuthenticationWith401",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -178,3 +179,15 @@ REST_FRAMEWORK = {
 
 # Frontend base URL — embedded in email links (verification, password reset).
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
+
+# Dev session debug — wire the SessionDebugMiddleware logger to stdout.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "session.debug": {"handlers": ["console"], "level": "WARNING"},
+    },
+}

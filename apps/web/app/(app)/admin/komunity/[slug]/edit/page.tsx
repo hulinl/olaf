@@ -12,6 +12,7 @@ import {
   type Workspace,
   type WorkspaceWritePayload,
   assetUrl,
+  auth,
   workspaces,
 } from "@/lib/api";
 
@@ -77,10 +78,15 @@ export default function WorkspaceEditPage({ params }: Props) {
     let cancelled = false;
     workspaces
       .detail(slug)
-      .then((ws) => {
+      .then(async (ws) => {
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/workspaces/${slug}`);
+          try {
+            await auth.me();
+            router.replace(`/${slug}`);
+          } catch {
+            router.replace(`/login?next=/admin/komunity/${slug}/edit`);
+          }
           return;
         }
         setWorkspace(ws);
@@ -96,8 +102,12 @@ export default function WorkspaceEditPage({ params }: Props) {
       })
       .catch((err) => {
         if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?next=/admin/komunity/${slug}/edit`);
+          return;
+        }
         if (err instanceof ApiError && err.status === 404) {
-          router.replace("/workspaces");
+          router.replace("/admin/komunity");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
@@ -204,36 +214,35 @@ export default function WorkspaceEditPage({ params }: Props) {
 
   if (loading) {
     return (
-      <main className="flex flex-1 items-center justify-center">
+      <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-      </main>
+      </div>
     );
   }
   if (!workspace) return null;
 
   return (
-    <main className="flex flex-1 flex-col">
-      <section className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:py-12">
-        <Breadcrumbs
-          items={[
-            { label: "Komunity", href: "/workspaces" },
-            { label: workspace.name, href: `/workspaces/${slug}` },
-            { label: "Upravit komunitu" },
-          ]}
-        />
+    <div className="flex flex-col gap-6">
+      <Breadcrumbs
+        items={[
+          { label: "Komunity", href: "/admin/komunity" },
+          { label: workspace.name, href: `/admin/komunity/${slug}` },
+          { label: "Upravit" },
+        ]}
+      />
 
-        <header className="mt-4 mb-8">
-          <p className="text-sm font-medium text-brand">Komunita</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
-            Upravit profil komunity
-          </h1>
-          <p className="mt-2 text-ink-500">
-            Co tady nastavíš, uvidí návštěvníci na veřejné stránce{" "}
-            <strong>/{slug}</strong>.
-          </p>
-        </header>
+      <header>
+        <p className="text-sm font-medium text-brand">Komunita</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
+          Upravit profil komunity
+        </h1>
+        <p className="mt-2 text-ink-500">
+          Co tady nastavíš, uvidí návštěvníci na veřejné stránce{" "}
+          <strong>/{slug}</strong>.
+        </p>
+      </header>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <Card>
             <CardSection>
               <h2 className="text-base font-semibold text-ink-900">Základní info</h2>
@@ -458,8 +467,7 @@ export default function WorkspaceEditPage({ params }: Props) {
               {submitting ? "Ukládám…" : "Uložit"}
             </Button>
           </div>
-        </form>
-      </section>
-    </main>
+      </form>
+    </div>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, use, useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import {
   type RSVPRecord,
   events,
 } from "@/lib/api";
+
+type Filter = "all" | "yes" | "waitlist" | "pending_approval" | "cancelled";
 
 const RSVP_STATUS_LABEL: Record<RSVPRecord["status"], string> = {
   yes: "Potvrzeno",
@@ -41,9 +43,32 @@ interface Props {
  * insurance. Backed today by RSVP.questionnaire_answers; the placeholder
  * columns get wired when RSVP.payment_status + RSVP.required_docs land.
  */
-export default function AdminEventDetailPage({ params }: Props) {
+export default function AdminEventDetailPage(props: Props) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-12">
+          <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+        </div>
+      }
+    >
+      <AdminEventDetail {...props} />
+    </Suspense>
+  );
+}
+
+function AdminEventDetail({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const filterParam = searchParams.get("filter") as Filter | null;
+  const filter: Filter =
+    filterParam &&
+    ["all", "yes", "waitlist", "pending_approval", "cancelled"].includes(
+      filterParam,
+    )
+      ? filterParam
+      : "all";
   const [event, setEvent] = useState<OlafEvent | null>(null);
   const [rsvps, setRsvps] = useState<RSVPRecord[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +87,10 @@ export default function AdminEventDetailPage({ params }: Props) {
         setRsvps(list);
       } catch (err) {
         if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?next=/admin/eventy/${wsSlug}/${eventSlug}`);
+          return;
+        }
         if (err instanceof ApiError && err.status === 404) {
           router.replace("/admin/eventy");
           return;
@@ -94,6 +123,8 @@ export default function AdminEventDetailPage({ params }: Props) {
   const waitlist = rsvps.filter((r) => r.status === "waitlist");
   const pending = rsvps.filter((r) => r.status === "pending_approval");
   const cancelled = rsvps.filter((r) => r.status === "cancelled");
+  const filteredRsvps =
+    filter === "all" ? rsvps : rsvps.filter((r) => r.status === filter);
 
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
@@ -128,7 +159,7 @@ export default function AdminEventDetailPage({ params }: Props) {
         </div>
         <div className="flex flex-wrap gap-2">
           <LinkButton
-            href={`/events/${wsSlug}/${eventSlug}`}
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit`}
             variant="secondary"
             size="md"
           >
@@ -149,27 +180,54 @@ export default function AdminEventDetailPage({ params }: Props) {
         <StatTile
           label="Přihlášeno"
           value={`${confirmed.length}${event.capacity != null ? ` / ${event.capacity}` : ""}`}
+          href={`/admin/eventy/${wsSlug}/${eventSlug}?filter=yes`}
+          active={filter === "yes"}
         />
         <StatTile
           label="Waitlist"
           value={String(waitlist.length)}
           tone={waitlist.length > 0 ? "warning" : undefined}
+          href={`/admin/eventy/${wsSlug}/${eventSlug}?filter=waitlist`}
+          active={filter === "waitlist"}
         />
         <StatTile
           label="Ke schválení"
           value={String(pending.length)}
           tone={pending.length > 0 ? "warning" : undefined}
+          href={`/admin/eventy/${wsSlug}/${eventSlug}?filter=pending_approval`}
+          active={filter === "pending_approval"}
         />
-        <StatTile label="Zrušeno" value={String(cancelled.length)} />
+        <StatTile
+          label="Zrušeno"
+          value={String(cancelled.length)}
+          href={`/admin/eventy/${wsSlug}/${eventSlug}?filter=cancelled`}
+          active={filter === "cancelled"}
+        />
       </div>
 
-      {rsvps.length === 0 ? (
+      {filter !== "all" && (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-ink-500">Filtr aktivní.</span>
+          <Link
+            href={`/admin/eventy/${wsSlug}/${eventSlug}`}
+            className="font-medium text-brand hover:underline"
+          >
+            Zobrazit všechny ×
+          </Link>
+        </div>
+      )}
+
+      {filteredRsvps.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
           <h3 className="text-base font-semibold text-ink-900">
-            Zatím žádné registrace
+            {filter === "all"
+              ? "Zatím žádné registrace"
+              : "Žádné záznamy v tomto filtru"}
           </h3>
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-            Až se někdo přihlásí, uvidíš ho tady.
+            {filter === "all"
+              ? "Až se někdo přihlásí, uvidíš ho tady."
+              : "Zkus jiný filtr nebo zobraz všechny."}
           </p>
         </div>
       ) : (
@@ -186,7 +244,7 @@ export default function AdminEventDetailPage({ params }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rsvps.map((r) => (
+              {filteredRsvps.map((r) => (
                 <RsvpRow key={r.id} rsvp={r} />
               ))}
             </tbody>
@@ -201,16 +259,25 @@ function StatTile({
   label,
   value,
   tone,
+  href,
+  active,
 }: {
   label: string;
   value: string;
   tone?: "warning";
+  href?: string;
+  active?: boolean;
 }) {
-  return (
+  const body = (
     <div
       className={[
-        "rounded-2xl border bg-surface p-5",
-        tone === "warning" ? "border-warning/30" : "border-border",
+        "rounded-2xl border bg-surface p-5 transition-colors",
+        active
+          ? "border-brand bg-brand/5"
+          : tone === "warning"
+            ? "border-warning/30"
+            : "border-border",
+        href ? "hover:border-brand hover:bg-brand/10" : "",
       ].join(" ")}
     >
       <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
@@ -226,6 +293,8 @@ function StatTile({
       </p>
     </div>
   );
+  if (href) return <Link href={href}>{body}</Link>;
+  return body;
 }
 
 function RsvpRow({ rsvp }: { rsvp: RSVPRecord }) {

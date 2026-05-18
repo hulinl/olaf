@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { EventDangerZone } from "@/components/event-danger-zone";
-import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { Alert, Card, CardSection } from "@/components/ui/card";
+import { Alert } from "@/components/ui/card";
 import {
   ApiError,
   type Event as OlafEvent,
   type Workspace,
+  auth,
   events,
   workspaces,
 } from "@/lib/api";
@@ -35,7 +35,13 @@ const STATUS_TONE: Record<OlafEvent["status"], string> = {
   completed: "bg-surface-muted text-ink-500",
 };
 
-export default function EventCockpitPage({ params }: Props) {
+/**
+ * Level 3 cockpit — actions on a single event (detaily / obsah / galerie /
+ * šablona / zrušit). Stats live on Level 2 (the roster page) so we don't
+ * duplicate them here. Lives under /admin so the admin sidebar stays
+ * visible while editing.
+ */
+export default function EventEditCockpitPage({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -53,20 +59,32 @@ export default function EventCockpitPage({ params }: Props) {
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${wsSlug}/e/${eventSlug}`);
+          // ws.detail is AllowAny — anon users get my_role=null too. Don't
+          // assume "not owner" without re-checking auth, or a transient session
+          // hiccup would silently kick a real owner to the public landing.
+          try {
+            await auth.me();
+            router.replace(`/${wsSlug}/e/${eventSlug}`);
+          } catch {
+            router.replace(
+              `/login?next=/admin/eventy/${wsSlug}/${eventSlug}/edit`,
+            );
+          }
           return;
         }
         setWorkspace(ws);
         setEvent(ev);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 404) {
-          router.replace("/events");
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?next=/admin/eventy/${wsSlug}/${eventSlug}/edit`);
           return;
         }
-        setError(
-          err instanceof ApiError ? err.message : "Něco se pokazilo.",
-        );
+        if (err instanceof ApiError && err.status === 404) {
+          router.replace("/admin/eventy");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Něco se pokazilo.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -78,21 +96,13 @@ export default function EventCockpitPage({ params }: Props) {
 
   if (loading) {
     return (
-      <main className="flex flex-1 items-center justify-center">
+      <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-      </main>
+      </div>
     );
   }
-
-  if (error || !workspace || !event) {
-    return (
-      <main className="flex flex-1 flex-col">
-        <section className="mx-auto w-full max-w-4xl px-4 py-10">
-          {error && <Alert variant="danger">{error}</Alert>}
-        </section>
-      </main>
-    );
-  }
+  if (error) return <Alert variant="danger">{error}</Alert>;
+  if (!workspace || !event) return null;
 
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
@@ -103,131 +113,75 @@ export default function EventCockpitPage({ params }: Props) {
         month: "long",
         year: "numeric",
       })
-    : `${starts.toLocaleDateString("cs-CZ", {
-        day: "numeric",
-        month: "short",
-      })} – ${ends.toLocaleDateString("cs-CZ", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })}`;
+    : `${starts.toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })} – ${ends.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}`;
 
   return (
-    <main className="flex flex-1 flex-col">
-      <section className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:py-12">
-        <Breadcrumbs
-          items={[
-            { label: "Akce", href: "/events" },
-            { label: event.title },
-          ]}
-        />
+    <div className="flex flex-col gap-6">
+      <Link
+        href={`/admin/eventy/${wsSlug}/${eventSlug}`}
+        className="text-sm text-ink-500 hover:text-ink-900"
+      >
+        ← Zpět na přehled akce
+      </Link>
 
-        <header className="mt-4 mb-8">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <span
-              className={[
-                "shrink-0 rounded px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
-                STATUS_TONE[event.status],
-              ].join(" ")}
-            >
-              {STATUS_LABELS[event.status]}
-            </span>
-            <span className="text-sm text-ink-500">{dateLabel}</span>
-            {event.location_text && (
-              <span className="text-sm text-ink-500">
-                · {event.location_text}
-              </span>
-            )}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-              {event.title}
-            </h1>
-            <a
-              href={`/${wsSlug}/e/${eventSlug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Veřejný náhled"
-              aria-label="Otevřít veřejný náhled v novém okně"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M14 3h7v7" />
-                <path d="M10 14L21 3" />
-                <path d="M21 14v7H3V3h7" />
-              </svg>
-            </a>
-          </div>
-        </header>
-
-        <div className="grid gap-3 sm:grid-cols-4">
-          <StatTile
-            label="Potvrzeno"
-            value={
-              event.capacity != null
-                ? `${event.confirmed_count} / ${event.capacity}`
-                : String(event.confirmed_count)
-            }
-            href={`/events/${wsSlug}/${eventSlug}/rsvps?filter=yes`}
-            hint={
-              event.remaining_capacity == null
-                ? "bez limitu"
-                : `volných ${event.remaining_capacity}`
-            }
-          />
-          <StatTile
-            label="Waitlist"
-            value={String(event.waitlist_count)}
-            href={`/events/${wsSlug}/${eventSlug}/rsvps?filter=waitlist`}
-            hint={
-              event.waitlist_count > 0
-                ? "automatický postup při zrušení"
-                : event.waitlist_enabled
-                  ? "zapnutý"
-                  : "vypnutý"
-            }
-          />
-          <StatTile
-            label="Čeká na schválení"
-            value="—"
-            href={`/events/${wsSlug}/${eventSlug}/rsvps?filter=pending_approval`}
-            hint={
-              event.requires_approval
-                ? "schvaluješ každou registraci"
-                : "schvalování vypnuto"
-            }
-          />
-          <StatTile
-            label="Vše"
-            value={String(
-              event.confirmed_count + event.waitlist_count,
-            )}
-            href={`/events/${wsSlug}/${eventSlug}/rsvps`}
-            hint="celkem registrací"
-          />
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <span
+            className={[
+              "shrink-0 rounded px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
+              STATUS_TONE[event.status],
+            ].join(" ")}
+          >
+            {STATUS_LABELS[event.status]}
+          </span>
+          <span className="text-sm text-ink-500">{dateLabel}</span>
+          {event.location_text && (
+            <span className="text-sm text-ink-500">· {event.location_text}</span>
+          )}
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+            {event.title}
+          </h1>
+          <a
+            href={`/${wsSlug}/e/${eventSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Veřejný náhled"
+            aria-label="Otevřít veřejný náhled v novém okně"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 3h7v7" />
+              <path d="M10 14L21 3" />
+              <path d="M21 14v7H3V3h7" />
+            </svg>
+          </a>
+        </div>
+      </header>
 
-        <h2 className="mt-10 text-lg font-semibold text-ink-900">Úpravy</h2>
+      <section>
+        <h2 className="text-lg font-semibold text-ink-900">Úpravy</h2>
         <p className="mt-1 text-sm text-ink-500">
-          Akce má dvě úrovně nastavení: <strong>detaily</strong> pro
-          mechaniku (kdy, kde, kolik míst, kdo se vidí, RSVP otázky) a
-          <strong> obsah stránky</strong> pro to, co účastník na veřejné
-          stránce skutečně uvidí.
+          Akce má dvě úrovně nastavení: <strong>detaily</strong> pro mechaniku
+          (kdy, kde, kolik míst, kdo se vidí, RSVP otázky) a
+          <strong> obsah stránky</strong> pro to, co účastník na veřejné stránce
+          skutečně uvidí.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <PrimaryActionTile
             title="Upravit detaily"
             description="Termín, lokalita, kapacita, viditelnost, sdílení v komunitách, RSVP dotazník."
-            href={`/events/${wsSlug}/${eventSlug}/edit`}
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit/detaily`}
           />
           <PrimaryActionTile
             title="Upravit obsah stránky"
@@ -238,11 +192,13 @@ export default function EventCockpitPage({ params }: Props) {
                   ? "y"
                   : "ů"
             } — hero, program, ceny, FAQ, mapa…`}
-            href={`/events/${wsSlug}/${eventSlug}/blocks`}
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit/obsah`}
           />
         </div>
+      </section>
 
-        <h2 className="mt-10 text-lg font-semibold text-ink-900">Galerie</h2>
+      <section>
+        <h2 className="text-lg font-semibold text-ink-900">Galerie</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <ActionTile
             title="Galerie obrázků"
@@ -257,11 +213,13 @@ export default function EventCockpitPage({ params }: Props) {
                   } · spravuj a přerovnej.`
                 : "Žádné obrázky. Nahraj galerii pro stránku akce."
             }
-            href={`/events/${wsSlug}/${eventSlug}/gallery`}
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit/galerie`}
           />
         </div>
+      </section>
 
-        <h2 className="mt-10 text-lg font-semibold text-ink-900">Šablona</h2>
+      <section>
+        <h2 className="text-lg font-semibold text-ink-900">Šablona</h2>
         <p className="mt-1 text-sm text-ink-500">
           Pořádáš podobné akce opakovaně? Vytvoř z této akce kopii s novým
           slugem ve stavu Draft a uprav jen datum/místo.
@@ -269,16 +227,16 @@ export default function EventCockpitPage({ params }: Props) {
         <div className="mt-3">
           <DuplicateButton wsSlug={wsSlug} eventSlug={eventSlug} />
         </div>
-
-        <div className="mt-10 border-t border-border pt-10">
-          <EventDangerZone
-            event={event}
-            workspaceSlug={wsSlug}
-            onCancelled={(updated) => setEvent(updated)}
-          />
-        </div>
       </section>
-    </main>
+
+      <div className="mt-4 border-t border-border pt-8">
+        <EventDangerZone
+          event={event}
+          workspaceSlug={wsSlug}
+          onCancelled={(updated) => setEvent(updated)}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -299,7 +257,7 @@ function DuplicateButton({
     setErr(null);
     try {
       const copy = await events.duplicate(wsSlug, eventSlug);
-      router.push(`/events/${wsSlug}/${copy.slug}/edit`);
+      router.push(`/admin/eventy/${wsSlug}/${copy.slug}/edit/detaily`);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : "Kopírování selhalo.");
       setBusy(false);
@@ -316,33 +274,9 @@ function DuplicateButton({
       >
         {busy ? "Kopíruji…" : "Duplikovat akci"}
       </button>
-      {err && (
-        <p className="mt-2 text-sm text-danger">{err}</p>
-      )}
+      {err && <p className="mt-2 text-sm text-danger">{err}</p>}
     </>
   );
-}
-
-function StatTile({
-  label,
-  value,
-  hint,
-  href,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  href?: string;
-}) {
-  const body = (
-    <div className="rounded-md border border-border bg-surface p-5 shadow-sm transition-colors hover:border-brand hover:bg-brand/10 focus-ring">
-      <p className="text-sm font-medium text-ink-500">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
-      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
-    </div>
-  );
-  if (href) return <Link href={href}>{body}</Link>;
-  return body;
 }
 
 function ActionTile({

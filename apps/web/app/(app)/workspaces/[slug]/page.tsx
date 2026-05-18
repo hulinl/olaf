@@ -201,7 +201,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
                   </p>
                   {isOwner && (
                     <LinkButton
-                      href="/events/new"
+                      href="/admin/eventy/new"
                       variant="primary"
                       size="md"
                       className="mt-5"
@@ -266,7 +266,7 @@ function EventCard({
 }) {
   const starts = new Date(event.starts_at);
   const href = showStatus
-    ? `/events/${workspaceSlug}/${event.slug}`
+    ? `/admin/eventy/${workspaceSlug}/${event.slug}`
     : `/${workspaceSlug}/e/${event.slug}`;
   return (
     <Link

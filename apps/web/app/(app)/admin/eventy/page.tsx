@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const STATUS_LABELS: Record<EventSummary["status"], string> = {
  * wired when those slices land.
  */
 export default function AdminEventyTablePage() {
+  const router = useRouter();
   const [ownedEvents, setOwnedEvents] = useState<EventSummary[] | null>(null);
   const [hasWorkspace, setHasWorkspace] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,10 @@ export default function AdminEventyTablePage() {
         setOwnedEvents(ev);
       } catch (err) {
         if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace("/login?next=/admin/eventy");
+          return;
+        }
         setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
       } finally {
         if (!cancelled) setLoading(false);
@@ -61,7 +67,7 @@ export default function AdminEventyTablePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const now = Date.now();
   const rows = (ownedEvents ?? []).filter((e) => {
@@ -85,7 +91,7 @@ export default function AdminEventyTablePage() {
           </p>
         </div>
         {hasWorkspace && (
-          <LinkButton href="/events/new" variant="primary" size="md">
+          <LinkButton href="/admin/eventy/new" variant="primary" size="md">
             + Vytvořit akci
           </LinkButton>
         )}
@@ -130,7 +136,6 @@ export default function AdminEventyTablePage() {
                 <th className="px-4 py-3 text-right">Platby</th>
                 <th className="px-4 py-3 text-right">Smlouvy</th>
                 <th className="px-4 py-3 text-right">Pojištění</th>
-                <th className="px-4 py-3" aria-label="Akce" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -165,7 +170,7 @@ function FilterTabs({
           type="button"
           onClick={() => onChange(t.v)}
           className={[
-            "rounded px-3 py-1.5 text-xs font-medium transition-colors focus-ring",
+            "rounded-[5px] px-3 py-1.5 text-xs font-medium transition-colors focus-ring",
             filter === t.v
               ? "bg-ink-900 text-ink-inverse"
               : "text-ink-700 hover:bg-surface-muted",
@@ -223,15 +228,6 @@ function EventRow({ event }: { event: EventSummary }) {
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">
         —
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right">
-        <Link
-          href={`/events/${event.workspace_slug}/${event.slug}`}
-          className="text-xs font-medium text-ink-500 hover:text-ink-900"
-          aria-label={`Otevřít editaci ${event.title}`}
-        >
-          Upravit →
-        </Link>
       </td>
     </tr>
   );

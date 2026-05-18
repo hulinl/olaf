@@ -10,6 +10,7 @@ import {
   ApiError,
   type EventSummary,
   type Workspace,
+  auth,
   workspaces,
 } from "@/lib/api";
 
@@ -49,13 +50,22 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/workspaces/${slug}`);
+          try {
+            await auth.me();
+            router.replace(`/${slug}`);
+          } catch {
+            router.replace(`/login?next=/admin/komunity/${slug}`);
+          }
           return;
         }
         setWorkspace(ws);
         setEventList(ev);
       } catch (err) {
         if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?next=/admin/komunity/${slug}`);
+          return;
+        }
         if (err instanceof ApiError && err.status === 404) {
           router.replace("/admin/komunity");
           return;
@@ -112,7 +122,7 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         </div>
         <div className="flex flex-wrap gap-2">
           <LinkButton
-            href={`/workspaces/${workspace.slug}/edit`}
+            href={`/admin/komunity/${workspace.slug}/edit`}
             variant="secondary"
             size="md"
           >
@@ -137,8 +147,10 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
 
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-xl font-semibold text-ink-900">Akce komunity</h2>
-          <LinkButton href="/events/new" variant="secondary" size="md">
+          <h2 className="text-xl font-semibold text-ink-900">
+            Akce sdílené v této komunitě
+          </h2>
+          <LinkButton href="/admin/eventy/new" variant="secondary" size="md">
             + Vytvořit akci
           </LinkButton>
         </div>
@@ -160,7 +172,6 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
                   <th className="px-4 py-3">Termín</th>
                   <th className="px-4 py-3 text-right">Přihlášeno</th>
                   <th className="px-4 py-3 text-right">Waitlist</th>
-                  <th className="px-4 py-3" aria-label="Akce" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -225,14 +236,6 @@ function EventRow({
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
         {event.waitlist_count > 0 ? event.waitlist_count : "—"}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right">
-        <Link
-          href={`/events/${wsSlug}/${event.slug}`}
-          className="text-xs font-medium text-ink-500 hover:text-ink-900"
-        >
-          Upravit →
-        </Link>
       </td>
     </tr>
   );

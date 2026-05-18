@@ -186,7 +186,7 @@ class MeTests(TestCase):
 
     def test_me_requires_auth(self) -> None:
         resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_me_returns_current_user(self) -> None:
         self.client.force_authenticate(self.user)

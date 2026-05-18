@@ -40,7 +40,7 @@ export function OwnerCockpitLink({ workspaceSlug, eventSlug }: Props) {
 
   return (
     <Link
-      href={`/events/${workspaceSlug}/${eventSlug}`}
+      href={`/admin/eventy/${workspaceSlug}/${eventSlug}/edit`}
       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-border-strong hover:text-ink-900 focus-ring"
     >
       Owner view →

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const VISIBILITY_LABEL: Record<Workspace["visibility"], string> = {
  * Row hover lights up the whole line with the brand amber accent.
  */
 export default function AdminKomunityTablePage() {
+  const router = useRouter();
   const [myWorkspaces, setMyWorkspaces] = useState<Workspace[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +33,12 @@ export default function AdminKomunityTablePage() {
         if (!cancelled) setMyWorkspaces(ws.filter((w) => w.my_role === "owner"));
       })
       .catch((err) => {
-        if (!cancelled)
-          setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace("/login?next=/admin/komunity");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -40,7 +46,7 @@ export default function AdminKomunityTablePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -94,7 +100,6 @@ export default function AdminKomunityTablePage() {
                 <th className="px-4 py-3">Viditelnost</th>
                 <th className="px-4 py-3 text-right">Členů</th>
                 <th className="px-4 py-3 text-right">Akce</th>
-                <th className="px-4 py-3" aria-label="Otevřít" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -133,14 +138,6 @@ function KomunityRow({ workspace: w }: { workspace: Workspace }) {
         {w.member_count ?? "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
-      <td className="whitespace-nowrap px-4 py-3 text-right">
-        <Link
-          href={`/workspaces/${w.slug}/edit`}
-          className="text-xs font-medium text-ink-500 hover:text-ink-900"
-        >
-          Upravit →
-        </Link>
-      </td>
     </tr>
   );
 }
