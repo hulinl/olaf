@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
@@ -10,7 +11,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Workspace, WorkspaceMember
-from .serializers import WorkspacePublicSerializer, WorkspaceWriteSerializer
+from .serializers import (
+    WorkspaceCreateSerializer,
+    WorkspacePublicSerializer,
+    WorkspaceWriteSerializer,
+)
 
 
 def _is_owner(user, workspace: Workspace) -> bool:
@@ -69,6 +74,29 @@ def public_workspace(request: Request, slug: str) -> Response:
 
     serializer = WorkspacePublicSerializer(workspace, context={"request": request})
     return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_workspace(request: Request) -> Response:
+    """Create a new workspace. The authenticated user becomes its owner.
+
+    Any authenticated user can hit this — there's no "I'm a creator" gate.
+    The act of creating the workspace is what makes them one.
+    """
+    serializer = WorkspaceCreateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    with transaction.atomic():
+        workspace = serializer.save()
+        WorkspaceMember.objects.create(
+            workspace=workspace,
+            user=request.user,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+    data = WorkspacePublicSerializer(workspace, context={"request": request}).data
+    data["my_role"] = WorkspaceMember.ROLE_OWNER
+    data["member_count"] = 1
+    return Response(data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])

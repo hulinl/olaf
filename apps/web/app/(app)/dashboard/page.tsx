@@ -135,7 +135,8 @@ export default function DashboardPage() {
               {(myWorkspaces?.length ?? 0) === 0 ? (
                 <EmptyState
                   title="Zatím nejsi v žádné komunitě"
-                  body="Až tě někdo pozve nebo si vytvoříš vlastní komunitu, uvidíš ji tady."
+                  body="Vytvoř si vlastní komunitu pro tvoje akce, nebo počkej až tě někdo pozve do svojí."
+                  cta={{ label: "+ Vytvořit komunitu", href: "/workspaces/new" }}
                 />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
