@@ -208,12 +208,20 @@ export class ApiError extends Error {
     this.data = data;
   }
 
-  /** Convenience for showing the first per-field error in a form. */
+  /** Convenience for showing the first per-field error in a form.
+   *
+   * Handles both DRF's array-of-messages shape (`{field: ["msg"]}`) and our
+   * own ad-hoc string-per-field responses (`{field: "msg"}`). Skips the
+   * generic `detail` key — that's already exposed as `err.message`. */
   firstFieldError(): string | null {
     for (const key of Object.keys(this.data)) {
+      if (key === "detail") continue;
       const value = this.data[key];
       if (Array.isArray(value) && value.length > 0) {
         return `${key}: ${value[0]}`;
+      }
+      if (typeof value === "string" && value) {
+        return value;
       }
     }
     return null;

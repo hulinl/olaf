@@ -399,7 +399,10 @@ def duplicate_event(
 
 
 GALLERY_MAX_IMAGES = 20
-GALLERY_MAX_BYTES = 5 * 1024 * 1024
+# Modern phone photos commonly land in the 4-10 MB range — 5 MB was rejecting
+# typical uploads. Bumped to 12 MB; if storage starts hurting we'll add
+# server-side compression rather than tighten the gate.
+GALLERY_MAX_BYTES = 12 * 1024 * 1024
 
 
 @api_view(["GET", "POST"])
@@ -433,13 +436,14 @@ def event_images(
             status=status.HTTP_400_BAD_REQUEST,
         )
     if upload.size > GALLERY_MAX_BYTES:
+        mb = GALLERY_MAX_BYTES // (1024 * 1024)
         return Response(
-            {"image": "Maximální velikost je 5 MB."},
+            {"detail": f"Obrázek je moc velký — maximum je {mb} MB."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     if event.images.count() >= GALLERY_MAX_IMAGES:
         return Response(
-            {"image": f"Maximum je {GALLERY_MAX_IMAGES} obrázků v galerii."},
+            {"detail": f"Maximum je {GALLERY_MAX_IMAGES} obrázků v galerii."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
