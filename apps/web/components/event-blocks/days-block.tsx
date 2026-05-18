@@ -26,7 +26,7 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
           : "bg-canvas",
       ].join(" ")}
     >
-      <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:py-12">
         <SectionHead
           eyebrow="Program"
           title="Den po dni"

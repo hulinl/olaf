@@ -178,11 +178,44 @@ smoke() {
   echo
 }
 
+swa() {
+  # Static Web App via `az staticwebapp create --login-with-github`.
+  #
+  # Avoids the personal-access-token dance the Bicep route needs:
+  # Azure opens a browser, you click "Authorize Azure Static Web Apps"
+  # in GitHub, Azure installs the SWA GitHub App on the repo. The PAT
+  # never leaves Azure's side. Output capture is then patched into the
+  # Bicep outputs so subsequent re-provisions know the SWA exists.
+  local swa_name="olaf-frontend"
+  echo "==> Creating Static Web App $swa_name (browser auth in a moment)..."
+  echo "    A browser tab will open. Click 'Authorize Azure Static Web Apps'."
+  az staticwebapp create \
+    --resource-group "$RG" \
+    --name "$swa_name" \
+    --location "westeurope" \
+    --source "$GITHUB_REPO" \
+    --branch "$GITHUB_BRANCH" \
+    --app-location "/apps/web" \
+    --output-location ".next" \
+    --login-with-github
+
+  local swa_host
+  swa_host=$(az staticwebapp show -g "$RG" -n "$swa_name" --query "defaultHostname" -o tsv)
+  echo
+  echo "✓ Static Web App created."
+  echo "  default hostname: $swa_host"
+  echo "  GitHub Actions workflow was added to the repo (push-on-main)."
+  echo
+  echo "  Next: re-run 'provision' so the apex ALIAS + www CNAME in DNS"
+  echo "  zone get pointed at this SWA."
+}
+
 usage() {
   cat <<USAGE
 OLAF deploy orchestrator. Subcommands:
 
   provision   one-time: register providers, create RG, deploy Bicep
+  swa         create Static Web App via browser auth (no PAT needed)
   build       docker buildx + push to ACR
   release     roll Container App revision to the latest pushed image
   migrate     run manage.py migrate + createcachetable in the live container
@@ -196,6 +229,7 @@ USAGE
 
 case "${1:-}" in
   provision) provision ;;
+  swa)       swa ;;
   build)     build ;;
   release)   release ;;
   migrate)   migrate ;;

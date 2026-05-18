@@ -17,7 +17,7 @@ export function StatsBlock({ payload, tone: _tone = "canvas" }: Props) {
   return (
     <section
       className={[
-        "py-12 sm:py-14",
+        "py-10 sm:py-12",
         dark
           ? "bg-ink-900 text-ink-inverse"
           : "bg-canvas text-ink-900",

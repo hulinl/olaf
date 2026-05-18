@@ -56,6 +56,9 @@ param githubToken string = ''
 @description('Initial container image for the backend Container App. Real image is swapped in by deploy.sh release.')
 param backendInitialImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
+@description('Link the customer-managed olaf.events domain to Communication Services. Must be false on first provision — the domain is created in pending-verification state and ACS rejects the link until it flips Verified. Re-run provision with this true after the DNS TXT records propagate.')
+param linkCustomEmailDomain bool = false
+
 // ---------------------------------------------------------------------------
 // Globally-unique name suffix
 // ---------------------------------------------------------------------------
@@ -177,8 +180,23 @@ resource comm 'Microsoft.Communication/CommunicationServices@2023-04-01' = {
   location: 'global'
   properties: {
     dataLocation: 'Europe'
-    linkedDomains: [ emailDomain.id, emailCustomDomain.id ]
+    // First provision links only the Azure-managed sender domain — the
+    // custom olaf.events domain is still pending verification at this point
+    // and ACS rejects the link with DomainValidationError. After the TXT
+    // records propagate and the domain flips Verified, re-run provision
+    // with `linkCustomEmailDomain=true` to add it here.
+    linkedDomains: linkCustomEmailDomain
+      ? [ emailDomain.id, emailCustomDomain.id ]
+      : [ emailDomain.id ]
   }
+  // Bicep doesn't infer the dependency through linkedDomains[].id strings
+  // (child of a different resource type), so without this ARM tried to
+  // create `comm` before the Domain children existed and bailed with
+  // ResourceNotFound. Explicit dependsOn forces the order.
+  dependsOn: [
+    emailDomain
+    emailCustomDomain
+  ]
 }
 
 // ===========================================================================
