@@ -338,7 +338,7 @@ def duplicate_event(
     - status = draft
     - cancellation_reason = "" (start clean)
     - cover file is duplicated, not referenced
-    - dates, location, content blocks, FAQ, program, questionnaire — all copied
+    - dates, location, content blocks, questionnaire sections — all copied
     - RSVPs are NOT copied
     """
     from django.core.files.base import ContentFile
@@ -377,18 +377,6 @@ def duplicate_event(
         status=Event.STATUS_DRAFT,
         requires_approval=event.requires_approval,
         cancellation_reason="",
-        highlights=list(event.highlights or []),
-        included=list(event.included or []),
-        not_included=list(event.not_included or []),
-        additional_cost_note=event.additional_cost_note,
-        difficulty_level=event.difficulty_level,
-        difficulty_note=event.difficulty_note,
-        transport_info=event.transport_info,
-        accommodation_info=event.accommodation_info,
-        gear_info=event.gear_info,
-        faq=list(event.faq or []),
-        program=list(event.program or []),
-        price_text=event.price_text,
         blocks=list(event.blocks or []),
         enabled_questionnaire_sections=list(
             event.enabled_questionnaire_sections or []

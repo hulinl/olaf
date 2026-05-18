@@ -96,12 +96,6 @@ export interface Workspace {
   member_count?: number;
 }
 
-export interface ProgramDay {
-  day: string;
-  title: string;
-  body: string;
-}
-
 export interface EventSummary {
   slug: string;
   title: string;
@@ -123,11 +117,6 @@ export interface EventSummary {
   waitlist_count: number;
 }
 
-export interface FaqItem {
-  question: string;
-  answer: string;
-}
-
 export interface EventImage {
   id: number;
   url: string | null;
@@ -141,18 +130,6 @@ export interface Event extends EventSummary {
   location_url: string;
   waitlist_enabled: boolean;
   requires_approval: boolean;
-  highlights: string[];
-  included: string[];
-  not_included: string[];
-  additional_cost_note: string;
-  difficulty_level: number; // 0 = unset; 1..5
-  difficulty_note: string;
-  transport_info: string;
-  accommodation_info: string;
-  gear_info: string;
-  faq: FaqItem[];
-  program: ProgramDay[];
-  price_text: string;
   blocks: EventBlock[];
   enabled_questionnaire_sections: QuestionnaireSection[];
   community_slugs: string[];
@@ -402,18 +379,6 @@ export interface EventWritePayload {
   visibility?: "public" | "invite_only";
   status?: "draft" | "published" | "closed" | "cancelled" | "completed";
   requires_approval?: boolean;
-  highlights?: string[];
-  included?: string[];
-  not_included?: string[];
-  additional_cost_note?: string;
-  difficulty_level?: number;
-  difficulty_note?: string;
-  transport_info?: string;
-  accommodation_info?: string;
-  gear_info?: string;
-  faq?: FaqItem[];
-  program?: ProgramDay[];
-  price_text?: string;
   blocks?: EventBlock[];
   enabled_questionnaire_sections?: QuestionnaireSection[];
   cancellation_reason?: string;

@@ -331,10 +331,6 @@ class CreateUpdateEventTests(TestCase):
             "waitlist_enabled": True,
             "visibility": Event.VISIBILITY_PUBLIC,
             "status": Event.STATUS_PUBLISHED,
-            "price_text": "2 950 Kč",
-            "highlights": ["technika", "regenerace"],
-            "included": ["3 noci", "snídaně"],
-            "program": [],
         }
 
     def test_owner_can_create_event(self) -> None:

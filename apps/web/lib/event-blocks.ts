@@ -77,6 +77,28 @@ export interface MapBlockPayload {
   map_url: string;
 }
 
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+export interface FaqBlockPayload {
+  eyebrow?: string;
+  title?: string;
+  items: FaqItem[];
+}
+
+export interface PracticalBlockPayload {
+  eyebrow?: string;
+  title?: string;
+  transport?: string;
+  accommodation?: string;
+  gear?: string;
+  /** 0 = unset; 1-5 = light → very hard. */
+  difficulty_level?: number;
+  difficulty_note?: string;
+}
+
 export type EventBlock =
   | { id: string; type: "hero"; payload: HeroBlockPayload }
   | { id: string; type: "prose"; payload: ProseBlockPayload }
@@ -88,7 +110,9 @@ export type EventBlock =
       payload: IncludedSplitBlockPayload;
     }
   | { id: string; type: "gallery"; payload: GalleryBlockPayload }
-  | { id: string; type: "map"; payload: MapBlockPayload };
+  | { id: string; type: "map"; payload: MapBlockPayload }
+  | { id: string; type: "faq"; payload: FaqBlockPayload }
+  | { id: string; type: "practical"; payload: PracticalBlockPayload };
 
 export type BlockType = EventBlock["type"];
 
@@ -108,6 +132,8 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   included_split: "Co je / není v ceně",
   gallery: "Galerie — grid obrázků",
   map: "Mapa — jedna trasa (embed)",
+  faq: "FAQ — časté dotazy",
+  practical: "Praktické info — doprava, ubytování, výbava, náročnost",
 };
 
 /** Detect Mapy.cz / mapy.com URLs we should embed as iframe. */

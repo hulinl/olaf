@@ -178,18 +178,34 @@ export default function EventCockpitPage({ params }: Props) {
           />
         </div>
 
-        <h2 className="mt-10 text-lg font-semibold text-ink-900">Akce</h2>
+        <h2 className="mt-10 text-lg font-semibold text-ink-900">Úpravy</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Akce má dvě úrovně nastavení: <strong>detaily</strong> pro
+          mechaniku (kdy, kde, kolik míst, kdo se vidí, RSVP otázky) a
+          <strong> obsah stránky</strong> pro to, co účastník na veřejné
+          stránce skutečně uvidí.
+        </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <ActionTile
+          <PrimaryActionTile
             title="Upravit detaily"
-            description="Název, popis, termín, místo, kapacita, dotazník."
+            description="Termín, lokalita, kapacita, viditelnost, sdílení v komunitách, RSVP dotazník."
             href={`/events/${wsSlug}/${eventSlug}/edit`}
           />
-          <ActionTile
-            title="Bloky stránky"
-            description="Sestav veřejnou stránku — hero, dny, statistiky, co je v ceně."
+          <PrimaryActionTile
+            title="Upravit obsah stránky"
+            description={`${event.blocks.length} blok${
+              event.blocks.length === 1
+                ? ""
+                : event.blocks.length < 5
+                  ? "y"
+                  : "ů"
+            } — hero, program, ceny, FAQ, mapa…`}
             href={`/events/${wsSlug}/${eventSlug}/blocks`}
           />
+        </div>
+
+        <h2 className="mt-10 text-lg font-semibold text-ink-900">Další</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <ActionTile
             title="Přihlášení"
             description={`${event.confirmed_count} potvrzeno${
@@ -210,24 +226,9 @@ export default function EventCockpitPage({ params }: Props) {
                         ? "y"
                         : "ů"
                   } · spravuj a přerovnej.`
-                : "Žádné obrázky. Nahraj galerii pod hlavní obsah."
+                : "Žádné obrázky. Nahraj galerii pro stránku akce."
             }
             href={`/events/${wsSlug}/${eventSlug}/gallery`}
-          />
-          <ActionTile
-            title="Sdílení"
-            description={
-              event.community_slugs.length === 0
-                ? `Není sdílené v žádné komunitě v ${workspace.name}.`
-                : `Sdíleno v ${event.community_slugs.length} komunit${
-                    event.community_slugs.length === 1
-                      ? "ě"
-                      : event.community_slugs.length < 5
-                        ? "ách"
-                        : "ách"
-                  }.`
-            }
-            href={`/events/${wsSlug}/${eventSlug}/edit#sdileni`}
           />
           <ActionTile
             title="Veřejný náhled"
@@ -350,4 +351,30 @@ function ActionTile({
     );
   }
   return <Link href={href}>{inner}</Link>;
+}
+
+function PrimaryActionTile({
+  title,
+  description,
+  href,
+}: {
+  title: string;
+  description: string;
+  href: string;
+}) {
+  return (
+    <Link href={href}>
+      <div className="flex h-full flex-col rounded-2xl border border-border bg-surface p-7 shadow-md transition-all hover:-translate-y-0.5 hover:border-brand hover:shadow-lg focus-ring">
+        <div className="flex items-baseline justify-between gap-3">
+          <h3 className="text-lg font-semibold text-ink-900 sm:text-xl">
+            {title}
+          </h3>
+          <span className="text-brand" aria-hidden="true">
+            →
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-ink-700">{description}</p>
+      </div>
+    </Link>
+  );
 }

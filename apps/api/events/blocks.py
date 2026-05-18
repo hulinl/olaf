@@ -136,6 +136,34 @@ def _validate_map(payload: dict) -> None:
         raise ValueError("'map_url' must be an absolute URL")
 
 
+def _validate_faq(payload: dict) -> None:
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
+    items = _expect_list(payload.get("items", []), "items")
+    if not items:
+        raise ValueError("'items' must contain at least one entry")
+    for i, item in enumerate(items):
+        it = _expect_dict(item, f"items[{i}]")
+        _expect_str(it.get("question", ""), f"items[{i}].question", allow_blank=False)
+        _expect_str(it.get("answer", ""), f"items[{i}].answer", allow_blank=False)
+
+
+def _validate_practical(payload: dict) -> None:
+    """Practical-info block: optional transport/accommodation/gear columns +
+    optional difficulty (level 0-5 + free-text note). Renders as the
+    "Praktické info" + "Náročnost" section pair from the legacy layout.
+    """
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
+    _expect_str(payload.get("transport", ""), "transport")
+    _expect_str(payload.get("accommodation", ""), "accommodation")
+    _expect_str(payload.get("gear", ""), "gear")
+    _expect_str(payload.get("difficulty_note", ""), "difficulty_note")
+    lvl = payload.get("difficulty_level", 0)
+    if not isinstance(lvl, int) or lvl < 0 or lvl > 5:
+        raise ValueError("'difficulty_level' must be an integer between 0 and 5")
+
+
 BLOCK_SCHEMAS: dict[str, Any] = {
     "hero": _validate_hero,
     "prose": _validate_prose,
@@ -144,6 +172,8 @@ BLOCK_SCHEMAS: dict[str, Any] = {
     "included_split": _validate_included_split,
     "gallery": _validate_gallery,
     "map": _validate_map,
+    "faq": _validate_faq,
+    "practical": _validate_practical,
 }
 
 KNOWN_BLOCK_TYPES = tuple(BLOCK_SCHEMAS.keys())

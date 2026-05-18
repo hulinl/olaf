@@ -200,18 +200,6 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "status",
             "requires_approval",
             "community_slugs",
-            "highlights",
-            "included",
-            "not_included",
-            "additional_cost_note",
-            "difficulty_level",
-            "difficulty_note",
-            "transport_info",
-            "accommodation_info",
-            "gear_info",
-            "faq",
-            "program",
-            "price_text",
             "blocks",
             "enabled_questionnaire_sections",
             "images",
@@ -366,18 +354,6 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "status",
             "requires_approval",
             "community_slugs",
-            "highlights",
-            "included",
-            "not_included",
-            "additional_cost_note",
-            "difficulty_level",
-            "difficulty_note",
-            "transport_info",
-            "accommodation_info",
-            "gear_info",
-            "faq",
-            "program",
-            "price_text",
             "blocks",
             "enabled_questionnaire_sections",
             "cancellation_reason",
@@ -392,27 +368,6 @@ class EventWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Neznámá sekce: {bad}. Povolené: {sorted(valid_keys)}."
             )
-        return value
-
-    def validate_difficulty_level(self, value):
-        if value not in (0, 1, 2, 3, 4, 5):
-            raise serializers.ValidationError(
-                "Náročnost musí být v rozsahu 0-5 (0 = nezadáno)."
-            )
-        return value
-
-    def validate_faq(self, value):
-        if not isinstance(value, list):
-            raise serializers.ValidationError("FAQ musí být seznam.")
-        for i, item in enumerate(value):
-            if not isinstance(item, dict):
-                raise serializers.ValidationError(
-                    f"FAQ položka {i} musí být objekt."
-                )
-            if "question" not in item or "answer" not in item:
-                raise serializers.ValidationError(
-                    f"FAQ položka {i} musí mít pole 'question' a 'answer'."
-                )
         return value
 
     def validate_blocks(self, value):

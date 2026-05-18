@@ -2,10 +2,12 @@ import type { EventImage } from "@/lib/api";
 import type { BlockTone, EventBlock } from "@/lib/event-blocks";
 
 import { DaysBlock } from "./days-block";
+import { FaqBlock } from "./faq-block";
 import { GalleryBlock } from "./gallery-block";
 import { HeroBlock } from "./hero-block";
 import { IncludedSplitBlock } from "./included-split-block";
 import { MapBlock } from "./map-block";
+import { PracticalBlock } from "./practical-block";
 import { ProseBlock } from "./prose-block";
 import { StatsBlock } from "./stats-block";
 
@@ -55,6 +57,10 @@ export function BlockRenderer({
       );
     case "map":
       return <MapBlock payload={block.payload} tone={tone} />;
+    case "faq":
+      return <FaqBlock payload={block.payload} tone={tone} />;
+    case "practical":
+      return <PracticalBlock payload={block.payload} tone={tone} />;
     default:
       return null;
   }
