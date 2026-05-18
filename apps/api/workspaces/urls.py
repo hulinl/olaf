@@ -9,4 +9,6 @@ urlpatterns = [
     path("<slug:slug>/", views.public_workspace, name="public"),
     path("<slug:slug>/detail/", views.workspace_detail, name="detail"),
     path("<slug:slug>/events/", views.workspace_events, name="events"),
+    path("<slug:slug>/logo/", views.workspace_logo, name="logo"),
+    path("<slug:slug>/cover/", views.workspace_cover, name="cover"),
 ]
