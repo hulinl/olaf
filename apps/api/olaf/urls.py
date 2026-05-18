@@ -11,7 +11,9 @@ def health(_request):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Container Apps probes /healthz; keep /health/ around for back-compat.
     path("health/", health),
+    path("healthz", health),
     path("api/auth/", include("accounts.urls", namespace="accounts")),
     path("api/workspaces/", include("workspaces.urls", namespace="workspaces")),
     path("api/events/", include("events.urls", namespace="events")),
