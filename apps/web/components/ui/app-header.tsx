@@ -110,31 +110,41 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
                 </DropdownLink>
               </NavDropdown>
 
-              <NavDropdown
-                label="Akce"
-                pathname={pathname}
-                activeWhenStartsWith="/events"
-                onOpen={ws.load}
-              >
-                <DropdownLink href="/events">Všechny akce</DropdownLink>
-                <DropdownLink href="/events?filter=owner">
-                  Akce, které vedu
-                </DropdownLink>
-                {ownerWorkspaces.length > 0 && (
-                  <>
-                    <DropdownDivider />
-                    <DropdownLink href="/events/new">+ Nová akce</DropdownLink>
-                  </>
-                )}
-              </NavDropdown>
+              <NavLink href="/events" pathname={pathname}>
+                Akce
+              </NavLink>
             </nav>
           </div>
 
-          <UserMenu
-            user={user}
-            onSignOut={onSignOut}
-            signingOut={signingOut}
-          />
+          <div className="flex items-center gap-2">
+            {ownerWorkspaces.length > 0 && (
+              <Link
+                href="/admin"
+                className={[
+                  "hidden items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-ring sm:inline-flex",
+                  pathname.startsWith("/admin")
+                    ? "border-brand bg-brand text-brand-ink"
+                    : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+                ].join(" ")}
+              >
+                <span
+                  aria-hidden
+                  className={
+                    pathname.startsWith("/admin") ? "text-brand-ink" : "text-brand"
+                  }
+                  style={{ fontSize: "0.7em", lineHeight: 1 }}
+                >
+                  ●
+                </span>
+                Správce
+              </Link>
+            )}
+            <UserMenu
+              user={user}
+              onSignOut={onSignOut}
+              signingOut={signingOut}
+            />
+          </div>
         </div>
       </header>
 
@@ -366,25 +376,21 @@ function MobileDrawer({
               pathname={pathname}
               onClose={onClose}
             >
-              Všechny akce
+              Moje akce
             </DrawerSubLink>
-            <DrawerSubLink
-              href="/events?filter=owner"
-              pathname={pathname}
-              onClose={onClose}
-            >
-              Akce, které vedu
-            </DrawerSubLink>
-            {ownerWorkspaces.length > 0 && (
+          </DrawerSection>
+
+          {ownerWorkspaces.length > 0 && (
+            <DrawerSection label="Správce">
               <DrawerSubLink
-                href="/events/new"
+                href="/admin"
                 pathname={pathname}
                 onClose={onClose}
               >
-                + Nová akce
+                Otevřít sekci správce
               </DrawerSubLink>
-            )}
-          </DrawerSection>
+            </DrawerSection>
+          )}
         </nav>
       </div>
     </div>
