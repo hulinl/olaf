@@ -22,16 +22,19 @@ jobs:
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          # Compile-time env vars baked into the Next.js bundle. NEXT_PUBLIC_*
+          # ends up in the browser; INTERNAL_API_URL is the server-side fetch
+          # target used by SSR pages (public landing, workspace profile).
+          NEXT_PUBLIC_API_URL: https://api.olaf.events
+          INTERNAL_API_URL: https://api.olaf.events
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_GENTLE_GROUND_0C0BA5903 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
           action: "upload"
-          ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
-          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: "/apps/web" # App source code path
-          api_location: "" # Api source code path - optional
-          output_location: ".next" # Built app content directory - optional
-          ###### End of Repository/Build Configurations ######
+          app_location: "/apps/web"
+          api_location: ""
+          output_location: ".next"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

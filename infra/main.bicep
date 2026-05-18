@@ -56,8 +56,8 @@ param githubToken string = ''
 @description('Initial container image for the backend Container App. Real image is swapped in by deploy.sh release.')
 param backendInitialImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
-@description('Link the customer-managed olaf.events domain to Communication Services. Must be false on first provision — the domain is created in pending-verification state and ACS rejects the link until it flips Verified. Re-run provision with this true after the DNS TXT records propagate.')
-param linkCustomEmailDomain bool = false
+@description('Link the customer-managed olaf.events domain to Communication Services. Must be false on first provision — the domain is created in pending-verification state and ACS rejects the link until it flips Verified. Flipped to true on 2026-05-18 after DKIM/SPF/Domain finished verifying.')
+param linkCustomEmailDomain bool = true
 
 // ---------------------------------------------------------------------------
 // Globally-unique name suffix
@@ -267,6 +267,13 @@ resource caBackend 'Microsoft.App/containerApps@2024-03-01' = {
 
 // ===========================================================================
 // Static Web Apps (Free tier — frontend Next.js)
+//
+// The actual SWA was provisioned via `az staticwebapp create
+// --login-with-github` (no PAT needed; Azure installs its GitHub App
+// through browser auth). The Bicep declaration below stays as a fallback
+// in case anyone re-creates the resource from scratch with a PAT, but the
+// hot path goes through the `existing` reference so the DNS records can
+// point at the resource without depending on githubToken.
 // ===========================================================================
 resource swa 'Microsoft.Web/staticSites@2023-12-01' = if (!empty(githubToken)) {
   name: swaName
@@ -284,21 +291,25 @@ resource swa 'Microsoft.Web/staticSites@2023-12-01' = if (!empty(githubToken)) {
   }
 }
 
+resource existingSwa 'Microsoft.Web/staticSites@2023-12-01' existing = {
+  name: swaName
+}
+
 // ===========================================================================
 // Azure DNS — owns olaf.events. Registration stays at webglobe; NS records
 // there point at the four ns*-08.azure-dns.* servers Azure assigned.
 // ===========================================================================
 @description('SWA validation token for apex olaf.events (TXT _dnsauth). Refresh via az staticwebapp hostname show after first SWA deploy.')
-param swaApexValidationToken string = ''
+param swaApexValidationToken string = '_qbxeossv4hrbdefonmfajzh9tc2umv5'
 
 @description('SWA validation token for www.olaf.events (TXT _dnsauth.www).')
-param swaWwwValidationToken string = ''
+param swaWwwValidationToken string = '_q01n9z95w9tiviu04x0szlbh1jhmi07'
 
 @description('Container App env customDomainVerificationId (TXT asuid.api).')
-param caBackendVerificationId string = ''
+param caBackendVerificationId string = '11E901F8148387D9CC9786CD5B79BD7F096D4471C57C8A64EE778E84E5D99E21'
 
 @description('ACS olaf.events domain ownership token (TXT @, ms-domain-verification=<this>).')
-param acsDomainVerificationId string = ''
+param acsDomainVerificationId string = 'd1bc357b-be37-499d-adc1-24179ed92eee'
 
 resource dnsZone 'Microsoft.Network/dnsZones@2018-05-01' = {
   name: 'olaf.events'
@@ -306,11 +317,12 @@ resource dnsZone 'Microsoft.Network/dnsZones@2018-05-01' = {
   properties: { zoneType: 'Public' }
 }
 
-// --- Apex ALIAS to SWA (only when SWA exists).
-resource apexAlias 'Microsoft.Network/dnsZones/A@2018-05-01' = if (!empty(githubToken)) {
+// --- Apex ALIAS to SWA. Uses `existingSwa` so it works regardless of
+// whether SWA was provisioned via Bicep+PAT or via az CLI+browser auth.
+resource apexAlias 'Microsoft.Network/dnsZones/A@2018-05-01' = {
   parent: dnsZone
   name: '@'
-  properties: { TTL: 3600, targetResource: { id: swa.id } }
+  properties: { TTL: 3600, targetResource: { id: existingSwa.id } }
 }
 
 // --- Apex TXT: ACS domain verification + SPF.
@@ -353,10 +365,10 @@ resource dmarc 'Microsoft.Network/dnsZones/TXT@2018-05-01' = {
   }
 }
 
-resource cnameWww 'Microsoft.Network/dnsZones/CNAME@2018-05-01' = if (!empty(githubToken)) {
+resource cnameWww 'Microsoft.Network/dnsZones/CNAME@2018-05-01' = {
   parent: dnsZone
   name: 'www'
-  properties: { TTL: 3600, CNAMERecord: { cname: swa.properties.defaultHostname } }
+  properties: { TTL: 3600, CNAMERecord: { cname: existingSwa.properties.defaultHostname } }
 }
 
 resource cnameApi 'Microsoft.Network/dnsZones/CNAME@2018-05-01' = {
@@ -391,8 +403,8 @@ output acrName string = acr.name
 output backendFqdn string = caBackend.properties.configuration.ingress.fqdn
 output backendName string = caBackend.name
 
-output staticWebHost string = empty(githubToken) ? '' : swa.properties.defaultHostname
-output staticWebName string = empty(githubToken) ? '' : swa.name
+output staticWebHost string = existingSwa.properties.defaultHostname
+output staticWebName string = existingSwa.name
 
 output emailSenderDomain string = emailDomain.properties.fromSenderDomain
 output communicationServiceName string = comm.name
