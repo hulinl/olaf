@@ -10,12 +10,9 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import { WorkspaceMetaLine } from "@/components/ui/workspace-meta-line";
 import {
   ApiError,
-  type Community,
   type EventSummary,
   type Workspace,
   assetUrl,
-  communities as communitiesApi,
-  events as eventsApi,
   workspaces,
 } from "@/lib/api";
 
@@ -36,7 +33,6 @@ export default function WorkspaceDetailPage({ params }: Props) {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [eventList, setEventList] = useState<EventSummary[] | null>(null);
-  const [communityList, setCommunityList] = useState<Community[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,15 +40,13 @@ export default function WorkspaceDetailPage({ params }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, ev, comms] = await Promise.all([
+        const [ws, ev] = await Promise.all([
           workspaces.detail(slug),
           workspaces.eventsFor(slug),
-          communitiesApi.forWorkspace(slug).catch(() => [] as Community[]),
         ]);
         if (cancelled) return;
         setWorkspace(ws);
         setEventList(ev);
-        setCommunityList(comms);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
@@ -113,7 +107,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
         <Breadcrumbs
           items={[
-            { label: "Workspaces", href: "/workspaces" },
+            { label: "Komunity", href: "/workspaces" },
             { label: workspace.name },
           ]}
         />
@@ -234,64 +228,11 @@ export default function WorkspaceDetailPage({ params }: Props) {
           </section>
         )}
 
-        {isOwner && (
-          <section className="mt-12">
-            <div className="mb-5 flex items-baseline justify-between gap-4">
-              <h2 className="text-xl font-semibold text-ink-900">Komunity</h2>
-              <LinkButton
-                href={`/workspaces/${workspace.slug}/communities/new`}
-                variant="ghost"
-                size="md"
-              >
-                + Nová komunita
-              </LinkButton>
-            </div>
-            {communityList === null ? (
-              <p className="text-sm text-ink-500">Načítám…</p>
-            ) : communityList.length === 0 ? (
-              <Card>
-                <CardSection>
-                  <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
-                    <h3 className="text-base font-semibold text-ink-900">
-                      Žádné komunity
-                    </h3>
-                    <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                      Komunita = roster lidí pod tvým workspacem, do kterého
-                      sdílíš akce. Vytvoř první.
-                    </p>
-                  </div>
-                </CardSection>
-              </Card>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {communityList.map((c) => (
-                  <Link
-                    key={c.slug}
-                    href={`/workspaces/${workspace.slug}/communities/${c.slug}`}
-                    className="block rounded-lg border border-border bg-surface p-5 shadow-sm transition-colors hover:border-border-strong hover:shadow-md focus-ring"
-                  >
-                    <h3 className="text-base font-semibold text-ink-900">
-                      {c.name}
-                    </h3>
-                    {c.description && (
-                      <p className="mt-1 line-clamp-2 text-sm text-ink-500">
-                        {c.description}
-                      </p>
-                    )}
-                    <p className="mt-3 text-xs font-mono uppercase tracking-[0.14em] text-ink-500">
-                      {c.member_count} členů ·{" "}
-                      {c.visibility === "public"
-                        ? "veřejná"
-                        : c.visibility === "unlisted"
-                          ? "skrytá"
-                          : "soukromá"}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+        {/* Sub-Community feature (smaller member rosters within a workspace)
+            is parked for V1.5 — the model + endpoints still exist, but the
+            UI surface is hidden so the V1 audience doesn't see two levels of
+            "komunita" with the same word. Re-enable here when the V1.5 slice
+            ships. */}
       </section>
     </main>
   );

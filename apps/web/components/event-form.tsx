@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -8,14 +8,12 @@ import { DateTimeField } from "@/components/ui/date-time-field";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
-  type Community,
   type Event as OlafEvent,
   type EventWritePayload,
   QUESTIONNAIRE_SECTION_HINTS,
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
-  communities as communitiesApi,
 } from "@/lib/api";
 
 interface Props {
@@ -106,39 +104,6 @@ export function EventForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Communities the event is shared into. The workspace's full Community list
-  // is loaded once on mount; selection is a Set<slug>.
-  const [availableCommunities, setAvailableCommunities] = useState<
-    Community[] | null
-  >(null);
-  const [selectedCommunitySlugs, setSelectedCommunitySlugs] = useState<
-    Set<string>
-  >(new Set(initial?.community_slugs ?? []));
-
-  useEffect(() => {
-    let cancelled = false;
-    communitiesApi
-      .forWorkspace(workspaceSlug)
-      .then((list) => {
-        if (!cancelled) setAvailableCommunities(list);
-      })
-      .catch(() => {
-        if (!cancelled) setAvailableCommunities([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceSlug]);
-
-  function toggleCommunity(slug: string) {
-    setSelectedCommunitySlugs((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
-  }
-
   function updateTitle(value: string) {
     setTitle(value);
     if (!slugTouched) setSlug(slugify(value));
@@ -153,7 +118,6 @@ export function EventForm({
         slug,
         title,
         description,
-        community_slugs: Array.from(selectedCommunitySlugs),
         starts_at: fromLocalInput(startsAt),
         ends_at: fromLocalInput(endsAt),
         tz,
@@ -347,62 +311,9 @@ export function EventForm({
         </CardSection>
       </Card>
 
-      <Card>
-        <CardSection>
-          <div id="sdileni" className="-mt-1 scroll-mt-20">
-            <h2 className="text-base font-semibold text-ink-900">
-              Kde se zobrazí
-            </h2>
-            <p className="mt-1 text-sm text-ink-500">
-              Vyber komunity ve workspace <strong>{workspaceSlug}</strong>,
-              ve kterých se akce má zobrazit. Členové komunity ji uvidí v
-              nadcházejících akcích.
-            </p>
-            <div className="mt-4">
-              {availableCommunities === null ? (
-                <p className="text-sm text-ink-500">Načítám komunity…</p>
-              ) : availableCommunities.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 px-4 py-3 text-sm text-ink-500">
-                  Tento workspace zatím nemá žádné komunity. Akce zůstane
-                  viditelná jen přes přímý odkaz, dokud nějakou nezaložíš.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  {availableCommunities.map((c) => {
-                    const checked = selectedCommunitySlugs.has(c.slug);
-                    return (
-                      <label
-                        key={c.slug}
-                        className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleCommunity(c.slug)}
-                          className="mt-0.5 size-4 accent-brand"
-                        />
-                        <span className="flex flex-col">
-                          <span className="font-medium text-ink-900">
-                            {c.name}
-                          </span>
-                          <span className="text-xs text-ink-500">
-                            {c.member_count} členů ·{" "}
-                            {c.visibility === "public"
-                              ? "veřejná"
-                              : c.visibility === "unlisted"
-                                ? "skrytá (jen odkaz)"
-                                : "soukromá"}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </CardSection>
-      </Card>
+      {/* "Kde se zobrazí" — sub-Community sharing picker is parked for V1.5.
+          See apps/web/app/(app)/workspaces/[slug]/page.tsx for the matching
+          hidden roster section. Re-enable both when the V1.5 slice ships. */}
 
       <Card>
         <CardSection>

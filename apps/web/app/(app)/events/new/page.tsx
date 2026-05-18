@@ -38,7 +38,7 @@ export default function NewEventPage() {
         setError(
           err instanceof ApiError
             ? err.message
-            : "Nepovedlo se načíst tvoje workspace.",
+            : "Nepovedlo se načíst tvoje komunity.",
         );
       }
     })();

@@ -34,32 +34,23 @@ export function HeroBlock({
   return (
     <section
       className={[
-        "relative overflow-hidden",
+        "relative isolate overflow-hidden",
         cover
-          ? "min-h-[520px]"
+          ? "min-h-[440px] sm:min-h-[520px]"
           : tone === "ink"
             ? "bg-ink-900 text-ink-inverse"
             : "border-b border-border",
       ].join(" ")}
     >
       {cover && (
-        <>
-          <div
-            className="absolute inset-0 -z-10"
-            style={{
-              backgroundImage: `url(${cover})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          />
-          <div
-            className="absolute inset-0 -z-10"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.75) 100%)",
-            }}
-          />
-        </>
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.85) 100%), url(${cover})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
       )}
 
       <div
@@ -70,23 +61,39 @@ export function HeroBlock({
       >
         {badge}
 
-        {payload.eyebrow && (
-          <p
-            className={[
-              "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-              onDark ? "text-white/80" : "text-ink-500",
-            ].join(" ")}
-          >
-            {payload.eyebrow}
-          </p>
-        )}
+        {payload.eyebrow &&
+          (cover ? (
+            <span
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.12] px-4 py-1.5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md"
+            >
+              <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+                ●
+              </span>
+              {payload.eyebrow}
+            </span>
+          ) : (
+            <p
+              className={[
+                "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em]",
+                tone === "ink" ? "text-white/85" : "text-ink-900",
+              ].join(" ")}
+            >
+              <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+                ●
+              </span>
+              {payload.eyebrow}
+            </p>
+          ))}
 
         <h1
           className={[
             "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
             onDark ? "text-ink-inverse" : "text-ink-900",
           ].join(" ")}
-          style={{ letterSpacing: "-0.035em" }}
+          style={{
+            letterSpacing: "-0.035em",
+            textShadow: cover ? "0 2px 24px rgba(0,0,0,0.45)" : undefined,
+          }}
         >
           {title}
         </h1>
@@ -95,9 +102,14 @@ export function HeroBlock({
           <p
             className={[
               "max-w-2xl text-lg sm:text-xl",
-              onDark ? "text-white/90" : "text-ink-700",
+              onDark ? "text-white/95" : "text-ink-700",
             ].join(" ")}
-            style={{ letterSpacing: "-0.01em", lineHeight: 1.4, fontWeight: 500 }}
+            style={{
+              letterSpacing: "-0.01em",
+              lineHeight: 1.4,
+              fontWeight: 500,
+              textShadow: cover ? "0 1px 12px rgba(0,0,0,0.5)" : undefined,
+            }}
           >
             {payload.subtitle}
           </p>

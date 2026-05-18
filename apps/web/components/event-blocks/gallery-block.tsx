@@ -10,15 +10,18 @@ interface Props {
 }
 
 /**
- * Gallery block — owner-positioned grid of all event.images. The actual
- * grid + lightbox is shared with the auto-render fallback in EventGallery
- * (client island). This wrapper just lets the owner add an eyebrow/title
- * override and place the gallery anywhere in the block order.
+ * Gallery block — owner-positioned grid of all event.images.
+ *
+ * Renders heading-less by default — the gallery speaks for itself and the
+ * owner usually just wants a strip of photos between two text-heavy blocks.
+ * When the owner does fill in `eyebrow` or `title` we render a SectionHead
+ * (e.g. "Z minulých kempů"), but it's opt-in, not a fallback.
  */
 export function GalleryBlock({ payload, images, tone = "canvas" }: Props) {
   if (images.length === 0) return null;
-  const eyebrow = payload.eyebrow || "Galerie";
-  const title = payload.title || "Z minulých kempů";
+  const eyebrow = (payload.eyebrow ?? "").trim();
+  const title = (payload.title ?? "").trim();
+  const hasHead = Boolean(eyebrow || title);
   const dark = tone === "ink";
   return (
     <section
@@ -27,12 +30,14 @@ export function GalleryBlock({ payload, images, tone = "canvas" }: Props) {
         dark ? "border-transparent bg-ink-900" : "border-border bg-canvas",
       ].join(" ")}
     >
-      <div className="mx-auto max-w-5xl px-4 py-24 sm:py-28">
-        <SectionHead
-          eyebrow={eyebrow}
-          title={title}
-          tone={dark ? "dark" : "light"}
-        />
+      <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
+        {hasHead && (
+          <SectionHead
+            eyebrow={eyebrow || undefined}
+            title={title}
+            tone={dark ? "dark" : "light"}
+          />
+        )}
         <EventGallery images={images} chrome={false} />
       </div>
     </section>

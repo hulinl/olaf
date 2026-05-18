@@ -17,14 +17,14 @@ export function StatsBlock({ payload, tone: _tone = "canvas" }: Props) {
   return (
     <section
       className={[
-        "border-t py-24 sm:py-28",
+        "border-t py-12 sm:py-14",
         dark
           ? "border-transparent bg-ink-900 text-ink-inverse"
           : "border-border bg-canvas text-ink-900",
       ].join(" ")}
     >
       <div className="mx-auto max-w-5xl px-4">
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
           {payload.tiles.map((t, i) => (
             <div key={i}>
               <dt
@@ -37,7 +37,7 @@ export function StatsBlock({ payload, tone: _tone = "canvas" }: Props) {
               </dt>
               <dd
                 className={[
-                  "mt-2 text-4xl font-semibold sm:text-5xl",
+                  "mt-2 text-3xl font-semibold sm:text-4xl",
                   dark ? "text-ink-inverse" : "text-ink-900",
                 ].join(" ")}
                 style={{ letterSpacing: "-0.035em", lineHeight: 1 }}

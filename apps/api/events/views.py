@@ -399,7 +399,10 @@ def duplicate_event(
 
 
 GALLERY_MAX_IMAGES = 20
-GALLERY_MAX_BYTES = 5 * 1024 * 1024
+# Modern phone photos commonly land in the 4-10 MB range — 5 MB was rejecting
+# typical uploads. Bumped to 12 MB; if storage starts hurting we'll add
+# server-side compression rather than tighten the gate.
+GALLERY_MAX_BYTES = 12 * 1024 * 1024
 
 
 @api_view(["GET", "POST"])
@@ -433,13 +436,14 @@ def event_images(
             status=status.HTTP_400_BAD_REQUEST,
         )
     if upload.size > GALLERY_MAX_BYTES:
+        mb = GALLERY_MAX_BYTES // (1024 * 1024)
         return Response(
-            {"image": "Maximální velikost je 5 MB."},
+            {"detail": f"Obrázek je moc velký — maximum je {mb} MB."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     if event.images.count() >= GALLERY_MAX_IMAGES:
         return Response(
-            {"image": f"Maximum je {GALLERY_MAX_IMAGES} obrázků v galerii."},
+            {"detail": f"Maximum je {GALLERY_MAX_IMAGES} obrázků v galerii."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -480,6 +484,57 @@ def event_image_detail(
     img.image.delete(save=False)
     img.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def event_block_image_upload(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Upload an image referenced from inside a block payload (hero cover,
+    prose image, day image, …).
+
+    Unlike `event_images`, this does NOT create an EventImage row. The file
+    lands in media/events/blocks/<event-id>/ and the URL goes straight into
+    the block JSON. Keeps the public gallery (event.images) from listing
+    every cover photo someone uploaded for a hero block.
+    """
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, event.workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    upload = request.FILES.get("image")
+    if not upload:
+        return Response(
+            {"detail": "Soubor je povinný."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if upload.size > GALLERY_MAX_BYTES:
+        mb = GALLERY_MAX_BYTES // (1024 * 1024)
+        return Response(
+            {"detail": f"Obrázek je moc velký — maximum je {mb} MB."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from django.core.files.storage import default_storage
+
+    ext = (
+        upload.name.rsplit(".", 1)[-1] if "." in (upload.name or "") else "jpg"
+    ).lower()
+    # Keep filenames opaque — they're embedded in block payloads.
+    name = f"events/blocks/{event.pk}/{secrets.token_urlsafe(12)}.{ext}"
+    saved_path = default_storage.save(name, upload)
+    return Response(
+        {"url": default_storage.url(saved_path)},
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["POST"])
