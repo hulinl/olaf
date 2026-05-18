@@ -49,6 +49,37 @@ class WorkspaceWriteSerializer(serializers.ModelSerializer):
         return value
 
 
+class WorkspaceCreateSerializer(serializers.ModelSerializer):
+    """Create-workspace payload. Slug must be set on create and is then
+    immutable (validators in workspaces/validators.py enforce shape +
+    reserved-paths blocking). Everything else has sensible defaults so the
+    fresh-signup CTA can be a 2-field form (name + slug)."""
+
+    class Meta:
+        model = Workspace
+        fields = (
+            "slug",
+            "name",
+            "bio",
+            "location",
+            "visibility",
+            "default_tz",
+        )
+
+    def validate_slug(self, value):
+        from .validators import validate_workspace_slug
+
+        try:
+            validate_workspace_slug(value)
+        except Exception as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        if Workspace.objects.filter(slug=value).exists():
+            raise serializers.ValidationError(
+                "Komunita s tímto slugem už existuje."
+            )
+        return value
+
+
 class WorkspacePublicSerializer(serializers.ModelSerializer):
     """Public-facing workspace data — what `/api/workspaces/{slug}/` returns
     for `public` and `unlisted` visibility (anyone with the link).

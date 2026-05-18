@@ -288,6 +288,15 @@ export interface WorkspaceWritePayload {
   default_tz?: string;
 }
 
+export interface WorkspaceCreatePayload {
+  slug: string;
+  name: string;
+  bio?: string;
+  location?: string;
+  visibility?: "public" | "unlisted" | "private";
+  default_tz?: string;
+}
+
 export const workspaces = {
   byPublicSlug: (slug: string) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/`),
@@ -296,6 +305,11 @@ export const workspaces = {
   eventsFor: (slug: string) =>
     apiFetch<EventSummary[]>(`/api/workspaces/${slug}/events/`),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
+  create: (payload: WorkspaceCreatePayload) =>
+    apiFetch<Workspace>("/api/workspaces/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   update: (slug: string, payload: WorkspaceWritePayload) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/detail/`, {
       method: "PATCH",
