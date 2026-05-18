@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 
 import { AuthShell } from "@/components/ui/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,19 @@ import { Field, Input } from "@/components/ui/field";
 import { ApiError, auth } from "@/lib/api";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
+  // Only allow same-origin relative paths so a crafted ?next= can't redirect off-site.
+  const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -23,7 +35,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await auth.login({ email, password });
-      router.push("/dashboard");
+      router.push(safeNext ?? "/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.firstFieldError() ?? err.message);

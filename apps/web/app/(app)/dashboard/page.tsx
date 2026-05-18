@@ -18,7 +18,6 @@ import { useUser } from "@/lib/user-context";
 export default function DashboardPage() {
   const user = useUser();
   const [myWorkspaces, setMyWorkspaces] = useState<Workspace[] | null>(null);
-  const [ownedEvents, setOwnedEvents] = useState<EventSummary[] | null>(null);
   const [myEvents, setMyEvents] = useState<EventSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,14 +26,12 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, owned, mine] = await Promise.all([
+        const [ws, mine] = await Promise.all([
           workspaces.mine(),
-          events.owner().catch(() => [] as EventSummary[]),
           events.mine().catch(() => [] as EventSummary[]),
         ]);
         if (cancelled) return;
         setMyWorkspaces(ws);
-        setOwnedEvents(owned);
         setMyEvents(mine);
       } catch (err) {
         if (cancelled) return;
@@ -52,43 +49,22 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const upcomingOwned = (ownedEvents ?? []).filter(
-    (e) =>
-      e.status === "published" ||
-      e.status === "draft" ||
-      e.status === "closed",
-  );
   const upcomingRsvped = (myEvents ?? []).filter(
-    (e) => new Date(e.starts_at).getTime() > Date.now(),
-  );
-  const totalConfirmed = (ownedEvents ?? []).reduce(
-    (sum, e) => sum + (e.confirmed_count || 0),
-    0,
+    (e) => new Date(e.ends_at).getTime() >= Date.now(),
   );
 
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-brand">Dashboard</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-              Ahoj, {user.first_name}.
-            </h1>
-            <p className="mt-2 max-w-xl text-ink-500">
-              Přehled tvých komunit a akcí — vytvoř event, sleduj přihlášené,
-              nebo se podívej, na co ses zaregistroval/a.
-            </p>
-          </div>
-          {myWorkspaces && myWorkspaces.some((ws) => ws.my_role === "owner") && (
-            <LinkButton
-              href="/events/new"
-              variant="primary"
-              size="md"
-            >
-              + Nový event
-            </LinkButton>
-          )}
+        <header className="mb-10">
+          <p className="text-sm font-medium text-brand">Dashboard</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+            Ahoj, {user.first_name}.
+          </h1>
+          <p className="mt-2 max-w-xl text-ink-500">
+            Tvůj domov na olafu — kde jsi přihlášen, kde jsi členem, co se po
+            tobě chce.
+          </p>
         </header>
 
         {loading && (
@@ -101,37 +77,39 @@ export default function DashboardPage() {
 
         {!loading && !error && (
           <>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <StatCard
-                label="Komunity"
-                value={String(myWorkspaces?.length ?? 0)}
-                hint={
-                  (myWorkspaces?.length ?? 0) > 0
-                    ? "Klikni níže pro detail"
-                    : "Zatím žádné"
-                }
-              />
-              <StatCard
-                label="Tvoje akce (Owner)"
-                value={String(upcomingOwned.length)}
-                hint={
-                  upcomingOwned.length > 0
-                    ? `${totalConfirmed} celkem přihlášených`
-                    : "—"
-                }
-              />
-              <StatCard
-                label="Tvoje RSVP"
-                value={String(upcomingRsvped.length)}
-                hint={
-                  upcomingRsvped.length > 0
-                    ? "Nadcházející"
-                    : "Žádné nadcházející"
-                }
-              />
-            </div>
+            {/* Co se po tobě chce — placeholder; konkrétní obsah přijde
+                s RSVP.payment_status + RSVP.required_docs (V1.5). */}
+            <Section title="Čeká na tebe">
+              <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-6 text-sm text-ink-500">
+                <p className="font-medium text-ink-900">Vše vyřízeno 🎉</p>
+                <p className="mt-1 max-w-md">
+                  Tady uvidíš věci, které po tobě chtějí pořadatelé akcí, na
+                  které ses přihlásil — třeba zaplatit, doložit pojištění
+                  nebo poslat smlouvu.
+                </p>
+              </div>
+            </Section>
 
-            <Section title="Tvoje komunity" href="/workspaces">
+            <Section title="Moje nadcházející akce" href="/events">
+              {upcomingRsvped.length === 0 ? (
+                <EmptyState
+                  title="Zatím žádné přihlášky"
+                  body="Až se přihlásíš na akci v některé z komunit, uvidíš ji tady."
+                  cta={{ label: "Projít komunity", href: "/workspaces" }}
+                />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {upcomingRsvped.slice(0, 4).map((e) => (
+                    <EventMini
+                      key={`${e.workspace_slug}/${e.slug}`}
+                      event={e}
+                    />
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            <Section title="Moje komunity" href="/workspaces">
               {(myWorkspaces?.length ?? 0) === 0 ? (
                 <EmptyState
                   title="Zatím nejsi v žádné komunitě"
@@ -146,70 +124,10 @@ export default function DashboardPage() {
                 </div>
               )}
             </Section>
-
-            <Section title="Akce, které vedeš" href="/events">
-              {upcomingOwned.length === 0 ? (
-                <EmptyState
-                  title="Zatím žádný event"
-                  body="Vytvoř první event v Django adminu a uvidíš ho tady."
-                  cta={
-                    myWorkspaces && myWorkspaces.length > 0
-                      ? {
-                          label: "Vytvořit event",
-                          href: "/events/new",
-                        }
-                      : undefined
-                  }
-                />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {upcomingOwned.slice(0, 4).map((e) => (
-                    <EventMini
-                      key={`${e.workspace_slug}/${e.slug}`}
-                      event={e}
-                      ownerView
-                    />
-                  ))}
-                </div>
-              )}
-            </Section>
-
-            {upcomingRsvped.length > 0 && (
-              <Section title="Tvoje nadcházející akce">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {upcomingRsvped.slice(0, 4).map((e) => (
-                    <EventMini
-                      key={`${e.workspace_slug}/${e.slug}`}
-                      event={e}
-                    />
-                  ))}
-                </div>
-              </Section>
-            )}
           </>
         )}
       </section>
     </main>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <Card>
-      <CardSection>
-        <p className="text-sm font-medium text-ink-500">{label}</p>
-        <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
-        {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
-      </CardSection>
-    </Card>
   );
 }
 
@@ -325,7 +243,7 @@ function EventMini({
 }) {
   const starts = new Date(event.starts_at);
   const href = ownerView
-    ? `/events/${event.workspace_slug}/${event.slug}`
+    ? `/admin/eventy/${event.workspace_slug}/${event.slug}`
     : `/${event.workspace_slug}/e/${event.slug}`;
   return (
     <Link

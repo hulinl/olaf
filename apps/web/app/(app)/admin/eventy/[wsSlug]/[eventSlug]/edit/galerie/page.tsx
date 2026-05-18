@@ -11,6 +11,7 @@ import {
   type EventImage,
   type Workspace,
   assetUrl,
+  auth,
   events,
   workspaces,
 } from "@/lib/api";
@@ -44,7 +45,14 @@ export default function EventGalleryPage({ params }: Props) {
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${wsSlug}/e/${eventSlug}`);
+          try {
+            await auth.me();
+            router.replace(`/${wsSlug}/e/${eventSlug}`);
+          } catch {
+            router.replace(
+              `/login?next=/admin/eventy/${wsSlug}/${eventSlug}/edit/galerie`,
+            );
+          }
           return;
         }
         setWorkspace(ws);
@@ -52,13 +60,17 @@ export default function EventGalleryPage({ params }: Props) {
         setImages(imgs);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 404) {
-          router.replace("/events");
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(
+            `/login?next=/admin/eventy/${wsSlug}/${eventSlug}/edit/galerie`,
+          );
           return;
         }
-        setError(
-          err instanceof ApiError ? err.message : "Načtení selhalo.",
-        );
+        if (err instanceof ApiError && err.status === 404) {
+          router.replace("/admin/eventy");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -136,9 +148,9 @@ export default function EventGalleryPage({ params }: Props) {
 
   if (loading) {
     return (
-      <main className="flex flex-1 items-center justify-center">
+      <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-      </main>
+      </div>
     );
   }
 
@@ -147,131 +159,125 @@ export default function EventGalleryPage({ params }: Props) {
   const atLimit = images.length >= MAX_IMAGES;
 
   return (
-    <main className="flex flex-1 flex-col">
-      <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-        <Breadcrumbs
-          items={[
-            { label: "Akce", href: "/events" },
-            {
-              label: event.title,
-              href: `/events/${wsSlug}/${eventSlug}`,
-            },
-            { label: "Galerie" },
-          ]}
+    <div className="flex flex-col gap-6">
+      <Breadcrumbs
+        items={[
+          { label: "Eventy", href: "/admin/eventy" },
+          {
+            label: event.title,
+            href: `/admin/eventy/${wsSlug}/${eventSlug}/edit`,
+          },
+          { label: "Galerie" },
+        ]}
+      />
+
+      <header>
+        <p className="text-sm font-medium text-brand">Galerie</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
+          {event.title}
+        </h1>
+        <p className="mt-2 text-sm text-ink-500">
+          Nahraj až {MAX_IMAGES} obrázků (5 MB každý). Zobrazí se jako grid na
+          veřejné stránce akce. Pořadí změníš tlačítky ↑/↓.
+        </p>
+      </header>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => handleFiles(e.target.files)}
+          className="hidden"
+          id="image-upload"
+          disabled={uploading || atLimit}
         />
+        <label
+          htmlFor="image-upload"
+          className={[
+            "inline-flex cursor-pointer items-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-hover focus-ring",
+            uploading || atLimit ? "pointer-events-none opacity-60" : "",
+          ].join(" ")}
+        >
+          {uploading
+            ? "Nahrávám…"
+            : atLimit
+              ? `Plno (${MAX_IMAGES} max)`
+              : "+ Nahrát obrázky"}
+        </label>
+        <span className="text-sm text-ink-500">
+          {images.length} / {MAX_IMAGES} obrázků
+        </span>
+      </div>
 
-        <header className="mt-4 mb-8">
-          <p className="text-sm font-medium text-brand">Galerie</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
-            {event.title}
-          </h1>
-          <p className="mt-2 text-sm text-ink-500">
-            Nahraj až {MAX_IMAGES} obrázků (5 MB každý). Zobrazí se jako grid
-            na veřejné stránce akce. Pořadí změníš tlačítky ↑/↓.
+      {images.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-12 text-center">
+          <p className="text-sm text-ink-500">
+            Zatím prázdno. Klikni „+ Nahrát obrázky".
           </p>
-        </header>
-
-        {error && (
-          <div className="mb-6">
-            <Alert variant="danger">{error}</Alert>
-          </div>
-        )}
-
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => handleFiles(e.target.files)}
-            className="hidden"
-            id="image-upload"
-            disabled={uploading || atLimit}
-          />
-          <label
-            htmlFor="image-upload"
-            className={[
-              "inline-flex cursor-pointer items-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-hover focus-ring",
-              uploading || atLimit ? "pointer-events-none opacity-60" : "",
-            ].join(" ")}
-          >
-            {uploading
-              ? "Nahrávám…"
-              : atLimit
-                ? `Plno (${MAX_IMAGES} max)`
-                : "+ Nahrát obrázky"}
-          </label>
-          <span className="text-sm text-ink-500">
-            {images.length} / {MAX_IMAGES} obrázků
-          </span>
         </div>
-
-        {images.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-12 text-center">
-            <p className="text-sm text-ink-500">
-              Zatím prázdno. Klikni „+ Nahrát obrázky".
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {images.map((img, i) => {
-              const src = assetUrl(img.url);
-              const isFirst = i === 0;
-              const isLast = i === images.length - 1;
-              const isBusy = busy === img.id;
-              return (
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {images.map((img, i) => {
+            const src = assetUrl(img.url);
+            const isFirst = i === 0;
+            const isLast = i === images.length - 1;
+            const isBusy = busy === img.id;
+            return (
+              <div
+                key={img.id}
+                className="group relative overflow-hidden rounded-md border border-border bg-surface"
+              >
+                {src ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={src}
+                    alt={img.alt_text}
+                    className="aspect-square w-full object-cover"
+                  />
+                ) : (
+                  <div className="aspect-square w-full bg-surface-muted" />
+                )}
                 <div
-                  key={img.id}
-                  className="group relative overflow-hidden rounded-md border border-border bg-surface"
+                  className={[
+                    "absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 text-white transition-opacity",
+                    isBusy ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                  ].join(" ")}
                 >
-                  {src ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={src}
-                      alt={img.alt_text}
-                      className="aspect-square w-full object-cover"
-                    />
-                  ) : (
-                    <div className="aspect-square w-full bg-surface-muted" />
-                  )}
-                  <div
-                    className={[
-                      "absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 text-white transition-opacity",
-                      isBusy ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                    ].join(" ")}
-                  >
-                    <div className="flex gap-1">
-                      <IconButton
-                        onClick={() => move(img, -1)}
-                        disabled={isFirst || isBusy}
-                        label="Posunout doleva"
-                      >
-                        ↑
-                      </IconButton>
-                      <IconButton
-                        onClick={() => move(img, 1)}
-                        disabled={isLast || isBusy}
-                        label="Posunout doprava"
-                      >
-                        ↓
-                      </IconButton>
-                    </div>
+                  <div className="flex gap-1">
                     <IconButton
-                      onClick={() => handleDelete(img)}
-                      disabled={isBusy}
-                      label="Smazat obrázek"
-                      variant="danger"
+                      onClick={() => move(img, -1)}
+                      disabled={isFirst || isBusy}
+                      label="Posunout doleva"
                     >
-                      ×
+                      ↑
+                    </IconButton>
+                    <IconButton
+                      onClick={() => move(img, 1)}
+                      disabled={isLast || isBusy}
+                      label="Posunout doprava"
+                    >
+                      ↓
                     </IconButton>
                   </div>
+                  <IconButton
+                    onClick={() => handleDelete(img)}
+                    disabled={isBusy}
+                    label="Smazat obrázek"
+                    variant="danger"
+                  >
+                    ×
+                  </IconButton>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </main>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -47,20 +47,12 @@ export function PublicAuthIndicator() {
 
   if (state.kind === "anon") {
     return (
-      <div className="flex items-center gap-2 text-sm">
-        <Link
-          href="/login"
-          className="rounded-md px-3 py-1.5 font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
-        >
-          Přihlásit
-        </Link>
-        <Link
-          href="/signup"
-          className="inline-flex h-9 items-center justify-center rounded-md bg-ink-900 px-3 text-xs font-medium text-ink-inverse hover:bg-ink-700 focus-ring"
-        >
-          Vytvořit účet
-        </Link>
-      </div>
+      <Link
+        href="/login"
+        className="rounded-md px-3 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
+      >
+        Přihlásit
+      </Link>
     );
   }
 

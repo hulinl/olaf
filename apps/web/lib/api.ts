@@ -52,12 +52,12 @@ export type QuestionnaireSection =
   | "photo_consent";
 
 export const QUESTIONNAIRE_SECTION_ORDER: QuestionnaireSection[] = [
-  "tshirt_size",
-  "diet",
   "fitness",
+  "diet",
   "health_notes",
   "emergency_contact",
   "photo_consent",
+  "tshirt_size",
 ];
 
 export const QUESTIONNAIRE_SECTION_LABELS: Record<QuestionnaireSection, string> = {

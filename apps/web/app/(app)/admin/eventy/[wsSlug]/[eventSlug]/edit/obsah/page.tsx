@@ -11,6 +11,7 @@ import {
   ApiError,
   type Event as OlafEvent,
   type Workspace,
+  auth,
   events,
   workspaces,
 } from "@/lib/api";
@@ -42,7 +43,14 @@ export default function EventBlocksPage({ params }: Props) {
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${wsSlug}/e/${eventSlug}`);
+          try {
+            await auth.me();
+            router.replace(`/${wsSlug}/e/${eventSlug}`);
+          } catch {
+            router.replace(
+              `/login?next=/admin/eventy/${wsSlug}/${eventSlug}/edit/obsah`,
+            );
+          }
           return;
         }
         setWorkspace(ws);
@@ -50,13 +58,17 @@ export default function EventBlocksPage({ params }: Props) {
         setBlocks(ev.blocks ?? []);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 404) {
-          router.replace("/events");
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(
+            `/login?next=/admin/eventy/${wsSlug}/${eventSlug}/edit/obsah`,
+          );
           return;
         }
-        setError(
-          err instanceof ApiError ? err.message : "Něco se pokazilo.",
-        );
+        if (err instanceof ApiError && err.status === 404) {
+          router.replace("/admin/eventy");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Něco se pokazilo.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -94,94 +106,81 @@ export default function EventBlocksPage({ params }: Props) {
 
   if (loading) {
     return (
-      <main className="flex flex-1 items-center justify-center">
+      <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-      </main>
+      </div>
     );
   }
-
   if (!workspace || !event) {
-    return (
-      <main className="flex flex-1 flex-col">
-        <section className="mx-auto w-full max-w-3xl px-4 py-10">
-          {error && <Alert variant="danger">{error}</Alert>}
-        </section>
-      </main>
-    );
+    return error ? <Alert variant="danger">{error}</Alert> : null;
   }
 
   return (
-    <main className="flex flex-1 flex-col">
-      <section className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:py-12">
-        <Breadcrumbs
-          items={[
-            { label: "Akce", href: "/events" },
-            {
-              label: event.title,
-              href: `/events/${wsSlug}/${eventSlug}`,
-            },
-            { label: "Bloky" },
-          ]}
-        />
+    <div className="flex flex-col gap-6">
+      <Breadcrumbs
+        items={[
+          { label: "Eventy", href: "/admin/eventy" },
+          {
+            label: event.title,
+            href: `/admin/eventy/${wsSlug}/${eventSlug}/edit`,
+          },
+          { label: "Obsah" },
+        ]}
+      />
 
-        <header className="mt-4 mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-brand">Bloky stránky</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
-              {event.title}
-            </h1>
-            <p className="mt-2 text-sm text-ink-500">
-              Bloky se na veřejné stránce použijí, pokud existuje alespoň jeden.
-              Jinak se použije klasická struktura z editace.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <LinkButton
-              href={`/${wsSlug}/e/${eventSlug}`}
-              variant="secondary"
-              size="md"
-            >
-              Náhled
-            </LinkButton>
-          </div>
-        </header>
-
-        {error && (
-          <div className="mb-6">
-            <Alert variant="danger">{error}</Alert>
-          </div>
-        )}
-
-        <Builder
-          blocks={blocks}
-          onChange={handleChange}
-          workspaceSlug={wsSlug}
-          eventSlug={eventSlug}
-        />
-
-        <div className="sticky bottom-4 mt-8 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 backdrop-blur">
-          <p className="text-sm text-ink-500">
-            {dirty
-              ? "Máš neuložené změny."
-              : savedAt
-                ? `Uloženo v ${savedAt.toLocaleTimeString("cs-CZ", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}.`
-                : "Vše uloženo."}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-brand">Obsah stránky</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
+            {event.title}
+          </h1>
+          <p className="mt-2 text-sm text-ink-500">
+            Bloky se na veřejné stránce použijí, pokud existuje alespoň jeden.
+            Jinak se použije klasická struktura z editace.
           </p>
-          <Button
-            type="button"
-            variant="primary"
-            size="md"
-            loading={saving}
-            disabled={!dirty}
-            onClick={handleSave}
-          >
-            Uložit
-          </Button>
         </div>
-      </section>
-    </main>
+        <div className="flex gap-2">
+          <LinkButton
+            href={`/${wsSlug}/e/${eventSlug}`}
+            variant="secondary"
+            size="md"
+          >
+            Náhled
+          </LinkButton>
+        </div>
+      </header>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+
+      <Builder
+        blocks={blocks}
+        onChange={handleChange}
+        workspaceSlug={wsSlug}
+        eventSlug={eventSlug}
+      />
+
+      <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 backdrop-blur">
+        <p className="text-sm text-ink-500">
+          {dirty
+            ? "Máš neuložené změny."
+            : savedAt
+              ? `Uloženo v ${savedAt.toLocaleTimeString("cs-CZ", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}.`
+              : "Vše uloženo."}
+        </p>
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          loading={saving}
+          disabled={!dirty}
+          onClick={handleSave}
+        >
+          Uložit
+        </Button>
+      </div>
+    </div>
   );
 }

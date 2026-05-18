@@ -136,7 +136,7 @@ class MyWorkspacesEndpointTests(TestCase):
 
     def test_unauthenticated_rejected(self) -> None:
         resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_returns_user_workspaces(self) -> None:
         ws1 = Workspace.objects.create(slug="ws-one", name="Workspace One")
