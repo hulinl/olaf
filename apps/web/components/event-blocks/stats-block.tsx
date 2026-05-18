@@ -1,13 +1,16 @@
-import type { StatsBlockPayload } from "@/lib/event-blocks";
+import type { BlockTone, StatsBlockPayload } from "@/lib/event-blocks";
 
 interface Props {
   payload: StatsBlockPayload;
+  tone?: BlockTone;
 }
 
-export function StatsBlock({ payload }: Props) {
+export function StatsBlock({ payload, tone = "canvas" }: Props) {
   if (!payload.tiles || payload.tiles.length === 0) return null;
 
-  const dark = Boolean(payload.dark);
+  // Tone drives the appearance now. The legacy `payload.dark` is kept in the
+  // schema for backward compat but ignored — the page assigns tones by index.
+  const dark = tone === "ink";
 
   return (
     <section

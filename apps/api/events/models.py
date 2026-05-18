@@ -216,6 +216,15 @@ class Event(TenantScopedModel):
         ),
     )
 
+    # Communities the event has been shared into (PRD §4.5 line 179).
+    # Multi-community sharing landed with Slice 3.
+    communities = models.ManyToManyField(
+        "communities.Community",
+        blank=True,
+        related_name="events",
+        help_text="Communities under the workspace where this event is listed.",
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -269,6 +278,28 @@ class Event(TenantScopedModel):
         if self.capacity is None:
             return None
         return max(0, self.capacity - self.confirmed_rsvp_count)
+
+
+class EventImage(models.Model):
+    """One image in an event's gallery. Separate from Event.cover (single hero
+    image) — these are the "vibes" gallery rendered as a grid on the landing.
+    """
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="images"
+    )
+    image = models.ImageField(upload_to="events/gallery/")
+    alt_text = models.CharField(max_length=200, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "events_eventimage"
+        ordering = ["sort_order", "id"]
+        indexes = [models.Index(fields=["event", "sort_order"])]
+
+    def __str__(self) -> str:
+        return f"Image #{self.pk} for {self.event.slug}"
 
 
 class RSVP(models.Model):

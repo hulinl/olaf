@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, use, useEffect, useState } from "react";
 
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
@@ -259,20 +260,42 @@ export default function RSVPPage({ params }: Props) {
   return (
     <>
       <header className="sticky top-0 z-10 border-b border-border bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
-          <Link
-            href={`/${slug}/e/${eventSlug}`}
-            className="text-sm font-medium text-ink-700 transition-colors hover:text-ink-900"
-          >
-            ← Zpět na {event.title}
-          </Link>
+        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3 px-4">
+          <Breadcrumbs
+            items={[
+              { label: event.title, href: `/${slug}/e/${eventSlug}` },
+              { label: "Přihláška" },
+            ]}
+            className="min-w-0 truncate"
+          />
           <Logo size={20} />
         </div>
       </header>
 
       <main className="flex flex-1 flex-col">
         <section className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-14">
-          <header className="mb-8">
+          <Link
+            href={`/${slug}/e/${eventSlug}`}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 5 L7 10 L12 15"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Zpět na akci
+          </Link>
+          <header className="mt-6 mb-8">
             <p className="text-sm font-medium text-brand">Přihláška</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
               {event.title}

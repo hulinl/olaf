@@ -128,6 +128,13 @@ export interface FaqItem {
   answer: string;
 }
 
+export interface EventImage {
+  id: number;
+  url: string | null;
+  alt_text: string;
+  sort_order: number;
+}
+
 export interface Event extends EventSummary {
   description: string;
   meeting_point_text: string;
@@ -148,6 +155,8 @@ export interface Event extends EventSummary {
   price_text: string;
   blocks: EventBlock[];
   enabled_questionnaire_sections: QuestionnaireSection[];
+  community_slugs: string[];
+  images: EventImage[];
   workspace_name: string;
   workspace_logo_url: string | null;
   workspace_accent_color: string;
@@ -258,9 +267,11 @@ export async function apiFetch<T>(
     await ensureCsrfToken();
   }
   const csrf = getCookie("csrftoken");
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(init.body ? { "Content-Type": "application/json" } : {}),
+    ...(init.body && !isFormData ? { "Content-Type": "application/json" } : {}),
     ...(init.headers as Record<string, string> | undefined),
   };
   if (csrf) headers["X-CSRFToken"] = csrf;
@@ -292,10 +303,94 @@ export const workspaces = {
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
 };
 
+export interface Community {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  cover_url: string | null;
+  visibility: "private" | "unlisted" | "public";
+  membership_policy: "approval" | "invite_only";
+  workspace_slug: string;
+  workspace_name: string;
+  member_count: number;
+  created_at: string;
+}
+
+export interface CommunityMemberRecord {
+  id: number;
+  status: "pending" | "member" | "declined" | "removed";
+  joined_at: string;
+  decided_at: string | null;
+  user_email: string;
+  user_full_name: string;
+}
+
+export interface CommunityWritePayload {
+  slug: string;
+  name: string;
+  description?: string;
+  visibility?: Community["visibility"];
+  membership_policy?: Community["membership_policy"];
+}
+
+export interface CommunityInviteResult {
+  added: CommunityMemberRecord[];
+  skipped_already_member: string[];
+  no_account_yet: string[];
+}
+
+export const communities = {
+  forWorkspace: (workspaceSlug: string) =>
+    apiFetch<Community[]>(`/api/communities/workspaces/${workspaceSlug}/`),
+  create: (workspaceSlug: string, payload: CommunityWritePayload) =>
+    apiFetch<Community>(`/api/communities/workspaces/${workspaceSlug}/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  detail: (workspaceSlug: string, communitySlug: string) =>
+    apiFetch<Community>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/`,
+    ),
+  update: (
+    workspaceSlug: string,
+    communitySlug: string,
+    payload: Partial<CommunityWritePayload>,
+  ) =>
+    apiFetch<Community>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  remove: (workspaceSlug: string, communitySlug: string) =>
+    apiFetch<void>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/`,
+      { method: "DELETE" },
+    ),
+  members: (workspaceSlug: string, communitySlug: string) =>
+    apiFetch<CommunityMemberRecord[]>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/`,
+    ),
+  invite: (workspaceSlug: string, communitySlug: string, emails: string) =>
+    apiFetch<CommunityInviteResult>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/`,
+      { method: "POST", body: JSON.stringify({ emails }) },
+    ),
+  removeMember: (
+    workspaceSlug: string,
+    communitySlug: string,
+    memberId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/`,
+      { method: "DELETE" },
+    ),
+};
+
 export interface EventWritePayload {
   slug: string;
   title: string;
   description?: string;
+  community_slugs?: string[];
   starts_at: string;
   ends_at: string;
   tz?: string;
@@ -366,6 +461,49 @@ export const events = {
       method: "POST",
       body: JSON.stringify({ reason }),
     }),
+  uploadCover: (workspaceSlug: string, eventSlug: string, file: File) => {
+    const fd = new FormData();
+    fd.append("cover", file);
+    return apiFetch<Event>(
+      `/api/events/${workspaceSlug}/${eventSlug}/cover/`,
+      { method: "POST", body: fd },
+    );
+  },
+  deleteCover: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/cover/`, {
+      method: "DELETE",
+    }),
+  duplicate: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Event>(
+      `/api/events/${workspaceSlug}/${eventSlug}/duplicate/`,
+      { method: "POST" },
+    ),
+  listImages: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<EventImage[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/images/`,
+    ),
+  uploadImage: (workspaceSlug: string, eventSlug: string, file: File) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    return apiFetch<EventImage>(
+      `/api/events/${workspaceSlug}/${eventSlug}/images/`,
+      { method: "POST", body: fd },
+    );
+  },
+  deleteImage: (workspaceSlug: string, eventSlug: string, imageId: number) =>
+    apiFetch<void>(
+      `/api/events/${workspaceSlug}/${eventSlug}/images/${imageId}/`,
+      { method: "DELETE" },
+    ),
+  reorderImages: (
+    workspaceSlug: string,
+    eventSlug: string,
+    order: number[],
+  ) =>
+    apiFetch<EventImage[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/images/reorder/`,
+      { method: "POST", body: JSON.stringify({ order }) },
+    ),
   approveRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/approve/`,

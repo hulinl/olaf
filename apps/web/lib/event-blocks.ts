@@ -65,6 +65,18 @@ export interface IncludedSplitBlockPayload {
   price_note?: string;
 }
 
+export interface GalleryBlockPayload {
+  eyebrow?: string;
+  title?: string;
+}
+
+export interface MapBlockPayload {
+  eyebrow?: string;
+  title?: string;
+  caption?: string;
+  map_url: string;
+}
+
 export type EventBlock =
   | { id: string; type: "hero"; payload: HeroBlockPayload }
   | { id: string; type: "prose"; payload: ProseBlockPayload }
@@ -74,9 +86,19 @@ export type EventBlock =
       id: string;
       type: "included_split";
       payload: IncludedSplitBlockPayload;
-    };
+    }
+  | { id: string; type: "gallery"; payload: GalleryBlockPayload }
+  | { id: string; type: "map"; payload: MapBlockPayload };
 
 export type BlockType = EventBlock["type"];
+
+/**
+ * Visual tone applied to a block on the public landing. The page assigns
+ * tones by index so reordering blocks in the builder keeps the rhythm
+ * (canvas → ink → canvas → …). Individual renderers map "ink" onto their
+ * own dark variant (background, text, borders, internal cards).
+ */
+export type BlockTone = "canvas" | "ink";
 
 export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   hero: "Hero — úvodní fotka + meta",
@@ -84,6 +106,8 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   stats: "Statistiky — řada dlaždic",
   days: "Program — den po dni + Mapy.cz",
   included_split: "Co je / není v ceně",
+  gallery: "Galerie — grid obrázků",
+  map: "Mapa — jedna trasa (embed)",
 };
 
 /** Detect Mapy.cz / mapy.com URLs we should embed as iframe. */

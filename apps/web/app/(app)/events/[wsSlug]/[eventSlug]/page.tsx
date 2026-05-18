@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { EventDangerZone } from "@/components/event-danger-zone";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import {
   ApiError,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/api";
 
 interface Props {
-  params: Promise<{ slug: string; eventSlug: string }>;
+  params: Promise<{ wsSlug: string; eventSlug: string }>;
 }
 
 const STATUS_LABELS: Record<OlafEvent["status"], string> = {
@@ -35,7 +36,7 @@ const STATUS_TONE: Record<OlafEvent["status"], string> = {
 };
 
 export default function EventCockpitPage({ params }: Props) {
-  const { slug, eventSlug } = use(params);
+  const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [event, setEvent] = useState<OlafEvent | null>(null);
@@ -47,12 +48,12 @@ export default function EventCockpitPage({ params }: Props) {
     (async () => {
       try {
         const [ws, ev] = await Promise.all([
-          workspaces.detail(slug),
-          events.publicEvent(slug, eventSlug),
+          workspaces.detail(wsSlug),
+          events.publicEvent(wsSlug, eventSlug),
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${slug}/e/${eventSlug}`);
+          router.replace(`/${wsSlug}/e/${eventSlug}`);
           return;
         }
         setWorkspace(ws);
@@ -60,7 +61,7 @@ export default function EventCockpitPage({ params }: Props) {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
-          router.replace(`/communities/${slug}`);
+          router.replace("/events");
           return;
         }
         setError(
@@ -73,7 +74,7 @@ export default function EventCockpitPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [slug, eventSlug, router]);
+  }, [wsSlug, eventSlug, router]);
 
   if (loading) {
     return (
@@ -95,8 +96,7 @@ export default function EventCockpitPage({ params }: Props) {
 
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
-  const sameDay =
-    starts.toDateString() === ends.toDateString();
+  const sameDay = starts.toDateString() === ends.toDateString();
   const dateLabel = sameDay
     ? starts.toLocaleDateString("cs-CZ", {
         day: "numeric",
@@ -115,14 +115,12 @@ export default function EventCockpitPage({ params }: Props) {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:py-12">
-        <p className="text-sm text-ink-500">
-          <Link
-            href={`/communities/${slug}`}
-            className="hover:text-ink-900"
-          >
-            ← {workspace.name}
-          </Link>
-        </p>
+        <Breadcrumbs
+          items={[
+            { label: "Akce", href: "/events" },
+            { label: event.title },
+          ]}
+        />
 
         <header className="mt-4 mb-8">
           <div className="flex flex-wrap items-baseline gap-3">
@@ -185,12 +183,12 @@ export default function EventCockpitPage({ params }: Props) {
           <ActionTile
             title="Upravit detaily"
             description="Název, popis, termín, místo, kapacita, dotazník."
-            href={`/communities/${slug}/events/${eventSlug}/edit`}
+            href={`/events/${wsSlug}/${eventSlug}/edit`}
           />
           <ActionTile
             title="Bloky stránky"
             description="Sestav veřejnou stránku — hero, dny, statistiky, co je v ceně."
-            href={`/communities/${slug}/events/${eventSlug}/blocks`}
+            href={`/events/${wsSlug}/${eventSlug}/blocks`}
           />
           <ActionTile
             title="Přihlášení"
@@ -199,25 +197,105 @@ export default function EventCockpitPage({ params }: Props) {
                 ? ` · ${event.waitlist_count} waitlist`
                 : ""
             }. Schvaluj, kontaktuj, exportuj.`}
-            href={`/communities/${slug}/events/${eventSlug}/rsvps`}
+            href={`/events/${wsSlug}/${eventSlug}/rsvps`}
+          />
+          <ActionTile
+            title="Galerie"
+            description={
+              event.images.length > 0
+                ? `${event.images.length} obrázk${
+                    event.images.length === 1
+                      ? ""
+                      : event.images.length < 5
+                        ? "y"
+                        : "ů"
+                  } · spravuj a přerovnej.`
+                : "Žádné obrázky. Nahraj galerii pod hlavní obsah."
+            }
+            href={`/events/${wsSlug}/${eventSlug}/gallery`}
+          />
+          <ActionTile
+            title="Sdílení"
+            description={
+              event.community_slugs.length === 0
+                ? `Není sdílené v žádné komunitě v ${workspace.name}.`
+                : `Sdíleno v ${event.community_slugs.length} komunit${
+                    event.community_slugs.length === 1
+                      ? "ě"
+                      : event.community_slugs.length < 5
+                        ? "ách"
+                        : "ách"
+                  }.`
+            }
+            href={`/events/${wsSlug}/${eventSlug}/edit#sdileni`}
           />
           <ActionTile
             title="Veřejný náhled"
             description="Otevři, jak akci uvidí účastníci."
-            href={`/${slug}/e/${eventSlug}`}
+            href={`/${wsSlug}/e/${eventSlug}`}
             external
           />
+        </div>
+
+        <h2 className="mt-10 text-lg font-semibold text-ink-900">Šablona</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Pořádáš podobné akce opakovaně? Vytvoř z této akce kopii s novým
+          slugem ve stavu Draft a uprav jen datum/místo.
+        </p>
+        <div className="mt-3">
+          <DuplicateButton wsSlug={wsSlug} eventSlug={eventSlug} />
         </div>
 
         <div className="mt-10 border-t border-border pt-10">
           <EventDangerZone
             event={event}
-            workspaceSlug={slug}
+            workspaceSlug={wsSlug}
             onCancelled={(updated) => setEvent(updated)}
           />
         </div>
       </section>
     </main>
+  );
+}
+
+function DuplicateButton({
+  wsSlug,
+  eventSlug,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle() {
+    if (!confirm("Vytvořit kopii této akce? Skončí jako Draft.")) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const copy = await events.duplicate(wsSlug, eventSlug);
+      router.push(`/events/${wsSlug}/${copy.slug}/edit`);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Kopírování selhalo.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handle}
+        disabled={busy}
+        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring disabled:opacity-50"
+      >
+        {busy ? "Kopíruji…" : "Duplikovat akci"}
+      </button>
+      {err && (
+        <p className="mt-2 text-sm text-danger">{err}</p>
+      )}
+    </>
   );
 }
 

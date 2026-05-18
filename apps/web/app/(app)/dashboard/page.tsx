@@ -82,7 +82,7 @@ export default function DashboardPage() {
           </div>
           {myWorkspaces && myWorkspaces.some((ws) => ws.my_role === "owner") && (
             <LinkButton
-              href={`/communities/${myWorkspaces.find((ws) => ws.my_role === "owner")!.slug}/events/new`}
+              href="/events/new"
               variant="primary"
               size="md"
             >
@@ -131,7 +131,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <Section title="Tvoje komunity" href="/communities">
+            <Section title="Tvoje komunity" href="/workspaces">
               {(myWorkspaces?.length ?? 0) === 0 ? (
                 <EmptyState
                   title="Zatím nejsi v žádné komunitě"
@@ -155,7 +155,7 @@ export default function DashboardPage() {
                     myWorkspaces && myWorkspaces.length > 0
                       ? {
                           label: "Vytvořit event",
-                          href: `/communities/${myWorkspaces[0].slug}/events/new`,
+                          href: "/events/new",
                         }
                       : undefined
                   }
@@ -274,7 +274,7 @@ function WorkspaceMini({ workspace }: { workspace: Workspace }) {
   const logo = assetUrl(workspace.logo_url);
   return (
     <Link
-      href={`/communities/${workspace.slug}`}
+      href={`/workspaces/${workspace.slug}`}
       className="group flex items-center gap-3 rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
     >
       <div
@@ -324,7 +324,7 @@ function EventMini({
 }) {
   const starts = new Date(event.starts_at);
   const href = ownerView
-    ? `/communities/${event.workspace_slug}/events/${event.slug}`
+    ? `/events/${event.workspace_slug}/${event.slug}`
     : `/${event.workspace_slug}/e/${event.slug}`;
   return (
     <Link

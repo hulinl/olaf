@@ -3,12 +3,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
+import { EventGallery } from "@/components/event-gallery";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
 import { assetUrl, type Event } from "@/lib/api";
+import type { BlockTone } from "@/lib/event-blocks";
 import { serverFetch } from "@/lib/server-api";
+
+/**
+ * Public landing alternates ink/canvas tones by block index so the page reads
+ * as a rhythm rather than a wall of one shade. Even indices = ink (dark),
+ * odd = canvas (light). Reordering blocks in the builder reshuffles the
+ * tones automatically — owners don't pick per-block.
+ */
+function toneForIndex(i: number): BlockTone {
+  return i % 2 === 0 ? "ink" : "canvas";
+}
 
 interface Props {
   params: Promise<{ slug: string; eventSlug: string }>;
@@ -82,13 +94,30 @@ function formatDateRange(starts: string, ends: string, _tz: string): string {
   )}`;
 }
 
+/**
+ * Convert a Mapy.cz / Mapy.com share URL into an embeddable URL by ensuring
+ * the `frame=1` query parameter is present. Returns null for unsupported hosts.
+ */
+function getMapyEmbed(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "mapy.cz" && u.hostname !== "mapy.com") return null;
+    if (u.searchParams.get("frame") !== "1") {
+      u.searchParams.set("frame", "1");
+    }
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export default async function EventLandingPage({ params }: Props) {
   const { slug, eventSlug } = await params;
   const event = await fetchEvent(slug, eventSlug);
   if (!event) notFound();
 
   const cover = assetUrl(event.cover_url);
-  const logo = assetUrl(event.workspace_logo_url);
   const dateRange = formatDateRange(event.starts_at, event.ends_at, event.tz);
   const cancelled = event.status === "cancelled";
   const cta_href = `/${event.workspace_slug}/e/${event.slug}/rsvp`;
@@ -98,20 +127,11 @@ export default async function EventLandingPage({ params }: Props) {
       <header className="sticky top-0 z-10 border-b border-border bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link
-            href={`/${event.workspace_slug}`}
-            className="flex items-center gap-2 text-ink-900 transition-opacity hover:opacity-80"
+            href="/"
+            className="text-ink-900 transition-opacity hover:opacity-80"
+            aria-label="olaf"
           >
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logo}
-                alt={`${event.workspace_name} logo`}
-                className="h-7 w-7 rounded object-contain"
-              />
-            ) : (
-              <Logo size={24} wordmark={false} />
-            )}
-            <span className="text-sm font-medium">{event.workspace_name}</span>
+            <Logo size={26} />
           </Link>
           <div className="flex items-center gap-3">
             <OwnerCockpitLink
@@ -159,6 +179,8 @@ export default async function EventLandingPage({ params }: Props) {
                   fallbackTitle={`${event.workspace_name} — ${event.title}`}
                   fallbackCtaHref={cta_href}
                   heroBadge={i === heroIndex ? heroBadge : undefined}
+                  images={event.images}
+                  tone={toneForIndex(i)}
                 />
               ))}
             </>
@@ -224,15 +246,6 @@ export default async function EventLandingPage({ params }: Props) {
                 return null;
               })()
             )}
-
-            <p
-              className={[
-                "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-                cover ? "text-white/80" : "text-ink-500",
-              ].join(" ")}
-            >
-              {event.workspace_name} · {dateRange}
-            </p>
 
             <h1
               className={[
@@ -315,9 +328,43 @@ export default async function EventLandingPage({ params }: Props) {
           </div>
         </section>
 
+        {/* MAPA — iframe embed when location_url is a Mapy.cz / Mapy.com share */}
+        {(() => {
+          const embed = getMapyEmbed(event.location_url);
+          if (!embed) return null;
+          return (
+            <section className="border-t border-border bg-canvas">
+              <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+                <SectionHead eyebrow="Mapa" title="Kde se sejdeme" />
+                <div
+                  className="relative w-full overflow-hidden rounded-md border border-border bg-surface"
+                  style={{ aspectRatio: "16 / 9" }}
+                >
+                  <iframe
+                    loading="lazy"
+                    src={embed}
+                    title="Mapa"
+                    className="absolute inset-0 h-full w-full border-0"
+                  />
+                </div>
+                {event.location_url && (
+                  <a
+                    href={event.location_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-700 hover:text-ink-900"
+                  >
+                    Otevřít v Mapy.cz →
+                  </a>
+                )}
+              </div>
+            </section>
+          );
+        })()}
+
         {/* O AKCI + foto */}
         {event.description && (
-          <section className="border-t border-border bg-canvas">
+          <section className="border-t border-border bg-surface-strong">
             <div className="mx-auto grid max-w-5xl gap-12 px-4 py-16 sm:py-20 md:grid-cols-2 md:items-start">
               <div>
                 <SectionHead eyebrow="O akci" title="Proč jet" />
@@ -342,32 +389,32 @@ export default async function EventLandingPage({ params }: Props) {
           </section>
         )}
 
-        {/* PROGRAM */}
+        {/* PROGRAM — dark accent section */}
         {event.program.length > 0 && (
-          <section className="border-t border-border bg-surface-muted">
+          <section className="border-t border-border bg-ink-900 text-ink-inverse">
             <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
-              <SectionHead eyebrow="Program" title="Den po dni" />
+              <SectionHead eyebrow="Program" title="Den po dni" tone="dark" />
               <ol className="space-y-8">
                 {event.program.map((d, i) => (
                   <li key={i} className="flex gap-5">
                     <span
-                      className="shrink-0 font-mono text-4xl font-semibold leading-none text-ink-300 sm:text-5xl"
+                      className="shrink-0 font-mono text-4xl font-semibold leading-none text-white/30 sm:text-5xl"
                       style={{ letterSpacing: "-0.03em" }}
                     >
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <div className="flex-1">
-                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-500">
+                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-white/60">
                         {d.day}
                       </p>
                       <h3
-                        className="mt-1 text-xl font-semibold text-ink-900 sm:text-2xl"
+                        className="mt-1 text-xl font-semibold text-ink-inverse sm:text-2xl"
                         style={{ letterSpacing: "-0.02em" }}
                       >
                         {d.title}
                       </h3>
                       <p
-                        className="mt-3 whitespace-pre-line text-ink-700"
+                        className="mt-3 whitespace-pre-line text-white/80"
                         style={{ fontSize: 16, lineHeight: 1.6 }}
                       >
                         {d.body}
@@ -434,7 +481,7 @@ export default async function EventLandingPage({ params }: Props) {
 
         {/* NÁROČNOST */}
         {(event.difficulty_level > 0 || event.difficulty_note) && (
-          <section className="border-t border-border bg-surface-muted">
+          <section className="border-t border-border bg-surface-strong">
             <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
               <SectionHead eyebrow="Náročnost" title={`${event.difficulty_level || "—"} z 5`} />
               {event.difficulty_level > 0 && (
@@ -491,7 +538,7 @@ export default async function EventLandingPage({ params }: Props) {
 
         {/* HIGHLIGHTS — Na co se zaměříme */}
         {event.highlights.length > 0 && (
-          <section className="border-t border-border bg-surface-muted">
+          <section className="border-t border-border bg-surface-strong">
             <div className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
               <SectionHead eyebrow="Highlights" title="Na co se zaměříme" />
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -569,25 +616,67 @@ export default async function EventLandingPage({ params }: Props) {
         </>
         )}
 
-        <footer className="border-t border-border bg-canvas">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              © {new Date().getFullYear()} {event.workspace_name} ·{" "}
-              <Link
-                href={`/${event.workspace_slug}`}
-                className="underline hover:text-ink-900"
+        {(() => {
+          const blockCount = event.blocks?.length ?? 0;
+          const hasAutoGallery =
+            event.images.length > 0 &&
+            !event.blocks.some((b) => b.type === "gallery");
+          const galleryTone: BlockTone = toneForIndex(blockCount);
+          const footerTone: BlockTone = toneForIndex(
+            blockCount + (hasAutoGallery ? 1 : 0),
+          );
+          const footerDark = footerTone === "ink";
+          return (
+            <>
+              {hasAutoGallery && (
+                <EventGallery images={event.images} tone={galleryTone} />
+              )}
+              <footer
+                className={[
+                  "border-t",
+                  footerDark
+                    ? "border-transparent bg-ink-900"
+                    : "border-border bg-canvas",
+                ].join(" ")}
               >
-                Profil
-              </Link>
-            </span>
-            <span>
-              <Link href="/" className="hover:text-ink-900">
-                olaf
-              </Link>{" "}
-              · EU-hosted · GDPR-clean
-            </span>
-          </div>
-        </footer>
+                <div
+                  className={[
+                    "mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] sm:flex-row sm:items-center sm:justify-between",
+                    footerDark ? "text-white/60" : "text-ink-500",
+                  ].join(" ")}
+                >
+                  <span>
+                    © {new Date().getFullYear()} {event.workspace_name} ·{" "}
+                    <Link
+                      href={`/${event.workspace_slug}`}
+                      className={[
+                        "underline",
+                        footerDark
+                          ? "hover:text-ink-inverse"
+                          : "hover:text-ink-900",
+                      ].join(" ")}
+                    >
+                      Profil
+                    </Link>
+                  </span>
+                  <span>
+                    <Link
+                      href="/"
+                      className={
+                        footerDark
+                          ? "hover:text-ink-inverse"
+                          : "hover:text-ink-900"
+                      }
+                    >
+                      olaf
+                    </Link>{" "}
+                    · EU-hosted · GDPR-clean
+                  </span>
+                </div>
+              </footer>
+            </>
+          );
+        })()}
       </main>
     </>
   );

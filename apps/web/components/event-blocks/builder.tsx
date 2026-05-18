@@ -9,8 +9,10 @@ import {
 } from "@/lib/event-blocks";
 
 import { DaysForm } from "./forms/days-form";
+import { GalleryForm } from "./forms/gallery-form";
 import { HeroForm } from "./forms/hero-form";
 import { IncludedSplitForm } from "./forms/included-split-form";
+import { MapForm } from "./forms/map-form";
 import { ProseForm } from "./forms/prose-form";
 import { StatsForm } from "./forms/stats-form";
 
@@ -25,6 +27,8 @@ const ADD_OPTIONS: BlockType[] = [
   "stats",
   "days",
   "included_split",
+  "gallery",
+  "map",
 ];
 
 export function Builder({ blocks, onChange }: Props) {
@@ -189,6 +193,10 @@ function BlockForm({
       return (
         <IncludedSplitForm payload={block.payload} onChange={onChange} />
       );
+    case "gallery":
+      return <GalleryForm payload={block.payload} onChange={onChange} />;
+    case "map":
+      return <MapForm payload={block.payload} onChange={onChange} />;
     default:
       return null;
   }
@@ -211,5 +219,9 @@ function makeBlock(type: BlockType): EventBlock {
       return { id, type, payload: { days: [] } };
     case "included_split":
       return { id, type, payload: { included: [], not_included: [] } };
+    case "gallery":
+      return { id, type, payload: {} };
+    case "map":
+      return { id, type, payload: { map_url: "" } };
   }
 }

@@ -88,7 +88,7 @@ export default function EventsPage() {
                   tady spolu s počtem přihlášených.
                 </p>
                 <LinkButton
-                  href="/communities"
+                  href="/workspaces"
                   variant="secondary"
                   size="md"
                   className="mt-5"
@@ -133,43 +133,39 @@ export default function EventsPage() {
 function EventRow({ event }: { event: EventSummary }) {
   const starts = new Date(event.starts_at);
   return (
-    <Card>
-      <CardSection>
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-            {STATUS_LABELS[event.status]}
+    <Link
+      href={`/events/${event.workspace_slug}/${event.slug}`}
+      className="block rounded-lg border border-border bg-surface p-6 shadow-sm transition-colors hover:border-border-strong hover:shadow-md focus-ring"
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          {STATUS_LABELS[event.status]}
+        </span>
+        <span className="text-xs text-ink-500">
+          {starts.toLocaleDateString("cs-CZ", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+        </span>
+      </div>
+      <h3 className="mt-2 text-base font-semibold text-ink-900">
+        {event.title}
+      </h3>
+      {event.location_text && (
+        <p className="mt-1 text-sm text-ink-500">{event.location_text}</p>
+      )}
+      <div className="mt-4 flex items-baseline gap-4 text-sm">
+        <span className="text-ink-900">
+          <strong>{event.confirmed_count}</strong>
+          {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
+        </span>
+        {event.waitlist_count > 0 && (
+          <span className="text-ink-500">
+            +{event.waitlist_count} waitlist
           </span>
-          <span className="text-xs text-ink-500">
-            {starts.toLocaleDateString("cs-CZ", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </span>
-        </div>
-        <h3 className="mt-2 text-base font-semibold text-ink-900">
-          <Link
-            href={`/communities/${event.workspace_slug}/events/${event.slug}`}
-            className="hover:underline"
-          >
-            {event.title}
-          </Link>
-        </h3>
-        {event.location_text && (
-          <p className="mt-1 text-sm text-ink-500">{event.location_text}</p>
         )}
-        <div className="mt-4 flex items-baseline gap-4 text-sm">
-          <span className="text-ink-900">
-            <strong>{event.confirmed_count}</strong>
-            {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
-          </span>
-          {event.waitlist_count > 0 && (
-            <span className="text-ink-500">
-              +{event.waitlist_count} waitlist
-            </span>
-          )}
-        </div>
-      </CardSection>
-    </Card>
+      </div>
+    </Link>
   );
 }

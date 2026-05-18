@@ -119,12 +119,31 @@ def _validate_included_split(payload: dict) -> None:
     _expect_str(payload.get("price_note", ""), "price_note")
 
 
+def _validate_gallery(payload: dict) -> None:
+    # Gallery block pulls images from event.images at render time, so the
+    # payload only carries optional presentation overrides.
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
+
+
+def _validate_map(payload: dict) -> None:
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
+    _expect_str(payload.get("caption", ""), "caption")
+    map_url = _expect_str(payload.get("map_url", ""), "map_url", allow_blank=False)
+    # Soft check — Mapy.cz/Mapy.com or fallback to a plain link.
+    if not map_url.startswith(("http://", "https://")):
+        raise ValueError("'map_url' must be an absolute URL")
+
+
 BLOCK_SCHEMAS: dict[str, Any] = {
     "hero": _validate_hero,
     "prose": _validate_prose,
     "stats": _validate_stats,
     "days": _validate_days,
     "included_split": _validate_included_split,
+    "gallery": _validate_gallery,
+    "map": _validate_map,
 }
 
 KNOWN_BLOCK_TYPES = tuple(BLOCK_SCHEMAS.keys())

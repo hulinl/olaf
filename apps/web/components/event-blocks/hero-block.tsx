@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { assetUrl } from "@/lib/api";
-import type { HeroBlockPayload } from "@/lib/event-blocks";
+import type { BlockTone, HeroBlockPayload } from "@/lib/event-blocks";
 
 interface Props {
   payload: HeroBlockPayload;
@@ -11,6 +11,7 @@ interface Props {
   fallbackCtaLabel?: string;
   /** Status badge from the public landing — passed through here so it sits on the hero. */
   badge?: React.ReactNode;
+  tone?: BlockTone;
 }
 
 export function HeroBlock({
@@ -19,21 +20,29 @@ export function HeroBlock({
   fallbackCtaHref,
   fallbackCtaLabel = "Přihlásit na akci",
   badge,
+  tone = "canvas",
 }: Props) {
   const cover = assetUrl(payload.cover_url);
   const title = payload.title_override || fallbackTitle;
   const ctaLabel = payload.cta_label || fallbackCtaLabel;
   const ctaHref = payload.cta_href || fallbackCtaHref;
-  const onPhoto = Boolean(cover);
+  // A cover photo always renders as dark surface (overlay). Otherwise the
+  // `tone` decides — `ink` paints a solid dark hero, `canvas` is the
+  // original light hero.
+  const onDark = Boolean(cover) || tone === "ink";
 
   return (
     <section
       className={[
         "relative overflow-hidden",
-        onPhoto ? "min-h-[520px]" : "border-b border-border",
+        cover
+          ? "min-h-[520px]"
+          : tone === "ink"
+            ? "bg-ink-900 text-ink-inverse"
+            : "border-b border-border",
       ].join(" ")}
     >
-      {onPhoto && (
+      {cover && (
         <>
           <div
             className="absolute inset-0 -z-10"
@@ -56,7 +65,7 @@ export function HeroBlock({
       <div
         className={[
           "mx-auto flex max-w-5xl flex-col items-start gap-6 px-4",
-          onPhoto ? "py-24 sm:py-32" : "py-20 sm:py-24",
+          cover ? "py-24 sm:py-32" : "py-20 sm:py-24",
         ].join(" ")}
       >
         {badge}
@@ -65,7 +74,7 @@ export function HeroBlock({
           <p
             className={[
               "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-              onPhoto ? "text-white/80" : "text-ink-500",
+              onDark ? "text-white/80" : "text-ink-500",
             ].join(" ")}
           >
             {payload.eyebrow}
@@ -75,7 +84,7 @@ export function HeroBlock({
         <h1
           className={[
             "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
-            onPhoto ? "text-ink-inverse" : "text-ink-900",
+            onDark ? "text-ink-inverse" : "text-ink-900",
           ].join(" ")}
           style={{ letterSpacing: "-0.035em" }}
         >
@@ -86,7 +95,7 @@ export function HeroBlock({
           <p
             className={[
               "max-w-2xl text-lg sm:text-xl",
-              onPhoto ? "text-white/90" : "text-ink-700",
+              onDark ? "text-white/90" : "text-ink-700",
             ].join(" ")}
             style={{ letterSpacing: "-0.01em", lineHeight: 1.4, fontWeight: 500 }}
           >
@@ -107,7 +116,7 @@ export function HeroBlock({
           <dl
             className={[
               "mt-6 flex flex-wrap gap-x-10 gap-y-5 border-t pt-7",
-              onPhoto ? "border-white/20" : "border-border",
+              onDark ? "border-white/20" : "border-border",
             ].join(" ")}
           >
             {payload.meta.map((m, i) => (
@@ -115,7 +124,7 @@ export function HeroBlock({
                 <dt
                   className={[
                     "font-mono text-[10px] font-medium uppercase tracking-[0.14em]",
-                    onPhoto ? "text-white/65" : "text-ink-500",
+                    onDark ? "text-white/65" : "text-ink-500",
                   ].join(" ")}
                 >
                   {m.k}
@@ -123,7 +132,7 @@ export function HeroBlock({
                 <dd
                   className={[
                     "mt-1 text-xl font-semibold sm:text-2xl",
-                    onPhoto ? "text-ink-inverse" : "text-ink-900",
+                    onDark ? "text-ink-inverse" : "text-ink-900",
                   ].join(" ")}
                   style={{ letterSpacing: "-0.02em" }}
                 >

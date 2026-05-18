@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls", namespace="accounts")),
     path("api/workspaces/", include("workspaces.urls", namespace="workspaces")),
     path("api/events/", include("events.urls", namespace="events")),
+    path("api/communities/", include("communities.urls", namespace="communities")),
 ]
 
 if settings.DEBUG:

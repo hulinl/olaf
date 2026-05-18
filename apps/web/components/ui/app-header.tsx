@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { type Workspace, workspaces as workspacesApi } from "@/lib/api";
 
 import { Logo } from "./logo";
 import { UserMenu } from "./user-menu";
@@ -13,24 +15,43 @@ interface AppHeaderProps {
   signingOut?: boolean;
 }
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/communities", label: "Communities" },
-  { href: "/events", label: "Events" },
-];
-
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
+}
+
+/**
+ * Lazy-loaded list of the user's workspaces. Cached for the whole AppHeader
+ * lifetime; the only mutation that invalidates this is creating a new
+ * workspace, which we don't have UI for yet in V1.
+ */
+function useWorkspaces() {
+  const [items, setItems] = useState<Workspace[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const requested = useRef(false);
+
+  function load() {
+    if (requested.current) return;
+    requested.current = true;
+    setLoading(true);
+    workspacesApi
+      .mine()
+      .then((ws) => setItems(ws))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }
+  return { items, loading, load };
 }
 
 export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const ws = useWorkspaces();
 
-  // Close the drawer whenever the route changes.
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
+
+  const ownerWorkspaces = ws.items?.filter((w) => w.my_role === "owner") ?? [];
 
   return (
     <>
@@ -59,21 +80,53 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
               aria-label="Primary"
               className="ml-6 hidden items-center gap-1 sm:flex"
             >
-              {NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={isActive(pathname, item.href) ? "page" : undefined}
-                  className={[
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    isActive(pathname, item.href)
-                      ? "bg-surface-muted text-ink-900"
-                      : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
-                  ].join(" ")}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              <NavLink href="/dashboard" pathname={pathname}>
+                Dashboard
+              </NavLink>
+
+              <NavDropdown
+                label="Workspace"
+                pathname={pathname}
+                activeWhenStartsWith="/workspaces"
+                onOpen={ws.load}
+              >
+                {ws.loading && !ws.items ? (
+                  <DropdownNote>Načítám…</DropdownNote>
+                ) : ws.items && ws.items.length === 0 ? (
+                  <DropdownNote>Zatím žádný workspace</DropdownNote>
+                ) : (
+                  ws.items?.map((w) => (
+                    <DropdownLink
+                      key={w.slug}
+                      href={`/workspaces/${w.slug}`}
+                    >
+                      {w.name}
+                    </DropdownLink>
+                  ))
+                )}
+                <DropdownDivider />
+                <DropdownLink href="/workspaces">
+                  Všechny workspaces
+                </DropdownLink>
+              </NavDropdown>
+
+              <NavDropdown
+                label="Akce"
+                pathname={pathname}
+                activeWhenStartsWith="/events"
+                onOpen={ws.load}
+              >
+                <DropdownLink href="/events">Všechny akce</DropdownLink>
+                <DropdownLink href="/events?filter=owner">
+                  Akce, které vedu
+                </DropdownLink>
+                {ownerWorkspaces.length > 0 && (
+                  <>
+                    <DropdownDivider />
+                    <DropdownLink href="/events/new">+ Nová akce</DropdownLink>
+                  </>
+                )}
+              </NavDropdown>
             </nav>
           </div>
 
@@ -88,6 +141,9 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
       {drawerOpen && (
         <MobileDrawer
           pathname={pathname}
+          workspaces={ws.items}
+          ownerWorkspaces={ownerWorkspaces}
+          onMount={ws.load}
           onClose={() => setDrawerOpen(false)}
         />
       )}
@@ -95,15 +151,150 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   );
 }
 
+function NavLink({
+  href,
+  pathname,
+  children,
+}: {
+  href: string;
+  pathname: string;
+  children: React.ReactNode;
+}) {
+  const active = isActive(pathname, href);
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        active
+          ? "bg-surface-muted text-ink-900"
+          : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+      ].join(" ")}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function NavDropdown({
+  label,
+  pathname,
+  activeWhenStartsWith,
+  onOpen,
+  children,
+}: {
+  label: string;
+  pathname: string;
+  activeWhenStartsWith: string;
+  onOpen?: () => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  // Close on route change
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  function toggle() {
+    if (!open && onOpen) onOpen();
+    setOpen((o) => !o);
+  }
+
+  const active = isActive(pathname, activeWhenStartsWith);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={[
+          "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+          active || open
+            ? "bg-surface-muted text-ink-900"
+            : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+        ].join(" ")}
+      >
+        {label}
+        <ChevronDown open={open} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 z-30 mt-1 min-w-[14rem] origin-top-left overflow-hidden rounded-md border border-border bg-surface shadow-lg"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropdownLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="block truncate px-4 py-2 text-sm text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function DropdownDivider() {
+  return <div className="my-1 border-t border-border" />;
+}
+
+function DropdownNote({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-4 py-2 text-sm text-ink-500">{children}</p>
+  );
+}
+
 function MobileDrawer({
   pathname,
+  workspaces,
+  ownerWorkspaces,
+  onMount,
   onClose,
 }: {
   pathname: string;
+  workspaces: Workspace[] | null;
+  ownerWorkspaces: Workspace[];
+  onMount: () => void;
   onClose: () => void;
 }) {
-  // Lock body scroll while drawer is open.
   useEffect(() => {
+    onMount();
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     function onEsc(e: KeyboardEvent) {
@@ -114,7 +305,7 @@ function MobileDrawer({
       document.body.style.overflow = original;
       document.removeEventListener("keydown", onEsc);
     };
-  }, [onClose]);
+  }, [onClose, onMount]);
 
   return (
     <div className="fixed inset-0 z-40 sm:hidden">
@@ -136,26 +327,142 @@ function MobileDrawer({
             <CloseIcon />
           </button>
         </div>
-        <nav aria-label="Primary mobile" className="flex flex-col gap-1 p-3">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              aria-current={isActive(pathname, item.href) ? "page" : undefined}
-              className={[
-                "rounded-md px-3 py-2.5 text-sm font-medium",
-                isActive(pathname, item.href)
-                  ? "bg-surface-muted text-ink-900"
-                  : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
-              ].join(" ")}
+
+        <nav
+          aria-label="Primary mobile"
+          className="flex flex-1 flex-col gap-1 overflow-y-auto p-3"
+        >
+          <DrawerLink
+            href="/dashboard"
+            pathname={pathname}
+            onClose={onClose}
+          >
+            Dashboard
+          </DrawerLink>
+
+          <DrawerSection label="Workspace">
+            {workspaces?.map((w) => (
+              <DrawerSubLink
+                key={w.slug}
+                href={`/workspaces/${w.slug}`}
+                pathname={pathname}
+                onClose={onClose}
+              >
+                {w.name}
+              </DrawerSubLink>
+            ))}
+            <DrawerSubLink
+              href="/workspaces"
+              pathname={pathname}
+              onClose={onClose}
             >
-              {item.label}
-            </Link>
-          ))}
+              Všechny workspaces
+            </DrawerSubLink>
+          </DrawerSection>
+
+          <DrawerSection label="Akce">
+            <DrawerSubLink
+              href="/events"
+              pathname={pathname}
+              onClose={onClose}
+            >
+              Všechny akce
+            </DrawerSubLink>
+            <DrawerSubLink
+              href="/events?filter=owner"
+              pathname={pathname}
+              onClose={onClose}
+            >
+              Akce, které vedu
+            </DrawerSubLink>
+            {ownerWorkspaces.length > 0 && (
+              <DrawerSubLink
+                href="/events/new"
+                pathname={pathname}
+                onClose={onClose}
+              >
+                + Nová akce
+              </DrawerSubLink>
+            )}
+          </DrawerSection>
         </nav>
       </div>
     </div>
+  );
+}
+
+function DrawerLink({
+  href,
+  pathname,
+  onClose,
+  children,
+}: {
+  href: string;
+  pathname: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const active = isActive(pathname, href);
+  return (
+    <Link
+      href={href}
+      onClick={onClose}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "rounded-md px-3 py-2.5 text-sm font-medium",
+        active
+          ? "bg-surface-muted text-ink-900"
+          : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+      ].join(" ")}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function DrawerSection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-3 flex flex-col">
+      <p className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-ink-500">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function DrawerSubLink({
+  href,
+  pathname,
+  onClose,
+  children,
+}: {
+  href: string;
+  pathname: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const active = pathname === href;
+  return (
+    <Link
+      href={href}
+      onClick={onClose}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "rounded-md px-3 py-2 text-sm",
+        active
+          ? "bg-surface-muted text-ink-900"
+          : "text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+      ].join(" ")}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -192,6 +499,30 @@ function CloseIcon() {
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronDown({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      className={[
+        "shrink-0 transition-transform",
+        open ? "rotate-180" : "",
+      ].join(" ")}
+    >
+      <path
+        d="M5 8 L10 13 L15 8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
