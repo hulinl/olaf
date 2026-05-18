@@ -27,11 +27,11 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
     body = render_to_string("emails/rsvp_confirmation.txt", context)
 
     if rsvp.status == RSVP.STATUS_WAITLIST:
-        subject = f"You're on the waitlist for {event.title}"
+        subject = f"Jsi na waitlistu — {event.title}"
     elif rsvp.status == RSVP.STATUS_PENDING_APPROVAL:
-        subject = f"Registration received — pending approval ({event.title})"
+        subject = f"Tvoje registrace čeká na schválení — {event.title}"
     else:
-        subject = f"You're in! {event.title}"
+        subject = f"Tvoje registrace potvrzena — {event.title}"
 
     send_mail(
         subject=subject,
@@ -53,7 +53,7 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
     }
     body = render_to_string("emails/rsvp_promoted.txt", context)
     send_mail(
-        subject=f"A spot opened up — you're in for {event.title}",
+        subject=f"Místo se uvolnilo — jedeš s námi na {event.title}",
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[rsvp.user.email],
@@ -72,7 +72,7 @@ def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
     }
     body = render_to_string("emails/event_cancelled.txt", context)
     send_mail(
-        subject=f"Cancelled: {event.title}",
+        subject=f"Akce zrušena — {event.title}",
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[rsvp.user.email],

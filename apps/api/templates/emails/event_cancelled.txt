@@ -1,13 +1,13 @@
-Hi {{ user.first_name }},
+Ahoj {{ user.first_name }},
 
-We're sorry — "{{ event.title }}" has been cancelled.
+bohužel — „{{ event.title }}" byla zrušena.
 
 {% if reason %}Důvod:
   {{ reason }}
 
-{% endif %}{% if event.starts_at %}Původní termín: {{ event.starts_at|date:"l, j F Y, H:i" }}{% endif %}{% if event.location_text %}
+{% endif %}{% if event.starts_at %}Původní termín: {{ event.starts_at|date:"l j. F Y, H:i" }}{% endif %}{% if event.location_text %}
 Místo: {{ event.location_text }}{% endif %}
 
-Vaše registrace je tímto zrušena. Pokud něco potřebujete, ozvěte se nám.
+Tvoje registrace je tímto zrušená. Pokud něco potřebuješ, ozvi se nám.
 
-— {{ workspace.name }} via olaf
+— {{ workspace.name }} přes olaf
