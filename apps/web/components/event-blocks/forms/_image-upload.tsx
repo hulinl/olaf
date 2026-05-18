@@ -17,12 +17,12 @@ interface Props {
 }
 
 /**
- * Field with both a manual URL input and an upload button. The upload reuses
- * the gallery endpoint (POST /events/{ws}/{slug}/images/) which writes into
- * event.images — that means uploaded block images are listed alongside the
- * gallery, owners can reuse them across blocks, and orphan cleanup is a
- * single concern. When workspaceSlug / eventSlug are absent (create flow
- * before the event exists), only the URL input is offered.
+ * Field with both a manual URL input and an upload button. Uploads go to the
+ * block-image endpoint (POST /events/{ws}/{slug}/block-images/), NOT the
+ * gallery — block images shouldn't show up in the public gallery (e.g. the
+ * hero cover would otherwise appear twice). When workspaceSlug / eventSlug
+ * are absent (create flow before the event exists), only the URL input is
+ * offered.
  */
 export function ImageUploadField({
   label,
@@ -43,8 +43,8 @@ export function ImageUploadField({
     setBusy(true);
     setError(null);
     try {
-      const img = await events.uploadImage(workspaceSlug, eventSlug, file);
-      if (img.url) onChange(img.url);
+      const res = await events.uploadBlockImage(workspaceSlug, eventSlug, file);
+      if (res.url) onChange(res.url);
     } catch (err) {
       setError(
         err instanceof ApiError

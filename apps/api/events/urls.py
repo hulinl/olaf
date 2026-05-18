@@ -48,6 +48,11 @@ urlpatterns = [
         name="image-detail",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/block-images/",
+        views.event_block_image_upload,
+        name="block-image-upload",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/cancel/",
         views.cancel_event,
         name="cancel",

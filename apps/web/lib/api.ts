@@ -477,6 +477,14 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/images/reorder/`,
       { method: "POST", body: JSON.stringify({ order }) },
     ),
+  uploadBlockImage: (workspaceSlug: string, eventSlug: string, file: File) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    return apiFetch<{ url: string }>(
+      `/api/events/${workspaceSlug}/${eventSlug}/block-images/`,
+      { method: "POST", body: fd },
+    );
+  },
   approveRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/approve/`,
