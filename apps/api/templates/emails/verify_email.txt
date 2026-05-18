@@ -1,11 +1,11 @@
-Hi {{ user.first_name }},
+Ahoj {{ user.first_name }},
 
-Welcome to olaf — where adventures begin.
+vítej na olafu — kde začíná dobrodružství.
 
-Confirm your email address by clicking the link below:
+Potvrď svoji e-mailovou adresu kliknutím na odkaz níže:
 
   {{ link }}
 
-This link expires in {{ expires_hours }} hours. If you didn't create an olaf account, you can ignore this email.
+Odkaz vyprší za {{ expires_hours }} hodin. Pokud sis účet na olafu nezakládal/a, můžeš tenhle e-mail ignorovat.
 
-— The olaf team
+— Tým olaf

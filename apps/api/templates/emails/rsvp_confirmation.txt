@@ -1,17 +1,17 @@
-Hi {{ user.first_name }},
+Ahoj {{ user.first_name }},
 
-{% if status == 'yes' %}You're confirmed for "{{ event.title }}". See you there.
-{% elif status == 'waitlist' %}You're on the waitlist for "{{ event.title }}". We'll email you as soon as a spot opens up.
-{% elif status == 'pending_approval' %}Your registration for "{{ event.title }}" is pending {{ workspace.name }}'s approval — you'll hear back shortly.
-{% else %}Your RSVP for "{{ event.title }}" was recorded.
+{% if status == 'yes' %}máš potvrzenou registraci na „{{ event.title }}". Těšíme se na tebe.
+{% elif status == 'waitlist' %}jsi na waitlistu pro „{{ event.title }}". Ozveme se hned, jak se uvolní místo.
+{% elif status == 'pending_approval' %}tvoje registrace na „{{ event.title }}" čeká na schválení od {{ workspace.name }}. Brzy se ti ozveme.
+{% else %}tvoje registrace na „{{ event.title }}" je zaznamenaná.
 {% endif %}
-Event page:
+Stránka akce:
   {{ event_url }}
 
-{% if event.starts_at %}When: {{ event.starts_at|date:"l, j F Y, H:i" }}{% endif %}{% if event.location_text %}
-Where: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
-Meeting point: {{ event.meeting_point_text }}{% endif %}
+{% if event.starts_at %}Kdy: {{ event.starts_at|date:"l j. F Y, H:i" }}{% endif %}{% if event.location_text %}
+Kde: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
+Sraz: {{ event.meeting_point_text }}{% endif %}
 
-You can review your registration anytime by visiting the event page above. If anything changes (or you need to cancel), just open the page and update your RSVP.
+Registraci si můžeš kdykoli zkontrolovat na stránce akce výše. Pokud něco nevyjde nebo potřebuješ zrušit, otevři si stránku a uprav svou registraci.
 
-— {{ workspace.name }} via olaf
+— {{ workspace.name }} přes olaf

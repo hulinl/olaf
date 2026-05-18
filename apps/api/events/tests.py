@@ -453,7 +453,7 @@ class CancelEventTests(TestCase):
         recipients = {m.to[0] for m in mail.outbox}
         self.assertEqual(recipients, {"p1@example.com", "p2@example.com"})
         for m in mail.outbox:
-            self.assertIn("Cancelled", m.subject)
+            self.assertIn("zrušena", m.subject)
             self.assertIn("Storm coming in", m.body)
 
     def test_cancel_without_reason_still_works(self) -> None:
