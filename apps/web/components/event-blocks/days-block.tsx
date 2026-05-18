@@ -43,26 +43,26 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
               <article
                 key={i}
                 className={[
-                  "overflow-hidden rounded-md border",
+                  "overflow-hidden rounded-2xl border shadow-md",
                   dark
                     ? "border-white/10 bg-white/[0.04]"
-                    : "border-border bg-canvas",
+                    : "border-border bg-surface",
                 ].join(" ")}
               >
-                <div className="grid gap-0 sm:grid-cols-[180px_1fr]">
+                <div className="grid gap-0 sm:grid-cols-[200px_1fr]">
                   <div
                     className={[
-                      "relative flex min-h-[160px] flex-col justify-between p-6",
+                      "relative flex min-h-[200px] flex-col justify-between p-8 sm:min-h-[240px]",
                       image
                         ? "text-ink-inverse"
                         : dark
-                          ? "bg-white/[0.06] text-ink-inverse"
-                          : "bg-surface-strong text-ink-900",
+                          ? "bg-ink-700 text-ink-inverse"
+                          : "bg-ink-900 text-ink-inverse",
                     ].join(" ")}
                     style={
                       image
                         ? {
-                            backgroundImage: `linear-gradient(rgba(0,0,0,0.30), rgba(0,0,0,0.55)), url(${image})`,
+                            backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.65)), url(${image})`,
                             backgroundSize: "cover",
                             backgroundPosition: "center",
                           }
@@ -70,28 +70,19 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
                     }
                   >
                     {d.label && (
-                      <p
-                        className={[
-                          "font-mono text-[10px] font-medium uppercase tracking-[0.14em]",
-                          image
-                            ? "text-white/75"
-                            : dark
-                              ? "text-white/60"
-                              : "text-ink-500",
-                        ].join(" ")}
-                      >
+                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white/75">
                         {d.label}
                       </p>
                     )}
                     <p
-                      className="text-5xl font-semibold leading-none"
-                      style={{ letterSpacing: "-0.03em" }}
+                      className="text-6xl font-semibold leading-none"
+                      style={{ letterSpacing: "-0.035em" }}
                     >
                       {num}
                     </p>
                   </div>
 
-                  <div className="p-6 sm:p-8">
+                  <div className="p-8 sm:p-10">
                     {d.title && (
                       <h3
                         className={[
@@ -127,7 +118,7 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
                     {(d.time || d.distance || d.ascent || d.descent) && (
                       <dl
                         className={[
-                          "mt-5 flex flex-wrap gap-x-8 gap-y-2 border-t pt-4",
+                          "mt-5 flex flex-wrap gap-x-8 gap-y-2 border-t border-dashed pt-4",
                           dark ? "border-white/10" : "border-border",
                         ].join(" ")}
                       >

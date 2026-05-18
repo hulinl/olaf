@@ -70,6 +70,23 @@
  * via a `data-theme` attribute, not browser-preference auto-flip. */
 
 /* -----------------------------------------------------------------------------
+ * data-theme="paper" — Pitztal-style warm-paper surface.
+ *
+ * Used on the public event landing (apps/web/app/[slug]/e/[eventSlug]/page.tsx)
+ * to get the "outdoor magazine" feel from templates/pitztal-template.html:
+ * paper background, warm borders, white cards on top. Black ink + amber
+ * accent stay (brand v1). Dashboard / settings / auth chrome keep the
+ * crystal-white canvas — this override is scoped to its DOM subtree.
+ * --------------------------------------------------------------------------- */
+
+[data-theme="paper"] {
+  --canvas: #fbfaf7;
+  --surface-muted: #f4f0e8;
+  --border: #e7e2d8;
+  --border-strong: #d6cfbe;
+}
+
+/* -----------------------------------------------------------------------------
  * Tailwind 4 @theme — map our tokens to utility class names.
  * Components write bg-canvas, text-ink-700, border-border, ring-brand etc.
  * Values reference :root vars so dark-mode override flows through.

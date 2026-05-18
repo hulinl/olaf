@@ -112,7 +112,7 @@ export default async function EventLandingPage({ params }: Props) {
   const cta_href = `/${event.workspace_slug}/e/${event.slug}/rsvp`;
 
   return (
-    <>
+    <div data-theme="paper" className="bg-canvas text-ink-900">
       <header className="sticky top-0 z-10 border-b border-border bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link
@@ -629,7 +629,7 @@ export default async function EventLandingPage({ params }: Props) {
           </div>
         </footer>
       </main>
-    </>
+    </div>
   );
 }
 

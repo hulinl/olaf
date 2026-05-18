@@ -9,95 +9,50 @@ interface Props {
   tone?: BlockTone;
 }
 
-export function IncludedSplitBlock({ payload, tone = "canvas" }: Props) {
+/**
+ * Included / Not-included — Pitztal-style split list with circle check / cross
+ * icons inline with each item, plus a standalone dark price card at the bottom.
+ * The whole section ALWAYS renders ink (dark) — it's the second deliberate
+ * dark statement on the landing (after Stats), framing the price decision.
+ */
+export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
   const hasIncluded = payload.included && payload.included.length > 0;
   const hasNotIncluded = payload.not_included && payload.not_included.length > 0;
   const hasPrice = Boolean(payload.price_value);
   if (!hasIncluded && !hasNotIncluded && !hasPrice) return null;
 
-  const dark = tone === "ink";
-
   return (
-    <section
-      className={[
-        "border-t",
-        dark ? "border-transparent bg-ink-900" : "border-border bg-canvas",
-      ].join(" ")}
-    >
+    <section className="border-t border-transparent bg-ink-900">
       <div className="mx-auto max-w-5xl px-4 py-24 sm:py-28">
         <SectionHead
           eyebrow="Cena"
           title="Co dostaneš a za co platíš"
-          tone={dark ? "dark" : "light"}
+          tone="dark"
         />
 
-        <div className="grid gap-12 md:grid-cols-2">
+        <div className="grid gap-12 md:grid-cols-2 md:gap-16">
           {hasIncluded && (
             <ItemColumn
               eyebrow="V ceně"
               items={payload.included}
-              accent="amber"
-              dark={dark}
+              variant="check"
             />
           )}
           {hasNotIncluded && (
             <ItemColumn
               eyebrow="Hradíš sám"
               items={payload.not_included}
-              accent="muted"
-              dark={dark}
+              variant="cross"
             />
           )}
         </div>
 
         {hasPrice && (
-          <div
-            className={[
-              "mt-12 flex flex-wrap items-baseline justify-between gap-6 border-t pt-10",
-              dark ? "border-white/15" : "border-border",
-            ].join(" ")}
-          >
-            <div>
-              <p
-                className={[
-                  "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-                  dark ? "text-white/60" : "text-ink-500",
-                ].join(" ")}
-              >
-                Cena výpravy
-              </p>
-              {payload.price_note && (
-                <p
-                  className={[
-                    "mt-3 max-w-md",
-                    dark ? "text-white/80" : "text-ink-700",
-                  ].join(" ")}
-                  style={{ fontSize: 16, lineHeight: 1.55 }}
-                >
-                  {payload.price_note}
-                </p>
-              )}
-            </div>
-            <p
-              className={[
-                "text-5xl font-semibold sm:text-6xl",
-                dark ? "text-ink-inverse" : "text-ink-900",
-              ].join(" ")}
-              style={{ letterSpacing: "-0.035em", lineHeight: 1 }}
-            >
-              {payload.price_value}
-              {payload.price_unit && (
-                <span
-                  className={[
-                    "ml-3 font-mono text-base font-medium uppercase tracking-[0.14em]",
-                    dark ? "text-white/60" : "text-ink-500",
-                  ].join(" ")}
-                >
-                  {payload.price_unit}
-                </span>
-              )}
-            </p>
-          </div>
+          <PriceCard
+            value={payload.price_value!}
+            unit={payload.price_unit}
+            note={payload.price_note}
+          />
         )}
       </div>
     </section>
@@ -107,64 +62,102 @@ export function IncludedSplitBlock({ payload, tone = "canvas" }: Props) {
 function ItemColumn({
   eyebrow,
   items,
-  accent,
-  dark,
+  variant,
 }: {
   eyebrow: string;
   items: { label: string; desc?: string }[];
-  accent: "amber" | "muted";
-  dark: boolean;
+  variant: "check" | "cross";
 }) {
   return (
     <div>
-      <p
-        className={[
-          "mb-5 font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-          accent === "amber"
-            ? dark
-              ? "text-ink-inverse"
-              : "text-ink-900"
-            : dark
-              ? "text-white/60"
-              : "text-ink-500",
-        ].join(" ")}
-      >
+      <h3 className="mb-6 text-lg font-semibold text-ink-inverse">
+        {variant === "check" ? "✓ " : "× "}
         {eyebrow}
-      </p>
-      <ul
-        className={[
-          "space-y-5 border-l-2 pl-6",
-          accent === "amber"
-            ? "border-brand"
-            : dark
-              ? "border-white/30"
-              : "border-border-strong",
-        ].join(" ")}
-      >
+      </h3>
+      <ul className="list-none p-0 m-0">
         {items.map((item, i) => (
-          <li key={i}>
-            <p
+          <li
+            key={i}
+            className="flex gap-4 border-b border-white/10 py-4 last:border-b-0"
+          >
+            <span
               className={[
-                "font-medium",
-                dark ? "text-ink-inverse" : "text-ink-900",
+                "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
+                variant === "check"
+                  ? "bg-brand/20 text-brand"
+                  : "bg-white/8 text-white/55",
               ].join(" ")}
+              aria-hidden
             >
-              {item.label}
-            </p>
-            {item.desc && (
-              <p
-                className={[
-                  "mt-1",
-                  dark ? "text-white/65" : "text-ink-500",
-                ].join(" ")}
-                style={{ fontSize: 14, lineHeight: 1.55 }}
-              >
-                {item.desc}
-              </p>
-            )}
+              {variant === "check" ? (
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              )}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-ink-inverse">{item.label}</p>
+              {item.desc && (
+                <p
+                  className="mt-1 text-white/55"
+                  style={{ fontSize: 14, lineHeight: 1.55 }}
+                >
+                  {item.desc}
+                </p>
+              )}
+            </div>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function PriceCard({
+  value,
+  unit,
+  note,
+}: {
+  value: string;
+  unit?: string;
+  note?: string;
+}) {
+  return (
+    <div
+      className="mt-14 grid items-center gap-10 rounded-2xl border border-white/10 p-10 sm:grid-cols-[1.2fr_1fr] sm:p-12"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))",
+      }}
+    >
+      <div>
+        <h3 className="text-2xl font-semibold text-ink-inverse sm:text-3xl" style={{ letterSpacing: "-0.025em" }}>
+          Cena výpravy
+        </h3>
+        {note && (
+          <p className="mt-3 text-white/70" style={{ fontSize: 16, lineHeight: 1.55 }}>
+            {note}
+          </p>
+        )}
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
+        <p
+          className="text-5xl font-semibold text-ink-inverse sm:text-6xl"
+          style={{ letterSpacing: "-0.035em", lineHeight: 1 }}
+        >
+          {value}
+          {unit && (
+            <span className="ml-2 text-lg font-mono font-medium uppercase tracking-[0.14em] text-white/60">
+              {unit}
+            </span>
+          )}
+        </p>
+      </div>
     </div>
   );
 }
