@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { Button, LinkButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import {
   ApiError,
@@ -46,13 +47,27 @@ const STATUS_TONE: Record<RSVPRecord["status"], string> = {
   cancelled: "bg-danger-soft text-danger",
 };
 
+const ALLOWED_FILTERS: Filter[] = [
+  "all",
+  "yes",
+  "waitlist",
+  "pending_approval",
+];
+
+function isFilter(value: string | null): value is Filter {
+  return value !== null && (ALLOWED_FILTERS as string[]).includes(value);
+}
+
 export default function RSVPAdminPage({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryFilter = searchParams.get("filter");
+  const initialFilter: Filter = isFilter(queryFilter) ? queryFilter : "all";
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [event, setEvent] = useState<OlafEvent | null>(null);
   const [rsvps, setRsvps] = useState<RSVPRecord[]>([]);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [acting, setActing] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,22 +184,6 @@ export default function RSVPAdminPage({ params }: Props) {
               {counts.pending_approval > 0 &&
                 ` · ${counts.pending_approval} čeká na schválení`}
             </p>
-          </div>
-          <div className="flex gap-2">
-            <LinkButton
-              href={`/${wsSlug}/e/${eventSlug}`}
-              variant="secondary"
-              size="md"
-            >
-              Veřejná stránka
-            </LinkButton>
-            <LinkButton
-              href={`/events/${wsSlug}/${eventSlug}/edit`}
-              variant="ghost"
-              size="md"
-            >
-              Upravit akci
-            </LinkButton>
           </div>
         </header>
 

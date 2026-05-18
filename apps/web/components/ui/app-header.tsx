@@ -47,6 +47,14 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const ws = useWorkspaces();
 
+  // Load workspaces on mount so the "Správce" pill in the top-right is
+  // visible from the very first paint of /dashboard, not only after the
+  // user opens a dropdown that triggers ws.load().
+  useEffect(() => {
+    ws.load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);

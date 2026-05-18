@@ -22,8 +22,8 @@ const NAV: NavItem[] = [
 /**
  * Správce shell — left sidebar tree + main content. The user can drill into
  * each agenda from the sidebar; content area routes handle list → detail.
- * "Zpět do uživatelského pohledu" sits in the sidebar so it's always at
- * hand without taking horizontal room on mobile.
+ * No "back to user view" link here — the top header is sticky and already
+ * carries Dashboard / Komunity / Akce, which serves as the way back.
  */
 export default function AdminLayout({
   children,
@@ -76,14 +76,6 @@ export default function AdminLayout({
                   );
                 })}
               </nav>
-              <div className="mt-3 border-t border-border pt-3">
-                <Link
-                  href="/dashboard"
-                  className="block rounded-md px-3 py-2 text-xs font-medium text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-                >
-                  ← Zpět do uživatelského pohledu
-                </Link>
-              </div>
             </div>
           </aside>
 

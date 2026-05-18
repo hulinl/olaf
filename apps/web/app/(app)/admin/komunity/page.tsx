@@ -4,10 +4,21 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
-import { Alert, Card, CardSection } from "@/components/ui/card";
+import { Alert } from "@/components/ui/card";
 import { ApiError, type Workspace, workspaces } from "@/lib/api";
 
-export default function AdminKomunityPage() {
+const VISIBILITY_LABEL: Record<Workspace["visibility"], string> = {
+  public: "Veřejná",
+  unlisted: "Skrytá",
+  private: "Soukromá",
+};
+
+/**
+ * Level 1 admin view of owned workspaces — table mirrors the /admin/eventy
+ * layout so the owner sees the same drilldown affordances across agendas.
+ * Row hover lights up the whole line with the brand amber accent.
+ */
+export default function AdminKomunityTablePage() {
   const [myWorkspaces, setMyWorkspaces] = useState<Workspace[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +51,8 @@ export default function AdminKomunityPage() {
             Moje komunity
           </h1>
           <p className="mt-2 max-w-2xl text-ink-500">
-            Komunity, které spravuješ. Klikni pro detail — profil, akce,
-            členy (a postupně přibydou další agendy: nástěnka, platby, …).
+            Komunity, které spravuješ. Klikni na řádek pro detail — profil,
+            akce, členy (postupně přibyde nástěnka, platby, ...).
           </p>
         </div>
         <LinkButton href="/workspaces/new" variant="primary" size="md">
@@ -58,53 +69,78 @@ export default function AdminKomunityPage() {
       {error && <Alert variant="danger">{error}</Alert>}
 
       {!loading && !error && (myWorkspaces?.length ?? 0) === 0 && (
-        <Card>
-          <CardSection>
-            <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
-              <h3 className="text-base font-semibold text-ink-900">
-                Zatím nemáš svoji komunitu
-              </h3>
-              <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                Komunita je tvůj domov pro akce. Vytvoř první.
-              </p>
-              <div className="mt-5">
-                <LinkButton href="/workspaces/new" variant="primary" size="md">
-                  + Vytvořit komunitu
-                </LinkButton>
-              </div>
-            </div>
-          </CardSection>
-        </Card>
+        <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
+          <h3 className="text-base font-semibold text-ink-900">
+            Zatím nemáš svoji komunitu
+          </h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+            Komunita je tvůj domov pro akce. Vytvoř první.
+          </p>
+          <div className="mt-5">
+            <LinkButton href="/workspaces/new" variant="primary" size="md">
+              + Vytvořit komunitu
+            </LinkButton>
+          </div>
+        </div>
       )}
 
       {!loading && (myWorkspaces?.length ?? 0) > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {myWorkspaces!.map((w) => (
-            <Link
-              key={w.slug}
-              href={`/workspaces/${w.slug}`}
-              className="block rounded-2xl border border-border bg-surface p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand hover:shadow-md focus-ring"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <h3 className="text-lg font-semibold text-ink-900">
-                  {w.name}
-                </h3>
-                <span className="rounded bg-brand px-1.5 py-0.5 text-xs font-medium text-brand-ink">
-                  Owner
-                </span>
-              </div>
-              {w.location && (
-                <p className="mt-1 text-sm text-ink-500">{w.location}</p>
-              )}
-              {w.bio && (
-                <p className="mt-3 line-clamp-2 text-sm text-ink-700">
-                  {w.bio}
-                </p>
-              )}
-            </Link>
-          ))}
+        <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-muted/60">
+              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                <th className="px-4 py-3">Komunita</th>
+                <th className="px-4 py-3">Lokalita</th>
+                <th className="px-4 py-3">Viditelnost</th>
+                <th className="px-4 py-3 text-right">Členů</th>
+                <th className="px-4 py-3 text-right">Akce</th>
+                <th className="px-4 py-3" aria-label="Otevřít" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {myWorkspaces!.map((w) => (
+                <KomunityRow key={w.slug} workspace={w} />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
+  );
+}
+
+function KomunityRow({ workspace: w }: { workspace: Workspace }) {
+  return (
+    <tr className="group cursor-pointer hover:bg-brand/10">
+      <td className="px-4 py-3">
+        <Link
+          href={`/admin/komunity/${w.slug}`}
+          className="flex flex-col gap-0.5 focus-ring"
+        >
+          <span className="font-medium text-ink-900">{w.name}</span>
+          {w.bio && (
+            <span className="line-clamp-1 text-xs text-ink-500">{w.bio}</span>
+          )}
+        </Link>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+        {w.location || "—"}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+        {VISIBILITY_LABEL[w.visibility]}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+        {w.member_count ?? "—"}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        <Link
+          href={`/workspaces/${w.slug}/edit`}
+          className="text-xs font-medium text-ink-500 hover:text-ink-900"
+        >
+          Upravit →
+        </Link>
+      </td>
+    </tr>
   );
 }

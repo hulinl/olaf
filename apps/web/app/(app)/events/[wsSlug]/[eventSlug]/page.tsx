@@ -139,42 +139,80 @@ export default function EventCockpitPage({ params }: Props) {
               </span>
             )}
           </div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            {event.title}
-          </h1>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+              {event.title}
+            </h1>
+            <a
+              href={`/${wsSlug}/e/${eventSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Veřejný náhled"
+              aria-label="Otevřít veřejný náhled v novém okně"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 3h7v7" />
+                <path d="M10 14L21 3" />
+                <path d="M21 14v7H3V3h7" />
+              </svg>
+            </a>
+          </div>
         </header>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <StatTile
-            label="Přihlášeno"
-            value={String(event.confirmed_count)}
-            hint={
+            label="Potvrzeno"
+            value={
               event.capacity != null
-                ? `z kapacity ${event.capacity}`
-                : "bez limitu"
+                ? `${event.confirmed_count} / ${event.capacity}`
+                : String(event.confirmed_count)
+            }
+            href={`/events/${wsSlug}/${eventSlug}/rsvps?filter=yes`}
+            hint={
+              event.remaining_capacity == null
+                ? "bez limitu"
+                : `volných ${event.remaining_capacity}`
             }
           />
           <StatTile
             label="Waitlist"
             value={String(event.waitlist_count)}
+            href={`/events/${wsSlug}/${eventSlug}/rsvps?filter=waitlist`}
             hint={
               event.waitlist_count > 0
-                ? "automaticky postoupí při zrušení"
+                ? "automatický postup při zrušení"
                 : event.waitlist_enabled
-                  ? "zapnutý, zatím prázdný"
+                  ? "zapnutý"
                   : "vypnutý"
             }
           />
           <StatTile
-            label="Volných míst"
-            value={
-              event.remaining_capacity == null
-                ? "∞"
-                : String(event.remaining_capacity)
-            }
+            label="Čeká na schválení"
+            value="—"
+            href={`/events/${wsSlug}/${eventSlug}/rsvps?filter=pending_approval`}
             hint={
-              event.is_open_for_rsvp ? "RSVP otevřené" : "RSVP zavřené"
+              event.requires_approval
+                ? "schvaluješ každou registraci"
+                : "schvalování vypnuto"
             }
+          />
+          <StatTile
+            label="Vše"
+            value={String(
+              event.confirmed_count + event.waitlist_count,
+            )}
+            href={`/events/${wsSlug}/${eventSlug}/rsvps`}
+            hint="celkem registrací"
           />
         </div>
 
@@ -204,19 +242,10 @@ export default function EventCockpitPage({ params }: Props) {
           />
         </div>
 
-        <h2 className="mt-10 text-lg font-semibold text-ink-900">Další</h2>
+        <h2 className="mt-10 text-lg font-semibold text-ink-900">Galerie</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <ActionTile
-            title="Přihlášení"
-            description={`${event.confirmed_count} potvrzeno${
-              event.waitlist_count > 0
-                ? ` · ${event.waitlist_count} waitlist`
-                : ""
-            }. Schvaluj, kontaktuj, exportuj.`}
-            href={`/events/${wsSlug}/${eventSlug}/rsvps`}
-          />
-          <ActionTile
-            title="Galerie"
+            title="Galerie obrázků"
             description={
               event.images.length > 0
                 ? `${event.images.length} obrázk${
@@ -229,12 +258,6 @@ export default function EventCockpitPage({ params }: Props) {
                 : "Žádné obrázky. Nahraj galerii pro stránku akce."
             }
             href={`/events/${wsSlug}/${eventSlug}/gallery`}
-          />
-          <ActionTile
-            title="Veřejný náhled"
-            description="Otevři, jak akci uvidí účastníci."
-            href={`/${wsSlug}/e/${eventSlug}`}
-            external
           />
         </div>
 
@@ -304,20 +327,22 @@ function StatTile({
   label,
   value,
   hint,
+  href,
 }: {
   label: string;
   value: string;
   hint?: string;
+  href?: string;
 }) {
-  return (
-    <Card>
-      <CardSection>
-        <p className="text-sm font-medium text-ink-500">{label}</p>
-        <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
-        {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
-      </CardSection>
-    </Card>
+  const body = (
+    <div className="rounded-md border border-border bg-surface p-5 shadow-sm transition-colors hover:border-brand hover:bg-brand/10 focus-ring">
+      <p className="text-sm font-medium text-ink-500">{label}</p>
+      <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
+      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
+    </div>
   );
+  if (href) return <Link href={href}>{body}</Link>;
+  return body;
 }
 
 function ActionTile({

@@ -152,24 +152,29 @@ export default function WorkspaceDetailPage({ params }: Props) {
               className="mt-1"
             />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            {isOwner && (
-              <LinkButton
-                href={`/workspaces/${workspace.slug}/edit`}
-                variant="secondary"
-                size="md"
-              >
-                Upravit komunitu
-              </LinkButton>
-            )}
-            <LinkButton
-              href={`/${workspace.slug}`}
-              variant="secondary"
-              size="md"
+          <a
+            href={`/${workspace.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Veřejný profil"
+            aria-label="Otevřít veřejný profil v novém okně"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              Veřejný profil
-            </LinkButton>
-          </div>
+              <path d="M14 3h7v7" />
+              <path d="M10 14L21 3" />
+              <path d="M21 14v7H3V3h7" />
+            </svg>
+          </a>
         </header>
 
         {workspace.bio && (
