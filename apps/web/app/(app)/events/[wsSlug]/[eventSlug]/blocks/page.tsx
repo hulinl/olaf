@@ -152,7 +152,12 @@ export default function EventBlocksPage({ params }: Props) {
           </div>
         )}
 
-        <Builder blocks={blocks} onChange={handleChange} />
+        <Builder
+          blocks={blocks}
+          onChange={handleChange}
+          workspaceSlug={wsSlug}
+          eventSlug={eventSlug}
+        />
 
         <div className="sticky bottom-4 mt-8 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 backdrop-blur">
           <p className="text-sm text-ink-500">

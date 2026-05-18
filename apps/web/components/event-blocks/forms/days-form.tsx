@@ -3,12 +3,21 @@
 import { Field, Input } from "@/components/ui/field";
 import type { BlockDay, DaysBlockPayload } from "@/lib/event-blocks";
 
+import { ImageUploadField } from "./_image-upload";
+
 interface Props {
   payload: DaysBlockPayload;
   onChange: (p: DaysBlockPayload) => void;
+  workspaceSlug?: string;
+  eventSlug?: string;
 }
 
-export function DaysForm({ payload, onChange }: Props) {
+export function DaysForm({
+  payload,
+  onChange,
+  workspaceSlug,
+  eventSlug,
+}: Props) {
   const days = payload.days ?? [];
 
   function update(i: number, patch: Partial<BlockDay>) {
@@ -157,15 +166,13 @@ export function DaysForm({ payload, onChange }: Props) {
                       onChange={(e) => update(i, { map_url: e.target.value })}
                     />
                   </Field>
-                  <Field label="URL obrázku (volitelné)">
-                    <Input
-                      placeholder="https://…/den1.jpg"
-                      value={d.image_url ?? ""}
-                      onChange={(e) =>
-                        update(i, { image_url: e.target.value })
-                      }
-                    />
-                  </Field>
+                  <ImageUploadField
+                    label="Obrázek dne (volitelné)"
+                    value={d.image_url ?? ""}
+                    onChange={(url) => update(i, { image_url: url })}
+                    workspaceSlug={workspaceSlug}
+                    eventSlug={eventSlug}
+                  />
                 </div>
               </div>
             ))}

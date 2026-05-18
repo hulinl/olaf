@@ -3,12 +3,21 @@
 import { Field, Input } from "@/components/ui/field";
 import type { HeroBlockPayload } from "@/lib/event-blocks";
 
+import { ImageUploadField } from "./_image-upload";
+
 interface Props {
   payload: HeroBlockPayload;
   onChange: (p: HeroBlockPayload) => void;
+  workspaceSlug?: string;
+  eventSlug?: string;
 }
 
-export function HeroForm({ payload, onChange }: Props) {
+export function HeroForm({
+  payload,
+  onChange,
+  workspaceSlug,
+  eventSlug,
+}: Props) {
   const meta = payload.meta ?? [];
 
   function updateMeta(idx: number, key: "k" | "v", value: string) {
@@ -26,16 +35,14 @@ export function HeroForm({ payload, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Field
-        label="Cover URL"
-        hint="Plnobarevná fotka na pozadí hero sekce. Prázdné = jen tmavé pozadí."
-      >
-        <Input
-          value={payload.cover_url ?? ""}
-          onChange={(e) => onChange({ ...payload, cover_url: e.target.value })}
-          placeholder="https://…/cover.jpg"
-        />
-      </Field>
+      <ImageUploadField
+        label="Úvodní obrázek"
+        hint="Velká fotka na pozadí hero sekce. Prázdné = jen tmavé pozadí."
+        value={payload.cover_url ?? ""}
+        onChange={(url) => onChange({ ...payload, cover_url: url })}
+        workspaceSlug={workspaceSlug}
+        eventSlug={eventSlug}
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Eyebrow" hint="Nad nadpisem, drobný kapitálkový text">
           <Input

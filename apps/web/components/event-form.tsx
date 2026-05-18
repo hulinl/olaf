@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -15,9 +15,7 @@ import {
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
-  assetUrl,
   communities as communitiesApi,
-  events as eventsApi,
 } from "@/lib/api";
 
 interface Props {
@@ -108,14 +106,6 @@ export function EventForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cover image: existing URL (from server) + pending File (not yet uploaded).
-  const [coverUrl, setCoverUrl] = useState<string | null>(
-    initial?.cover_url ?? null,
-  );
-  const [pendingCover, setPendingCover] = useState<File | null>(null);
-  const [coverBusy, setCoverBusy] = useState(false);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-
   // Communities the event is shared into. The workspace's full Community list
   // is loaded once on mount; selection is a Set<slug>.
   const [availableCommunities, setAvailableCommunities] = useState<
@@ -149,63 +139,6 @@ export function EventForm({
     });
   }
 
-  async function pickCover(file: File | null) {
-    if (!file) return;
-    if (initial) {
-      // Edit mode: upload immediately.
-      setCoverBusy(true);
-      setError(null);
-      try {
-        const updated = await eventsApi.uploadCover(
-          workspaceSlug,
-          initial.slug,
-          file,
-        );
-        setCoverUrl(updated.cover_url);
-      } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.firstFieldError() ?? err.message
-            : "Upload se nepodařil.",
-        );
-      } finally {
-        setCoverBusy(false);
-      }
-    } else {
-      // Create mode: defer until event is saved.
-      setPendingCover(file);
-    }
-  }
-
-  async function removeCover() {
-    if (initial && coverUrl) {
-      setCoverBusy(true);
-      setError(null);
-      try {
-        const updated = await eventsApi.deleteCover(
-          workspaceSlug,
-          initial.slug,
-        );
-        setCoverUrl(updated.cover_url);
-      } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.firstFieldError() ?? err.message
-            : "Nepodařilo se odstranit.",
-        );
-      } finally {
-        setCoverBusy(false);
-      }
-    } else {
-      setPendingCover(null);
-    }
-    if (coverInputRef.current) coverInputRef.current.value = "";
-  }
-
-  const coverPreview = pendingCover
-    ? URL.createObjectURL(pendingCover)
-    : assetUrl(coverUrl);
-
   function updateTitle(value: string) {
     setTitle(value);
     if (!slugTouched) setSlug(slugify(value));
@@ -235,17 +168,6 @@ export function EventForm({
         enabled_questionnaire_sections: enabledSections,
       };
       const event = await onSubmit(payload);
-      if (!initial && pendingCover) {
-        try {
-          await eventsApi.uploadCover(workspaceSlug, event.slug, pendingCover);
-        } catch (err) {
-          setError(
-            err instanceof ApiError
-              ? `Event uložen, ale upload obálky se nezdařil: ${err.firstFieldError() ?? err.message}`
-              : "Event uložen, ale upload obálky se nezdařil.",
-          );
-        }
-      }
       onSuccess(event);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -379,68 +301,6 @@ export function EventForm({
                   onChange={(e) => setLocationUrl(e.target.value)}
                 />
               </Field>
-            </div>
-          </div>
-        </CardSection>
-      </Card>
-
-      <Card>
-        <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">
-            Úvodní obrázek
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Velký obrázek na začátku veřejné stránky akce. Maximum 8 MB. JPG/PNG.
-          </p>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
-            {coverPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={coverPreview}
-                alt="Úvodní obrázek"
-                className="h-28 w-44 shrink-0 rounded-md border border-border object-cover"
-              />
-            ) : (
-              <div className="flex h-28 w-44 shrink-0 items-center justify-center rounded-md border border-dashed border-border-strong bg-surface-muted/40 text-xs text-ink-500">
-                Bez obrázku
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => pickCover(e.target.files?.[0] ?? null)}
-                className="hidden"
-                id="cover-input"
-              />
-              <label
-                htmlFor="cover-input"
-                className={[
-                  "inline-flex w-fit cursor-pointer items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring",
-                  coverBusy ? "pointer-events-none opacity-60" : "",
-                ].join(" ")}
-              >
-                {coverBusy
-                  ? "Nahrávám…"
-                  : coverPreview
-                    ? "Vybrat jiný"
-                    : "Nahrát obrázek"}
-              </label>
-              {coverPreview && !coverBusy && (
-                <button
-                  type="button"
-                  onClick={removeCover}
-                  className="w-fit text-xs text-ink-500 hover:text-danger"
-                >
-                  Odstranit
-                </button>
-              )}
-              {!initial && pendingCover && (
-                <p className="text-xs text-ink-500">
-                  Nahraje se po uložení akce.
-                </p>
-              )}
             </div>
           </div>
         </CardSection>
