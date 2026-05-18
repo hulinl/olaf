@@ -135,7 +135,7 @@ export default function DashboardPage() {
               {(myWorkspaces?.length ?? 0) === 0 ? (
                 <EmptyState
                   title="Zatím nejsi v žádné komunitě"
-                  body="Až tě někdo přidá nebo si vytvoříš workspace, uvidíš ho tady."
+                  body="Až tě někdo pozve nebo si vytvoříš vlastní komunitu, uvidíš ji tady."
                 />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">

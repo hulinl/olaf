@@ -85,7 +85,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
               </NavLink>
 
               <NavDropdown
-                label="Workspace"
+                label="Komunity"
                 pathname={pathname}
                 activeWhenStartsWith="/workspaces"
                 onOpen={ws.load}
@@ -93,7 +93,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
                 {ws.loading && !ws.items ? (
                   <DropdownNote>Načítám…</DropdownNote>
                 ) : ws.items && ws.items.length === 0 ? (
-                  <DropdownNote>Zatím žádný workspace</DropdownNote>
+                  <DropdownNote>Zatím žádná komunita</DropdownNote>
                 ) : (
                   ws.items?.map((w) => (
                     <DropdownLink
@@ -106,7 +106,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
                 )}
                 <DropdownDivider />
                 <DropdownLink href="/workspaces">
-                  Všechny workspaces
+                  Všechny komunity
                 </DropdownLink>
               </NavDropdown>
 
@@ -340,7 +340,7 @@ function MobileDrawer({
             Dashboard
           </DrawerLink>
 
-          <DrawerSection label="Workspace">
+          <DrawerSection label="Komunity">
             {workspaces?.map((w) => (
               <DrawerSubLink
                 key={w.slug}
@@ -356,7 +356,7 @@ function MobileDrawer({
               pathname={pathname}
               onClose={onClose}
             >
-              Všechny workspaces
+              Všechny komunity
             </DrawerSubLink>
           </DrawerSection>
 

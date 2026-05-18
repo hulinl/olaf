@@ -142,7 +142,7 @@ export default function CommunityDetailPage({ params }: Props) {
       <section className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:py-12">
         <Breadcrumbs
           items={[
-            { label: "Workspaces", href: "/workspaces" },
+            { label: "Komunity", href: "/workspaces" },
             { label: workspace.name, href: `/workspaces/${wsSlug}` },
             { label: community.name },
           ]}

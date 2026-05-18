@@ -40,7 +40,7 @@ export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
           )}
           {hasNotIncluded && (
             <ItemColumn
-              eyebrow="Hradíš sám"
+              eyebrow="Hradíš zvlášť"
               items={payload.not_included}
               variant="cross"
             />
@@ -129,30 +129,35 @@ function PriceCard({
 }) {
   return (
     <div
-      className="mt-14 grid items-center gap-10 rounded-2xl border border-white/10 p-10 sm:grid-cols-[1.2fr_1fr] sm:p-12"
+      className="mt-14 grid items-center gap-10 rounded-2xl p-10 shadow-lg sm:grid-cols-[1.2fr_1fr] sm:gap-12 sm:p-12"
       style={{
-        background:
-          "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))",
+        background: "linear-gradient(135deg, #0e1a26 0%, #1a2c3e 100%)",
       }}
     >
       <div>
-        <h3 className="text-2xl font-semibold text-ink-inverse sm:text-3xl" style={{ letterSpacing: "-0.025em" }}>
+        <h3
+          className="text-2xl font-semibold text-ink-inverse sm:text-3xl"
+          style={{ letterSpacing: "-0.025em", lineHeight: 1.15 }}
+        >
           Cena výpravy
         </h3>
         {note && (
-          <p className="mt-3 text-white/70" style={{ fontSize: 16, lineHeight: 1.55 }}>
+          <p
+            className="mt-4 text-white/75"
+            style={{ fontSize: 16, lineHeight: 1.6 }}
+          >
             {note}
           </p>
         )}
       </div>
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
+      <div className="rounded-xl border border-white/10 bg-white/[0.05] p-8 text-center">
         <p
-          className="text-5xl font-semibold text-ink-inverse sm:text-6xl"
+          className="text-5xl font-semibold text-ink-inverse sm:text-[3rem]"
           style={{ letterSpacing: "-0.035em", lineHeight: 1 }}
         >
           {value}
           {unit && (
-            <span className="ml-2 text-lg font-mono font-medium uppercase tracking-[0.14em] text-white/60">
+            <span className="ml-2 text-xl font-medium text-white/60">
               {unit}
             </span>
           )}

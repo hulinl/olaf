@@ -43,8 +43,8 @@ export default function CommunitiesPage() {
             Tvoje komunity
           </h1>
           <p className="mt-2 max-w-xl text-ink-500">
-            Pracovní prostory, ve kterých jsi člen nebo Owner. Klikni na
-            komunitu, abys viděl její eventy a profil.
+            Komunity, ve kterých jsi člen nebo Owner. Klikni na komunitu,
+            abys viděl její akce a profil.
           </p>
         </header>
 
@@ -64,8 +64,8 @@ export default function CommunitiesPage() {
                   Zatím nejsi v žádné komunitě
                 </h2>
                 <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                  Až tě někdo pozve nebo si vytvoříš vlastní workspace,
-                  uvidíš ho tady.
+                  Až tě někdo pozve nebo si vytvoříš vlastní komunitu,
+                  uvidíš ji tady.
                 </p>
               </div>
             </CardSection>

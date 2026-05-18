@@ -39,10 +39,17 @@ export function SectionHead({
       {eyebrow && (
         <p
           className={[
-            "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-            dark ? "text-white/60" : "text-ink-500",
+            "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em]",
+            dark ? "text-white/85" : "text-ink-900",
           ].join(" ")}
         >
+          <span
+            aria-hidden
+            className={dark ? "text-brand" : "text-brand"}
+            style={{ fontSize: "0.7em", lineHeight: 1 }}
+          >
+            ●
+          </span>
           {eyebrow}
         </p>
       )}
