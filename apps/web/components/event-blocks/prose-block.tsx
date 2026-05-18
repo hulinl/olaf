@@ -21,8 +21,8 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
   return (
     <section
       className={[
-        "border-t",
-        dark ? "border-transparent bg-ink-900" : "border-border bg-canvas",
+        "",
+        dark ? "bg-ink-900" : "bg-canvas",
       ].join(" ")}
     >
       <div

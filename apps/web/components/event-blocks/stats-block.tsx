@@ -17,10 +17,10 @@ export function StatsBlock({ payload, tone: _tone = "canvas" }: Props) {
   return (
     <section
       className={[
-        "border-t py-12 sm:py-14",
+        "py-12 sm:py-14",
         dark
-          ? "border-transparent bg-ink-900 text-ink-inverse"
-          : "border-border bg-canvas text-ink-900",
+          ? "bg-ink-900 text-ink-inverse"
+          : "bg-canvas text-ink-900",
       ].join(" ")}
     >
       <div className="mx-auto max-w-5xl px-4">

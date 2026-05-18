@@ -20,10 +20,10 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
   return (
     <section
       className={[
-        "border-t",
+        "",
         dark
-          ? "border-transparent bg-ink-900"
-          : "border-border bg-canvas",
+          ? "bg-ink-900"
+          : "bg-canvas",
       ].join(" ")}
     >
       <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">

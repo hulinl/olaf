@@ -22,7 +22,7 @@ export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
   if (!hasIncluded && !hasNotIncluded && !hasPrice) return null;
 
   return (
-    <section className="border-t border-transparent bg-ink-900">
+    <section className="bg-ink-900">
       <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
         <SectionHead
           eyebrow="Cena"
@@ -135,30 +135,14 @@ function PriceCard({
       }}
     >
       <div className="flex-1">
-        <p
-          className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em] text-white/80"
-        >
-          <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
-            ●
-          </span>
-          Cena
-        </p>
         <h3
-          className="mt-3 text-2xl font-semibold text-ink-inverse sm:text-3xl"
+          className="text-2xl font-semibold text-ink-inverse sm:text-3xl"
           style={{ letterSpacing: "-0.025em", lineHeight: 1.2 }}
         >
-          Cena výpravy
+          Celková cena
         </h3>
-        {note && (
-          <p
-            className="mt-3 max-w-md text-white/70"
-            style={{ fontSize: 15, lineHeight: 1.6 }}
-          >
-            {note}
-          </p>
-        )}
       </div>
-      <div className="shrink-0 sm:border-l sm:border-white/15 sm:pl-14 sm:text-right">
+      <div className="shrink-0 sm:max-w-xs sm:border-l sm:border-white/15 sm:pl-14 sm:text-right">
         <p
           className="text-6xl font-semibold text-ink-inverse sm:text-7xl"
           style={{ letterSpacing: "-0.04em", lineHeight: 1 }}
@@ -170,6 +154,14 @@ function PriceCard({
             </span>
           )}
         </p>
+        {note && (
+          <p
+            className="mt-4 text-white/70"
+            style={{ fontSize: 14, lineHeight: 1.55 }}
+          >
+            {note}
+          </p>
+        )}
       </div>
     </div>
   );
