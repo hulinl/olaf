@@ -9,18 +9,7 @@ import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
 import { assetUrl, type Event } from "@/lib/api";
-import type { BlockTone } from "@/lib/event-blocks";
 import { serverFetch } from "@/lib/server-api";
-
-/**
- * Public landing alternates ink/canvas tones by block index so the page reads
- * as a rhythm rather than a wall of one shade. Even indices = ink (dark),
- * odd = canvas (light). Reordering blocks in the builder reshuffles the
- * tones automatically — owners don't pick per-block.
- */
-function toneForIndex(i: number): BlockTone {
-  return i % 2 === 0 ? "ink" : "canvas";
-}
 
 interface Props {
   params: Promise<{ slug: string; eventSlug: string }>;
@@ -180,7 +169,6 @@ export default async function EventLandingPage({ params }: Props) {
                   fallbackCtaHref={cta_href}
                   heroBadge={i === heroIndex ? heroBadge : undefined}
                   images={event.images}
-                  tone={toneForIndex(i)}
                 />
               ))}
             </>
@@ -616,67 +604,30 @@ export default async function EventLandingPage({ params }: Props) {
         </>
         )}
 
-        {(() => {
-          const blockCount = event.blocks?.length ?? 0;
-          const hasAutoGallery =
-            event.images.length > 0 &&
-            !event.blocks.some((b) => b.type === "gallery");
-          const galleryTone: BlockTone = toneForIndex(blockCount);
-          const footerTone: BlockTone = toneForIndex(
-            blockCount + (hasAutoGallery ? 1 : 0),
-          );
-          const footerDark = footerTone === "ink";
-          return (
-            <>
-              {hasAutoGallery && (
-                <EventGallery images={event.images} tone={galleryTone} />
-              )}
-              <footer
-                className={[
-                  "border-t",
-                  footerDark
-                    ? "border-transparent bg-ink-900"
-                    : "border-border bg-canvas",
-                ].join(" ")}
+        {event.images.length > 0 &&
+          !event.blocks.some((b) => b.type === "gallery") && (
+            <EventGallery images={event.images} />
+          )}
+
+        <footer className="border-t border-border bg-canvas">
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              © {new Date().getFullYear()} {event.workspace_name} ·{" "}
+              <Link
+                href={`/${event.workspace_slug}`}
+                className="underline hover:text-ink-900"
               >
-                <div
-                  className={[
-                    "mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] sm:flex-row sm:items-center sm:justify-between",
-                    footerDark ? "text-white/60" : "text-ink-500",
-                  ].join(" ")}
-                >
-                  <span>
-                    © {new Date().getFullYear()} {event.workspace_name} ·{" "}
-                    <Link
-                      href={`/${event.workspace_slug}`}
-                      className={[
-                        "underline",
-                        footerDark
-                          ? "hover:text-ink-inverse"
-                          : "hover:text-ink-900",
-                      ].join(" ")}
-                    >
-                      Profil
-                    </Link>
-                  </span>
-                  <span>
-                    <Link
-                      href="/"
-                      className={
-                        footerDark
-                          ? "hover:text-ink-inverse"
-                          : "hover:text-ink-900"
-                      }
-                    >
-                      olaf
-                    </Link>{" "}
-                    · EU-hosted · GDPR-clean
-                  </span>
-                </div>
-              </footer>
-            </>
-          );
-        })()}
+                Profil
+              </Link>
+            </span>
+            <span>
+              <Link href="/" className="hover:text-ink-900">
+                olaf
+              </Link>{" "}
+              · EU-hosted · GDPR-clean
+            </span>
+          </div>
+        </footer>
       </main>
     </>
   );
