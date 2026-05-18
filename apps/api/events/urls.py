@@ -23,6 +23,31 @@ urlpatterns = [
         name="update",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/cover/",
+        views.event_cover,
+        name="cover",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/duplicate/",
+        views.duplicate_event,
+        name="duplicate",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/images/",
+        views.event_images,
+        name="images",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/images/reorder/",
+        views.event_images_reorder,
+        name="images-reorder",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/images/<int:image_id>/",
+        views.event_image_detail,
+        name="image-detail",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/cancel/",
         views.cancel_event,
         name="cancel",

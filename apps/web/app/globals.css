@@ -63,39 +63,27 @@
   --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.18);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: #0a0a0a;
-    --canvas-elevated: #121212;
-    --surface: #141414;
-    --surface-muted: #1a1a1a;
-    --surface-strong: #232323;
+/* Brand v1 is light-mode-only. A prefers-color-scheme override used to live
+ * here, but it inverted --ink-900 / --ink-inverse on dark-mode systems and
+ * broke any block that mixed our tokens with hardcoded white text (e.g. the
+ * Stats block labels). When/if a true dark theme ships it will be opt-in
+ * via a `data-theme` attribute, not browser-preference auto-flip. */
 
-    --border: #2a2a2a;
-    --border-strong: #3a3a3a;
+/* -----------------------------------------------------------------------------
+ * data-theme="paper" — Pitztal-style warm-paper surface.
+ *
+ * Used on the public event landing (apps/web/app/[slug]/e/[eventSlug]/page.tsx)
+ * to get the "outdoor magazine" feel from templates/pitztal-template.html:
+ * paper background, warm borders, white cards on top. Black ink + amber
+ * accent stay (brand v1). Dashboard / settings / auth chrome keep the
+ * crystal-white canvas — this override is scoped to its DOM subtree.
+ * --------------------------------------------------------------------------- */
 
-    --ink-900: #ffffff;
-    --ink-700: #d4d4d4;
-    --ink-500: #9c9c9c;
-    --ink-300: #6b6b6b;
-    --ink-inverse: #000000;
-
-    --brand: #ffc719;
-    --brand-hover: #ffd24d;
-    --brand-active: #f0b80f;
-    --brand-soft: #3a2e08;
-    --brand-ring: rgb(255 199 25 / 0.55);
-    --brand-ink: #000000;
-
-    --danger: #f87171;
-    --danger-soft: #3f1d1d;
-    --success: #34d399;
-    --warning: #fbbf24;
-
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-md: 0 6px 18px -4px rgb(0 0 0 / 0.55), 0 2px 4px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 20px 50px -12px rgb(0 0 0 / 0.65);
-  }
+[data-theme="paper"] {
+  --canvas: #fbfaf7;
+  --surface-muted: #f4f0e8;
+  --border: #e7e2d8;
+  --border-strong: #d6cfbe;
 }
 
 /* -----------------------------------------------------------------------------

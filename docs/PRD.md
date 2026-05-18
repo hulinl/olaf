@@ -205,6 +205,12 @@ A Community in V1 is **a roster of members + a list of events**. The wall feed (
 
 **Event landing page** (`olaf.events/{workspace-slug}/e/{event-slug}` for public events): cover, title, time, location with map link, meeting point, description, gear preview, RSVP CTA. OG + Twitter Card meta.
 
+The page is **block-based** (PRD ships a block builder in Slice 5). The minimum viable page is one block (hero) — title, date, meeting point, route, cover photo — for a single-evening výběh. The maximalist reference is `3_Dev/Pitztal` (the polished 4-day Tyrolean trek landing) — when V1.5 adds richer block types (gallery, hero ride, embedded map, parallax), the block builder should be capable of reproducing that page using stock blocks alone.
+
+**Event duplication (V1)** — `POST /api/events/{ws}/{slug}/duplicate/` creates a Draft copy with `{slug}-kopie`, copies all content + cover, does not copy RSVPs. Use case: Creator runs 20 similar výběhů a year; clone last one, change date + place + map URL. Available from the event cockpit ("Šablona" section).
+
+**Named templates (V1.5)** — promote duplication to first-class templates: "Save as template named …" + template picker on `/events/new`. Templates live per-workspace, no dates, no slug, just the content scaffold. Defer until duplication usage shows the demand.
+
 **Status lifecycle**
 - `draft` — Creator editing; visible to Creator only.
 - `published` — RSVPs open.
@@ -593,6 +599,8 @@ Each slice ships as one PR with model + API + UI + tests. Nothing starts until t
 - 30-day soft-delete buffer for workspaces and events.
 - Newsletter integration (Mailchimp / Brevo connectors).
 - Multi-Owner promotion UI; workspace-create flow for new tenants.
+- **Named event templates** — "Save as template" + template picker on `/events/new`. Builds on the V1 duplication primitive.
+- **Event gallery block** — multi-image upload with sort + lightbox; matches `3_Dev/Pitztal` reference.
 
 **V2 — Commercial features**
 - Stripe-based payments for paid events (one-time + deposits).

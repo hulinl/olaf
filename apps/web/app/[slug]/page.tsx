@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
+import { WorkspaceMetaLine } from "@/components/ui/workspace-meta-line";
 import { assetUrl, type Workspace } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -65,23 +66,37 @@ export default async function WorkspaceProfilePage({ params }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col">
-        <div
-          className="relative h-48 w-full border-b border-border bg-surface-strong sm:h-64"
-          style={
-            cover
-              ? {
-                  backgroundImage: `url(${cover})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }
-              : undefined
-          }
-        />
+        {cover && (
+          <div
+            className="relative h-48 w-full border-b border-border sm:h-64"
+            style={{
+              backgroundImage: `url(${cover})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+        )}
 
         <section className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16">
-          <div className="-mt-12 sm:-mt-16 flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+          <div
+            className={[
+              "flex flex-row items-center gap-5",
+              cover ? "-mt-12 sm:-mt-16" : "pt-10 sm:pt-14",
+            ].join(" ")}
+          >
+            <div className="min-w-0 flex-1">
+              <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+                {workspace.name}
+              </h1>
+              <WorkspaceMetaLine
+                location={workspace.location}
+                memberCount={workspace.member_count}
+                socials={socials}
+                className="mt-2"
+              />
+            </div>
             <div
-              className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-canvas bg-surface shadow-md sm:h-32 sm:w-32"
+              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-canvas bg-surface shadow-md sm:h-28 sm:w-28"
               style={
                 workspace.accent_color
                   ? { backgroundColor: workspace.accent_color }
@@ -101,39 +116,12 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                 </span>
               )}
             </div>
-
-            <div className="text-center sm:flex-1 sm:pb-2 sm:text-left">
-              <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-                {workspace.name}
-              </h1>
-              {workspace.location && (
-                <p className="mt-1 text-sm text-ink-500">
-                  {workspace.location}
-                </p>
-              )}
-            </div>
           </div>
 
           {workspace.bio && (
             <p className="mt-8 max-w-2xl text-balance text-ink-700">
               {workspace.bio}
             </p>
-          )}
-
-          {socials.length > 0 && (
-            <div className="mt-6 flex flex-wrap gap-2">
-              {socials.map(([key, url]) => (
-                <a
-                  key={key}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900"
-                >
-                  {key}
-                </a>
-              ))}
-            </div>
           )}
 
           <div className="mt-12 grid gap-6 md:grid-cols-2">

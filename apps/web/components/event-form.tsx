@@ -1,20 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { DateTimeField } from "@/components/ui/date-time-field";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
+  type Community,
   type Event as OlafEvent,
   type EventWritePayload,
-  type FaqItem,
-  type ProgramDay,
   QUESTIONNAIRE_SECTION_HINTS,
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
+  communities as communitiesApi,
 } from "@/lib/api";
 
 interface Props {
@@ -50,6 +51,13 @@ function fromLocalInput(value: string): string {
   return new Date(value).toISOString();
 }
 
+/**
+ * Event mechanics form — owner-only fields that drive how the event behaves
+ * (time, capacity, RSVP, sharing, status). All visual landing content lives
+ * in the block builder at /events/[wsSlug]/[eventSlug]/blocks. The form
+ * intentionally has no fields for highlights / included / program / faq /
+ * practical info / price — those are blocks now.
+ */
 export function EventForm({
   initial,
   workspaceSlug,
@@ -91,70 +99,49 @@ export function EventForm({
     "draft" | "published" | "closed" | "cancelled" | "completed"
   >(initial?.status ?? "draft");
 
-  const [priceText, setPriceText] = useState(initial?.price_text ?? "");
-  const [highlightsText, setHighlightsText] = useState(
-    initial?.highlights?.join("\n") ?? "",
-  );
-  const [includedText, setIncludedText] = useState(
-    initial?.included?.join("\n") ?? "",
-  );
-  const [program, setProgram] = useState<ProgramDay[]>(
-    initial?.program ?? [],
-  );
-
   const [enabledSections, setEnabledSections] = useState<QuestionnaireSection[]>(
     initial?.enabled_questionnaire_sections ?? [...QUESTIONNAIRE_SECTION_ORDER],
   );
 
-  const [notIncludedText, setNotIncludedText] = useState(
-    initial?.not_included?.join("\n") ?? "",
-  );
-  const [additionalCostNote, setAdditionalCostNote] = useState(
-    initial?.additional_cost_note ?? "",
-  );
-  const [difficultyLevel, setDifficultyLevel] = useState<number>(
-    initial?.difficulty_level ?? 0,
-  );
-  const [difficultyNote, setDifficultyNote] = useState(
-    initial?.difficulty_note ?? "",
-  );
-  const [transportInfo, setTransportInfo] = useState(
-    initial?.transport_info ?? "",
-  );
-  const [accommodationInfo, setAccommodationInfo] = useState(
-    initial?.accommodation_info ?? "",
-  );
-  const [gearInfo, setGearInfo] = useState(initial?.gear_info ?? "");
-  const [faq, setFaq] = useState<FaqItem[]>(initial?.faq ?? []);
-
-  function addFaq() {
-    setFaq((prev) => [...prev, { question: "", answer: "" }]);
-  }
-  function updateFaq(i: number, patch: Partial<FaqItem>) {
-    setFaq((prev) => prev.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
-  }
-  function removeFaq(i: number) {
-    setFaq((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Communities the event is shared into. The workspace's full Community list
+  // is loaded once on mount; selection is a Set<slug>.
+  const [availableCommunities, setAvailableCommunities] = useState<
+    Community[] | null
+  >(null);
+  const [selectedCommunitySlugs, setSelectedCommunitySlugs] = useState<
+    Set<string>
+  >(new Set(initial?.community_slugs ?? []));
+
+  useEffect(() => {
+    let cancelled = false;
+    communitiesApi
+      .forWorkspace(workspaceSlug)
+      .then((list) => {
+        if (!cancelled) setAvailableCommunities(list);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableCommunities([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceSlug]);
+
+  function toggleCommunity(slug: string) {
+    setSelectedCommunitySlugs((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
 
   function updateTitle(value: string) {
     setTitle(value);
     if (!slugTouched) setSlug(slugify(value));
-  }
-
-  function addProgramDay() {
-    setProgram((prev) => [...prev, { day: "", title: "", body: "" }]);
-  }
-
-  function updateProgramDay(i: number, patch: Partial<ProgramDay>) {
-    setProgram((prev) => prev.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
-  }
-
-  function removeProgramDay(i: number) {
-    setProgram((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -166,6 +153,7 @@ export function EventForm({
         slug,
         title,
         description,
+        community_slugs: Array.from(selectedCommunitySlugs),
         starts_at: fromLocalInput(startsAt),
         ends_at: fromLocalInput(endsAt),
         tz,
@@ -177,30 +165,7 @@ export function EventForm({
         requires_approval: requiresApproval,
         visibility,
         status,
-        price_text: priceText,
-        highlights: highlightsText
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        included: includedText
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        program: program.filter(
-          (d) => d.day.trim() || d.title.trim() || d.body.trim(),
-        ),
         enabled_questionnaire_sections: enabledSections,
-        not_included: notIncludedText
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        additional_cost_note: additionalCostNote,
-        difficulty_level: difficultyLevel,
-        difficulty_note: difficultyNote,
-        transport_info: transportInfo,
-        accommodation_info: accommodationInfo,
-        gear_info: gearInfo,
-        faq: faq.filter((f) => f.question.trim() || f.answer.trim()),
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -255,21 +220,19 @@ export function EventForm({
               </Field>
             </div>
             <Field label="Začátek *" htmlFor="starts">
-              <Input
+              <DateTimeField
                 id="starts"
-                type="datetime-local"
                 required
                 value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
+                onChange={setStartsAt}
               />
             </Field>
             <Field label="Konec *" htmlFor="ends">
-              <Input
+              <DateTimeField
                 id="ends"
-                type="datetime-local"
                 required
                 value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
+                onChange={setEndsAt}
               />
             </Field>
             <Field
@@ -283,34 +246,22 @@ export function EventForm({
                 onChange={(e) => setTz(e.target.value)}
               />
             </Field>
-            <Field label="Cena (text)" htmlFor="price" hint='např. "2 450 Kč"'>
-              <Input
-                id="price"
-                value={priceText}
-                onChange={(e) => setPriceText(e.target.value)}
-              />
-            </Field>
-          </div>
-        </CardSection>
-      </Card>
-
-      <Card>
-        <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">Popis</h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Krátký intro odstavec na začátek landing page.
-          </p>
-          <div className="mt-4">
-            <Field label="Popis akce" htmlFor="desc">
-              <textarea
-                id="desc"
-                rows={5}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Připoj se k nám na intenzivní víkend plný běhání…"
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
+            <div className="sm:col-span-2">
+              <Field
+                label="Krátký intro"
+                htmlFor="desc"
+                hint="Jedna věta nebo dva odstavce. Plný obsah landingu se skládá v sekci Obsah stránky."
+              >
+                <textarea
+                  id="desc"
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Připoj se k nám na intenzivní víkend plný běhání…"
+                  className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
+                />
+              </Field>
+            </div>
           </div>
         </CardSection>
       </Card>
@@ -398,299 +349,58 @@ export function EventForm({
 
       <Card>
         <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">Obsah landing page</h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Tyhle texty se vykreslí na veřejné stránce akce.
-          </p>
-          <div className="mt-4 flex flex-col gap-4">
-            <Field
-              label="Na co se zaměříme"
-              htmlFor="highlights"
-              hint="Jeden bod na řádek"
-            >
-              <textarea
-                id="highlights"
-                rows={4}
-                value={highlightsText}
-                onChange={(e) => setHighlightsText(e.target.value)}
-                placeholder={
-                  "technika běhu v terénu\nregenerace a práce s tělem\nstravování pro dlouhé běhy"
-                }
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-            <Field
-              label="Co je v ceně"
-              htmlFor="included"
-              hint="Jeden bod na řádek"
-            >
-              <textarea
-                id="included"
-                rows={4}
-                value={includedText}
-                onChange={(e) => setIncludedText(e.target.value)}
-                placeholder={"3 noci ubytování\norganizované tréninky\nsnídaně a večeře"}
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-
-            <div>
-              <div className="mb-2 flex items-baseline justify-between">
-                <label className="text-sm font-medium text-ink-900">
-                  Program (den po dni)
-                </label>
-                <button
-                  type="button"
-                  onClick={addProgramDay}
-                  className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
-                >
-                  + Přidat den
-                </button>
-              </div>
-              {program.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
-                  Zatím prázdné. Klikni „Přidat den" a napiš program.
+          <div id="sdileni" className="-mt-1 scroll-mt-20">
+            <h2 className="text-base font-semibold text-ink-900">
+              Kde se zobrazí
+            </h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Vyber komunity ve workspace <strong>{workspaceSlug}</strong>,
+              ve kterých se akce má zobrazit. Členové komunity ji uvidí v
+              nadcházejících akcích.
+            </p>
+            <div className="mt-4">
+              {availableCommunities === null ? (
+                <p className="text-sm text-ink-500">Načítám komunity…</p>
+              ) : availableCommunities.length === 0 ? (
+                <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 px-4 py-3 text-sm text-ink-500">
+                  Tento workspace zatím nemá žádné komunity. Akce zůstane
+                  viditelná jen přes přímý odkaz, dokud nějakou nezaložíš.
                 </p>
               ) : (
-                <div className="flex flex-col gap-3">
-                  {program.map((d, i) => (
-                    <div
-                      key={i}
-                      className="rounded-md border border-border bg-surface p-4"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-xs font-bold text-brand-ink">
-                          {i + 1}
+                <div className="grid grid-cols-1 gap-2">
+                  {availableCommunities.map((c) => {
+                    const checked = selectedCommunitySlugs.has(c.slug);
+                    return (
+                      <label
+                        key={c.slug}
+                        className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCommunity(c.slug)}
+                          className="mt-0.5 size-4 accent-brand"
+                        />
+                        <span className="flex flex-col">
+                          <span className="font-medium text-ink-900">
+                            {c.name}
+                          </span>
+                          <span className="text-xs text-ink-500">
+                            {c.member_count} členů ·{" "}
+                            {c.visibility === "public"
+                              ? "veřejná"
+                              : c.visibility === "unlisted"
+                                ? "skrytá (jen odkaz)"
+                                : "soukromá"}
+                          </span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => removeProgramDay(i)}
-                          className="text-xs text-ink-500 hover:text-danger"
-                        >
-                          Odstranit
-                        </button>
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Input
-                          placeholder="Čtvrtek"
-                          value={d.day}
-                          onChange={(e) =>
-                            updateProgramDay(i, { day: e.target.value })
-                          }
-                        />
-                        <Input
-                          placeholder="Příjezd a zahájení"
-                          value={d.title}
-                          onChange={(e) =>
-                            updateProgramDay(i, { title: e.target.value })
-                          }
-                        />
-                      </div>
-                      <textarea
-                        rows={2}
-                        placeholder="Krátký popis programu dne…"
-                        value={d.body}
-                        onChange={(e) =>
-                          updateProgramDay(i, { body: e.target.value })
-                        }
-                        className="mt-3 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-                      />
-                    </div>
-                  ))}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
-        </CardSection>
-      </Card>
-
-      <Card>
-        <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">
-            Co NENÍ v ceně
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Vyjasní očekávání. Účastníci ocení, když ví co si platí navíc.
-          </p>
-          <div className="mt-4 flex flex-col gap-4">
-            <Field
-              label="Položky mimo cenu"
-              htmlFor="not_included"
-              hint="Jeden bod na řádek"
-            >
-              <textarea
-                id="not_included"
-                rows={4}
-                value={notIncludedText}
-                onChange={(e) => setNotIncludedText(e.target.value)}
-                placeholder={
-                  "doprava na místo\nstartovné na závodu\nosobní pojištění"
-                }
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-            <Field
-              label="Odhad dodatečných nákladů"
-              htmlFor="additional_cost"
-              hint='např. "~1 500 Kč navíc na lanovky a oběd v restauraci"'
-            >
-              <Input
-                id="additional_cost"
-                value={additionalCostNote}
-                onChange={(e) => setAdditionalCostNote(e.target.value)}
-              />
-            </Field>
-          </div>
-        </CardSection>
-      </Card>
-
-      <Card>
-        <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">Náročnost</h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Pomáhá účastníkům posoudit, jestli to zvládnou.
-          </p>
-          <div className="mt-4 flex flex-col gap-4">
-            <div>
-              <p className="text-sm font-medium text-ink-900">
-                Úroveň (0 = nezadáno)
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[0, 1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setDifficultyLevel(n)}
-                    className={[
-                      "h-10 w-12 rounded-md border text-sm font-medium transition-colors focus-ring",
-                      difficultyLevel === n
-                        ? "border-brand bg-brand text-brand-ink"
-                        : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
-                    ].join(" ")}
-                  >
-                    {n === 0 ? "—" : n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <Field
-              label="Co náročnost znamená pro tuto akci"
-              htmlFor="diff_note"
-              hint="Vzdálenost/den, hodiny pohybu, převýšení, požadovaná kondice."
-            >
-              <textarea
-                id="diff_note"
-                rows={3}
-                value={difficultyNote}
-                onChange={(e) => setDifficultyNote(e.target.value)}
-                placeholder="např. 15–20 km/den, 5–7 h chůze, min. kondice: zvládneš dlouhý výběh 15 km"
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-          </div>
-        </CardSection>
-      </Card>
-
-      <Card>
-        <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">
-            Doprava, ubytování, výbava
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Volitelné. Co účastník potřebuje vědět, aby přijel připravený.
-          </p>
-          <div className="mt-4 flex flex-col gap-4">
-            <Field label="Doprava" htmlFor="transport">
-              <textarea
-                id="transport"
-                rows={2}
-                value={transportInfo}
-                onChange={(e) => setTransportInfo(e.target.value)}
-                placeholder="Sraz v Karlovicích, autem (může se sdílet), ke startu vlakem…"
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-            <Field label="Ubytování a strava" htmlFor="accomm">
-              <textarea
-                id="accomm"
-                rows={2}
-                value={accommodationInfo}
-                onChange={(e) => setAccommodationInfo(e.target.value)}
-                placeholder="Chata Kyčerka, 4-lůžkové pokoje, polopenze v ceně, večeře 18:30."
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-            <Field label="Výbava" htmlFor="gear">
-              <textarea
-                id="gear"
-                rows={2}
-                value={gearInfo}
-                onChange={(e) => setGearInfo(e.target.value)}
-                placeholder="Trailové boty, plecák 20–30 l, čelovka, vrstvení na zimu/déšť. GPS budeme mít s sebou."
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-            </Field>
-          </div>
-        </CardSection>
-      </Card>
-
-      <Card>
-        <CardSection>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-base font-semibold text-ink-900">
-              Časté dotazy (FAQ)
-            </h2>
-            <button
-              type="button"
-              onClick={addFaq}
-              className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
-            >
-              + Přidat otázku
-            </button>
-          </div>
-          <p className="text-sm text-ink-500">
-            Zachytí otázky, na které jinak budeš odpovídat emaily.
-          </p>
-          {faq.length === 0 ? (
-            <p className="mt-4 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
-              Zatím prázdné. Přidej první otázku.
-            </p>
-          ) : (
-            <div className="mt-4 flex flex-col gap-3">
-              {faq.map((f, i) => (
-                <div
-                  key={i}
-                  className="rounded-md border border-border bg-surface p-4"
-                >
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                      Otázka {i + 1}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeFaq(i)}
-                      className="text-xs text-ink-500 hover:text-danger"
-                    >
-                      Odstranit
-                    </button>
-                  </div>
-                  <Input
-                    placeholder="Co když přijdu pozdě?"
-                    value={f.question}
-                    onChange={(e) => updateFaq(i, { question: e.target.value })}
-                    className="mt-3"
-                  />
-                  <textarea
-                    rows={2}
-                    placeholder="Sraz je v 17:00, ale večeři držíme do 19:00. Napiš mi, kdyby ses zpozdil/a víc."
-                    value={f.answer}
-                    onChange={(e) => updateFaq(i, { answer: e.target.value })}
-                    className="mt-3 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
         </CardSection>
       </Card>
 

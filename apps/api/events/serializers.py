@@ -4,7 +4,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from .blocks import BlockValidationError, validate_blocks
-from .models import RSVP, Event
+from .models import RSVP, Event, EventImage
 
 # Max-set questionnaire fields. Owner picks which sections appear on RSVP via
 # Event.enabled_questionnaire_sections; serializer below validates dynamically.
@@ -146,9 +146,24 @@ class QuestionnaireAnswersSerializer(serializers.Serializer):
         return attrs
 
 
+class EventImageSerializer(serializers.ModelSerializer):
+    """Single gallery image — id, image URL, alt, sort order."""
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventImage
+        fields = ("id", "url", "alt_text", "sort_order")
+        read_only_fields = fields
+
+    def get_url(self, obj: EventImage) -> str | None:
+        return obj.image.url if obj.image else None
+
+
 class EventPublicSerializer(serializers.ModelSerializer):
     """Public-facing event payload for /api/events/{ws}/{slug}/."""
 
+    images = EventImageSerializer(many=True, read_only=True)
     cover_url = serializers.SerializerMethodField()
     workspace_slug = serializers.CharField(source="workspace.slug", read_only=True)
     workspace_name = serializers.CharField(source="workspace.name", read_only=True)
@@ -164,6 +179,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     remaining_capacity = serializers.IntegerField(read_only=True)
 
     enabled_questionnaire_sections = serializers.SerializerMethodField()
+    community_slugs = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -183,20 +199,10 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "visibility",
             "status",
             "requires_approval",
-            "highlights",
-            "included",
-            "not_included",
-            "additional_cost_note",
-            "difficulty_level",
-            "difficulty_note",
-            "transport_info",
-            "accommodation_info",
-            "gear_info",
-            "faq",
-            "program",
-            "price_text",
+            "community_slugs",
             "blocks",
             "enabled_questionnaire_sections",
+            "images",
             "workspace_slug",
             "workspace_name",
             "workspace_logo_url",
@@ -220,6 +226,9 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     def get_enabled_questionnaire_sections(self, obj: Event) -> list[str]:
         return obj.effective_questionnaire_sections
+
+    def get_community_slugs(self, obj: Event) -> list[str]:
+        return list(obj.communities.values_list("slug", flat=True))
 
 
 class EventSummarySerializer(serializers.ModelSerializer):
@@ -320,6 +329,13 @@ class MyRSVPSerializer(serializers.ModelSerializer):
 class EventWriteSerializer(serializers.ModelSerializer):
     """Used for both create + update by workspace Owners."""
 
+    community_slugs = serializers.ListField(
+        child=serializers.SlugField(),
+        required=False,
+        write_only=True,
+        help_text="Slugs of Communities to share the event into.",
+    )
+
     class Meta:
         model = Event
         fields = (
@@ -337,18 +353,7 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "visibility",
             "status",
             "requires_approval",
-            "highlights",
-            "included",
-            "not_included",
-            "additional_cost_note",
-            "difficulty_level",
-            "difficulty_note",
-            "transport_info",
-            "accommodation_info",
-            "gear_info",
-            "faq",
-            "program",
-            "price_text",
+            "community_slugs",
             "blocks",
             "enabled_questionnaire_sections",
             "cancellation_reason",
@@ -363,27 +368,6 @@ class EventWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Neznámá sekce: {bad}. Povolené: {sorted(valid_keys)}."
             )
-        return value
-
-    def validate_difficulty_level(self, value):
-        if value not in (0, 1, 2, 3, 4, 5):
-            raise serializers.ValidationError(
-                "Náročnost musí být v rozsahu 0-5 (0 = nezadáno)."
-            )
-        return value
-
-    def validate_faq(self, value):
-        if not isinstance(value, list):
-            raise serializers.ValidationError("FAQ musí být seznam.")
-        for i, item in enumerate(value):
-            if not isinstance(item, dict):
-                raise serializers.ValidationError(
-                    f"FAQ položka {i} musí být objekt."
-                )
-            if "question" not in item or "answer" not in item:
-                raise serializers.ValidationError(
-                    f"FAQ položka {i} musí mít pole 'question' a 'answer'."
-                )
         return value
 
     def validate_blocks(self, value):

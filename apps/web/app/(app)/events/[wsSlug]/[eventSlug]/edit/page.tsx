@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { EventForm } from "@/components/event-form";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Alert } from "@/components/ui/card";
 import {
   ApiError,
@@ -15,11 +15,11 @@ import {
 } from "@/lib/api";
 
 interface Props {
-  params: Promise<{ slug: string; eventSlug: string }>;
+  params: Promise<{ wsSlug: string; eventSlug: string }>;
 }
 
 export default function EditEventPage({ params }: Props) {
-  const { slug, eventSlug } = use(params);
+  const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [event, setEvent] = useState<OlafEvent | null>(null);
@@ -31,12 +31,12 @@ export default function EditEventPage({ params }: Props) {
     (async () => {
       try {
         const [ws, ev] = await Promise.all([
-          workspaces.detail(slug),
-          events.publicEvent(slug, eventSlug),
+          workspaces.detail(wsSlug),
+          events.publicEvent(wsSlug, eventSlug),
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${slug}/e/${eventSlug}`);
+          router.replace(`/${wsSlug}/e/${eventSlug}`);
           return;
         }
         setWorkspace(ws);
@@ -44,7 +44,7 @@ export default function EditEventPage({ params }: Props) {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
-          router.replace(`/communities/${slug}`);
+          router.replace("/events");
           return;
         }
         setError(
@@ -57,7 +57,7 @@ export default function EditEventPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [slug, eventSlug, router]);
+  }, [wsSlug, eventSlug, router]);
 
   if (loading) {
     return (
@@ -80,14 +80,16 @@ export default function EditEventPage({ params }: Props) {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:py-12">
-        <p className="text-sm text-ink-500">
-          <Link
-            href={`/communities/${slug}/events/${eventSlug}`}
-            className="hover:text-ink-900"
-          >
-            ← {event.title}
-          </Link>
-        </p>
+        <Breadcrumbs
+          items={[
+            { label: "Akce", href: "/events" },
+            {
+              label: event.title,
+              href: `/events/${wsSlug}/${eventSlug}`,
+            },
+            { label: "Úprava" },
+          ]}
+        />
 
         <header className="mt-4 mb-8">
           <p className="text-sm font-medium text-brand">Úprava akce</p>
@@ -100,11 +102,11 @@ export default function EditEventPage({ params }: Props) {
         </header>
 
         <EventForm
-          workspaceSlug={slug}
+          workspaceSlug={wsSlug}
           initial={event}
-          onSubmit={(payload) => events.update(slug, eventSlug, payload)}
+          onSubmit={(payload) => events.update(wsSlug, eventSlug, payload)}
           onSuccess={(updated) =>
-            router.push(`/communities/${slug}/events/${updated.slug}`)
+            router.push(`/events/${wsSlug}/${updated.slug}`)
           }
           submitLabel="Uložit změny"
         />

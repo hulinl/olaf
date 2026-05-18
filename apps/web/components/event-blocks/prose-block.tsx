@@ -1,12 +1,13 @@
 import { assetUrl } from "@/lib/api";
-import type { ProseBlockPayload } from "@/lib/event-blocks";
+import type { BlockTone, ProseBlockPayload } from "@/lib/event-blocks";
 import { SectionHead } from "@/components/ui/section-head";
 
 interface Props {
   payload: ProseBlockPayload;
+  tone?: BlockTone;
 }
 
-export function ProseBlock({ payload }: Props) {
+export function ProseBlock({ payload, tone = "canvas" }: Props) {
   const image = assetUrl(payload.image_url);
   const side = payload.image_side ?? "right";
   const paragraphs = (payload.body ?? "").split(/\n\n+/).filter(Boolean);
@@ -15,11 +16,18 @@ export function ProseBlock({ payload }: Props) {
     return null;
   }
 
+  const dark = tone === "ink";
+
   return (
-    <section className="border-t border-border bg-canvas">
+    <section
+      className={[
+        "border-t",
+        dark ? "border-transparent bg-ink-900" : "border-border bg-canvas",
+      ].join(" ")}
+    >
       <div
         className={[
-          "mx-auto max-w-5xl px-4 py-16 sm:py-20",
+          "mx-auto max-w-5xl px-4 py-24 sm:py-28",
           image ? "grid gap-12 md:grid-cols-2 md:items-start" : "",
         ].join(" ")}
       >
@@ -36,10 +44,13 @@ export function ProseBlock({ payload }: Props) {
             <SectionHead
               eyebrow={payload.eyebrow}
               title={payload.heading ?? ""}
+              tone={dark ? "dark" : "light"}
             />
           )}
           <div
-            className="space-y-4 text-ink-700"
+            className={["space-y-4", dark ? "text-white/80" : "text-ink-700"].join(
+              " ",
+            )}
             style={{ fontSize: 16, lineHeight: 1.6 }}
           >
             {paragraphs.map((p, i) => (

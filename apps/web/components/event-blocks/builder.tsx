@@ -9,14 +9,22 @@ import {
 } from "@/lib/event-blocks";
 
 import { DaysForm } from "./forms/days-form";
+import { FaqForm } from "./forms/faq-form";
+import { GalleryForm } from "./forms/gallery-form";
 import { HeroForm } from "./forms/hero-form";
 import { IncludedSplitForm } from "./forms/included-split-form";
+import { MapForm } from "./forms/map-form";
+import { PracticalForm } from "./forms/practical-form";
 import { ProseForm } from "./forms/prose-form";
 import { StatsForm } from "./forms/stats-form";
 
 interface Props {
   blocks: EventBlock[];
   onChange: (blocks: EventBlock[]) => void;
+  /** Both optional so the builder can render in a create flow. When present,
+   *  block forms expose upload buttons next to image URL inputs. */
+  workspaceSlug?: string;
+  eventSlug?: string;
 }
 
 const ADD_OPTIONS: BlockType[] = [
@@ -25,9 +33,18 @@ const ADD_OPTIONS: BlockType[] = [
   "stats",
   "days",
   "included_split",
+  "gallery",
+  "map",
+  "faq",
+  "practical",
 ];
 
-export function Builder({ blocks, onChange }: Props) {
+export function Builder({
+  blocks,
+  onChange,
+  workspaceSlug,
+  eventSlug,
+}: Props) {
   const [openId, setOpenId] = useState<string | null>(blocks[0]?.id ?? null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -122,7 +139,12 @@ export function Builder({ blocks, onChange }: Props) {
             </header>
             {isOpen && (
               <div className="px-4 py-4">
-                <BlockForm block={block} onChange={(p) => update(block.id, p)} />
+                <BlockForm
+                  block={block}
+                  onChange={(p) => update(block.id, p)}
+                  workspaceSlug={workspaceSlug}
+                  eventSlug={eventSlug}
+                />
               </div>
             )}
           </div>
@@ -172,23 +194,56 @@ export function Builder({ blocks, onChange }: Props) {
 function BlockForm({
   block,
   onChange,
+  workspaceSlug,
+  eventSlug,
 }: {
   block: EventBlock;
   onChange: (payload: EventBlock["payload"]) => void;
+  workspaceSlug?: string;
+  eventSlug?: string;
 }) {
   switch (block.type) {
     case "hero":
-      return <HeroForm payload={block.payload} onChange={onChange} />;
+      return (
+        <HeroForm
+          payload={block.payload}
+          onChange={onChange}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+        />
+      );
     case "prose":
-      return <ProseForm payload={block.payload} onChange={onChange} />;
+      return (
+        <ProseForm
+          payload={block.payload}
+          onChange={onChange}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+        />
+      );
     case "stats":
       return <StatsForm payload={block.payload} onChange={onChange} />;
     case "days":
-      return <DaysForm payload={block.payload} onChange={onChange} />;
+      return (
+        <DaysForm
+          payload={block.payload}
+          onChange={onChange}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+        />
+      );
     case "included_split":
       return (
         <IncludedSplitForm payload={block.payload} onChange={onChange} />
       );
+    case "gallery":
+      return <GalleryForm payload={block.payload} onChange={onChange} />;
+    case "map":
+      return <MapForm payload={block.payload} onChange={onChange} />;
+    case "faq":
+      return <FaqForm payload={block.payload} onChange={onChange} />;
+    case "practical":
+      return <PracticalForm payload={block.payload} onChange={onChange} />;
     default:
       return null;
   }
@@ -211,5 +266,13 @@ function makeBlock(type: BlockType): EventBlock {
       return { id, type, payload: { days: [] } };
     case "included_split":
       return { id, type, payload: { included: [], not_included: [] } };
+    case "gallery":
+      return { id, type, payload: {} };
+    case "map":
+      return { id, type, payload: { map_url: "" } };
+    case "faq":
+      return { id, type, payload: { items: [] } };
+    case "practical":
+      return { id, type, payload: {} };
   }
 }

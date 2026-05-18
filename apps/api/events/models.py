@@ -107,83 +107,10 @@ class Event(TenantScopedModel):
     )
     cancellation_reason = models.TextField(blank=True)
 
-    # V1 simplification (per shipping path): camp-specific structured copy
-    # the public landing page renders without a rich-text editor or a per-event
-    # questionnaire builder. Free-form lists; the frontend renders bullets.
-    highlights = models.JSONField(
-        default=list,
-        blank=True,
-        help_text=(
-            'Bullet list of "what we\'ll focus on" (e.g. ["technika běhu", '
-            '"regenerace", "výživa", "výbava"]).'
-        ),
-    )
-    included = models.JSONField(
-        default=list,
-        blank=True,
-        help_text=(
-            "Bullet list of what's included in the price "
-            '(["3 noci ubytování", "tréninky", "fotky", "snídaně + večeře"]).'
-        ),
-    )
-    program = models.JSONField(
-        default=list,
-        blank=True,
-        help_text=(
-            "Day-by-day program for the public landing page. Each entry is "
-            '{"day": "Čtvrtek", "title": "Příjezd", "body": "Přijeď..."}.'
-        ),
-    )
-    price_text = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text='Free-form price string for the landing page, e.g. "2 450 Kč".',
-    )
-    not_included = models.JSONField(
-        default=list,
-        blank=True,
-        help_text="List of bullet items NOT covered by the price.",
-    )
-    additional_cost_note = models.CharField(
-        max_length=200,
-        blank=True,
-        help_text='Rough estimate of extra costs, e.g. "~12 500 Kč/osoba navíc na ubytování a permity".',
-    )
-
-    # Difficulty — 0 = nezadáno; 1-5 = bezpečně-velmi náročné
-    difficulty_level = models.PositiveSmallIntegerField(
-        default=0,
-        help_text="0 = nezadáno, 1-5 = lehké → velmi náročné.",
-    )
-    difficulty_note = models.TextField(
-        blank=True,
-        help_text=(
-            "Co konkrétně náročnost na této akci znamená — počet km/den, "
-            "hodin chůze, převýšení, požadovaná kondice."
-        ),
-    )
-
-    transport_info = models.TextField(
-        blank=True,
-        help_text="Jak se na akci dostat, sraz, co se používá za dopravu během akce.",
-    )
-    accommodation_info = models.TextField(
-        blank=True,
-        help_text="Kde se spí, typ ubytování, polopenze/snídaně, co je v ceně.",
-    )
-    gear_info = models.TextField(
-        blank=True,
-        help_text="Co si vzít, co půjčíme/poskytneme, povinná vs. doporučená výbava.",
-    )
-    faq = models.JSONField(
-        default=list,
-        blank=True,
-        help_text='List of {"question": str, "answer": str} items.',
-    )
-
     # Block-based landing — ordered list of content blocks rendered by the
-    # public landing page (see events/blocks.py for schema). Empty list = use
-    # legacy structured-field rendering (hero/details/program/included/etc).
+    # public landing page (see events/blocks.py for schema). Every visible
+    # content surface is a block; the form on /edit only handles event
+    # mechanics (time, capacity, RSVP, sharing).
     blocks = models.JSONField(
         default=list,
         blank=True,
@@ -214,6 +141,15 @@ class Event(TenantScopedModel):
             "Which questionnaire sections appear on this event's RSVP form. "
             "Empty list = all sections enabled (backwards compat)."
         ),
+    )
+
+    # Communities the event has been shared into (PRD §4.5 line 179).
+    # Multi-community sharing landed with Slice 3.
+    communities = models.ManyToManyField(
+        "communities.Community",
+        blank=True,
+        related_name="events",
+        help_text="Communities under the workspace where this event is listed.",
     )
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -269,6 +205,28 @@ class Event(TenantScopedModel):
         if self.capacity is None:
             return None
         return max(0, self.capacity - self.confirmed_rsvp_count)
+
+
+class EventImage(models.Model):
+    """One image in an event's gallery. Separate from Event.cover (single hero
+    image) — these are the "vibes" gallery rendered as a grid on the landing.
+    """
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="images"
+    )
+    image = models.ImageField(upload_to="events/gallery/")
+    alt_text = models.CharField(max_length=200, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "events_eventimage"
+        ordering = ["sort_order", "id"]
+        indexes = [models.Index(fields=["event", "sort_order"])]
+
+    def __str__(self) -> str:
+        return f"Image #{self.pk} for {self.event.slug}"
 
 
 class RSVP(models.Model):

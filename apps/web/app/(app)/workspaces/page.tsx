@@ -88,7 +88,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
   const logo = assetUrl(workspace.logo_url);
   return (
     <Link
-      href={`/communities/${workspace.slug}`}
+      href={`/workspaces/${workspace.slug}`}
       className="group block rounded-lg border border-border bg-surface p-5 transition-colors hover:border-border-strong hover:shadow-md focus-ring"
     >
       <div className="flex items-start gap-4">

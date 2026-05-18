@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { Builder } from "@/components/event-blocks/builder";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import {
@@ -17,11 +17,11 @@ import {
 import type { EventBlock } from "@/lib/event-blocks";
 
 interface Props {
-  params: Promise<{ slug: string; eventSlug: string }>;
+  params: Promise<{ wsSlug: string; eventSlug: string }>;
 }
 
 export default function EventBlocksPage({ params }: Props) {
-  const { slug, eventSlug } = use(params);
+  const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [event, setEvent] = useState<OlafEvent | null>(null);
@@ -37,12 +37,12 @@ export default function EventBlocksPage({ params }: Props) {
     (async () => {
       try {
         const [ws, ev] = await Promise.all([
-          workspaces.detail(slug),
-          events.publicEvent(slug, eventSlug),
+          workspaces.detail(wsSlug),
+          events.publicEvent(wsSlug, eventSlug),
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${slug}/e/${eventSlug}`);
+          router.replace(`/${wsSlug}/e/${eventSlug}`);
           return;
         }
         setWorkspace(ws);
@@ -51,7 +51,7 @@ export default function EventBlocksPage({ params }: Props) {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
-          router.replace(`/communities/${slug}`);
+          router.replace("/events");
           return;
         }
         setError(
@@ -64,7 +64,7 @@ export default function EventBlocksPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [slug, eventSlug, router]);
+  }, [wsSlug, eventSlug, router]);
 
   function handleChange(next: EventBlock[]) {
     setBlocks(next);
@@ -75,7 +75,7 @@ export default function EventBlocksPage({ params }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const updated = await events.update(slug, eventSlug, { blocks });
+      const updated = await events.update(wsSlug, eventSlug, { blocks });
       setEvent(updated);
       setBlocks(updated.blocks ?? []);
       setDirty(false);
@@ -113,14 +113,16 @@ export default function EventBlocksPage({ params }: Props) {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:py-12">
-        <p className="text-sm text-ink-500">
-          <Link
-            href={`/communities/${slug}/events/${eventSlug}`}
-            className="hover:text-ink-900"
-          >
-            ← {event.title}
-          </Link>
-        </p>
+        <Breadcrumbs
+          items={[
+            { label: "Akce", href: "/events" },
+            {
+              label: event.title,
+              href: `/events/${wsSlug}/${eventSlug}`,
+            },
+            { label: "Bloky" },
+          ]}
+        />
 
         <header className="mt-4 mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -135,7 +137,7 @@ export default function EventBlocksPage({ params }: Props) {
           </div>
           <div className="flex gap-2">
             <LinkButton
-              href={`/${slug}/e/${eventSlug}`}
+              href={`/${wsSlug}/e/${eventSlug}`}
               variant="secondary"
               size="md"
             >
@@ -150,7 +152,12 @@ export default function EventBlocksPage({ params }: Props) {
           </div>
         )}
 
-        <Builder blocks={blocks} onChange={handleChange} />
+        <Builder
+          blocks={blocks}
+          onChange={handleChange}
+          workspaceSlug={wsSlug}
+          eventSlug={eventSlug}
+        />
 
         <div className="sticky bottom-4 mt-8 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 backdrop-blur">
           <p className="text-sm text-ink-500">

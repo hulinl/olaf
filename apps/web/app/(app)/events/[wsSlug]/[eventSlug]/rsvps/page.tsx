@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useState } from "react";
 
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import {
@@ -16,7 +16,7 @@ import {
 } from "@/lib/api";
 
 interface Props {
-  params: Promise<{ slug: string; eventSlug: string }>;
+  params: Promise<{ wsSlug: string; eventSlug: string }>;
 }
 
 type Filter = "all" | "yes" | "waitlist" | "pending_approval";
@@ -47,7 +47,7 @@ const STATUS_TONE: Record<RSVPRecord["status"], string> = {
 };
 
 export default function RSVPAdminPage({ params }: Props) {
-  const { slug, eventSlug } = use(params);
+  const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [event, setEvent] = useState<OlafEvent | null>(null);
@@ -63,13 +63,13 @@ export default function RSVPAdminPage({ params }: Props) {
     (async () => {
       try {
         const [ws, ev, list] = await Promise.all([
-          workspaces.detail(slug),
-          events.publicEvent(slug, eventSlug),
-          events.rsvpList(slug, eventSlug),
+          workspaces.detail(wsSlug),
+          events.publicEvent(wsSlug, eventSlug),
+          events.rsvpList(wsSlug, eventSlug),
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
-          router.replace(`/${slug}/e/${eventSlug}`);
+          router.replace(`/${wsSlug}/e/${eventSlug}`);
           return;
         }
         setWorkspace(ws);
@@ -78,7 +78,7 @@ export default function RSVPAdminPage({ params }: Props) {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
-          router.replace(`/communities/${slug}`);
+          router.replace("/events");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
@@ -89,7 +89,7 @@ export default function RSVPAdminPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [slug, eventSlug, router]);
+  }, [wsSlug, eventSlug, router]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return rsvps;
@@ -108,7 +108,7 @@ export default function RSVPAdminPage({ params }: Props) {
   async function handleApprove(rsvp: RSVPRecord) {
     setActing(rsvp.id);
     try {
-      const updated = await events.approveRsvp(slug, eventSlug, rsvp.id);
+      const updated = await events.approveRsvp(wsSlug, eventSlug, rsvp.id);
       setRsvps((prev) => prev.map((r) => (r.id === rsvp.id ? updated : r)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Schválení selhalo.");
@@ -123,7 +123,7 @@ export default function RSVPAdminPage({ params }: Props) {
     }
     setActing(rsvp.id);
     try {
-      const updated = await events.rejectRsvp(slug, eventSlug, rsvp.id);
+      const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
       setRsvps((prev) => prev.map((r) => (r.id === rsvp.id ? updated : r)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Zamítnutí selhalo.");
@@ -145,14 +145,16 @@ export default function RSVPAdminPage({ params }: Props) {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-        <p className="text-sm text-ink-500">
-          <Link
-            href={`/communities/${slug}/events/${eventSlug}`}
-            className="hover:text-ink-900"
-          >
-            ← {event.title}
-          </Link>
-        </p>
+        <Breadcrumbs
+          items={[
+            { label: "Akce", href: "/events" },
+            {
+              label: event.title,
+              href: `/events/${wsSlug}/${eventSlug}`,
+            },
+            { label: "Přihlášení" },
+          ]}
+        />
 
         <header className="mt-4 mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -170,14 +172,14 @@ export default function RSVPAdminPage({ params }: Props) {
           </div>
           <div className="flex gap-2">
             <LinkButton
-              href={`/${slug}/e/${eventSlug}`}
+              href={`/${wsSlug}/e/${eventSlug}`}
               variant="secondary"
               size="md"
             >
               Veřejná stránka
             </LinkButton>
             <LinkButton
-              href={`/communities/${slug}/events/${eventSlug}/edit`}
+              href={`/events/${wsSlug}/${eventSlug}/edit`}
               variant="ghost"
               size="md"
             >

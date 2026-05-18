@@ -3,12 +3,21 @@
 import { Field, Input } from "@/components/ui/field";
 import type { ProseBlockPayload } from "@/lib/event-blocks";
 
+import { ImageUploadField } from "./_image-upload";
+
 interface Props {
   payload: ProseBlockPayload;
   onChange: (p: ProseBlockPayload) => void;
+  workspaceSlug?: string;
+  eventSlug?: string;
 }
 
-export function ProseForm({ payload, onChange }: Props) {
+export function ProseForm({
+  payload,
+  onChange,
+  workspaceSlug,
+  eventSlug,
+}: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -35,15 +44,13 @@ export function ProseForm({ payload, onChange }: Props) {
         />
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="URL obrázku (volitelné)">
-          <Input
-            value={payload.image_url ?? ""}
-            onChange={(e) =>
-              onChange({ ...payload, image_url: e.target.value })
-            }
-            placeholder="https://…/foto.jpg"
-          />
-        </Field>
+        <ImageUploadField
+          label="Obrázek (volitelné)"
+          value={payload.image_url ?? ""}
+          onChange={(url) => onChange({ ...payload, image_url: url })}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+        />
         <Field label="Strana obrázku">
           <div className="flex gap-2">
             {(["left", "right"] as const).map((side) => (

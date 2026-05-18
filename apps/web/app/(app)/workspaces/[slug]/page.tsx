@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { WorkspaceMetaLine } from "@/components/ui/workspace-meta-line";
 import {
   ApiError,
+  type Community,
   type EventSummary,
   type Workspace,
   assetUrl,
+  communities as communitiesApi,
   events as eventsApi,
   workspaces,
 } from "@/lib/api";
@@ -32,6 +36,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [eventList, setEventList] = useState<EventSummary[] | null>(null);
+  const [communityList, setCommunityList] = useState<Community[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,17 +44,19 @@ export default function WorkspaceDetailPage({ params }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, ev] = await Promise.all([
+        const [ws, ev, comms] = await Promise.all([
           workspaces.detail(slug),
           workspaces.eventsFor(slug),
+          communitiesApi.forWorkspace(slug).catch(() => [] as Community[]),
         ]);
         if (cancelled) return;
         setWorkspace(ws);
         setEventList(ev);
+        setCommunityList(comms);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 404) {
-          router.replace("/communities");
+          router.replace("/workspaces");
           return;
         }
         setError(
@@ -104,14 +111,12 @@ export default function WorkspaceDetailPage({ params }: Props) {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-        <p className="text-sm text-ink-500">
-          <Link
-            href="/communities"
-            className="hover:text-ink-900"
-          >
-            ← Všechny komunity
-          </Link>
-        </p>
+        <Breadcrumbs
+          items={[
+            { label: "Workspaces", href: "/workspaces" },
+            { label: workspace.name },
+          ]}
+        />
 
         <header className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
           <div
@@ -136,7 +141,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
                 {workspace.name}
               </h1>
@@ -146,69 +151,31 @@ export default function WorkspaceDetailPage({ params }: Props) {
                 </span>
               )}
             </div>
-            {workspace.location && (
-              <p className="mt-1 text-sm text-ink-500">
-                {workspace.location}
-                {workspace.member_count != null && (
-                  <> · {workspace.member_count} členů</>
-                )}
-              </p>
-            )}
+            <WorkspaceMetaLine
+              location={workspace.location}
+              memberCount={workspace.member_count}
+              socials={socials}
+              className="mt-1"
+            />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <LinkButton
-              href={`/${workspace.slug}`}
-              variant="secondary"
-              size="md"
-            >
-              Veřejný profil
-            </LinkButton>
-            {isOwner && (
-              <LinkButton
-                href={`/communities/${workspace.slug}/events/new`}
-                variant="primary"
-                size="md"
-              >
-                Vytvořit event
-              </LinkButton>
-            )}
-          </div>
+          <LinkButton
+            href={`/${workspace.slug}`}
+            variant="secondary"
+            size="md"
+          >
+            Veřejný profil
+          </LinkButton>
         </header>
 
         {workspace.bio && (
           <p className="mt-6 max-w-2xl text-ink-700">{workspace.bio}</p>
         )}
 
-        {socials.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {socials.map(([key, url]) => (
-              <a
-                key={key}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900"
-              >
-                {key}
-              </a>
-            ))}
-          </div>
-        )}
-
         <section className="mt-12">
-          <div className="mb-5 flex items-baseline justify-between gap-4">
+          <div className="mb-5">
             <h2 className="text-xl font-semibold text-ink-900">
               Nadcházející akce
             </h2>
-            {isOwner && upcoming.length > 0 && (
-              <LinkButton
-                href={`/communities/${workspace.slug}/events/new`}
-                variant="ghost"
-                size="md"
-              >
-                + Nový event
-              </LinkButton>
-            )}
           </div>
           {upcoming.length === 0 ? (
             <Card>
@@ -224,7 +191,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
                   </p>
                   {isOwner && (
                     <LinkButton
-                      href={`/communities/${workspace.slug}/events/new`}
+                      href="/events/new"
                       variant="primary"
                       size="md"
                       className="mt-5"
@@ -266,6 +233,65 @@ export default function WorkspaceDetailPage({ params }: Props) {
             </div>
           </section>
         )}
+
+        {isOwner && (
+          <section className="mt-12">
+            <div className="mb-5 flex items-baseline justify-between gap-4">
+              <h2 className="text-xl font-semibold text-ink-900">Komunity</h2>
+              <LinkButton
+                href={`/workspaces/${workspace.slug}/communities/new`}
+                variant="ghost"
+                size="md"
+              >
+                + Nová komunita
+              </LinkButton>
+            </div>
+            {communityList === null ? (
+              <p className="text-sm text-ink-500">Načítám…</p>
+            ) : communityList.length === 0 ? (
+              <Card>
+                <CardSection>
+                  <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
+                    <h3 className="text-base font-semibold text-ink-900">
+                      Žádné komunity
+                    </h3>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                      Komunita = roster lidí pod tvým workspacem, do kterého
+                      sdílíš akce. Vytvoř první.
+                    </p>
+                  </div>
+                </CardSection>
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {communityList.map((c) => (
+                  <Link
+                    key={c.slug}
+                    href={`/workspaces/${workspace.slug}/communities/${c.slug}`}
+                    className="block rounded-lg border border-border bg-surface p-5 shadow-sm transition-colors hover:border-border-strong hover:shadow-md focus-ring"
+                  >
+                    <h3 className="text-base font-semibold text-ink-900">
+                      {c.name}
+                    </h3>
+                    {c.description && (
+                      <p className="mt-1 line-clamp-2 text-sm text-ink-500">
+                        {c.description}
+                      </p>
+                    )}
+                    <p className="mt-3 text-xs font-mono uppercase tracking-[0.14em] text-ink-500">
+                      {c.member_count} členů ·{" "}
+                      {c.visibility === "public"
+                        ? "veřejná"
+                        : c.visibility === "unlisted"
+                          ? "skrytá"
+                          : "soukromá"}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </section>
     </main>
   );
@@ -282,51 +308,46 @@ function EventCard({
   showStatus: boolean;
 }) {
   const starts = new Date(event.starts_at);
+  const href = showStatus
+    ? `/events/${workspaceSlug}/${event.slug}`
+    : `/${workspaceSlug}/e/${event.slug}`;
   return (
-    <Card>
-      <CardSection>
-        <div className="flex items-baseline justify-between gap-3">
-          {showStatus && (
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-              {STATUS_LABELS[event.status]}
-            </span>
-          )}
-          <span className="text-xs text-ink-500">
-            {starts.toLocaleDateString("cs-CZ", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+    <Link
+      href={href}
+      className="block rounded-lg border border-border bg-surface p-6 shadow-sm transition-colors hover:border-border-strong hover:shadow-md focus-ring"
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        {showStatus && (
+          <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            {STATUS_LABELS[event.status]}
           </span>
-        </div>
-        <h3 className="mt-2 text-base font-semibold text-ink-900">
-          <Link
-            href={
-              showStatus
-                ? `/communities/${workspaceSlug}/events/${event.slug}`
-                : `/${workspaceSlug}/e/${event.slug}`
-            }
-            className="hover:underline"
-          >
-            {event.title}
-          </Link>
-        </h3>
-        {event.location_text && (
-          <p className="mt-1 text-sm text-ink-500">{event.location_text}</p>
         )}
-        <div className="mt-4 flex items-baseline gap-4 text-sm">
-          <span className="text-ink-900">
-            <strong>{event.confirmed_count}</strong>
-            {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
-            přihlášeno
+        <span className="text-xs text-ink-500">
+          {starts.toLocaleDateString("cs-CZ", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+        </span>
+      </div>
+      <h3 className="mt-2 text-base font-semibold text-ink-900">
+        {event.title}
+      </h3>
+      {event.location_text && (
+        <p className="mt-1 text-sm text-ink-500">{event.location_text}</p>
+      )}
+      <div className="mt-4 flex items-baseline gap-4 text-sm">
+        <span className="text-ink-900">
+          <strong>{event.confirmed_count}</strong>
+          {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
+          přihlášeno
+        </span>
+        {event.waitlist_count > 0 && (
+          <span className="text-ink-500">
+            +{event.waitlist_count} waitlist
           </span>
-          {event.waitlist_count > 0 && (
-            <span className="text-ink-500">
-              +{event.waitlist_count} waitlist
-            </span>
-          )}
-        </div>
-      </CardSection>
-    </Card>
+        )}
+      </div>
+    </Link>
   );
 }

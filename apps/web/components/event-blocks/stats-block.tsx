@@ -1,18 +1,23 @@
-import type { StatsBlockPayload } from "@/lib/event-blocks";
+import type { BlockTone, StatsBlockPayload } from "@/lib/event-blocks";
 
 interface Props {
   payload: StatsBlockPayload;
+  tone?: BlockTone;
 }
 
-export function StatsBlock({ payload }: Props) {
+export function StatsBlock({ payload, tone: _tone = "canvas" }: Props) {
   if (!payload.tiles || payload.tiles.length === 0) return null;
 
-  const dark = Boolean(payload.dark);
+  // Stats is the single intentional dark statement on the public landing
+  // (Pitztal-style: warm/light page with one ink accent that carries the
+  // numbers). The `tone` prop and the legacy `payload.dark` are accepted
+  // for forward compat but the block always renders ink.
+  const dark = true;
 
   return (
     <section
       className={[
-        "border-t py-16 sm:py-20",
+        "border-t py-24 sm:py-28",
         dark
           ? "border-transparent bg-ink-900 text-ink-inverse"
           : "border-border bg-canvas text-ink-900",

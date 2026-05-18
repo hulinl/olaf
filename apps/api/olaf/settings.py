@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "accounts",
     "workspaces",
     "events",
+    "communities",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
