@@ -13,9 +13,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from accounts.models import User
-from workspaces.models import Workspace
-
 from communities.models import Community
+from workspaces.models import Workspace
 
 from .models import RSVP, Event, EventImage
 from .permissions import is_workspace_owner
