@@ -23,7 +23,7 @@ export function FaqBlock({ payload, tone = "canvas" }: Props) {
         dark ? "bg-ink-900" : "bg-canvas",
       ].join(" ")}
     >
-      <div className="mx-auto max-w-3xl px-4 py-14 sm:py-16">
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:py-12">
         <SectionHead
           eyebrow={eyebrow}
           title={title}

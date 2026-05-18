@@ -36,23 +36,10 @@ export function SectionHead({
         className,
       ].join(" ")}
     >
-      {eyebrow && (
-        <p
-          className={[
-            "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em]",
-            dark ? "text-white/85" : "text-ink-900",
-          ].join(" ")}
-        >
-          <span
-            aria-hidden
-            className={dark ? "text-brand" : "text-brand"}
-            style={{ fontSize: "0.7em", lineHeight: 1 }}
-          >
-            ●
-          </span>
-          {eyebrow}
-        </p>
-      )}
+      {/* Eyebrows used to render a ● + small uppercase line. User feedback
+          2026-05-18: too noisy, drop it entirely. SectionHead now is just
+          the display title + optional lead + a bottom rule. Kept the prop
+          so call sites compile without a sweep, but it no longer renders. */}
       <h2
         className={[
           "mt-2 text-3xl font-semibold tracking-tight sm:text-4xl",

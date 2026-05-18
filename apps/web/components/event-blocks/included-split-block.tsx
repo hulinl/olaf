@@ -23,7 +23,7 @@ export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
 
   return (
     <section className="bg-ink-900">
-      <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:py-12">
         <SectionHead
           eyebrow="Cena"
           title="Co dostaneš a za co platíš"
