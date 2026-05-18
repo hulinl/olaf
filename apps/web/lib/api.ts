@@ -278,6 +278,16 @@ export async function apiFetch<T>(
   return data as unknown as T;
 }
 
+export interface WorkspaceWritePayload {
+  name?: string;
+  bio?: string;
+  location?: string;
+  social_links?: Record<string, string>;
+  accent_color?: string;
+  visibility?: "public" | "unlisted" | "private";
+  default_tz?: string;
+}
+
 export const workspaces = {
   byPublicSlug: (slug: string) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/`),
@@ -286,6 +296,31 @@ export const workspaces = {
   eventsFor: (slug: string) =>
     apiFetch<EventSummary[]>(`/api/workspaces/${slug}/events/`),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
+  update: (slug: string, payload: WorkspaceWritePayload) =>
+    apiFetch<Workspace>(`/api/workspaces/${slug}/detail/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  uploadLogo: (slug: string, file: File) => {
+    const fd = new FormData();
+    fd.append("logo", file);
+    return apiFetch<Workspace>(`/api/workspaces/${slug}/logo/`, {
+      method: "POST",
+      body: fd,
+    });
+  },
+  deleteLogo: (slug: string) =>
+    apiFetch<Workspace>(`/api/workspaces/${slug}/logo/`, { method: "DELETE" }),
+  uploadCover: (slug: string, file: File) => {
+    const fd = new FormData();
+    fd.append("cover", file);
+    return apiFetch<Workspace>(`/api/workspaces/${slug}/cover/`, {
+      method: "POST",
+      body: fd,
+    });
+  },
+  deleteCover: (slug: string) =>
+    apiFetch<Workspace>(`/api/workspaces/${slug}/cover/`, { method: "DELETE" }),
 };
 
 export interface Community {

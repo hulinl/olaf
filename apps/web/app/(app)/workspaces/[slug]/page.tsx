@@ -152,13 +152,24 @@ export default function WorkspaceDetailPage({ params }: Props) {
               className="mt-1"
             />
           </div>
-          <LinkButton
-            href={`/${workspace.slug}`}
-            variant="secondary"
-            size="md"
-          >
-            Veřejný profil
-          </LinkButton>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            {isOwner && (
+              <LinkButton
+                href={`/workspaces/${workspace.slug}/edit`}
+                variant="secondary"
+                size="md"
+              >
+                Upravit komunitu
+              </LinkButton>
+            )}
+            <LinkButton
+              href={`/${workspace.slug}`}
+              variant="secondary"
+              size="md"
+            >
+              Veřejný profil
+            </LinkButton>
+          </div>
         </header>
 
         {workspace.bio && (
