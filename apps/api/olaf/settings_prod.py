@@ -18,8 +18,8 @@ from `settings.py` and overrides only what differs in production:
 """
 from __future__ import annotations
 
-from .settings import *  # noqa: F401,F403  — pull base settings
-from .settings import env  # noqa: E402
+from .settings import *  # noqa: F403  — pull base settings
+from .settings import env
 
 # --- Core ---
 DEBUG = False
