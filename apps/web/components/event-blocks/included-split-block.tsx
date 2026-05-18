@@ -135,16 +135,8 @@ function PriceCard({
       }}
     >
       <div className="flex-1">
-        <p
-          className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em] text-white/80"
-        >
-          <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
-            ●
-          </span>
-          Cena
-        </p>
         <h3
-          className="mt-3 text-2xl font-semibold text-ink-inverse sm:text-3xl"
+          className="text-2xl font-semibold text-ink-inverse sm:text-3xl"
           style={{ letterSpacing: "-0.025em", lineHeight: 1.2 }}
         >
           Celková cena
