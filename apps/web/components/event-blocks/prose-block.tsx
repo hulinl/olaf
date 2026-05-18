@@ -27,7 +27,7 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
     >
       <div
         className={[
-          "mx-auto max-w-5xl px-4 py-24 sm:py-28",
+          "mx-auto max-w-5xl px-4 py-14 sm:py-16",
           image ? "grid gap-12 md:grid-cols-2 md:items-start" : "",
         ].join(" ")}
       >

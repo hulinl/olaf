@@ -61,16 +61,29 @@ export function HeroBlock({
       >
         {badge}
 
-        {payload.eyebrow && (
-          <p
-            className={[
-              "font-mono text-[11px] font-medium uppercase tracking-[0.14em]",
-              onDark ? "text-white/80" : "text-ink-500",
-            ].join(" ")}
-          >
-            {payload.eyebrow}
-          </p>
-        )}
+        {payload.eyebrow &&
+          (cover ? (
+            <span
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.12] px-4 py-1.5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md"
+            >
+              <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+                ●
+              </span>
+              {payload.eyebrow}
+            </span>
+          ) : (
+            <p
+              className={[
+                "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em]",
+                tone === "ink" ? "text-white/85" : "text-ink-900",
+              ].join(" ")}
+            >
+              <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+                ●
+              </span>
+              {payload.eyebrow}
+            </p>
+          ))}
 
         <h1
           className={[

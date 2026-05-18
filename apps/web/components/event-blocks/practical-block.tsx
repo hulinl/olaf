@@ -34,7 +34,7 @@ export function PracticalBlock({ payload, tone = "canvas" }: Props) {
         dark ? "border-transparent bg-ink-900" : "border-border bg-canvas",
       ].join(" ")}
     >
-      <div className="mx-auto max-w-5xl px-4 py-24 sm:py-28">
+      <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
         <SectionHead
           eyebrow={eyebrow}
           title={title}

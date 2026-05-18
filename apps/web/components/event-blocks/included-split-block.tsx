@@ -23,7 +23,7 @@ export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
 
   return (
     <section className="border-t border-transparent bg-ink-900">
-      <div className="mx-auto max-w-5xl px-4 py-24 sm:py-28">
+      <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
         <SectionHead
           eyebrow="Cena"
           title="Co dostaneš a za co platíš"
@@ -129,35 +129,43 @@ function PriceCard({
 }) {
   return (
     <div
-      className="mt-14 grid items-center gap-10 rounded-2xl p-10 shadow-lg sm:grid-cols-[1.2fr_1fr] sm:gap-12 sm:p-12"
+      className="mt-14 flex flex-col gap-8 rounded-2xl p-10 shadow-lg sm:flex-row sm:items-center sm:justify-between sm:gap-14 sm:p-12"
       style={{
         background: "linear-gradient(135deg, #0e1a26 0%, #1a2c3e 100%)",
       }}
     >
-      <div>
+      <div className="flex-1">
+        <p
+          className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em] text-white/80"
+        >
+          <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+            ●
+          </span>
+          Cena
+        </p>
         <h3
-          className="text-2xl font-semibold text-ink-inverse sm:text-3xl"
-          style={{ letterSpacing: "-0.025em", lineHeight: 1.15 }}
+          className="mt-3 text-2xl font-semibold text-ink-inverse sm:text-3xl"
+          style={{ letterSpacing: "-0.025em", lineHeight: 1.2 }}
         >
           Cena výpravy
         </h3>
         {note && (
           <p
-            className="mt-4 text-white/75"
-            style={{ fontSize: 16, lineHeight: 1.6 }}
+            className="mt-3 max-w-md text-white/70"
+            style={{ fontSize: 15, lineHeight: 1.6 }}
           >
             {note}
           </p>
         )}
       </div>
-      <div className="rounded-xl border border-white/10 bg-white/[0.05] p-8 text-center">
+      <div className="shrink-0 sm:border-l sm:border-white/15 sm:pl-14 sm:text-right">
         <p
-          className="text-5xl font-semibold text-ink-inverse sm:text-[3rem]"
-          style={{ letterSpacing: "-0.035em", lineHeight: 1 }}
+          className="text-6xl font-semibold text-ink-inverse sm:text-7xl"
+          style={{ letterSpacing: "-0.04em", lineHeight: 1 }}
         >
           {value}
           {unit && (
-            <span className="ml-2 text-xl font-medium text-white/60">
+            <span className="ml-2 text-2xl font-medium text-white/60">
               {unit}
             </span>
           )}
