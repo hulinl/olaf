@@ -907,6 +907,16 @@ def mark_rsvp_paid(
     rsvp.payment_status = RSVP.PAYMENT_PAID
     rsvp.paid_at = timezone.now()
     rsvp.save(update_fields=["payment_status", "paid_at", "updated_at"])
+
+    # Auto-generate the invoice (Slice 8). Idempotent.
+    # Don't block mark-paid on invoice issues; owner can regenerate later.
+    import contextlib
+
+    from .models import generate_invoice_for_rsvp
+
+    with contextlib.suppress(Exception):
+        generate_invoice_for_rsvp(rsvp)
+
     return Response(RSVPSerializer(rsvp).data)
 
 
@@ -999,3 +1009,89 @@ def my_rsvp_document_detail(
 
     doc.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Slice 8 — Invoices (V1 minimum: list, detail, edit; no PDF yet)
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_invoices(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner-only list of all invoices generated for an event."""
+    from .models import Invoice
+    from .serializers import InvoiceSerializer
+
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, event.workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    qs = (
+        Invoice.objects.filter(rsvp__event=event)
+        .select_related("rsvp", "rsvp__user", "rsvp__event")
+        .order_by("-issued_at")
+    )
+    return Response(InvoiceSerializer(qs, many=True).data)
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([IsAuthenticated])
+def invoice_detail(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    invoice_id: int,
+) -> Response:
+    """Owner reads / edits a single invoice. Editing is intentionally
+    permissive in V1 — owner can fix anything in the snapshot."""
+    from .models import Invoice
+    from .serializers import InvoiceSerializer
+
+    try:
+        invoice = Invoice.objects.select_related(
+            "rsvp", "rsvp__user", "rsvp__event", "rsvp__event__workspace"
+        ).get(
+            pk=invoice_id,
+            rsvp__event__workspace__slug=workspace_slug,
+            rsvp__event__slug=event_slug,
+        )
+    except Invoice.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, invoice.rsvp.event.workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == "GET":
+        return Response(InvoiceSerializer(invoice).data)
+
+    serializer = InvoiceSerializer(invoice, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_invoice(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Participant read-only view of their own invoice for an event."""
+    from .serializers import InvoiceSerializer
+
+    rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
+    if rsvp is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    try:
+        invoice = rsvp.invoice
+    except Exception:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(InvoiceSerializer(invoice).data)

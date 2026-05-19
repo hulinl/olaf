@@ -476,3 +476,56 @@ class RSVPDocumentSerializer(serializers.ModelSerializer):
             return obj.file.url
         except Exception:
             return None
+
+
+from .models import Invoice  # noqa: E402
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="rsvp.user.email", read_only=True)
+    user_full_name = serializers.CharField(
+        source="rsvp.user.get_full_name", read_only=True
+    )
+    event_title = serializers.CharField(source="rsvp.event.title", read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = (
+            "id",
+            "number",
+            "status",
+            "supplier_name",
+            "supplier_address",
+            "supplier_ico",
+            "supplier_dic",
+            "supplier_iban",
+            "customer_name",
+            "customer_address",
+            "customer_ico",
+            "customer_dic",
+            "customer_email",
+            "items",
+            "subtotal",
+            "vat_rate",
+            "vat_amount",
+            "total",
+            "currency",
+            "variable_symbol",
+            "issued_at",
+            "due_at",
+            "notes",
+            "user_email",
+            "user_full_name",
+            "event_title",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "number",
+            "user_email",
+            "user_full_name",
+            "event_title",
+            "created_at",
+            "updated_at",
+        )

@@ -202,6 +202,44 @@ export interface RSVPDocumentsBundle {
   uploaded: RSVPDocument[];
 }
 
+export interface InvoiceItem {
+  label: string;
+  qty: number;
+  unit_price: string;
+  subtotal: string;
+}
+
+export interface Invoice {
+  id: number;
+  number: string;
+  status: "draft" | "issued" | "paid" | "void";
+  supplier_name: string;
+  supplier_address: string;
+  supplier_ico: string;
+  supplier_dic: string;
+  supplier_iban: string;
+  customer_name: string;
+  customer_address: string;
+  customer_ico: string;
+  customer_dic: string;
+  customer_email: string;
+  items: InvoiceItem[];
+  subtotal: string;
+  vat_rate: string;
+  vat_amount: string;
+  total: string;
+  currency: string;
+  variable_symbol: string;
+  issued_at: string;
+  due_at: string | null;
+  notes: string;
+  user_email: string;
+  user_full_name: string;
+  event_title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RSVPAnswers {
   // Tshirt section
   tshirt_size?: "XS" | "S" | "M" | "L" | "XL" | "XXL";
@@ -708,6 +746,32 @@ export const events = {
     apiFetch<void>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvp/documents/${documentId}/`,
       { method: "DELETE" },
+    ),
+  invoices: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Invoice[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/invoices/`,
+    ),
+  invoiceDetail: (
+    workspaceSlug: string,
+    eventSlug: string,
+    invoiceId: number,
+  ) =>
+    apiFetch<Invoice>(
+      `/api/events/${workspaceSlug}/${eventSlug}/invoices/${invoiceId}/`,
+    ),
+  updateInvoice: (
+    workspaceSlug: string,
+    eventSlug: string,
+    invoiceId: number,
+    patch: Partial<Invoice>,
+  ) =>
+    apiFetch<Invoice>(
+      `/api/events/${workspaceSlug}/${eventSlug}/invoices/${invoiceId}/`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    ),
+  myInvoice: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Invoice>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/invoice/`,
     ),
 };
 
