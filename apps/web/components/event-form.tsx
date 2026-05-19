@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -8,14 +8,12 @@ import { DateTimeField } from "@/components/ui/date-time-field";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
-  type Community,
   type Event as OlafEvent,
   type EventWritePayload,
   QUESTIONNAIRE_SECTION_HINTS,
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
-  communities,
 } from "@/lib/api";
 
 interface Props {
@@ -103,31 +101,8 @@ export function EventForm({
     initial?.enabled_questionnaire_sections ?? [...QUESTIONNAIRE_SECTION_ORDER],
   );
 
-  const [availableCommunities, setAvailableCommunities] = useState<
-    Community[] | null
-  >(null);
-  const [communitySlugs, setCommunitySlugs] = useState<string[]>(
-    initial?.community_slugs ?? [],
-  );
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    communities
-      .forWorkspace(workspaceSlug)
-      .then((list) => {
-        if (!cancelled) setAvailableCommunities(list);
-      })
-      .catch(() => {
-        // Communities list is non-blocking — owner can still save the event.
-        if (!cancelled) setAvailableCommunities([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceSlug]);
 
   function updateTitle(value: string) {
     setTitle(value);
@@ -155,7 +130,6 @@ export function EventForm({
         visibility,
         status,
         enabled_questionnaire_sections: enabledSections,
-        community_slugs: communitySlugs,
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -337,57 +311,10 @@ export function EventForm({
         </CardSection>
       </Card>
 
-      <Card>
-        <CardSection>
-          <h2 className="text-base font-semibold text-ink-900">
-            Sdílení do komunit
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Komunitu nepořádá tuhle akci — pořádáš ji ty, ale můžeš ji v
-            komunitě sdílet, takže její členové ji uvidí na profilu komunity.
-          </p>
-          {availableCommunities === null ? (
-            <p className="mt-4 text-sm text-ink-500">Načítám komunity…</p>
-          ) : availableCommunities.length === 0 ? (
-            <p className="mt-4 text-sm text-ink-500">
-              V této pracovní komunitě zatím žádné komunity nejsou.
-            </p>
-          ) : (
-            <div className="mt-4 grid grid-cols-1 gap-2">
-              {availableCommunities.map((c) => {
-                const checked = communitySlugs.includes(c.slug);
-                return (
-                  <label
-                    key={c.slug}
-                    className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        setCommunitySlugs((prev) =>
-                          prev.includes(c.slug)
-                            ? prev.filter((s) => s !== c.slug)
-                            : [...prev, c.slug],
-                        )
-                      }
-                      className="mt-0.5 size-4 accent-brand"
-                    />
-                    <span className="flex flex-col">
-                      <span className="font-medium text-ink-900">{c.name}</span>
-                      {c.description && (
-                        <span className="text-xs text-ink-500">
-                          {c.description}
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-        </CardSection>
-      </Card>
+      {/* Cross-workspace sharing (event visible in multiple of owner's
+          komunity) is V1.5 work: needs Event.shared_workspaces m2m + a
+          workspace picker here. Hidden in V1 because every owner today
+          has a single workspace and would just see an empty section. */}
 
       <Card>
         <CardSection>
