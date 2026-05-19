@@ -17,7 +17,17 @@ COPY requirements.txt /app/
 RUN pip install -r requirements.txt
 
 COPY . /app/
+RUN chmod +x /app/entrypoint.sh
+
+# Build-time collectstatic so the running container doesn't need write
+# access to STATIC_ROOT. Uses dummy SECRET_KEY so the build doesn't need
+# the real one.
+RUN DJANGO_SETTINGS_MODULE=olaf.settings DJANGO_SECRET_KEY=build-only \
+    python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Container Apps reuses Dockerfile CMD. entrypoint.sh runs migrate +
+# createcachetable (both idempotent) then execs gunicorn. Local dev
+# (docker compose) overrides CMD to python manage.py runserver.
+CMD ["/app/entrypoint.sh"]
