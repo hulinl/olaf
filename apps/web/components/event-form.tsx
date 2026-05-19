@@ -101,6 +101,13 @@ export function EventForm({
     initial?.enabled_questionnaire_sections ?? [...QUESTIONNAIRE_SECTION_ORDER],
   );
 
+  const [isPaid, setIsPaid] = useState(initial?.price_amount != null);
+  const [priceAmount, setPriceAmount] = useState(initial?.price_amount ?? "");
+  const [priceCurrency, setPriceCurrency] = useState(
+    initial?.price_currency || "CZK",
+  );
+  const [priceNote, setPriceNote] = useState(initial?.price_note ?? "");
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,6 +137,9 @@ export function EventForm({
         visibility,
         status,
         enabled_questionnaire_sections: enabledSections,
+        price_amount: isPaid && priceAmount ? priceAmount : null,
+        price_currency: priceCurrency,
+        price_note: isPaid ? priceNote : "",
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -308,6 +318,65 @@ export function EventForm({
               </label>
             </div>
           </div>
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">Cena</h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Akce zdarma? Nech tohle vypnuté. Pokud zapneš, cena se propíše
+            na veřejnou stránku a po registraci se vygenerují pokyny k
+            platbě.
+          </p>
+          <label className="mt-4 flex items-start gap-2 text-sm text-ink-900">
+            <input
+              type="checkbox"
+              checked={isPaid}
+              onChange={(e) => setIsPaid(e.target.checked)}
+              className="mt-0.5 size-4 accent-brand"
+            />
+            Akce je placená
+          </label>
+          {isPaid && (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_120px]">
+              <Field label="Cena *" htmlFor="price">
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={priceAmount}
+                  onChange={(e) => setPriceAmount(e.target.value)}
+                  required={isPaid}
+                />
+              </Field>
+              <Field label="Měna" htmlFor="price-currency">
+                <Input
+                  id="price-currency"
+                  value={priceCurrency}
+                  onChange={(e) =>
+                    setPriceCurrency(e.target.value.toUpperCase().slice(0, 3))
+                  }
+                  maxLength={3}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field
+                  label="Poznámka k ceně"
+                  htmlFor="price-note"
+                  hint='Krátký dodatek, např. "vč. DPH" nebo "záloha 1 000 Kč".'
+                >
+                  <Input
+                    id="price-note"
+                    value={priceNote}
+                    onChange={(e) => setPriceNote(e.target.value)}
+                    maxLength={120}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
         </CardSection>
       </Card>
 

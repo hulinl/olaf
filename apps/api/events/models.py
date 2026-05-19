@@ -152,6 +152,24 @@ class Event(TenantScopedModel):
         help_text="Communities under the workspace where this event is listed.",
     )
 
+    # Price (optional — events default to free; owner sets a price per event).
+    # No payment processing here; this just propagates to the landing page +
+    # later wires into RSVP.payment_due_amount (Slice 5).
+    price_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Set price → event is paid. Null → event is free.",
+    )
+    price_currency = models.CharField(max_length=3, default="CZK")
+    price_note = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text='Short qualifier shown next to the price (e.g. "vč. DPH", "záloha 1 000 Kč").',
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

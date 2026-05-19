@@ -212,6 +212,9 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "is_at_capacity",
             "remaining_capacity",
             "cancellation_reason",
+            "price_amount",
+            "price_currency",
+            "price_note",
             "created_at",
         )
         read_only_fields = fields
@@ -357,6 +360,9 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "blocks",
             "enabled_questionnaire_sections",
             "cancellation_reason",
+            "price_amount",
+            "price_currency",
+            "price_note",
         )
 
     def validate_enabled_questionnaire_sections(self, value):
