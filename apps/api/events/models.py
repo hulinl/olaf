@@ -598,6 +598,80 @@ class Invoice(models.Model):
         return self.number
 
 
+def _resolve_supplier_for_event(event: "Event") -> dict:
+    """Compute supplier_* fields from event.billing_profile, falling back
+    to the workspace owner's default profile, then to the bare Workspace.
+
+    Returned dict has the exact keys Invoice expects (supplier_name,
+    supplier_address, supplier_ico, supplier_dic, supplier_iban) so the
+    caller can hand it to Invoice() or .update() without reshape.
+    """
+    workspace = event.workspace
+    profile = event.billing_profile
+    if profile is None:
+        from accounts.models import BillingProfile
+
+        owner_id = (
+            workspace.members.filter(role="owner")
+            .values_list("user_id", flat=True)
+            .first()
+        )
+        if owner_id:
+            profile = (
+                BillingProfile.objects.filter(user_id=owner_id, is_default=True)
+                .first()
+            )
+            if profile is None:
+                profile = BillingProfile.objects.filter(user_id=owner_id).first()
+
+    if profile:
+        return {
+            "supplier_name": profile.legal_name,
+            "supplier_address": "\n".join(
+                filter(
+                    None,
+                    [
+                        profile.address_street.strip() if profile.address_street else "",
+                        f"{profile.address_zip} {profile.address_city}".strip(),
+                        profile.address_country,
+                    ],
+                )
+            ),
+            "supplier_ico": profile.ico,
+            "supplier_dic": profile.dic,
+            "supplier_iban": profile.iban or workspace.payment_iban,
+        }
+    return {
+        "supplier_name": workspace.name,
+        "supplier_address": workspace.location or "",
+        "supplier_ico": "",
+        "supplier_dic": "",
+        "supplier_iban": workspace.payment_iban,
+    }
+
+
+def refresh_invoice_supplier(invoice: "Invoice") -> "Invoice":
+    """Re-snapshot the invoice's supplier_* fields from the event's
+    current BillingProfile (or fallback chain). User explicitly asked for
+    live sync on view/download (issued 2026-05-19), so we treat the
+    invoice supplier as a derived view of the profile instead of a
+    frozen snapshot. Customer fields stay snapshotted — those are
+    accounting-sensitive and can be edited per-invoice if needed.
+
+    Returns the invoice (saved if anything changed).
+    """
+    fields = _resolve_supplier_for_event(invoice.rsvp.event)
+    dirty = []
+    for key, value in fields.items():
+        if getattr(invoice, key) != value:
+            setattr(invoice, key, value)
+            dirty.append(key)
+    if dirty:
+        dirty.append("updated_at")
+        invoice.save(update_fields=dirty)
+    return invoice
+
+
 def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
     """Build (or refresh-snapshot) the Invoice tied to an RSVP.
 
@@ -621,48 +695,7 @@ def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
         # No invoice for free or cash-only events.
         raise ValueError("Event does not generate invoices.")
 
-    # Supplier snapshot — prefer the event's explicitly chosen
-    # BillingProfile, fall back to the workspace owner's default profile,
-    # and only fall back to the bare workspace info if no profile exists.
-    profile = event.billing_profile
-    if profile is None:
-        from accounts.models import BillingProfile, User
-
-        owner_id = (
-            workspace.members.filter(role="owner")
-            .values_list("user_id", flat=True)
-            .first()
-        )
-        if owner_id:
-            profile = (
-                BillingProfile.objects.filter(user_id=owner_id, is_default=True)
-                .first()
-            )
-            if profile is None:
-                profile = BillingProfile.objects.filter(user_id=owner_id).first()
-        _ = User  # silence unused import in the no-profile branch
-
-    if profile:
-        supplier_name = profile.legal_name
-        supplier_address = "\n".join(
-            filter(
-                None,
-                [
-                    profile.address_street.strip() if profile.address_street else "",
-                    f"{profile.address_zip} {profile.address_city}".strip(),
-                    profile.address_country,
-                ],
-            )
-        )
-        supplier_ico = profile.ico
-        supplier_dic = profile.dic
-        supplier_iban = profile.iban or workspace.payment_iban
-    else:
-        supplier_name = workspace.name
-        supplier_address = workspace.location or ""
-        supplier_ico = ""
-        supplier_dic = ""
-        supplier_iban = workspace.payment_iban
+    supplier = _resolve_supplier_for_event(event)
 
     # Customer snapshot — prefer billing_* when the user has flipped the
     # gate, otherwise fall back to plain address_*.
@@ -708,11 +741,7 @@ def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
         rsvp=rsvp,
         number=number,
         status=Invoice.STATUS_PAID,
-        supplier_name=supplier_name,
-        supplier_address=supplier_address,
-        supplier_ico=supplier_ico,
-        supplier_dic=supplier_dic,
-        supplier_iban=supplier_iban,
+        **supplier,
         customer_name=customer_name,
         customer_address=customer_address,
         customer_ico=customer_ico,
