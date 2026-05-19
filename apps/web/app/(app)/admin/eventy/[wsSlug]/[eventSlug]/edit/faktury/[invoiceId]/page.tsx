@@ -104,7 +104,7 @@ export default function FakturaEditPage({ params }: Props) {
     <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
-          { label: "Eventy", href: "/admin/eventy" },
+          { label: "Akce", href: "/admin/eventy" },
           { label: inv.event_title, href: `/admin/eventy/${wsSlug}/${eventSlug}/edit` },
           { label: "Faktury", href: `/admin/eventy/${wsSlug}/${eventSlug}/edit/faktury` },
           { label: inv.number },

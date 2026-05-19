@@ -119,7 +119,7 @@ export default function EventBlocksPage({ params }: Props) {
     <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
-          { label: "Eventy", href: "/admin/eventy" },
+          { label: "Akce", href: "/admin/eventy" },
           {
             label: event.title,
             href: `/admin/eventy/${wsSlug}/${eventSlug}/edit`,

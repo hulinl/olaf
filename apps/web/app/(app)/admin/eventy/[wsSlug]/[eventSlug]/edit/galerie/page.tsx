@@ -30,6 +30,8 @@ export default function EventGalleryPage({ params }: Props) {
   const [images, setImages] = useState<EventImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const [uploadDone, setUploadDone] = useState(0);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,14 +84,19 @@ export default function EventGalleryPage({ params }: Props) {
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    const list = Array.from(files);
     setError(null);
     setUploading(true);
+    setUploadTotal(list.length);
+    setUploadDone(0);
     try {
-      // Sequential upload — keeps server order predictable; few enough images
-      // that throughput isn't a concern.
-      for (const file of Array.from(files)) {
-        const img = await events.uploadImage(wsSlug, eventSlug, file);
+      // Sequential upload — keeps server order predictable. Each
+      // image appears in the grid as soon as its POST completes so
+      // the user gets continuous visual feedback during the run.
+      for (let i = 0; i < list.length; i++) {
+        const img = await events.uploadImage(wsSlug, eventSlug, list[i]);
         setImages((prev) => [...prev, img]);
+        setUploadDone(i + 1);
       }
     } catch (err) {
       setError(
@@ -99,6 +106,8 @@ export default function EventGalleryPage({ params }: Props) {
       );
     } finally {
       setUploading(false);
+      setUploadTotal(0);
+      setUploadDone(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -160,9 +169,41 @@ export default function EventGalleryPage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Sticky upload banner — when you fire off 8 phone photos the
+          POST queue takes a while; without persistent feedback users
+          assume the page is dead and won't dare navigate. */}
+      {uploading && (
+        <div className="sticky top-16 z-20 flex flex-col gap-2 rounded-md border border-brand/40 bg-canvas/95 p-3 shadow-md backdrop-blur">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-medium text-ink-900">
+              Nahrávám obrázky…
+            </p>
+            <p className="text-xs tabular-nums text-ink-500">
+              {uploadDone} / {uploadTotal}
+            </p>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-muted">
+            <div
+              className="h-full bg-brand transition-[width] duration-300"
+              style={{
+                width: `${
+                  uploadTotal === 0
+                    ? 0
+                    : Math.round((uploadDone / uploadTotal) * 100)
+                }%`,
+              }}
+            />
+          </div>
+          <p className="text-[11px] text-ink-500">
+            Můžeš počkat tady, nebo dál pracovat — fotky se nahrávají na
+            pozadí. Stránku ale nezavírej, dokud bar nedoběhne.
+          </p>
+        </div>
+      )}
+
       <Breadcrumbs
         items={[
-          { label: "Eventy", href: "/admin/eventy" },
+          { label: "Akce", href: "/admin/eventy" },
           {
             label: event.title,
             href: `/admin/eventy/${wsSlug}/${eventSlug}/edit`,
@@ -203,7 +244,7 @@ export default function EventGalleryPage({ params }: Props) {
           ].join(" ")}
         >
           {uploading
-            ? "Nahrávám…"
+            ? `Nahrávám ${uploadDone} / ${uploadTotal}…`
             : atLimit
               ? `Plno (${MAX_IMAGES} max)`
               : "+ Nahrát obrázky"}

@@ -30,11 +30,23 @@ export default function FakturyListPage({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
   const [list, setList] = useState<Invoice[] | null>(null);
+  const [eventTitle, setEventTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    // Pull the event title for the breadcrumb in parallel with
+    // the invoice list. Title swap is non-blocking — if it 404s
+    // we fall back to the slug.
+    events
+      .publicEvent(wsSlug, eventSlug)
+      .then((ev) => {
+        if (!cancelled) setEventTitle(ev.title);
+      })
+      .catch(() => {
+        /* fall back to slug below */
+      });
     events
       .invoices(wsSlug, eventSlug)
       .then((data) => {
@@ -75,8 +87,11 @@ export default function FakturyListPage({ params }: Props) {
     <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
-          { label: "Eventy", href: "/admin/eventy" },
-          { label: eventSlug, href: `/admin/eventy/${wsSlug}/${eventSlug}/edit` },
+          { label: "Akce", href: "/admin/eventy" },
+          {
+            label: eventTitle || eventSlug,
+            href: `/admin/eventy/${wsSlug}/${eventSlug}/edit`,
+          },
           { label: "Faktury" },
         ]}
       />
