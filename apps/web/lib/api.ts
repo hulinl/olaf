@@ -163,6 +163,7 @@ export interface Event extends EventSummary {
   blocks: EventBlock[];
   enabled_questionnaire_sections: QuestionnaireSection[];
   community_slugs: string[];
+  shared_workspace_slugs: string[];
   images: EventImage[];
   workspace_name: string;
   workspace_logo_url: string | null;
@@ -475,6 +476,7 @@ export interface EventWritePayload {
   price_amount?: string | null;
   price_currency?: string;
   price_note?: string;
+  shared_workspace_slugs?: string[];
 }
 
 export const events = {

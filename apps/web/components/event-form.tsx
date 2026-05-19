@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import {
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
+  type Workspace,
+  workspaces,
 } from "@/lib/api";
 
 interface Props {
@@ -108,8 +110,35 @@ export function EventForm({
   );
   const [priceNote, setPriceNote] = useState(initial?.price_note ?? "");
 
+  // Cross-workspace sharing (Slice 3): owner picks other komunity they own
+  // where the event should appear. Always implicitly includes the primary
+  // workspace (workspace FK) — user doesn't deselect it here.
+  const [ownedWorkspaces, setOwnedWorkspaces] = useState<Workspace[] | null>(
+    null,
+  );
+  const [sharedSlugs, setSharedSlugs] = useState<string[]>(
+    initial?.shared_workspace_slugs ?? [],
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    workspaces
+      .mine()
+      .then((list) => {
+        if (cancelled) return;
+        setOwnedWorkspaces(list.filter((w) => w.my_role === "owner"));
+      })
+      .catch(() => {
+        // Non-blocking; the picker just stays hidden.
+        if (!cancelled) setOwnedWorkspaces([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updateTitle(value: string) {
     setTitle(value);
@@ -140,6 +169,7 @@ export function EventForm({
         price_amount: isPaid && priceAmount ? priceAmount : null,
         price_currency: priceCurrency,
         price_note: isPaid ? priceNote : "",
+        shared_workspace_slugs: sharedSlugs,
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -380,10 +410,57 @@ export function EventForm({
         </CardSection>
       </Card>
 
-      {/* Cross-workspace sharing (event visible in multiple of owner's
-          komunity) is V1.5 work: needs Event.shared_workspaces m2m + a
-          workspace picker here. Hidden in V1 because every owner today
-          has a single workspace and would just see an empty section. */}
+      {ownedWorkspaces && ownedWorkspaces.length >= 2 && (
+        <Card>
+          <CardSection>
+            <h2 className="text-base font-semibold text-ink-900">
+              Sdílení do dalších komunit
+            </h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Akce automaticky patří do komunity <strong>{workspaceSlug}</strong>
+              {" "}(té, kde jsi ji vytvořil). Pokud spravuješ víc komunit a
+              chceš akci ukázat i jejich členům, zaškrtni je tu — akce se
+              objeví na profilu každé z nich.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-2">
+              {ownedWorkspaces
+                .filter((w) => w.slug !== workspaceSlug)
+                .map((w) => {
+                  const checked = sharedSlugs.includes(w.slug);
+                  return (
+                    <label
+                      key={w.slug}
+                      className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setSharedSlugs((prev) =>
+                            prev.includes(w.slug)
+                              ? prev.filter((s) => s !== w.slug)
+                              : [...prev, w.slug],
+                          )
+                        }
+                        className="mt-0.5 size-4 accent-brand"
+                      />
+                      <span className="flex flex-col">
+                        <span className="font-medium text-ink-900">
+                          {w.name}
+                        </span>
+                        {w.location && (
+                          <span className="text-xs text-ink-500">
+                            {w.location}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+            </div>
+          </CardSection>
+        </Card>
+      )}
 
       <Card>
         <CardSection>
