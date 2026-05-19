@@ -235,6 +235,43 @@ export interface RSVPDocumentsBundle {
   uploaded: RSVPDocument[];
 }
 
+export interface DiscussionTopic {
+  id: number;
+  parent_type: "workspace" | "event";
+  parent_id: number;
+  title: string;
+  body: string;
+  pinned: boolean;
+  locked: boolean;
+  author_id: number | null;
+  author_name: string;
+  comment_count: number;
+  last_activity_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscussionComment {
+  id: number;
+  topic: number;
+  body: string;
+  author_id: number | null;
+  author_name: string;
+  author_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscussionTopicDetail extends DiscussionTopic {
+  comments: DiscussionComment[];
+}
+
+export interface TopicWritePayload {
+  title: string;
+  body?: string;
+  pinned?: boolean;
+}
+
 export type TodoItem =
   | {
       kind: "payment";
@@ -837,6 +874,110 @@ export const events = {
   myInvoice: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<Invoice>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvp/invoice/`,
+    ),
+};
+
+/** Discussion wall API — works against either a workspace or an event.
+ *  Two URL families share the same shape; pass the parent in `scope`. */
+export const discussions = {
+  listWorkspace: (slug: string) =>
+    apiFetch<DiscussionTopic[]>(`/api/discussions/workspace/${slug}/topics/`),
+  createWorkspaceTopic: (slug: string, payload: TopicWritePayload) =>
+    apiFetch<DiscussionTopicDetail>(
+      `/api/discussions/workspace/${slug}/topics/`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  workspaceTopic: (slug: string, topicId: number) =>
+    apiFetch<DiscussionTopicDetail>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/`,
+    ),
+  updateWorkspaceTopic: (
+    slug: string,
+    topicId: number,
+    payload: Partial<TopicWritePayload> & { locked?: boolean },
+  ) =>
+    apiFetch<DiscussionTopicDetail>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  deleteWorkspaceTopic: (slug: string, topicId: number) =>
+    apiFetch<void>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/`,
+      { method: "DELETE" },
+    ),
+  addWorkspaceComment: (slug: string, topicId: number, body: string) =>
+    apiFetch<DiscussionComment>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/comments/`,
+      { method: "POST", body: JSON.stringify({ body }) },
+    ),
+  deleteWorkspaceComment: (
+    slug: string,
+    topicId: number,
+    commentId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/comments/${commentId}/`,
+      { method: "DELETE" },
+    ),
+  listEvent: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<DiscussionTopic[]>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/`,
+    ),
+  createEventTopic: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: TopicWritePayload,
+  ) =>
+    apiFetch<DiscussionTopicDetail>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  eventTopic: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+  ) =>
+    apiFetch<DiscussionTopicDetail>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/`,
+    ),
+  updateEventTopic: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+    payload: Partial<TopicWritePayload> & { locked?: boolean },
+  ) =>
+    apiFetch<DiscussionTopicDetail>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  deleteEventTopic: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/`,
+      { method: "DELETE" },
+    ),
+  addEventComment: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+    body: string,
+  ) =>
+    apiFetch<DiscussionComment>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/`,
+      { method: "POST", body: JSON.stringify({ body }) },
+    ),
+  deleteEventComment: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+    commentId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/${commentId}/`,
+      { method: "DELETE" },
     ),
 };
 

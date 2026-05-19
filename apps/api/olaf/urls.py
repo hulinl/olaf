@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/workspaces/", include("workspaces.urls", namespace="workspaces")),
     path("api/events/", include("events.urls", namespace="events")),
     path("api/communities/", include("communities.urls", namespace="communities")),
+    path("api/discussions/", include("discussions.urls", namespace="discussions")),
 ]
 
 if settings.DEBUG:
