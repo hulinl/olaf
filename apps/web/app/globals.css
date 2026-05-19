@@ -142,6 +142,11 @@ html,
 body {
   background: var(--canvas);
   color: var(--ink-900);
+  /* Hard guard against horizontal scroll. We chase individual overflowing
+     children (long URLs in form previews, gallery grids, etc.) one by one,
+     but a single bug shouldn't be allowed to widen the whole viewport and
+     trigger the browser's "shrink-to-fit" zoom on mobile. */
+  overflow-x: hidden;
 }
 
 body {
