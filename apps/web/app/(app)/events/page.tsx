@@ -122,7 +122,7 @@ function EventRow({ event }: { event: EventSummary }) {
   const starts = new Date(event.starts_at);
   return (
     <Link
-      href={`/${event.workspace_slug}/e/${event.slug}`}
+      href={`/events/${event.workspace_slug}/${event.slug}`}
       className="block rounded-lg border border-border bg-surface p-6 shadow-sm transition-colors hover:border-border-strong hover:shadow-md focus-ring"
     >
       <div className="flex items-baseline justify-between gap-3">

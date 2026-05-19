@@ -255,7 +255,7 @@ function EventMini({
   const starts = new Date(event.starts_at);
   const href = ownerView
     ? `/admin/eventy/${event.workspace_slug}/${event.slug}`
-    : `/${event.workspace_slug}/e/${event.slug}`;
+    : `/events/${event.workspace_slug}/${event.slug}`;
   return (
     <Link
       href={href}
@@ -281,7 +281,7 @@ function EventMini({
 }
 
 function TodoCard({ item }: { item: TodoItem }) {
-  const eventHref = `/${item.workspace_slug}/e/${item.event_slug}`;
+  const eventHref = `/events/${item.workspace_slug}/${item.event_slug}`;
   const eventDate = new Date(item.event_starts_at).toLocaleDateString("cs-CZ", {
     day: "numeric",
     month: "short",
