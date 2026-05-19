@@ -499,3 +499,159 @@ class RSVPDocument(models.Model):
 
     def __str__(self) -> str:
         return f"{self.rsvp_id}/{self.key} (#{self.pk})"
+
+
+class Invoice(models.Model):
+    """Invoice generated when an RSVP for a paid event is marked paid.
+
+    V1 keeps numbering simple (auto-incrementing per workspace via the
+    db sequence underneath) and stores rendered fields denormalized so
+    the invoice stays correct even if the user later edits their address.
+    PDF rendering is V1.5 (WeasyPrint).
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_ISSUED = "issued"
+    STATUS_PAID = "paid"
+    STATUS_VOID = "void"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Draft"),
+        (STATUS_ISSUED, "Issued"),
+        (STATUS_PAID, "Paid"),
+        (STATUS_VOID, "Void"),
+    ]
+
+    rsvp = models.OneToOneField(
+        RSVP, on_delete=models.PROTECT, related_name="invoice"
+    )
+    number = models.CharField(
+        max_length=40,
+        unique=True,
+        help_text="Public invoice number (e.g. 'OLAF-2026-0001').",
+    )
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_ISSUED
+    )
+
+    # Snapshot of supplier (workspace owner) at issue time.
+    supplier_name = models.CharField(max_length=200)
+    supplier_address = models.TextField(blank=True, default="")
+    supplier_ico = models.CharField(max_length=20, blank=True, default="")
+    supplier_dic = models.CharField(max_length=20, blank=True, default="")
+    supplier_iban = models.CharField(max_length=34, blank=True, default="")
+
+    # Snapshot of customer (user) at issue time.
+    customer_name = models.CharField(max_length=200)
+    customer_address = models.TextField(blank=True, default="")
+    customer_ico = models.CharField(max_length=20, blank=True, default="")
+    customer_dic = models.CharField(max_length=20, blank=True, default="")
+    customer_email = models.EmailField(blank=True, default="")
+
+    # Items rendered as a list of {label, qty, unit_price, subtotal}.
+    items = models.JSONField(default=list, blank=True)
+
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    vat_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    currency = models.CharField(max_length=3, default="CZK")
+    variable_symbol = models.CharField(max_length=10, blank=True, default="")
+
+    issued_at = models.DateTimeField(default=timezone.now)
+    due_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_invoice"
+        ordering = ["-issued_at"]
+        indexes = [models.Index(fields=["rsvp"])]
+
+    def __str__(self) -> str:
+        return self.number
+
+
+def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
+    """Build (or refresh-snapshot) the Invoice tied to an RSVP.
+
+    Idempotent: if an invoice already exists, returns it unchanged. The
+    caller (mark_rsvp_paid) catches the "already exists" case.
+    """
+    try:
+        return rsvp.invoice
+    except Invoice.DoesNotExist:
+        pass
+
+    workspace = rsvp.event.workspace
+    user = rsvp.user
+
+    # Customer snapshot — prefer billing_* when the user has flipped the
+    # gate, otherwise fall back to plain address_*.
+    use_billing = getattr(user, "has_billing_address", False) and (
+        user.billing_street or user.billing_city or user.billing_name
+    )
+    if use_billing:
+        customer_name = user.billing_name or user.get_full_name()
+        customer_lines = [
+            user.billing_street,
+            f"{user.billing_zip} {user.billing_city}".strip(),
+            user.billing_country,
+        ]
+        customer_ico = user.billing_ico
+        customer_dic = user.billing_dic
+    else:
+        customer_name = user.get_full_name() or user.email
+        customer_lines = [
+            user.address_street,
+            f"{user.address_zip} {user.address_city}".strip(),
+            user.address_country,
+        ]
+        customer_ico = ""
+        customer_dic = ""
+    customer_address = "\n".join(
+        filter(None, [line.strip() for line in customer_lines])
+    )
+
+    amount = rsvp.payment_due_amount or rsvp.event.price_amount or 0
+    currency = rsvp.payment_currency or rsvp.event.price_currency or "CZK"
+
+    # V1 number: workspace slug + YYYY + 4-digit seq (per workspace).
+    year = timezone.now().year
+    seq_count = (
+        Invoice.objects.filter(
+            number__startswith=f"{workspace.slug.upper()}-{year}-"
+        ).count()
+        + 1
+    )
+    number = f"{workspace.slug.upper()}-{year}-{seq_count:04d}"
+
+    invoice = Invoice.objects.create(
+        rsvp=rsvp,
+        number=number,
+        status=Invoice.STATUS_PAID,
+        supplier_name=workspace.name,
+        supplier_address=workspace.location or "",
+        supplier_iban=workspace.payment_iban,
+        customer_name=customer_name,
+        customer_address=customer_address,
+        customer_ico=customer_ico,
+        customer_dic=customer_dic,
+        customer_email=user.email,
+        items=[
+            {
+                "label": rsvp.event.title,
+                "qty": 1,
+                "unit_price": str(amount),
+                "subtotal": str(amount),
+            }
+        ],
+        subtotal=amount,
+        vat_rate=0,
+        vat_amount=0,
+        total=amount,
+        currency=currency,
+        variable_symbol=rsvp.variable_symbol,
+    )
+    return invoice

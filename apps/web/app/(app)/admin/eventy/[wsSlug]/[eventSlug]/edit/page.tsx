@@ -219,6 +219,17 @@ export default function EventEditCockpitPage({ params }: Props) {
       </section>
 
       <section>
+        <h2 className="text-lg font-semibold text-ink-900">Platby a faktury</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <ActionTile
+            title="Faktury"
+            description="Seznam vystavených faktur k této akci. Generují se automaticky po označení platby jako zaplacené."
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit/faktury`}
+          />
+        </div>
+      </section>
+
+      <section>
         <h2 className="text-lg font-semibold text-ink-900">Šablona</h2>
         <p className="mt-1 text-sm text-ink-500">
           Pořádáš podobné akce opakovaně? Vytvoř z této akce kopii s novým

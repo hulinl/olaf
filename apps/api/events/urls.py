@@ -107,4 +107,19 @@ urlpatterns = [
         views.my_rsvp_document_detail,
         name="rsvp-document-detail",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/invoices/",
+        views.event_invoices,
+        name="invoices",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/invoices/<int:invoice_id>/",
+        views.invoice_detail,
+        name="invoice-detail",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvp/invoice/",
+        views.my_invoice,
+        name="my-invoice",
+    ),
 ]
