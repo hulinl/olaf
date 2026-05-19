@@ -21,27 +21,52 @@ from pywebpush import WebPushException, webpush
 logger = logging.getLogger("notifications.push")
 
 
+def _diag(msg: str) -> None:
+    # print() to stdout so Container App logs capture it without
+    # needing the LOGGING config to wire notifications.push.
+    print(f"[vapid] {msg}", flush=True)
+
+
 def _vapid_private_key() -> str:
     """Return the VAPID private key as a real PEM string.
 
-    Container App secrets / Azure env vars mangle multiline values
-    (newlines get stripped or escaped), so the canonical storage
-    format is base64-encoded PEM as a single line. If the raw value
-    already looks like a PEM (contains "BEGIN"), use it as-is. If it
-    contains literal "\\n" escapes, restore them. Otherwise try
-    base64 decode.
+    Container App secrets mangle multiline values (newlines stripped
+    or escaped), so the canonical storage format is base64-encoded
+    PEM as a single line. Handle the common shapes defensively.
     """
-    raw = settings.VAPID_PRIVATE_KEY or ""
+    raw = (settings.VAPID_PRIVATE_KEY or "").strip()
     if not raw:
         return ""
-    if "BEGIN" in raw and "\n" in raw:
-        return raw
+    _diag(f"raw len={len(raw)} starts={raw[:24]!r} ends={raw[-12:]!r}")
     if "\\n" in raw:
-        return raw.replace("\\n", "\n")
+        decoded = raw.replace("\\n", "\n")
+        _diag(f"restored \\n escapes → {len(decoded)} chars")
+        return decoded
+    if "BEGIN" in raw and "\n" in raw:
+        _diag(f"PEM with newlines → {len(raw)} chars")
+        return raw
+    if "BEGIN" in raw and "\n" not in raw:
+        # PEM with newlines stripped — reconstruct by re-inserting
+        # newlines every 64 chars in the body.
+        try:
+            header = "-----BEGIN PRIVATE KEY-----"
+            footer = "-----END PRIVATE KEY-----"
+            body = raw.replace(header, "").replace(footer, "").strip()
+            body = body.replace(" ", "")
+            chunks = [body[i : i + 64] for i in range(0, len(body), 64)]
+            rebuilt = "\n".join([header, *chunks, footer])
+            _diag(f"rebuilt PEM from stripped form → {len(rebuilt)} chars")
+            return rebuilt
+        except Exception:
+            logger.exception("VAPID key rebuild failed")
+            return raw
     try:
-        return base64.b64decode(raw).decode("ascii")
+        decoded = base64.b64decode(raw).decode("ascii")
+        _diag(f"base64-decoded → {len(decoded)} chars")
+        return decoded
     except Exception:
-        return raw  # last-ditch — pywebpush will surface the real error
+        logger.exception("VAPID key: all decode paths failed")
+        return raw
 
 
 def _vapid_configured() -> bool:
