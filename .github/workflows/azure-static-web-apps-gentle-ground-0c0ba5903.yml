@@ -4,14 +4,15 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
+
+# Per-PR preview deploys were turned off — they kept failing on
+# Microsoft-side flakes and spamming notification mail. Production
+# only ships from main, which is what the user actually tests
+# against, so the previews weren't earning their cost. CI (build
+# + tsc + lint) still runs on PRs via .github/workflows/ci.yml.
 
 jobs:
   build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
@@ -36,14 +37,3 @@ jobs:
           api_location: ""
           output_location: ".next"
 
-  close_pull_request_job:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    name: Close Pull Request Job
-    steps:
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_GENTLE_GROUND_0C0BA5903 }}
-          action: "close"
