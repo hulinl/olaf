@@ -181,7 +181,7 @@ function AdminEventDetail({ params }: Props) {
 
       <EventChecklist workspaceSlug={wsSlug} eventSlug={eventSlug} />
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-4 gap-2 sm:gap-3">
         <StatTile
           label="Přihlášeno"
           value={`${confirmed.length}${event.capacity != null ? ` / ${event.capacity}` : ""}`}
@@ -296,7 +296,7 @@ function StatTile({
   const body = (
     <div
       className={[
-        "rounded-2xl border bg-surface p-5 transition-colors",
+        "rounded-xl border bg-surface p-2.5 transition-colors sm:rounded-2xl sm:p-5",
         active
           ? "border-brand bg-brand/5"
           : tone === "warning"
@@ -305,12 +305,12 @@ function StatTile({
         href ? "hover:border-brand hover:bg-brand/10" : "",
       ].join(" ")}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-ink-500 sm:text-xs">
         {label}
       </p>
       <p
         className={[
-          "mt-2 text-3xl font-semibold",
+          "mt-1 text-lg font-semibold leading-tight sm:mt-2 sm:text-3xl",
           tone === "warning" ? "text-warning" : "text-ink-900",
         ].join(" ")}
       >
