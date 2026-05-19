@@ -55,7 +55,11 @@ export function Builder({
   eventSlug,
   eventPrice,
 }: Props) {
-  const [openId, setOpenId] = useState<string | null>(blocks[0]?.id ?? null);
+  // Default to all blocks collapsed — opening the builder with a
+  // long page used to dump every form on screen at once, eating
+  // scroll on phones. Owners explicitly expand the block they want
+  // to edit.
+  const [openId, setOpenId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   function add(type: BlockType) {
