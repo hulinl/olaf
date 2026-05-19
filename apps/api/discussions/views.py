@@ -90,6 +90,9 @@ def workspace_topics(request: Request, slug: str) -> Response:
         author=request.user,
         pinned=pinned,
     )
+    from .tasks import send_topic_announce_task
+
+    send_topic_announce_task.delay(topic.pk)
     return Response(
         TopicDetailSerializer(topic).data,
         status=status.HTTP_201_CREATED,
@@ -178,6 +181,9 @@ def workspace_topic_comments(
     comment = Comment.objects.create(
         topic=topic, body=body, author=request.user
     )
+    from .tasks import send_comment_notification_task
+
+    send_comment_notification_task.delay(comment.pk)
     return Response(
         CommentSerializer(comment).data, status=status.HTTP_201_CREATED
     )
@@ -249,6 +255,9 @@ def event_topics(
         author=request.user,
         pinned=pinned,
     )
+    from .tasks import send_topic_announce_task
+
+    send_topic_announce_task.delay(topic.pk)
     return Response(
         TopicDetailSerializer(topic).data,
         status=status.HTTP_201_CREATED,
@@ -342,6 +351,9 @@ def event_topic_comments(
     comment = Comment.objects.create(
         topic=topic, body=body, author=request.user
     )
+    from .tasks import send_comment_notification_task
+
+    send_comment_notification_task.delay(comment.pk)
     return Response(
         CommentSerializer(comment).data, status=status.HTTP_201_CREATED
     )

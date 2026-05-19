@@ -68,6 +68,9 @@ export interface User {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relationship: string;
+  // Notification preferences
+  notify_on_discussion_reply: boolean;
+  notify_on_discussion_announce: boolean;
   // System
   email_verified: boolean;
   date_joined: string;
