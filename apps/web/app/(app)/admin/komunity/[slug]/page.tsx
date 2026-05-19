@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type MouseEvent as ReactMouseEvent, use, useEffect, useState } from "react";
 
+import { DiscussionWall } from "@/components/discussion-wall";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useUser } from "@/lib/user-context";
 import {
   ApiError,
   type EventSummary,
@@ -43,6 +45,7 @@ interface Props {
 export default function AdminKomunitaDetailPage({ params }: Props) {
   const { slug } = use(params);
   const router = useRouter();
+  const user = useUser();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [eventList, setEventList] = useState<EventSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -196,6 +199,11 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
           </div>
         )}
       </section>
+
+      <DiscussionWall
+        scope={{ kind: "workspace", slug, isModerator: true }}
+        currentUserId={user.id}
+      />
     </div>
   );
 }

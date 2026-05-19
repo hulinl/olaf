@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { DiscussionWall } from "@/components/discussion-wall";
 import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
 import { RequiredDocsPanel } from "@/components/required-docs-panel";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useUser } from "@/lib/user-context";
 import {
   ApiError,
   type Event as OlafEvent,
@@ -54,6 +56,7 @@ const RSVP_STATUS_TONE: Record<string, string> = {
 export default function MyEventPage({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
+  const user = useUser();
   const [event, setEvent] = useState<OlafEvent | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
@@ -278,6 +281,21 @@ export default function MyEventPage({ params }: Props) {
               <CancelRsvpButton wsSlug={wsSlug} eventSlug={eventSlug} />
             </div>
           )}
+
+        {/* Nástěnka — visible to anyone with an active RSVP (or owner).
+            Backend filters topics + comments to the event scope so other
+            events' threads stay separate. */}
+        {my && my.status !== "cancelled" && (
+          <DiscussionWall
+            scope={{
+              kind: "event",
+              workspaceSlug: wsSlug,
+              eventSlug,
+              isModerator: false,
+            }}
+            currentUserId={user.id}
+          />
+        )}
       </section>
     </main>
   );
