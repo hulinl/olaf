@@ -39,6 +39,22 @@ class Workspace(models.Model):
     default_tz = models.CharField(
         max_length=50, default="UTC", help_text="IANA timezone, e.g. Europe/Prague."
     )
+
+    # Payment settings (Slice 5). Per-workspace so each owner can route
+    # money to their own account. Empty IBAN → workspace can't issue
+    # QR Platba and falls back to a manual "contact owner" prompt.
+    payment_iban = models.CharField(
+        max_length=34,
+        blank=True,
+        default="",
+        help_text="IBAN where participants send event payments (CZ format supported).",
+    )
+    payment_bank_name = models.CharField(max_length=80, blank=True, default="")
+    payment_due_days = models.PositiveIntegerField(
+        default=14,
+        help_text="Days from registration the participant has to pay.",
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

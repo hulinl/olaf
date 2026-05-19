@@ -119,6 +119,9 @@ export interface Workspace {
   cover_url: string | null;
   visibility: "public" | "unlisted" | "private";
   default_tz: string;
+  payment_iban: string;
+  payment_bank_name: string;
+  payment_due_days: number;
   created_at: string;
   /** Present on /workspaces/mine/ + /workspaces/{slug}/detail/ for auth'd members. */
   my_role?: "owner" | null;
@@ -217,7 +220,26 @@ export interface MyRSVP {
     | "cancelled";
   questionnaire_answers: RSVPAnswers | Record<string, never>;
   waitlist_position: number | null;
+  // Payment (Slice 5). Null/empty fields for free events.
+  payment_status: "pending" | "paid" | "refunded" | "waived";
+  payment_due_amount: string | null;
+  payment_currency: string;
+  variable_symbol: string;
+  paid_at: string | null;
   created_at: string;
+}
+
+export interface RSVPPaymentInstructions {
+  status: "pending" | "paid" | "refunded" | "waived";
+  amount: string;
+  currency: string;
+  variable_symbol: string;
+  iban: string;
+  bank_name: string;
+  due_days: number;
+  qr_png_url: string | null;
+  message: string;
+  paid_at: string | null;
 }
 
 export interface RSVPRecord extends MyRSVP {
@@ -320,6 +342,9 @@ export interface WorkspaceWritePayload {
   accent_color?: string;
   visibility?: "public" | "unlisted" | "private";
   default_tz?: string;
+  payment_iban?: string;
+  payment_bank_name?: string;
+  payment_due_days?: number;
 }
 
 export interface WorkspaceCreatePayload {
@@ -580,6 +605,15 @@ export const events = {
   rejectRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,
+      { method: "POST" },
+    ),
+  paymentInstructions: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<RSVPPaymentInstructions>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/payment/`,
+    ),
+  markRsvpPaid: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
+    apiFetch<RSVPRecord>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/mark-paid/`,
       { method: "POST" },
     ),
 };

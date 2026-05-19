@@ -21,6 +21,9 @@ class WorkspaceWriteSerializer(serializers.ModelSerializer):
             "accent_color",
             "visibility",
             "default_tz",
+            "payment_iban",
+            "payment_bank_name",
+            "payment_due_days",
         )
 
     def validate_social_links(self, value):
@@ -103,6 +106,9 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
             "cover_url",
             "visibility",
             "default_tz",
+            "payment_iban",
+            "payment_bank_name",
+            "payment_due_days",
             "created_at",
         )
         read_only_fields = fields

@@ -245,7 +245,17 @@ function AdminEventDetail({ params }: Props) {
             </thead>
             <tbody className="divide-y divide-border">
               {filteredRsvps.map((r) => (
-                <RsvpRow key={r.id} rsvp={r} />
+                <RsvpRow
+                  key={r.id}
+                  rsvp={r}
+                  wsSlug={wsSlug}
+                  eventSlug={eventSlug}
+                  onPaid={(updated) =>
+                    setRsvps((prev) =>
+                      prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev,
+                    )
+                  }
+                />
               ))}
             </tbody>
           </table>
@@ -297,8 +307,34 @@ function StatTile({
   return body;
 }
 
-function RsvpRow({ rsvp }: { rsvp: RSVPRecord }) {
+function RsvpRow({
+  rsvp,
+  wsSlug,
+  eventSlug,
+  onPaid,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+  onPaid: (updated: RSVPRecord) => void;
+}) {
+  const [marking, setMarking] = useState(false);
   const created = new Date(rsvp.created_at);
+
+  async function handleMarkPaid() {
+    if (marking) return;
+    if (!confirm("Označit jako zaplaceno?")) return;
+    setMarking(true);
+    try {
+      const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
+      onPaid(updated);
+    } catch {
+      // Quietly fail; admin can retry.
+    } finally {
+      setMarking(false);
+    }
+  }
+
   return (
     <tr className="group hover:bg-brand/10">
       <td className="px-4 py-3">
@@ -327,8 +363,10 @@ function RsvpRow({ rsvp }: { rsvp: RSVPRecord }) {
           </span>
         )}
       </td>
-      {/* Placeholders — V1.5 wiring via RSVP.payment_status + required_docs. */}
-      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={marking} />
+      </td>
+      {/* Smlouva / Pojištění — Slice 7 (required_documents). */}
       <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
       <td className="whitespace-nowrap px-4 py-3 text-ink-500">
@@ -339,5 +377,41 @@ function RsvpRow({ rsvp }: { rsvp: RSVPRecord }) {
         })}
       </td>
     </tr>
+  );
+}
+
+function PaymentCell({
+  rsvp,
+  onMarkPaid,
+  marking,
+}: {
+  rsvp: RSVPRecord;
+  onMarkPaid: () => void;
+  marking: boolean;
+}) {
+  if (rsvp.payment_status === "waived") {
+    return <span className="text-ink-300">—</span>;
+  }
+  if (rsvp.payment_status === "paid") {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/15 text-success">
+        Zaplaceno
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-warning/15 text-warning">
+        Čeká
+      </span>
+      <button
+        type="button"
+        onClick={onMarkPaid}
+        disabled={marking}
+        className="text-[11px] font-medium text-ink-500 hover:text-ink-900 disabled:opacity-50"
+      >
+        {marking ? "..." : "Označit zaplaceno"}
+      </button>
+    </div>
   );
 }

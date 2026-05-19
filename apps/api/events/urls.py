@@ -82,4 +82,19 @@ urlpatterns = [
         views.reject_rsvp,
         name="rsvp-reject",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvp/payment/",
+        views.my_rsvp_payment,
+        name="rsvp-payment",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvp/payment/qr.png",
+        views.my_rsvp_payment_qr,
+        name="rsvp-payment-qr",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/mark-paid/",
+        views.mark_rsvp_paid,
+        name="rsvp-mark-paid",
+    ),
 ]

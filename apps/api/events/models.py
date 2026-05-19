@@ -297,6 +297,36 @@ class RSVP(models.Model):
         blank=True,
         help_text="Set by the Creator after the event.",
     )
+
+    # Payment (Slice 5). Wired only when event.price_amount is set;
+    # free events keep payment_status="waived" and the rest stays null.
+    PAYMENT_PENDING = "pending"
+    PAYMENT_PAID = "paid"
+    PAYMENT_REFUNDED = "refunded"
+    PAYMENT_WAIVED = "waived"  # event is free or owner comp'd this RSVP
+    PAYMENT_CHOICES = [
+        (PAYMENT_PENDING, "Pending"),
+        (PAYMENT_PAID, "Paid"),
+        (PAYMENT_REFUNDED, "Refunded"),
+        (PAYMENT_WAIVED, "Waived"),
+    ]
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_CHOICES,
+        default=PAYMENT_WAIVED,
+    )
+    payment_due_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    payment_currency = models.CharField(max_length=3, blank=True, default="")
+    variable_symbol = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+        help_text="Czech 'variabilní symbol' (max 10 digits) for QR Platba.",
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -364,6 +394,24 @@ class RSVP(models.Model):
         else:
             rsvp.status = cls.STATUS_YES
             rsvp.waitlist_position = None
+
+        # Wire payment fields once, when the RSVP is first created against
+        # a paid event. Subsequent edits don't bump amount/VS — that keeps
+        # the variable_symbol stable across answer updates so the QR the
+        # user already has stays valid.
+        if created and locked_event.price_amount:
+            rsvp.payment_status = cls.PAYMENT_PENDING
+            rsvp.payment_due_amount = locked_event.price_amount
+            rsvp.payment_currency = locked_event.price_currency or "CZK"
+            # Save once first so we have rsvp.id for the VS, then re-save
+            # with the VS populated. Two writes is fine — happens once per
+            # RSVP lifetime.
+            rsvp.save()
+            from .payments import next_variable_symbol
+
+            rsvp.variable_symbol = next_variable_symbol(rsvp.id, locked_event.id)
+            rsvp.save(update_fields=["variable_symbol", "updated_at"])
+            return rsvp
 
         rsvp.save()
         return rsvp
