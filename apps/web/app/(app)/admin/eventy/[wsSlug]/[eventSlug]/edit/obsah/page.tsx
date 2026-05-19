@@ -157,6 +157,11 @@ export default function EventBlocksPage({ params }: Props) {
         onChange={handleChange}
         workspaceSlug={wsSlug}
         eventSlug={eventSlug}
+        eventPrice={{
+          amount: event.price_amount,
+          currency: event.price_currency,
+          note: event.price_note,
+        }}
       />
 
       <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 backdrop-blur">

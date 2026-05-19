@@ -18,6 +18,12 @@ import { PracticalForm } from "./forms/practical-form";
 import { ProseForm } from "./forms/prose-form";
 import { StatsForm } from "./forms/stats-form";
 
+interface EventPriceContext {
+  amount: string | null;
+  currency: string;
+  note: string;
+}
+
 interface Props {
   blocks: EventBlock[];
   onChange: (blocks: EventBlock[]) => void;
@@ -25,6 +31,9 @@ interface Props {
    *  block forms expose upload buttons next to image URL inputs. */
   workspaceSlug?: string;
   eventSlug?: string;
+  /** Surfaced to the included_split form so it can render price + currency
+   *  + note as read-only (single source of truth = event detail). */
+  eventPrice?: EventPriceContext;
 }
 
 const ADD_OPTIONS: BlockType[] = [
@@ -44,6 +53,7 @@ export function Builder({
   onChange,
   workspaceSlug,
   eventSlug,
+  eventPrice,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(blocks[0]?.id ?? null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -144,6 +154,7 @@ export function Builder({
                   onChange={(p) => update(block.id, p)}
                   workspaceSlug={workspaceSlug}
                   eventSlug={eventSlug}
+                  eventPrice={eventPrice}
                 />
               </div>
             )}
@@ -196,11 +207,13 @@ function BlockForm({
   onChange,
   workspaceSlug,
   eventSlug,
+  eventPrice,
 }: {
   block: EventBlock;
   onChange: (payload: EventBlock["payload"]) => void;
   workspaceSlug?: string;
   eventSlug?: string;
+  eventPrice?: EventPriceContext;
 }) {
   switch (block.type) {
     case "hero":
@@ -234,7 +247,13 @@ function BlockForm({
       );
     case "included_split":
       return (
-        <IncludedSplitForm payload={block.payload} onChange={onChange} />
+        <IncludedSplitForm
+          payload={block.payload}
+          onChange={onChange}
+          eventPrice={eventPrice}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+        />
       );
     case "gallery":
       return <GalleryForm payload={block.payload} onChange={onChange} />;

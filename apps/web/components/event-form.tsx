@@ -28,6 +28,30 @@ interface Props {
   submitLabel: string;
 }
 
+/**
+ * Standard document types — present these in the EventForm as one-click
+ * adds so owners settle on a small, reportable vocabulary instead of
+ * inventing a custom name per event. Custom rows are still possible.
+ */
+const DOC_PRESETS: { key: string; label: string }[] = [
+  { key: "smlouva", label: "Smlouva" },
+  { key: "pojisteni", label: "Pojištění" },
+];
+
+/** Make a slug-style key from a label, with a positional fallback so
+ *  fresh "+ Vlastní dokument" rows still have a valid key before the
+ *  owner types anything. */
+function slugifyDocKey(label: string, index: number): string {
+  const base = label
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return base || `custom-${index + 1}`;
+}
+
 function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -479,84 +503,124 @@ export function EventForm({
             Požadované dokumenty
           </h2>
           <p className="mt-1 text-sm text-ink-500">
-            Co budeš po účastnících chtít doložit? Nahrávají do svého
-            profilu akce (souhlas s riziky, kopie pojistky, parental
-            consent, ...). Pole „key" si zvol libovolně bez mezer — drží
-            soubory u sebe i po přejmenování labelu.
+            Co budeš po účastnících chtít doložit? Vyber ze standardních
+            typů, ať se to dá reportovat napříč akcemi. Pokud potřebuješ
+            něco jiného, použij <strong>Vlastní dokument</strong>.
           </p>
+
           <div className="mt-4 flex flex-col gap-2">
-            {requiredDocs.map((d, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-1 gap-2 rounded-md border border-border p-3 sm:grid-cols-[140px_1fr_auto_auto]"
-              >
-                <Input
-                  value={d.key}
-                  placeholder="key"
-                  onChange={(e) =>
-                    setRequiredDocs((prev) =>
-                      prev.map((p, i) =>
-                        i === idx
-                          ? {
-                              ...p,
-                              key: e.target.value
-                                .toLowerCase()
-                                .replace(/[^a-z0-9_-]/g, ""),
-                            }
-                          : p,
-                      ),
-                    )
-                  }
-                />
-                <Input
-                  value={d.label}
-                  placeholder="Souhlas s riziky"
-                  onChange={(e) =>
-                    setRequiredDocs((prev) =>
-                      prev.map((p, i) =>
-                        i === idx ? { ...p, label: e.target.value } : p,
-                      ),
-                    )
-                  }
-                />
-                <label className="flex items-center gap-2 text-xs text-ink-700">
-                  <input
-                    type="checkbox"
-                    checked={d.required}
-                    onChange={(e) =>
-                      setRequiredDocs((prev) =>
-                        prev.map((p, i) =>
-                          i === idx ? { ...p, required: e.target.checked } : p,
-                        ),
-                      )
+            {requiredDocs.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+                Zatím žádné dokumenty. Přidej níže, pokud po účastnících
+                budeš něco vyžadovat.
+              </p>
+            ) : (
+              requiredDocs.map((d, idx) => {
+                const preset = DOC_PRESETS.find((p) => p.key === d.key);
+                const isCustom = !preset;
+                return (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-1 items-center gap-2 rounded-md border border-border p-3 sm:grid-cols-[1fr_auto_auto]"
+                  >
+                    {isCustom ? (
+                      <Input
+                        value={d.label}
+                        placeholder="Název vlastního dokumentu"
+                        onChange={(e) =>
+                          setRequiredDocs((prev) =>
+                            prev.map((p, i) =>
+                              i === idx
+                                ? {
+                                    ...p,
+                                    label: e.target.value,
+                                    key: slugifyDocKey(e.target.value, idx),
+                                  }
+                                : p,
+                            ),
+                          )
+                        }
+                      />
+                    ) : (
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-ink-900">
+                          {preset.label}
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-ink-500">
+                          {preset.key}
+                        </span>
+                      </div>
+                    )}
+                    <label className="flex items-center gap-2 text-xs text-ink-700">
+                      <input
+                        type="checkbox"
+                        checked={d.required}
+                        onChange={(e) =>
+                          setRequiredDocs((prev) =>
+                            prev.map((p, i) =>
+                              i === idx
+                                ? { ...p, required: e.target.checked }
+                                : p,
+                            ),
+                          )
+                        }
+                        className="size-4 accent-brand"
+                      />
+                      Povinný
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRequiredDocs((prev) =>
+                          prev.filter((_, i) => i !== idx),
+                        )
+                      }
+                      className="rounded-md border border-border bg-surface px-3 py-1 text-xs text-ink-500 hover:text-danger"
+                    >
+                      Smazat
+                    </button>
+                  </div>
+                );
+              })
+            )}
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              {DOC_PRESETS.map((p) => {
+                const used = requiredDocs.some((d) => d.key === p.key);
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    disabled={used}
+                    onClick={() =>
+                      setRequiredDocs((prev) => [
+                        ...prev,
+                        { key: p.key, label: p.label, required: true },
+                      ])
                     }
-                    className="size-4 accent-brand"
-                  />
-                  Povinný
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRequiredDocs((prev) => prev.filter((_, i) => i !== idx))
-                  }
-                  className="rounded-md border border-border bg-surface px-3 py-1 text-xs text-ink-500 hover:text-danger"
-                >
-                  Smazat
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setRequiredDocs((prev) => [
-                  ...prev,
-                  { key: "", label: "", required: true },
-                ])
-              }
-              className="inline-flex w-fit items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
-            >
-              + Přidat dokument
-            </button>
+                    className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    + {p.label}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() =>
+                  setRequiredDocs((prev) => [
+                    ...prev,
+                    {
+                      key: slugifyDocKey("", prev.length),
+                      label: "",
+                      required: true,
+                    },
+                  ])
+                }
+                className="inline-flex items-center rounded-md border border-dashed border-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+              >
+                + Vlastní dokument
+              </button>
+            </div>
           </div>
         </CardSection>
       </Card>

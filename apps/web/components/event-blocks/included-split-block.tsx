@@ -1,3 +1,4 @@
+import { formatEventPrice } from "@/lib/api";
 import { SectionHead } from "@/components/ui/section-head";
 import type {
   BlockTone,
@@ -7,6 +8,13 @@ import type {
 interface Props {
   payload: IncludedSplitBlockPayload;
   tone?: BlockTone;
+  /** Event-level price (preferred). Falls back to the block payload's
+   *  legacy price_value/_unit/_note when not set. */
+  eventPrice?: {
+    amount: string | null;
+    currency: string;
+    note: string;
+  };
 }
 
 /**
@@ -15,10 +23,29 @@ interface Props {
  * The whole section ALWAYS renders ink (dark) — it's the second deliberate
  * dark statement on the landing (after Stats), framing the price decision.
  */
-export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
+export function IncludedSplitBlock({
+  payload,
+  tone: _tone = "canvas",
+  eventPrice,
+}: Props) {
   const hasIncluded = payload.included && payload.included.length > 0;
   const hasNotIncluded = payload.not_included && payload.not_included.length > 0;
-  const hasPrice = Boolean(payload.price_value);
+
+  // Prefer event-level price (single source of truth across landing + RSVP
+  // + invoice). Falls back to in-block legacy values so older events with
+  // no Event.price_amount keep rendering.
+  const formattedPrice = eventPrice?.amount
+    ? formatEventPrice(eventPrice.amount, eventPrice.currency)
+    : null;
+  const priceValue =
+    formattedPrice?.split(" ")[0] ?? payload.price_value ?? "";
+  const priceUnit =
+    formattedPrice?.split(" ").slice(1).join(" ") ||
+    payload.price_unit ||
+    "";
+  const priceNote = eventPrice?.note || payload.price_note || "";
+  const hasPrice = Boolean(priceValue);
+
   if (!hasIncluded && !hasNotIncluded && !hasPrice) return null;
 
   return (
@@ -48,11 +75,7 @@ export function IncludedSplitBlock({ payload, tone: _tone = "canvas" }: Props) {
         </div>
 
         {hasPrice && (
-          <PriceCard
-            value={payload.price_value!}
-            unit={payload.price_unit}
-            note={payload.price_note}
-          />
+          <PriceCard value={priceValue} unit={priceUnit} note={priceNote} />
         )}
       </div>
     </section>
