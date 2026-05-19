@@ -421,9 +421,16 @@ def push_subscription_detail(request: Request, sub_id: int) -> Response:
 @permission_classes([IsAuthenticated])
 def push_test(request: Request) -> Response:
     """Fire a sample notification at every device the caller has
-    registered. Lets owners verify the install + permission flow."""
+    registered. Lets owners verify the install + permission flow.
+
+    Returns diagnostic info so we can distinguish "no subscriptions
+    saved on the backend" (browser subscribed but POST failed) from
+    "VAPID misconfigured" (subscriptions exist but send fails)."""
+    from django.conf import settings as dj_settings
+
     from notifications.push import send_push_to_user
 
+    sub_count = request.user.push_subscriptions.count()
     sent = send_push_to_user(
         request.user,
         title="olaf — test push",
@@ -431,4 +438,11 @@ def push_test(request: Request) -> Response:
         url="/dashboard",
         tag="test",
     )
-    return Response({"sent": sent})
+    return Response(
+        {
+            "sent": sent,
+            "subscriptions": sub_count,
+            "vapid_configured": bool(dj_settings.VAPID_PUBLIC_KEY)
+            and bool(dj_settings.VAPID_PRIVATE_KEY),
+        }
+    )

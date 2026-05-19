@@ -185,14 +185,30 @@ function PushNotificationsCard() {
     setBusy(true);
     setMsg(null);
     try {
-      const sent = await sendTestPush();
-      setMsg({
-        kind: "ok",
-        text:
-          sent > 0
-            ? `Testovací push odeslán na ${sent} zařízení. Mrkni do oznamovací lišty.`
-            : "Žádné zařízení nemá aktivovaný push.",
-      });
+      const r = await sendTestPush();
+      if (r.sent > 0) {
+        setMsg({
+          kind: "ok",
+          text: `Testovací push odeslán na ${r.sent} zařízení. Mrkni do oznamovací lišty.`,
+        });
+      } else if (!r.vapid_configured) {
+        setMsg({
+          kind: "err",
+          text:
+            "Backend nemá nastavený VAPID — push v tomto prostředí nefunguje. Řekni adminovi.",
+        });
+      } else if (r.subscriptions === 0) {
+        setMsg({
+          kind: "err",
+          text:
+            "Tvoje zařízení není zaregistrované u backendu. Vypni push a aktivuj ho znovu — předchozí pokus se asi neuložil.",
+        });
+      } else {
+        setMsg({
+          kind: "err",
+          text: `Push nedoručen — ${r.subscriptions} zařízení v DB ale push service je odmítla. Push subscriptions byly přemazány.`,
+        });
+      }
     } catch (err) {
       setMsg({
         kind: "err",

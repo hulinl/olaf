@@ -37,6 +37,8 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
             src={image}
             alt=""
             className="aspect-[4/5] w-full rounded-md object-cover"
+            loading="lazy"
+            decoding="async"
           />
         )}
         <div>
@@ -64,6 +66,8 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
             src={image}
             alt=""
             className="aspect-[4/5] w-full rounded-md object-cover"
+            loading="lazy"
+            decoding="async"
           />
         )}
       </div>
