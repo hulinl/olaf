@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
@@ -50,21 +50,22 @@ export default function AdminKomunityTablePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-brand">Správce</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Moje komunity
-          </h1>
-          <p className="mt-2 max-w-2xl text-ink-500">
-            Komunity, které spravuješ. Klikni na řádek pro detail — profil,
-            akce, členy (postupně přibyde nástěnka, platby, ...).
-          </p>
-        </div>
-        <LinkButton href="/workspaces/new" variant="primary" size="md">
+      <header>
+        <p className="text-sm font-medium text-brand">Správce</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+          Moje komunity
+        </h1>
+        <p className="mt-2 max-w-2xl text-ink-500">
+          Komunity, které spravuješ. Klikni na řádek pro detail — profil,
+          akce, členy (postupně přibyde nástěnka, platby, ...).
+        </p>
+      </header>
+
+      <div className="flex justify-end">
+        <LinkButton href="/workspaces/new" variant="secondary" size="md">
           + Vytvořit komunitu
         </LinkButton>
-      </header>
+      </div>
 
       {loading && (
         <div className="flex justify-center py-12">
@@ -83,7 +84,7 @@ export default function AdminKomunityTablePage() {
             Komunita je tvůj domov pro akce. Vytvoř první.
           </p>
           <div className="mt-5">
-            <LinkButton href="/workspaces/new" variant="primary" size="md">
+            <LinkButton href="/workspaces/new" variant="secondary" size="md">
               + Vytvořit komunitu
             </LinkButton>
           </div>
@@ -115,11 +116,23 @@ export default function AdminKomunityTablePage() {
 }
 
 function KomunityRow({ workspace: w }: { workspace: Workspace }) {
+  const router = useRouter();
+  const href = `/admin/komunity/${w.slug}`;
+
+  function handleRowClick(e: ReactMouseEvent<HTMLTableRowElement>) {
+    const target = e.target as HTMLElement;
+    if (target.closest("a, button, input, label")) return;
+    router.push(href);
+  }
+
   return (
-    <tr className="group cursor-pointer hover:bg-brand/10">
+    <tr
+      onClick={handleRowClick}
+      className="group cursor-pointer hover:bg-brand/10"
+    >
       <td className="px-4 py-3">
         <Link
-          href={`/admin/komunity/${w.slug}`}
+          href={href}
           className="flex flex-col gap-0.5 focus-ring"
         >
           <span className="font-medium text-ink-900">{w.name}</span>

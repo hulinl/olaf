@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
@@ -184,6 +184,8 @@ function FilterTabs({
 }
 
 function EventRow({ event }: { event: EventSummary }) {
+  const router = useRouter();
+  const href = `/admin/eventy/${event.workspace_slug}/${event.slug}`;
   const starts = new Date(event.starts_at);
   const dateLabel = starts.toLocaleDateString("cs-CZ", {
     day: "numeric",
@@ -195,11 +197,23 @@ function EventRow({ event }: { event: EventSummary }) {
       ? `${event.confirmed_count} / ${event.capacity}`
       : String(event.confirmed_count);
 
+  // Make the whole row navigable. Skip when click started inside an
+  // interactive element so users can still text-select cells without
+  // triggering navigation.
+  function handleRowClick(e: ReactMouseEvent<HTMLTableRowElement>) {
+    const target = e.target as HTMLElement;
+    if (target.closest("a, button, input, label")) return;
+    router.push(href);
+  }
+
   return (
-    <tr className="group cursor-pointer hover:bg-brand/10">
+    <tr
+      onClick={handleRowClick}
+      className="group cursor-pointer hover:bg-brand/10"
+    >
       <td className="px-4 py-3">
         <Link
-          href={`/admin/eventy/${event.workspace_slug}/${event.slug}`}
+          href={href}
           className="flex flex-col gap-0.5 focus-ring"
         >
           <span className="font-medium text-ink-900">{event.title}</span>

@@ -10,6 +10,23 @@ export function assetUrl(path: string | null | undefined): string | undefined {
   return `${API_URL}${path}`;
 }
 
+/** Format an event price for display, or null if the event is free. */
+export function formatEventPrice(
+  amount: string | null | undefined,
+  currency: string | undefined,
+): string | null {
+  if (!amount) return null;
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return null;
+  // Strip trailing .00 for whole-currency values; keep cents otherwise.
+  const isWhole = Math.round(n * 100) === Math.round(n) * 100;
+  const body = new Intl.NumberFormat("cs-CZ", {
+    minimumFractionDigits: isWhole ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+  return `${body} ${currency || "CZK"}`;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -141,6 +158,9 @@ export interface Event extends EventSummary {
   is_at_capacity: boolean;
   remaining_capacity: number | null;
   cancellation_reason: string;
+  price_amount: string | null;
+  price_currency: string;
+  price_note: string;
   my_rsvp?: MyRSVP | null;
 }
 
@@ -439,6 +459,9 @@ export interface EventWritePayload {
   blocks?: EventBlock[];
   enabled_questionnaire_sections?: QuestionnaireSection[];
   cancellation_reason?: string;
+  price_amount?: string | null;
+  price_currency?: string;
+  price_note?: string;
 }
 
 export const events = {
