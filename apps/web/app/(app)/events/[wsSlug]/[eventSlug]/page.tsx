@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { DiscussionWall } from "@/components/discussion-wall";
@@ -57,12 +57,15 @@ type TabKey = "nastenka" | "registrace";
 export default function MyEventPage({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useUser();
   const [event, setEvent] = useState<OlafEvent | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("nastenka");
+  const initialTab: TabKey =
+    searchParams.get("tab") === "registrace" ? "registrace" : "nastenka";
+  const [tab, setTab] = useState<TabKey>(initialTab);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,8 +82,16 @@ export default function MyEventPage({ params }: Props) {
           // ignore
         }
         // No RSVP yet? Default to the management tab so the user lands
-        // on the "Přihlásit se" CTA instead of an empty wall.
-        if (!cancelled && !ev.my_rsvp) setTab("registrace");
+        // on the "Přihlásit se" CTA instead of an empty wall. Skip when
+        // the URL already specifies a tab — that's an explicit deep-link
+        // (e.g. dashboard "Doložit dokument" → ?tab=registrace#dokumenty).
+        if (
+          !cancelled &&
+          !ev.my_rsvp &&
+          !searchParams.get("tab")
+        ) {
+          setTab("registrace");
+        }
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -99,7 +110,22 @@ export default function MyEventPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [wsSlug, eventSlug, router]);
+  }, [wsSlug, eventSlug, router, searchParams]);
+
+  // After the page mounts and the right tab is active, honor any
+  // #section hash from the deep-link (dashboard → ?tab=registrace#dokumenty).
+  // We delay one frame so the panel anchors are in the DOM.
+  useEffect(() => {
+    if (loading || tab !== "registrace") return;
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const id = window.requestAnimationFrame(() => {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [loading, tab]);
 
   if (loading) {
     return (
@@ -150,12 +176,14 @@ export default function MyEventPage({ params }: Props) {
           <p className="mt-2 text-sm text-ink-500">
             {dateLabel}
             {event.location_text && ` · ${event.location_text}`} ·{" "}
-            <Link
+            <a
               href={`/${wsSlug}/e/${eventSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="underline hover:text-ink-900"
             >
               Otevřít stránku akce ↗
-            </Link>
+            </a>
           </p>
         </header>
 
@@ -336,15 +364,22 @@ function MyReservationPanel({
         </div>
       )}
 
-      <PaymentInstructionsPanel
-        workspaceSlug={wsSlug}
-        eventSlug={eventSlug}
-      />
+      <div id="platba" className="scroll-mt-24">
+        <PaymentInstructionsPanel
+          workspaceSlug={wsSlug}
+          eventSlug={eventSlug}
+        />
+      </div>
 
-      <RequiredDocsPanel workspaceSlug={wsSlug} eventSlug={eventSlug} />
+      <div id="dokumenty" className="scroll-mt-24">
+        <RequiredDocsPanel workspaceSlug={wsSlug} eventSlug={eventSlug} />
+      </div>
 
       {invoice && (
-        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <section
+          id="faktura"
+          className="scroll-mt-24 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-ink-900">Faktura</h3>

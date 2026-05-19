@@ -359,6 +359,44 @@ function TopicCard({
   const [loading, setLoading] = useState(false);
   const [composerBody, setComposerBody] = useState("");
   const [posting, setPosting] = useState(false);
+  // Optimistic like state — seeded from the prop, owned locally so a
+  // toggle doesn't need a full list re-fetch. Reset when the topic id
+  // changes (e.g. after a delete + insert in the parent list).
+  const [liked, setLiked] = useState<boolean>(topic.i_liked);
+  const [likeCount, setLikeCount] = useState<number>(topic.like_count);
+  useEffect(() => {
+    setLiked(topic.i_liked);
+    setLikeCount(topic.like_count);
+  }, [topic.id, topic.i_liked, topic.like_count]);
+
+  async function handleToggleLike(e: React.MouseEvent) {
+    e.stopPropagation();
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount((n) => Math.max(0, n + (nextLiked ? 1 : -1)));
+    try {
+      const resp =
+        scope.kind === "workspace"
+          ? await discussions.toggleWorkspaceLike(
+              scope.slug,
+              topic.id,
+              nextLiked,
+            )
+          : await discussions.toggleEventLike(
+              scope.workspaceSlug,
+              scope.eventSlug,
+              topic.id,
+              nextLiked,
+            );
+      // Sync to server-truth in case of races (someone else liked too).
+      setLiked(resp.i_liked);
+      setLikeCount(resp.like_count);
+    } catch {
+      // Rollback on failure.
+      setLiked(!nextLiked);
+      setLikeCount((n) => Math.max(0, n + (nextLiked ? -1 : 1)));
+    }
+  }
 
   async function loadDetail() {
     setLoading(true);
@@ -460,7 +498,26 @@ function TopicCard({
                 : "komentářů"}
           </p>
         </div>
-        <span className="text-xs text-ink-500">{open ? "Skrýt" : "Otevřít"}</span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleToggleLike}
+            aria-pressed={liked}
+            aria-label={liked ? "Zrušit lajk" : "Lajknout"}
+            className={[
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-ring",
+              liked
+                ? "border-brand/40 bg-brand/10 text-brand"
+                : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+            ].join(" ")}
+          >
+            <span aria-hidden>{liked ? "♥" : "♡"}</span>
+            <span className="tabular-nums">{likeCount}</span>
+          </button>
+          <span className="text-xs text-ink-500">
+            {open ? "Skrýt" : "Otevřít"}
+          </span>
+        </div>
       </header>
 
       {open && (

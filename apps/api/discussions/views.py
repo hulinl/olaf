@@ -11,13 +11,14 @@ Permissions are centralised in .permissions (members/RSVPs only).
 """
 from __future__ import annotations
 
+from django.db.models import Count, Exists, OuterRef
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Comment, Topic
+from .models import Comment, Topic, TopicLike
 from .permissions import (
     can_access_event_wall,
     can_access_workspace_wall,
@@ -29,6 +30,19 @@ from .serializers import (
     TopicDetailSerializer,
     TopicSerializer,
 )
+
+
+def _annotate_likes(qs, user):
+    """Annotate topics with _like_count + _i_liked for serializer use.
+    Cuts the N+1 the SerializerMethodField would otherwise produce."""
+    qs = qs.annotate(_like_count=Count("likes", distinct=True))
+    if user.is_authenticated:
+        qs = qs.annotate(
+            _i_liked=Exists(
+                TopicLike.objects.filter(topic=OuterRef("pk"), user=user)
+            )
+        )
+    return qs
 
 
 def _resolve_workspace(slug):
@@ -66,10 +80,15 @@ def workspace_topics(request: Request, slug: str) -> Response:
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
-        qs = Topic.objects.filter(
-            parent_type=Topic.PARENT_WORKSPACE, parent_id=workspace.id
+        qs = _annotate_likes(
+            Topic.objects.filter(
+                parent_type=Topic.PARENT_WORKSPACE, parent_id=workspace.id
+            ),
+            request.user,
         )
-        return Response(TopicSerializer(qs, many=True).data)
+        return Response(
+            TopicSerializer(qs, many=True, context={"request": request}).data
+        )
 
     title = (request.data.get("title") or "").strip()
     body = (request.data.get("body") or "").strip()
@@ -94,7 +113,7 @@ def workspace_topics(request: Request, slug: str) -> Response:
 
     send_topic_announce_task.delay(topic.pk)
     return Response(
-        TopicDetailSerializer(topic).data,
+        TopicDetailSerializer(topic, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -123,7 +142,9 @@ def workspace_topic_detail(
     is_author = topic.author_id == request.user.id
 
     if request.method == "GET":
-        return Response(TopicDetailSerializer(topic).data)
+        return Response(
+            TopicDetailSerializer(topic, context={"request": request}).data
+        )
 
     if not (is_mod or is_author):
         return Response(status=status.HTTP_403_FORBIDDEN)
@@ -144,7 +165,9 @@ def workspace_topic_detail(
         if "locked" in request.data:
             topic.locked = bool(request.data["locked"])
     topic.save()
-    return Response(TopicDetailSerializer(topic).data)
+    return Response(
+        TopicDetailSerializer(topic, context={"request": request}).data
+    )
 
 
 @api_view(["POST"])
@@ -231,10 +254,15 @@ def event_topics(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
-        qs = Topic.objects.filter(
-            parent_type=Topic.PARENT_EVENT, parent_id=event.id
+        qs = _annotate_likes(
+            Topic.objects.filter(
+                parent_type=Topic.PARENT_EVENT, parent_id=event.id
+            ),
+            request.user,
         )
-        return Response(TopicSerializer(qs, many=True).data)
+        return Response(
+            TopicSerializer(qs, many=True, context={"request": request}).data
+        )
 
     title = (request.data.get("title") or "").strip()
     body = (request.data.get("body") or "").strip()
@@ -259,7 +287,7 @@ def event_topics(
 
     send_topic_announce_task.delay(topic.pk)
     return Response(
-        TopicDetailSerializer(topic).data,
+        TopicDetailSerializer(topic, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -291,7 +319,9 @@ def event_topic_detail(
     is_author = topic.author_id == request.user.id
 
     if request.method == "GET":
-        return Response(TopicDetailSerializer(topic).data)
+        return Response(
+            TopicDetailSerializer(topic, context={"request": request}).data
+        )
 
     if not (is_mod or is_author):
         return Response(status=status.HTTP_403_FORBIDDEN)
@@ -312,7 +342,9 @@ def event_topic_detail(
         if "locked" in request.data:
             topic.locked = bool(request.data["locked"])
     topic.save()
-    return Response(TopicDetailSerializer(topic).data)
+    return Response(
+        TopicDetailSerializer(topic, context={"request": request}).data
+    )
 
 
 @api_view(["POST"])
@@ -386,3 +418,71 @@ def event_comment_detail(
         return Response(status=status.HTTP_403_FORBIDDEN)
     comment.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Likes (shared toggle endpoint — works for both scopes)
+# ---------------------------------------------------------------------------
+
+
+def _toggle_like(request, topic: Topic) -> Response:
+    """POST = like, DELETE = unlike. Idempotent both ways. Returns the
+    updated like_count + i_liked so the client can refresh without
+    re-listing."""
+    if request.method == "POST":
+        TopicLike.objects.get_or_create(topic=topic, user=request.user)
+    else:
+        TopicLike.objects.filter(topic=topic, user=request.user).delete()
+    return Response(
+        {
+            "topic_id": topic.id,
+            "like_count": topic.likes.count(),
+            "i_liked": request.method == "POST",
+        }
+    )
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def workspace_topic_like(
+    request: Request, slug: str, topic_id: int
+) -> Response:
+    workspace = _resolve_workspace(slug)
+    if workspace is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_access_workspace_wall(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    try:
+        topic = Topic.objects.get(
+            pk=topic_id,
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=workspace.id,
+        )
+    except Topic.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return _toggle_like(request, topic)
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def event_topic_like(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    topic_id: int,
+) -> Response:
+    event = _resolve_event(workspace_slug, event_slug)
+    if event is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_access_event_wall(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    try:
+        topic = Topic.objects.get(
+            pk=topic_id,
+            parent_type=Topic.PARENT_EVENT,
+            parent_id=event.id,
+        )
+    except Topic.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return _toggle_like(request, topic)
+

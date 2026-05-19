@@ -289,9 +289,17 @@ export interface DiscussionTopic {
   author_id: number | null;
   author_name: string;
   comment_count: number;
+  like_count: number;
+  i_liked: boolean;
   last_activity_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TopicLikeResponse {
+  topic_id: number;
+  like_count: number;
+  i_liked: boolean;
 }
 
 export interface DiscussionComment {
@@ -1079,6 +1087,21 @@ export const discussions = {
     apiFetch<void>(
       `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/${commentId}/`,
       { method: "DELETE" },
+    ),
+  toggleWorkspaceLike: (slug: string, topicId: number, liked: boolean) =>
+    apiFetch<TopicLikeResponse>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/like/`,
+      { method: liked ? "POST" : "DELETE" },
+    ),
+  toggleEventLike: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+    liked: boolean,
+  ) =>
+    apiFetch<TopicLikeResponse>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/like/`,
+      { method: liked ? "POST" : "DELETE" },
     ),
 };
 
