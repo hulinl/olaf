@@ -460,6 +460,28 @@ export interface RSVPRecord extends MyRSVP {
   updated_at: string;
 }
 
+export interface ParticipantProfile {
+  rsvp_id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    zip: string;
+    country: string;
+    legacy: string;
+  };
+  emergency_contact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+}
+
 export class ApiError extends Error {
   status: number;
   data: Record<string, unknown>;
@@ -858,6 +880,14 @@ export const events = {
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/approve/`,
       { method: "POST" },
+    ),
+  participantProfile: (
+    workspaceSlug: string,
+    eventSlug: string,
+    rsvpId: number,
+  ) =>
+    apiFetch<ParticipantProfile>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/profile/`,
     ),
   rejectRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(

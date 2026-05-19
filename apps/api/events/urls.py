@@ -73,6 +73,11 @@ urlpatterns = [
         name="rsvps",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/profile/",
+        views.participant_profile,
+        name="rsvp-profile",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/approve/",
         views.approve_rsvp,
         name="rsvp-approve",

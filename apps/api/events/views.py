@@ -773,6 +773,56 @@ def reject_rsvp(
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def participant_profile(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Owner view of a participant's profile basics (name, phone, address,
+    emergency contact). Surfaces just enough for the owner to call/identify
+    the person without exposing internal user fields.
+    """
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        rsvp = RSVP.objects.select_related("user").get(pk=rsvp_id, event=event)
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    user = rsvp.user
+    if user is None:
+        return Response(
+            {"detail": "Účastník registrovaný bez účtu — profil není dostupný."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response(
+        {
+            "rsvp_id": rsvp.id,
+            "user_id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "full_name": user.get_full_name() or user.email,
+            "email": user.email,
+            "phone": user.phone,
+            "address": {
+                "street": user.address_street,
+                "city": user.address_city,
+                "zip": user.address_zip,
+                "country": user.address_country,
+                # Legacy single-line, only shown when structured is empty.
+                "legacy": user.address,
+            },
+            "emergency_contact": {
+                "name": user.emergency_contact_name,
+                "phone": user.emergency_contact_phone,
+                "relationship": user.emergency_contact_relationship,
+            },
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Response:
     """Owner-only list of RSVPs for an event (with questionnaire answers)."""
     try:
