@@ -331,3 +331,104 @@ def billing_profile_detail(request: Request, profile_id: int) -> Response:
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# Web Push subscriptions
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def push_subscriptions(request: Request) -> Response:
+    """List or register web-push subscriptions for the current user.
+
+    GET — small payload per device for the settings UI.
+    POST body — { endpoint, keys: { p256dh, auth }, user_agent? } as
+    produced by PushManager.subscribe(). Endpoint is the natural
+    key — re-subscribing the same browser updates the existing row
+    instead of creating a duplicate.
+    """
+    from .models import PushSubscription
+
+    user = request.user
+
+    if request.method == "GET":
+        out = [
+            {
+                "id": s.pk,
+                "user_agent": s.user_agent,
+                "created_at": s.created_at,
+                "last_used_at": s.last_used_at,
+            }
+            for s in user.push_subscriptions.all()
+        ]
+        return Response(out)
+
+    from django.conf import settings as dj_settings
+
+    if not dj_settings.VAPID_PUBLIC_KEY:
+        return Response(
+            {"detail": "Web Push není v tomto prostředí nastaveno."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    endpoint = (request.data.get("endpoint") or "").strip()
+    keys = request.data.get("keys") or {}
+    p256dh = (keys.get("p256dh") or "").strip()
+    auth = (keys.get("auth") or "").strip()
+    user_agent = (request.data.get("user_agent") or "")[:300]
+    if not (endpoint and p256dh and auth):
+        return Response(
+            {"detail": "Chybí endpoint nebo klíče."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    sub, _ = PushSubscription.objects.update_or_create(
+        endpoint=endpoint,
+        defaults={
+            "user": user,
+            "p256dh": p256dh,
+            "auth": auth,
+            "user_agent": user_agent,
+        },
+    )
+    return Response(
+        {
+            "id": sub.pk,
+            "user_agent": sub.user_agent,
+            "created_at": sub.created_at,
+            "last_used_at": sub.last_used_at,
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def push_subscription_detail(request: Request, sub_id: int) -> Response:
+    from .models import PushSubscription
+
+    try:
+        sub = PushSubscription.objects.get(pk=sub_id, user=request.user)
+    except PushSubscription.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    sub.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def push_test(request: Request) -> Response:
+    """Fire a sample notification at every device the caller has
+    registered. Lets owners verify the install + permission flow."""
+    from notifications.push import send_push_to_user
+
+    sent = send_push_to_user(
+        request.user,
+        title="olaf — test push",
+        body="Push notifikace fungují. 👋",
+        url="/dashboard",
+        tag="test",
+    )
+    return Response({"sent": sent})

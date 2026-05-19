@@ -272,3 +272,50 @@ class BillingProfile(models.Model):
                 user=self.user, is_default=True
             ).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+
+class PushSubscription(models.Model):
+    """A browser Web Push subscription belonging to a user + device.
+
+    The frontend calls PushManager.subscribe(), gets back a
+    PushSubscription object (endpoint URL + p256dh public key + auth
+    secret), and we POST that here. The backend then uses pywebpush
+    to deliver notifications to the endpoint, which Apple / Mozilla /
+    Google forward to the user's device.
+
+    One user can have many subscriptions (one per browser/device).
+    Endpoint is the natural key — same browser re-subscribing
+    overwrites rather than duplicates.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+    )
+    endpoint = models.URLField(max_length=600, unique=True)
+    p256dh = models.CharField(
+        max_length=200,
+        help_text="ECDH P-256 public key, base64-url encoded.",
+    )
+    auth = models.CharField(
+        max_length=80,
+        help_text="Auth secret, base64-url encoded.",
+    )
+    user_agent = models.CharField(
+        max_length=300,
+        blank=True,
+        default="",
+        help_text="Captured at subscription time for the user-facing list.",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    last_used_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "accounts_push_subscription"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "-created_at"])]
+
+    def __str__(self) -> str:
+        return f"PushSubscription #{self.pk} for {self.user_id}"

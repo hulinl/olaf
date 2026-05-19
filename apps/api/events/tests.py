@@ -137,11 +137,16 @@ class PublicEventEndpointTests(TestCase):
         self.assertEqual(body["title"], "Letní kemp 2026")
         self.assertTrue(body["is_open_for_rsvp"])
 
-    def test_draft_event_404_to_anonymous(self) -> None:
+    def test_draft_event_returns_friendly_preview_to_anonymous(self) -> None:
+        # Draft events used to 404 for non-owners; we now serve a slim
+        # "is_draft_preview" payload (200) so the public landing can
+        # show a friendly placeholder.
         self.event.status = Event.STATUS_DRAFT
         self.event.save()
         resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.json()["is_draft_preview"])
+        self.assertNotIn("blocks", resp.json())
 
     def test_draft_event_visible_to_owner(self) -> None:
         self.event.status = Event.STATUS_DRAFT

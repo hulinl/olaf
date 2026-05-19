@@ -22,6 +22,17 @@ urlpatterns = [
         views.billing_profile_detail,
         name="billing-profile-detail",
     ),
+    path(
+        "me/push-subscriptions/",
+        views.push_subscriptions,
+        name="push-subscriptions",
+    ),
+    path(
+        "me/push-subscriptions/<int:sub_id>/",
+        views.push_subscription_detail,
+        name="push-subscription-detail",
+    ),
+    path("me/push-test/", views.push_test, name="push-test"),
     path("password/reset/request/", views.password_reset_request, name="password-reset-request"),
     path("password/reset/confirm/", views.password_reset_confirm, name="password-reset-confirm"),
 ]

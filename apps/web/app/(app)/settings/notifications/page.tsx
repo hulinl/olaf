@@ -5,6 +5,14 @@ import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { ApiError, type User, auth } from "@/lib/api";
+import {
+  getExistingSubscription,
+  isPwa,
+  pushAvailable,
+  sendTestPush,
+  subscribePush,
+  unsubscribePush,
+} from "@/lib/push";
 
 type NotifyPrefs = Pick<
   User,
@@ -95,6 +103,8 @@ export default function NotificationsSettingsPage() {
         </CardSection>
       </Card>
 
+      <PushNotificationsCard />
+
       {error && <Alert variant="danger">{error}</Alert>}
       {saved && !error && (
         <Alert variant="success">Předvolby uloženy.</Alert>
@@ -106,6 +116,154 @@ export default function NotificationsSettingsPage() {
         </Button>
       </div>
     </form>
+  );
+}
+
+function PushNotificationsCard() {
+  const [supported] = useState(() => pushAvailable());
+  const [pwa] = useState(() => isPwa());
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!supported) return;
+    getExistingSubscription().then((s) => setSubscribed(!!s));
+  }, [supported]);
+
+  if (!supported) {
+    return (
+      <Card>
+        <CardSection>
+          <h3 className="text-base font-semibold text-ink-900">
+            Push notifikace
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Tento prohlížeč push notifikace nepodporuje, nebo nejsou v
+            tomto prostředí nastavené.
+          </p>
+        </CardSection>
+      </Card>
+    );
+  }
+
+  async function handleSubscribe() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await subscribePush();
+      setSubscribed(true);
+      setMsg({ kind: "ok", text: "Push notifikace aktivované." });
+    } catch (err) {
+      setMsg({
+        kind: "err",
+        text: err instanceof Error ? err.message : "Aktivace selhala.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleUnsubscribe() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await unsubscribePush();
+      setSubscribed(false);
+      setMsg({ kind: "ok", text: "Push notifikace vypnuté." });
+    } catch (err) {
+      setMsg({
+        kind: "err",
+        text: err instanceof Error ? err.message : "Vypnutí selhalo.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleTest() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const sent = await sendTestPush();
+      setMsg({
+        kind: "ok",
+        text:
+          sent > 0
+            ? `Testovací push odeslán na ${sent} zařízení. Mrkni do oznamovací lišty.`
+            : "Žádné zařízení nemá aktivovaný push.",
+      });
+    } catch (err) {
+      setMsg({
+        kind: "err",
+        text: err instanceof Error ? err.message : "Test selhal.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardSection>
+        <h3 className="text-base font-semibold text-ink-900">
+          Push notifikace
+        </h3>
+        <p className="mt-1 text-sm text-ink-500">
+          Okamžitá upozornění v oznamovací liště telefonu nebo počítače
+          — paralelně s e-maily. Na iPhonu fungují, jen pokud máš olaf
+          přidaný na hlavní obrazovku přes Safari → Sdílet → Přidat na
+          plochu.
+        </p>
+        {!pwa && (
+          <p className="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3 text-xs text-ink-700">
+            Tip: na iOS aktivuj push až poté, co si appku přidáš na
+            plochu (Safari → ikonka sdílení → „Přidat na plochu").
+            V samotném prohlížeči iOS push neumí.
+          </p>
+        )}
+        <div className="mt-5 flex flex-wrap gap-2">
+          {subscribed === null ? (
+            <span className="text-sm text-ink-500">Načítám…</span>
+          ) : subscribed ? (
+            <>
+              <button
+                type="button"
+                onClick={handleUnsubscribe}
+                disabled={busy}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50 focus-ring"
+              >
+                Vypnout push
+              </button>
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={busy}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand/5 disabled:opacity-50 focus-ring"
+              >
+                Pošli testovací push
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubscribe}
+              disabled={busy}
+              className="rounded-md bg-brand px-4 py-1.5 text-sm font-semibold text-brand-ink hover:bg-brand-hover disabled:opacity-50 focus-ring"
+            >
+              Aktivovat push na tomto zařízení
+            </button>
+          )}
+        </div>
+        {msg && (
+          <div className="mt-3">
+            <Alert variant={msg.kind === "ok" ? "success" : "danger"}>
+              {msg.text}
+            </Alert>
+          </div>
+        )}
+      </CardSection>
+    </Card>
   );
 }
 

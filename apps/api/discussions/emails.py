@@ -47,7 +47,7 @@ def _parent_label(topic: Topic) -> str:
 
 
 def send_comment_notification(comment: Comment) -> None:
-    """Email the topic author when someone replies. Skips when:
+    """Email + push the topic author when someone replies. Skips when:
     - the comment author IS the topic author (no self-pings),
     - the topic author opted out,
     - the topic author is missing.
@@ -58,16 +58,17 @@ def send_comment_notification(comment: Comment) -> None:
     if not topic.author.notify_on_discussion_reply:
         return
 
+    author_name = (
+        comment.author.get_full_name()
+        if comment.author
+        else "[smazaný uživatel]"
+    )
     context = {
         "topic": topic,
         "comment": comment,
         "topic_url": _topic_url(topic),
         "parent_label": _parent_label(topic),
-        "author_name": (
-            comment.author.get_full_name()
-            if comment.author
-            else "[smazaný uživatel]"
-        ),
+        "author_name": author_name,
     }
     body = render_to_string("discussions/comment_added.txt", context)
     send_mail(
@@ -76,6 +77,18 @@ def send_comment_notification(comment: Comment) -> None:
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[topic.author.email],
         fail_silently=False,
+    )
+    # Push on top of e-mail. Best-effort; failure here doesn't unwind
+    # the e-mail send. Import lazily so the discussions app doesn't
+    # take a hard dependency on the optional notifications.push.
+    from notifications.push import send_push_to_user
+
+    send_push_to_user(
+        topic.author,
+        title=f"Nová odpověď: {topic.title}",
+        body=f"{author_name}: {(comment.body or '')[:140]}",
+        url=_topic_url(topic),
+        tag=f"comment-{comment.pk}",
     )
 
 
@@ -132,17 +145,18 @@ def send_topic_announce(topic: Topic) -> None:
     parent_label = _parent_label(topic)
     topic_url = _topic_url(topic)
 
+    from notifications.push import send_push_to_user
+
+    author_name = (
+        topic.author.get_full_name() if topic.author else "[smazaný uživatel]"
+    )
     for user in audience:
         context = {
             "topic": topic,
             "topic_url": topic_url,
             "parent_label": parent_label,
             "recipient": user,
-            "author_name": (
-                topic.author.get_full_name()
-                if topic.author
-                else "[smazaný uživatel]"
-            ),
+            "author_name": author_name,
         }
         body = render_to_string("discussions/topic_announced.txt", context)
         send_mail(
@@ -151,4 +165,13 @@ def send_topic_announce(topic: Topic) -> None:
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
             fail_silently=True,  # one bad address shouldn't drop the rest
+        )
+        # Mirror to push — same opt-out gate (notify_on_discussion_announce)
+        # is already applied upstream via _audience_for_topic.
+        send_push_to_user(
+            user,
+            title=f"Nové téma v {parent_label}",
+            body=f"{author_name}: {topic.title}",
+            url=topic_url,
+            tag=f"topic-{topic.pk}",
         )

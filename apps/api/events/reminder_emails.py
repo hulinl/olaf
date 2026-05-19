@@ -68,6 +68,8 @@ def send_checklist_reminder(item: EventChecklistItem) -> int:
         else f"[Checklist] {event.title}: {item.title}"
     )
 
+    from notifications.push import send_push_to_user
+
     sent = 0
     for user in audience:
         context = {
@@ -84,6 +86,13 @@ def send_checklist_reminder(item: EventChecklistItem) -> int:
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
             fail_silently=True,
+        )
+        send_push_to_user(
+            user,
+            title=subject,
+            body=item.description[:140] if item.description else item.title,
+            url=cockpit_url,
+            tag=f"reminder-{item.pk}",
         )
         sent += 1
 
