@@ -105,6 +105,16 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
 
+# Cookie domain — set to the parent domain (`.olaf.events`) in production so
+# the frontend on `olaf.events` can read the csrftoken set by `api.olaf.events`
+# via document.cookie. Without this both cookies are host-only and the SPA
+# can't see them across the subdomain split. Empty/None = Django default
+# (host-only) — used locally where everything talks to localhost.
+_cookie_domain = env("COOKIE_DOMAIN", default="")
+if _cookie_domain:
+    CSRF_COOKIE_DOMAIN = _cookie_domain
+    SESSION_COOKIE_DOMAIN = _cookie_domain
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},

@@ -20,7 +20,7 @@ const NAV: NavItem[] = [
 ];
 
 /**
- * Správce shell — left sidebar tree + main content. The user can drill into
+ * Tvůrce shell — left sidebar tree + main content. The user can drill into
  * each agenda from the sidebar; content area routes handle list → detail.
  * No "back to user view" link here — the top header is sticky and already
  * carries Dashboard / Komunity / Akce, which serves as the way back.
@@ -40,7 +40,7 @@ export default function AdminLayout({
           <aside className="lg:w-60 lg:shrink-0">
             <div className="sticky top-20 flex flex-col gap-1 rounded-2xl border border-border bg-surface p-3 shadow-sm">
               <p className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-[0.16em] text-ink-500">
-                Správce
+                Tvůrce
               </p>
               <nav className="flex flex-col gap-0.5" aria-label="Admin sections">
                 {NAV.map((item) => {

@@ -16,7 +16,7 @@ export function ComingSoon({
     <div className="flex flex-col gap-6">
       <header>
         <div className="flex items-baseline gap-3">
-          <p className="text-sm font-medium text-brand">Správce</p>
+          <p className="text-sm font-medium text-brand">Tvůrce</p>
           <span className="rounded bg-surface-muted px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.14em] text-ink-500">
             Brzy
           </span>

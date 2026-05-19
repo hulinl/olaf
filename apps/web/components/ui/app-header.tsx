@@ -47,7 +47,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const ws = useWorkspaces();
 
-  // Load workspaces on mount so the "Správce" pill in the top-right is
+  // Load workspaces on mount so the "Tvůrce" pill in the top-right is
   // visible from the very first paint of /dashboard, not only after the
   // user opens a dropdown that triggers ws.load().
   useEffect(() => {
@@ -58,8 +58,6 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
-
-  const ownerWorkspaces = ws.items?.filter((w) => w.my_role === "owner") ?? [];
 
   return (
     <>
@@ -125,28 +123,26 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {ownerWorkspaces.length > 0 && (
-              <Link
-                href="/admin"
-                className={[
-                  "hidden items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-ring sm:inline-flex",
-                  pathname.startsWith("/admin")
-                    ? "border-brand bg-brand text-brand-ink"
-                    : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
-                ].join(" ")}
+            <Link
+              href="/admin"
+              className={[
+                "hidden items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-ring sm:inline-flex",
+                pathname.startsWith("/admin")
+                  ? "border-brand bg-brand text-brand-ink"
+                  : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+              ].join(" ")}
+            >
+              <span
+                aria-hidden
+                className={
+                  pathname.startsWith("/admin") ? "text-brand-ink" : "text-brand"
+                }
+                style={{ fontSize: "0.7em", lineHeight: 1 }}
               >
-                <span
-                  aria-hidden
-                  className={
-                    pathname.startsWith("/admin") ? "text-brand-ink" : "text-brand"
-                  }
-                  style={{ fontSize: "0.7em", lineHeight: 1 }}
-                >
-                  ●
-                </span>
-                Správce
-              </Link>
-            )}
+                ●
+              </span>
+              Tvůrce
+            </Link>
             <UserMenu
               user={user}
               onSignOut={onSignOut}
@@ -160,7 +156,6 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
         <MobileDrawer
           pathname={pathname}
           workspaces={ws.items}
-          ownerWorkspaces={ownerWorkspaces}
           onMount={ws.load}
           onClose={() => setDrawerOpen(false)}
         />
@@ -301,13 +296,11 @@ function DropdownNote({ children }: { children: React.ReactNode }) {
 function MobileDrawer({
   pathname,
   workspaces,
-  ownerWorkspaces,
   onMount,
   onClose,
 }: {
   pathname: string;
   workspaces: Workspace[] | null;
-  ownerWorkspaces: Workspace[];
   onMount: () => void;
   onClose: () => void;
 }) {
@@ -388,17 +381,15 @@ function MobileDrawer({
             </DrawerSubLink>
           </DrawerSection>
 
-          {ownerWorkspaces.length > 0 && (
-            <DrawerSection label="Správce">
-              <DrawerSubLink
-                href="/admin"
-                pathname={pathname}
-                onClose={onClose}
-              >
-                Otevřít sekci správce
-              </DrawerSubLink>
-            </DrawerSection>
-          )}
+          <DrawerSection label="Tvůrce">
+            <DrawerSubLink
+              href="/admin"
+              pathname={pathname}
+              onClose={onClose}
+            >
+              Otevřít sekci tvůrce
+            </DrawerSubLink>
+          </DrawerSection>
         </nav>
       </div>
     </div>
