@@ -14,6 +14,7 @@ import {
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
+  type RequiredDocumentSpec,
   type Workspace,
   workspaces,
 } from "@/lib/api";
@@ -120,6 +121,10 @@ export function EventForm({
     initial?.shared_workspace_slugs ?? [],
   );
 
+  const [requiredDocs, setRequiredDocs] = useState<RequiredDocumentSpec[]>(
+    initial?.required_documents ?? [],
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -170,6 +175,7 @@ export function EventForm({
         price_currency: priceCurrency,
         price_note: isPaid ? priceNote : "",
         shared_workspace_slugs: sharedSlugs,
+        required_documents: requiredDocs,
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -461,6 +467,94 @@ export function EventForm({
           </CardSection>
         </Card>
       )}
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">
+            Požadované dokumenty
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Co budeš po účastnících chtít doložit? Nahrávají do svého
+            profilu akce (souhlas s riziky, kopie pojistky, parental
+            consent, ...). Pole „key" si zvol libovolně bez mezer — drží
+            soubory u sebe i po přejmenování labelu.
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            {requiredDocs.map((d, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-1 gap-2 rounded-md border border-border p-3 sm:grid-cols-[140px_1fr_auto_auto]"
+              >
+                <Input
+                  value={d.key}
+                  placeholder="key"
+                  onChange={(e) =>
+                    setRequiredDocs((prev) =>
+                      prev.map((p, i) =>
+                        i === idx
+                          ? {
+                              ...p,
+                              key: e.target.value
+                                .toLowerCase()
+                                .replace(/[^a-z0-9_-]/g, ""),
+                            }
+                          : p,
+                      ),
+                    )
+                  }
+                />
+                <Input
+                  value={d.label}
+                  placeholder="Souhlas s riziky"
+                  onChange={(e) =>
+                    setRequiredDocs((prev) =>
+                      prev.map((p, i) =>
+                        i === idx ? { ...p, label: e.target.value } : p,
+                      ),
+                    )
+                  }
+                />
+                <label className="flex items-center gap-2 text-xs text-ink-700">
+                  <input
+                    type="checkbox"
+                    checked={d.required}
+                    onChange={(e) =>
+                      setRequiredDocs((prev) =>
+                        prev.map((p, i) =>
+                          i === idx ? { ...p, required: e.target.checked } : p,
+                        ),
+                      )
+                    }
+                    className="size-4 accent-brand"
+                  />
+                  Povinný
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRequiredDocs((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  className="rounded-md border border-border bg-surface px-3 py-1 text-xs text-ink-500 hover:text-danger"
+                >
+                  Smazat
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setRequiredDocs((prev) => [
+                  ...prev,
+                  { key: "", label: "", required: true },
+                ])
+              }
+              className="inline-flex w-fit items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+            >
+              + Přidat dokument
+            </button>
+          </div>
+        </CardSection>
+      </Card>
 
       <Card>
         <CardSection>

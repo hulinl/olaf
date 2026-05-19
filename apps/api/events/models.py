@@ -184,6 +184,19 @@ class Event(TenantScopedModel):
         help_text='Short qualifier shown next to the price (e.g. "vč. DPH", "záloha 1 000 Kč").',
     )
 
+    # Required documents (Slice 7). Owner declares a list of documents
+    # the participant must upload (waiver, insurance card, parental
+    # consent, ...). Each item is {key, label, required}. Files land in
+    # RSVPDocument rows tied to the RSVP.
+    required_documents = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            'Documents required from participants: '
+            '[{"key": "waiver", "label": "Souhlas s riziky", "required": true}, ...].'
+        ),
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -449,3 +462,40 @@ class RSVP(models.Model):
                 head.waitlist_position = None
                 head.save(update_fields=["status", "waitlist_position", "updated_at"])
                 # Email fan-out lives in the view layer; we return None here.
+
+
+class RSVPDocument(models.Model):
+    """One uploaded file matching one entry in event.required_documents.
+
+    Owner defines required documents on the Event; participants upload
+    files keyed by the document's `key`. We allow multiple uploads per
+    (rsvp, key) and use the most recent as canonical (so users can fix
+    a mistake). Owner reviews/approves via `verified_at`.
+    """
+
+    rsvp = models.ForeignKey(
+        RSVP, on_delete=models.CASCADE, related_name="documents"
+    )
+    key = models.CharField(
+        max_length=60,
+        help_text="Matches a key inside event.required_documents.",
+    )
+    file = models.FileField(upload_to="events/rsvp-docs/")
+    original_name = models.CharField(max_length=255, blank=True, default="")
+    uploaded_at = models.DateTimeField(default=timezone.now)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_rsvp_documents",
+    )
+
+    class Meta:
+        db_table = "events_rsvpdocument"
+        ordering = ["-uploaded_at"]
+        indexes = [models.Index(fields=["rsvp", "key"])]
+
+    def __str__(self) -> str:
+        return f"{self.rsvp_id}/{self.key} (#{self.pk})"

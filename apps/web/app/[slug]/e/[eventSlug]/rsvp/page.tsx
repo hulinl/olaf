@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, use, useEffect, useState } from "react";
 
 import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
+import { RequiredDocsPanel } from "@/components/required-docs-panel";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -225,12 +226,14 @@ export default function RSVPPage({ params }: Props) {
         </div>
 
         {/* Paid event → show payment instructions inline so they don't have
-            to hunt them down. The panel hides itself for free events. */}
-        <div className="mt-10 w-full max-w-xl text-left">
+            to hunt them down. The panel hides itself for free events.
+            Same for required docs — auto-hides when nothing is asked for. */}
+        <div className="mt-10 flex w-full max-w-xl flex-col gap-4 text-left">
           <PaymentInstructionsPanel
             workspaceSlug={slug}
             eventSlug={eventSlug}
           />
+          <RequiredDocsPanel workspaceSlug={slug} eventSlug={eventSlug} />
         </div>
 
         <LinkButton

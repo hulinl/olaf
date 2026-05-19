@@ -908,3 +908,94 @@ def mark_rsvp_paid(
     rsvp.paid_at = timezone.now()
     rsvp.save(update_fields=["payment_status", "paid_at", "updated_at"])
     return Response(RSVPSerializer(rsvp).data)
+
+
+# ---------------------------------------------------------------------------
+# Slice 7 — RSVP documents (uploads tied to required_documents)
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def my_rsvp_documents(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """List or upload the current user's RSVP documents.
+
+    GET: returns required_documents schema + uploaded files.
+    POST (multipart): {key, file} → creates RSVPDocument row.
+    """
+    from .models import RSVPDocument
+    from .serializers import RSVPDocumentSerializer
+
+    rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
+    if rsvp is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        docs = RSVPDocument.objects.filter(rsvp=rsvp)
+        return Response(
+            {
+                "required": rsvp.event.required_documents or [],
+                "uploaded": RSVPDocumentSerializer(docs, many=True).data,
+            }
+        )
+
+    # POST
+    key = (request.data.get("key") or "").strip()
+    file_obj = request.FILES.get("file")
+    if not key or not file_obj:
+        return Response(
+            {"detail": "Vyžadovaná pole: key, file."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    valid_keys = {d.get("key") for d in (rsvp.event.required_documents or [])}
+    if key not in valid_keys:
+        return Response(
+            {"key": "Neznámý typ dokumentu."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    doc = RSVPDocument.objects.create(
+        rsvp=rsvp,
+        key=key,
+        file=file_obj,
+        original_name=getattr(file_obj, "name", "")[:255],
+    )
+    return Response(
+        RSVPDocumentSerializer(doc).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def my_rsvp_document_detail(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    document_id: int,
+) -> Response:
+    """Delete a previously-uploaded document. Self-service so participant
+    can re-upload after a mistake."""
+    from .models import RSVPDocument
+
+    rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
+    if rsvp is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        doc = RSVPDocument.objects.get(pk=document_id, rsvp=rsvp)
+    except RSVPDocument.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if doc.verified_at:
+        return Response(
+            {"detail": "Dokument už ověřil organizátor, nelze smazat."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    doc.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
