@@ -271,3 +271,153 @@ def workspace_events(request: Request, slug: str) -> Response:
         qs = qs.exclude(status=Event.STATUS_DRAFT)
     qs = qs.order_by("-starts_at")
     return Response(EventSummarySerializer(qs, many=True).data)
+
+
+# ---------------------------------------------------------------------------
+# Slice 9 — Členové komunity (owner-only views)
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_members(request: Request, slug: str) -> Response:
+    """List participants who have at least one RSVP in this workspace's events.
+
+    "Member" in V1 = anyone who's registered for an event the workspace
+    owns (or shares — Slice 3). Owner-only because it includes email + phone.
+    """
+    from django.db.models import Count, Max
+    from django.db.models import Q as DQ
+    from django.utils import timezone
+
+    from accounts.models import User
+    from events.models import RSVP, Event
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    event_ids = list(
+        Event.objects.filter(
+            DQ(workspace=workspace) | DQ(shared_workspaces=workspace)
+        )
+        .values_list("id", flat=True)
+        .distinct()
+    )
+
+    now = timezone.now()
+    users = (
+        User.objects.filter(rsvps__event_id__in=event_ids)
+        .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
+        .annotate(
+            total_rsvps=Count("rsvps", filter=DQ(rsvps__event_id__in=event_ids)),
+            upcoming_rsvps=Count(
+                "rsvps",
+                filter=DQ(
+                    rsvps__event_id__in=event_ids,
+                    rsvps__event__ends_at__gte=now,
+                )
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+            ),
+            past_rsvps=Count(
+                "rsvps",
+                filter=DQ(
+                    rsvps__event_id__in=event_ids,
+                    rsvps__event__ends_at__lt=now,
+                )
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+            ),
+            last_rsvp_at=Max("rsvps__created_at"),
+        )
+        .distinct()
+        .order_by("-last_rsvp_at")
+    )
+
+    return Response(
+        [
+            {
+                "id": u.id,
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "full_name": u.get_full_name(),
+                "phone": u.phone,
+                "total_rsvps": u.total_rsvps,
+                "upcoming_rsvps": u.upcoming_rsvps,
+                "past_rsvps": u.past_rsvps,
+                "last_rsvp_at": u.last_rsvp_at,
+            }
+            for u in users
+        ]
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_member_detail(
+    request: Request, slug: str, user_id: int
+) -> Response:
+    """Profile + RSVP history for one member, scoped to this workspace."""
+    from django.db.models import Q as DQ
+
+    from accounts.models import User
+    from events.models import RSVP, Event
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        member = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    event_ids = list(
+        Event.objects.filter(
+            DQ(workspace=workspace) | DQ(shared_workspaces=workspace)
+        )
+        .values_list("id", flat=True)
+        .distinct()
+    )
+
+    rsvps = (
+        RSVP.objects.filter(user=member, event_id__in=event_ids)
+        .select_related("event")
+        .order_by("-event__starts_at")
+    )
+
+    return Response(
+        {
+            "id": member.id,
+            "email": member.email,
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "full_name": member.get_full_name(),
+            "phone": member.phone,
+            "bio": member.bio,
+            "fitness_level": member.fitness_level,
+            "diet": member.diet,
+            "tshirt_size": member.tshirt_size,
+            "rsvps": [
+                {
+                    "id": r.id,
+                    "event_slug": r.event.slug,
+                    "event_title": r.event.title,
+                    "event_starts_at": r.event.starts_at,
+                    "event_workspace_slug": r.event.workspace.slug,
+                    "status": r.status,
+                    "payment_status": r.payment_status,
+                    "created_at": r.created_at,
+                }
+                for r in rsvps
+            ],
+        }
+    )

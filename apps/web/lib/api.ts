@@ -356,6 +356,44 @@ export interface WorkspaceCreatePayload {
   default_tz?: string;
 }
 
+export interface WorkspaceMemberSummary {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  phone: string;
+  total_rsvps: number;
+  upcoming_rsvps: number;
+  past_rsvps: number;
+  last_rsvp_at: string | null;
+}
+
+export interface WorkspaceMemberRSVP {
+  id: number;
+  event_slug: string;
+  event_title: string;
+  event_starts_at: string;
+  event_workspace_slug: string;
+  status: MyRSVP["status"];
+  payment_status: MyRSVP["payment_status"];
+  created_at: string;
+}
+
+export interface WorkspaceMemberDetail {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  phone: string;
+  bio: string;
+  fitness_level: User["fitness_level"];
+  diet: User["diet"];
+  tshirt_size: string;
+  rsvps: WorkspaceMemberRSVP[];
+}
+
 export const workspaces = {
   byPublicSlug: (slug: string) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/`),
@@ -363,6 +401,12 @@ export const workspaces = {
     apiFetch<Workspace>(`/api/workspaces/${slug}/detail/`),
   eventsFor: (slug: string) =>
     apiFetch<EventSummary[]>(`/api/workspaces/${slug}/events/`),
+  members: (slug: string) =>
+    apiFetch<WorkspaceMemberSummary[]>(`/api/workspaces/${slug}/members/`),
+  memberDetail: (slug: string, userId: number) =>
+    apiFetch<WorkspaceMemberDetail>(
+      `/api/workspaces/${slug}/members/${userId}/`,
+    ),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
   create: (payload: WorkspaceCreatePayload) =>
     apiFetch<Workspace>("/api/workspaces/", {
