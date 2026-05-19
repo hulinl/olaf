@@ -139,7 +139,7 @@ class Event(TenantScopedModel):
         blank=True,
         help_text=(
             "Which questionnaire sections appear on this event's RSVP form. "
-            "Empty list = all sections enabled (backwards compat)."
+            "Empty list = no questionnaire (form collects only user profile)."
         ),
     )
 
@@ -246,10 +246,12 @@ class Event(TenantScopedModel):
 
     @property
     def effective_questionnaire_sections(self) -> list[str]:
-        """Empty list defaults to all sections enabled."""
-        if not self.enabled_questionnaire_sections:
-            return list(self.QUESTIONNAIRE_SECTIONS_ALL)
-        return list(self.enabled_questionnaire_sections)
+        """Whatever the owner has explicitly enabled — empty list is
+        a valid state meaning "no extra questionnaire, just the
+        profile fields." Legacy events created before the toggle
+        existed are migrated to the full set in
+        events.0019_seed_questionnaire_sections."""
+        return list(self.enabled_questionnaire_sections or [])
 
     @property
     def confirmed_rsvp_count(self) -> int:

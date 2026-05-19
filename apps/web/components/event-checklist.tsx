@@ -90,7 +90,7 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
     <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h3 className="text-base font-semibold text-ink-900">
-          Roadmapa akce
+          Roadmapa
         </h3>
         <span
           className={[
