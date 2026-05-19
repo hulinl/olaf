@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, use, useEffect, useState } from "react";
 
+import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -212,8 +213,8 @@ export default function RSVPPage({ params }: Props) {
           ? "Jsi na waitlistu"
           : "Registrace přijata — čeká na schválení";
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-4 py-16">
-        <div className="w-full max-w-md text-center">
+      <main className="flex flex-1 flex-col items-center px-4 py-16">
+        <div className="w-full max-w-xl text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
             {headline}
           </h1>
@@ -221,15 +222,25 @@ export default function RSVPPage({ params }: Props) {
             Poslali jsme ti potvrzení na e-mail. Detaily najdeš taky na
             stránce akce.
           </p>
-          <LinkButton
-            href={`/${slug}/e/${eventSlug}`}
-            variant="primary"
-            size="lg"
-            className="mt-8"
-          >
-            Zpět na stránku akce
-          </LinkButton>
         </div>
+
+        {/* Paid event → show payment instructions inline so they don't have
+            to hunt them down. The panel hides itself for free events. */}
+        <div className="mt-10 w-full max-w-xl text-left">
+          <PaymentInstructionsPanel
+            workspaceSlug={slug}
+            eventSlug={eventSlug}
+          />
+        </div>
+
+        <LinkButton
+          href={`/${slug}/e/${eventSlug}`}
+          variant="primary"
+          size="lg"
+          className="mt-8"
+        >
+          Zpět na stránku akce
+        </LinkButton>
       </main>
     );
   }

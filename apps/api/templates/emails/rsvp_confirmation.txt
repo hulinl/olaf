@@ -10,7 +10,19 @@ Stránka akce:
 
 {% if event.starts_at %}Kdy: {{ event.starts_at|date:"l j. F Y, H:i" }}{% endif %}{% if event.location_text %}
 Kde: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
-Sraz: {{ event.meeting_point_text }}{% endif %}
+Sraz: {{ event.meeting_point_text }}{% endif %}{% if rsvp.payment_status == 'pending' and rsvp.payment_due_amount %}
+
+—— POKYNY K PLATBĚ ——
+
+Částka:     {{ rsvp.payment_due_amount }} {{ rsvp.payment_currency }}
+Účet:       {{ workspace.payment_iban|default:"(organizátor ještě nezadal IBAN)" }}
+{% if workspace.payment_bank_name %}Banka:      {{ workspace.payment_bank_name }}
+{% endif %}Var. symbol: {{ rsvp.variable_symbol }}
+Zpráva:     {{ workspace.name }} — {{ event.title }}
+Splatnost:  {{ workspace.payment_due_days }} dní od registrace
+
+QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.
+{% endif %}
 
 Registraci si můžeš kdykoli zkontrolovat na stránce akce výše. Pokud něco nevyjde nebo potřebuješ zrušit, otevři si stránku a uprav svou registraci.
 

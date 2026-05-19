@@ -313,6 +313,11 @@ class RSVPSerializer(serializers.ModelSerializer):
             "questionnaire_answers",
             "waitlist_position",
             "attended",
+            "payment_status",
+            "payment_due_amount",
+            "payment_currency",
+            "variable_symbol",
+            "paid_at",
             "created_at",
             "updated_at",
         )
@@ -329,6 +334,11 @@ class MyRSVPSerializer(serializers.ModelSerializer):
             "status",
             "questionnaire_answers",
             "waitlist_position",
+            "payment_status",
+            "payment_due_amount",
+            "payment_currency",
+            "variable_symbol",
+            "paid_at",
             "created_at",
         )
         read_only_fields = fields

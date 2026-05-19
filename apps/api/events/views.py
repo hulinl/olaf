@@ -5,6 +5,8 @@ import secrets
 
 from django.contrib.auth import login
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -785,3 +787,124 @@ def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Respo
         .order_by("status", "waitlist_position", "created_at")
     )
     return Response(RSVPSerializer(rsvps, many=True).data)
+
+
+# ---------------------------------------------------------------------------
+# Slice 5 — RSVP payment endpoints
+# ---------------------------------------------------------------------------
+
+
+def _my_rsvp_or_404(user, workspace_slug: str, event_slug: str):
+    """Helper: load the current user's RSVP for an event, or return None."""
+    try:
+        return RSVP.objects.select_related("event", "event__workspace").get(
+            event__workspace__slug=workspace_slug,
+            event__slug=event_slug,
+            user=user,
+        )
+    except RSVP.DoesNotExist:
+        return None
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_rsvp_payment(request: Request, workspace_slug: str, event_slug: str) -> Response:
+    """Payment instructions for the current user's RSVP.
+
+    Returns the structured info the frontend needs to render a QR + IBAN
+    + variable symbol panel. 404 when there's no RSVP, 400 when the
+    event is free, 200 with the data otherwise.
+    """
+    rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
+    if rsvp is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not rsvp.event.price_amount:
+        return Response(
+            {"detail": "Tato akce je zdarma — žádná platba se neřeší."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    workspace = rsvp.event.workspace
+    qr_url = (
+        request.build_absolute_uri(
+            f"/api/events/{workspace_slug}/{event_slug}/rsvp/payment/qr.png"
+        )
+        if workspace.payment_iban
+        else None
+    )
+    return Response(
+        {
+            "status": rsvp.payment_status,
+            "amount": str(rsvp.payment_due_amount or rsvp.event.price_amount),
+            "currency": rsvp.payment_currency or rsvp.event.price_currency,
+            "variable_symbol": rsvp.variable_symbol,
+            "iban": workspace.payment_iban,
+            "bank_name": workspace.payment_bank_name,
+            "due_days": workspace.payment_due_days,
+            "qr_png_url": qr_url,
+            "message": f"{workspace.name} — {rsvp.event.title}"[:60],
+            "paid_at": rsvp.paid_at,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_rsvp_payment_qr(
+    request: Request, workspace_slug: str, event_slug: str
+) -> HttpResponse:
+    """Render the QR Platba PNG for the current user's RSVP. Inline image."""
+    from .payments import build_qr_png, build_spayd_string
+
+    rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
+    if rsvp is None or not rsvp.event.price_amount:
+        return HttpResponse(status=404)
+
+    workspace = rsvp.event.workspace
+    if not workspace.payment_iban:
+        return HttpResponse(status=404)
+
+    spayd = build_spayd_string(
+        iban=workspace.payment_iban,
+        amount=rsvp.payment_due_amount or rsvp.event.price_amount,
+        currency=rsvp.payment_currency or rsvp.event.price_currency or "CZK",
+        variable_symbol=rsvp.variable_symbol,
+        message=f"{workspace.name} — {rsvp.event.title}",
+    )
+    png = build_qr_png(spayd)
+    response = HttpResponse(png, content_type="image/png")
+    # Short cache: VS doesn't change, but if the owner edits the IBAN
+    # mid-flight we want it to refresh quickly.
+    response["Cache-Control"] = "private, max-age=300"
+    return response
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mark_rsvp_paid(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Owner action: mark an RSVP as paid (manual reconciliation in V1).
+
+    V1.5 will replace this with a Fio bank webhook that matches incoming
+    payments by variable_symbol + amount and flips the status automatically.
+    """
+    try:
+        rsvp = RSVP.objects.select_related("event", "event__workspace").get(
+            pk=rsvp_id,
+            event__workspace__slug=workspace_slug,
+            event__slug=event_slug,
+        )
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, rsvp.event.workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if rsvp.payment_status == RSVP.PAYMENT_PAID:
+        return Response(RSVPSerializer(rsvp).data)
+
+    rsvp.payment_status = RSVP.PAYMENT_PAID
+    rsvp.paid_at = timezone.now()
+    rsvp.save(update_fields=["payment_status", "paid_at", "updated_at"])
+    return Response(RSVPSerializer(rsvp).data)

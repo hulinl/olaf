@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
 import { EventGallery } from "@/components/event-gallery";
+import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
@@ -139,6 +140,15 @@ export default async function EventLandingPage({ params }: Props) {
             </div>
           </section>
         )}
+
+        {/* Logged-in participant: payment block (auto-hides for free
+            events / anonymous viewers / non-attendees). */}
+        <section className="mx-auto w-full max-w-3xl px-4 py-6">
+          <PaymentInstructionsPanel
+            workspaceSlug={event.workspace_slug}
+            eventSlug={event.slug}
+          />
+        </section>
 
         {event.images.length > 0 &&
           !event.blocks.some((b) => b.type === "gallery") && (

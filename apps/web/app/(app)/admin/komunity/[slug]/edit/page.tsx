@@ -74,6 +74,10 @@ export default function WorkspaceEditPage({ params }: Props) {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
+  const [paymentIban, setPaymentIban] = useState("");
+  const [paymentBankName, setPaymentBankName] = useState("");
+  const [paymentDueDays, setPaymentDueDays] = useState("14");
+
   useEffect(() => {
     let cancelled = false;
     workspaces
@@ -99,6 +103,9 @@ export default function WorkspaceEditPage({ params }: Props) {
         setSocials(ws.social_links ?? {});
         setLogoUrl(ws.logo_url);
         setCoverUrl(ws.cover_url);
+        setPaymentIban(ws.payment_iban ?? "");
+        setPaymentBankName(ws.payment_bank_name ?? "");
+        setPaymentDueDays(String(ws.payment_due_days ?? 14));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -201,6 +208,9 @@ export default function WorkspaceEditPage({ params }: Props) {
         default_tz: defaultTz,
         accent_color: accentColor,
         social_links: cleanSocials,
+        payment_iban: paymentIban.replace(/\s+/g, ""),
+        payment_bank_name: paymentBankName,
+        payment_due_days: Number(paymentDueDays) || 14,
       };
       const updated = await workspaces.update(slug, payload);
       setWorkspace(updated);
@@ -422,6 +432,60 @@ export default function WorkspaceEditPage({ params }: Props) {
                     />
                   </Field>
                 ))}
+              </div>
+            </CardSection>
+          </Card>
+
+          <Card>
+            <CardSection>
+              <h2 className="text-base font-semibold text-ink-900">
+                Platby
+              </h2>
+              <p className="mt-1 text-sm text-ink-500">
+                Bankovní účet, na který přijdou platby za placené akce. Pro
+                každou registraci se vygeneruje QR Platba s variabilním
+                symbolem, který jasně identifikuje, kdo a za kterou akci
+                platí.
+              </p>
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Field
+                    label="IBAN"
+                    htmlFor="iban"
+                    hint="Český formát: CZ65 0800 0000 1920 0014 5399 (mezery povoleny)."
+                  >
+                    <Input
+                      id="iban"
+                      value={paymentIban}
+                      onChange={(e) =>
+                        setPaymentIban(e.target.value.toUpperCase())
+                      }
+                      placeholder="CZ65 0800 0000 1920 0014 5399"
+                    />
+                  </Field>
+                </div>
+                <Field label="Název banky" htmlFor="bank-name">
+                  <Input
+                    id="bank-name"
+                    value={paymentBankName}
+                    onChange={(e) => setPaymentBankName(e.target.value)}
+                    placeholder="ČS, FIO, ..."
+                  />
+                </Field>
+                <Field
+                  label="Splatnost (dny)"
+                  htmlFor="due-days"
+                  hint="Kolik dní má účastník na zaplacení od registrace."
+                >
+                  <Input
+                    id="due-days"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={paymentDueDays}
+                    onChange={(e) => setPaymentDueDays(e.target.value)}
+                  />
+                </Field>
               </div>
             </CardSection>
           </Card>
