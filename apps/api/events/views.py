@@ -1162,11 +1162,15 @@ def invoice_qr(
     if not (is_owner or is_participant):
         return HttpResponse(status=403)
 
-    if not invoice.supplier_iban or not invoice.total:
+    # Fallback chain for IBAN: invoice snapshot → workspace.payment_iban.
+    # Catches older invoices generated before billing profiles landed,
+    # or invoices manually edited blank.
+    iban = invoice.supplier_iban or invoice.rsvp.event.workspace.payment_iban
+    if not iban or not invoice.total:
         return HttpResponse(status=404)
 
     spayd = build_spayd_string(
-        iban=invoice.supplier_iban,
+        iban=iban,
         amount=invoice.total,
         currency=invoice.currency or "CZK",
         variable_symbol=invoice.variable_symbol,

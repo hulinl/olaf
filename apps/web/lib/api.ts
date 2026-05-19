@@ -292,6 +292,7 @@ export interface Invoice {
   issued_at: string;
   due_at: string | null;
   notes: string;
+  has_qr: boolean;
   user_email: string;
   user_full_name: string;
   event_title: string;

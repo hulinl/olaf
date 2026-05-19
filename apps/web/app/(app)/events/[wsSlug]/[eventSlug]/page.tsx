@@ -150,40 +150,31 @@ export default function MyEventPage({ params }: Props) {
           </p>
         </header>
 
-        {/* RSVP status summary */}
+        {/* RSVP status summary — header pill on the right mirrors every
+            other section's status placement. Price lives on the invoice
+            / payment panel below, no need to duplicate it here. */}
         {my && (
           <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                  Status registrace
-                </p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span
-                    className={[
-                      "inline-flex rounded px-2 py-0.5 text-xs font-medium",
-                      RSVP_STATUS_TONE[my.status] ?? "bg-surface-muted text-ink-500",
-                    ].join(" ")}
-                  >
-                    {RSVP_STATUS_LABEL[my.status] ?? my.status}
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="text-base font-semibold text-ink-900">
+                Status registrace
+              </h3>
+              <div className="flex items-center gap-2">
+                {my.waitlist_position != null && (
+                  <span className="text-xs text-ink-500">
+                    pořadí #{my.waitlist_position}
                   </span>
-                  {my.waitlist_position != null && (
-                    <span className="text-sm text-ink-500">
-                      pořadí #{my.waitlist_position}
-                    </span>
-                  )}
-                </div>
+                )}
+                <span
+                  className={[
+                    "inline-flex rounded-full px-3 py-0.5 text-xs font-semibold",
+                    RSVP_STATUS_TONE[my.status] ??
+                      "bg-surface-muted text-ink-500",
+                  ].join(" ")}
+                >
+                  {RSVP_STATUS_LABEL[my.status] ?? my.status}
+                </span>
               </div>
-              {event.price_amount && (
-                <div className="text-right">
-                  <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                    Cena
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-ink-900">
-                    {formatEventPrice(event.price_amount, event.price_currency)}
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -242,7 +233,7 @@ export default function MyEventPage({ params }: Props) {
                 <dt className="text-ink-500">Odběratel</dt>
                 <dd className="text-ink-700">{invoice.customer_name}</dd>
               </dl>
-              {invoice.supplier_iban && (
+              {invoice.has_qr && (
                 <div className="flex flex-col items-center gap-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

@@ -513,6 +513,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         source="rsvp.user.get_full_name", read_only=True
     )
     event_title = serializers.CharField(source="rsvp.event.title", read_only=True)
+    has_qr = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -540,6 +541,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "issued_at",
             "due_at",
             "notes",
+            "has_qr",
             "user_email",
             "user_full_name",
             "event_title",
@@ -549,9 +551,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "number",
+            "has_qr",
             "user_email",
             "user_full_name",
             "event_title",
             "created_at",
             "updated_at",
         )
+
+    def get_has_qr(self, obj: Invoice) -> bool:
+        """True when the QR endpoint will be able to produce a PNG —
+        i.e. there's an IBAN (snapshot or workspace fallback) + amount."""
+        iban = obj.supplier_iban or obj.rsvp.event.workspace.payment_iban
+        return bool(iban and obj.total)
