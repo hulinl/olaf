@@ -178,7 +178,28 @@ export interface Event extends EventSummary {
   price_amount: string | null;
   price_currency: string;
   price_note: string;
+  required_documents: RequiredDocumentSpec[];
   my_rsvp?: MyRSVP | null;
+}
+
+export interface RequiredDocumentSpec {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface RSVPDocument {
+  id: number;
+  key: string;
+  url: string | null;
+  original_name: string;
+  uploaded_at: string;
+  verified_at: string | null;
+}
+
+export interface RSVPDocumentsBundle {
+  required: RequiredDocumentSpec[];
+  uploaded: RSVPDocument[];
 }
 
 export interface RSVPAnswers {
@@ -546,6 +567,7 @@ export interface EventWritePayload {
   price_currency?: string;
   price_note?: string;
   shared_workspace_slugs?: string[];
+  required_documents?: RequiredDocumentSpec[];
 }
 
 export const events = {
@@ -659,6 +681,33 @@ export const events = {
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/mark-paid/`,
       { method: "POST" },
+    ),
+  myDocuments: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<RSVPDocumentsBundle>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/documents/`,
+    ),
+  uploadDocument: (
+    workspaceSlug: string,
+    eventSlug: string,
+    key: string,
+    file: File,
+  ) => {
+    const fd = new FormData();
+    fd.append("key", key);
+    fd.append("file", file);
+    return apiFetch<RSVPDocument>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/documents/`,
+      { method: "POST", body: fd },
+    );
+  },
+  deleteDocument: (
+    workspaceSlug: string,
+    eventSlug: string,
+    documentId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/documents/${documentId}/`,
+      { method: "DELETE" },
     ),
 };
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from .blocks import BlockValidationError, validate_blocks
-from .models import RSVP, Event, EventImage
+from .models import RSVP, Event, EventImage, RSVPDocument
 
 # Max-set questionnaire fields. Owner picks which sections appear on RSVP via
 # Event.enabled_questionnaire_sections; serializer below validates dynamically.
@@ -217,6 +217,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "price_amount",
             "price_currency",
             "price_note",
+            "required_documents",
             "created_at",
         )
         read_only_fields = fields
@@ -388,7 +389,33 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "price_amount",
             "price_currency",
             "price_note",
+            "required_documents",
         )
+
+    def validate_required_documents(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Musí být seznam.")
+        seen_keys: set[str] = set()
+        cleaned = []
+        for i, item in enumerate(value):
+            if not isinstance(item, dict):
+                raise serializers.ValidationError(
+                    f"Položka #{i} musí být objekt."
+                )
+            key = (item.get("key") or "").strip()
+            label = (item.get("label") or "").strip()
+            required = bool(item.get("required", True))
+            if not key or not label:
+                raise serializers.ValidationError(
+                    f"Položka #{i}: vyplň 'key' i 'label'."
+                )
+            if key in seen_keys:
+                raise serializers.ValidationError(
+                    f"Položka #{i}: duplicitní key '{key}'."
+                )
+            seen_keys.add(key)
+            cleaned.append({"key": key, "label": label, "required": required})
+        return cleaned
 
     def validate_enabled_questionnaire_sections(self, value):
         if not isinstance(value, list):
@@ -425,3 +452,27 @@ class EventWriteSerializer(serializers.ModelSerializer):
         except Exception as exc:
             raise serializers.ValidationError(str(exc)) from exc
         return value
+
+
+class RSVPDocumentSerializer(serializers.ModelSerializer):
+    """Single uploaded document. URL is built from FileField storage."""
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RSVPDocument
+        fields = (
+            "id",
+            "key",
+            "url",
+            "original_name",
+            "uploaded_at",
+            "verified_at",
+        )
+        read_only_fields = fields
+
+    def get_url(self, obj) -> str | None:
+        try:
+            return obj.file.url
+        except Exception:
+            return None

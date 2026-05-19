@@ -97,4 +97,14 @@ urlpatterns = [
         views.mark_rsvp_paid,
         name="rsvp-mark-paid",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvp/documents/",
+        views.my_rsvp_documents,
+        name="rsvp-documents",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvp/documents/<int:document_id>/",
+        views.my_rsvp_document_detail,
+        name="rsvp-document-detail",
+    ),
 ]

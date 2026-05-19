@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
 import { EventGallery } from "@/components/event-gallery";
 import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
+import { RequiredDocsPanel } from "@/components/required-docs-panel";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
@@ -141,10 +142,15 @@ export default async function EventLandingPage({ params }: Props) {
           </section>
         )}
 
-        {/* Logged-in participant: payment block (auto-hides for free
-            events / anonymous viewers / non-attendees). */}
-        <section className="mx-auto w-full max-w-3xl px-4 py-6">
+        {/* Logged-in participant: payment block + required-docs block.
+            Both auto-hide when not applicable (free event, anon viewer,
+            no required docs, no RSVP). */}
+        <section className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
           <PaymentInstructionsPanel
+            workspaceSlug={event.workspace_slug}
+            eventSlug={event.slug}
+          />
+          <RequiredDocsPanel
             workspaceSlug={event.workspace_slug}
             eventSlug={event.slug}
           />
