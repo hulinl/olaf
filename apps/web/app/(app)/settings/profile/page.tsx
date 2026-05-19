@@ -127,6 +127,132 @@ export default function ProfileSettingsPage() {
 
       <Card>
         <CardSection>
+          <h2 className="text-lg font-semibold text-ink-900">Adresa</h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Použijeme ji pro generování faktur a smluvních dokumentů u akcí,
+            kde je to potřeba.
+          </p>
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Field label="Ulice a č.p." htmlFor="address_street">
+                <Input
+                  id="address_street"
+                  value={user.address_street}
+                  onChange={(e) => update("address_street", e.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="Město" htmlFor="address_city">
+              <Input
+                id="address_city"
+                value={user.address_city}
+                onChange={(e) => update("address_city", e.target.value)}
+              />
+            </Field>
+            <Field label="PSČ" htmlFor="address_zip">
+              <Input
+                id="address_zip"
+                value={user.address_zip}
+                onChange={(e) => update("address_zip", e.target.value)}
+              />
+            </Field>
+            <Field label="Země" htmlFor="address_country" hint="Kód (CZ, SK, ...).">
+              <Input
+                id="address_country"
+                value={user.address_country}
+                onChange={(e) =>
+                  update(
+                    "address_country",
+                    e.target.value.toUpperCase().slice(0, 2),
+                  )
+                }
+                maxLength={2}
+              />
+            </Field>
+          </div>
+
+          <label className="mt-6 flex items-start gap-2 text-sm text-ink-900">
+            <input
+              type="checkbox"
+              checked={user.has_billing_address}
+              onChange={(e) => update("has_billing_address", e.target.checked)}
+              className="mt-0.5 size-4 accent-brand"
+            />
+            Mám jinou fakturační adresu
+          </label>
+
+          {user.has_billing_address && (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field
+                  label="Jméno / název firmy"
+                  htmlFor="billing_name"
+                  hint="Komu fakturujeme. Může být firma (B2B) i jiná osoba."
+                >
+                  <Input
+                    id="billing_name"
+                    value={user.billing_name}
+                    onChange={(e) => update("billing_name", e.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="IČO" htmlFor="billing_ico">
+                <Input
+                  id="billing_ico"
+                  value={user.billing_ico}
+                  onChange={(e) => update("billing_ico", e.target.value)}
+                />
+              </Field>
+              <Field label="DIČ" htmlFor="billing_dic">
+                <Input
+                  id="billing_dic"
+                  value={user.billing_dic}
+                  onChange={(e) => update("billing_dic", e.target.value)}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Ulice a č.p." htmlFor="billing_street">
+                  <Input
+                    id="billing_street"
+                    value={user.billing_street}
+                    onChange={(e) => update("billing_street", e.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="Město" htmlFor="billing_city">
+                <Input
+                  id="billing_city"
+                  value={user.billing_city}
+                  onChange={(e) => update("billing_city", e.target.value)}
+                />
+              </Field>
+              <Field label="PSČ" htmlFor="billing_zip">
+                <Input
+                  id="billing_zip"
+                  value={user.billing_zip}
+                  onChange={(e) => update("billing_zip", e.target.value)}
+                />
+              </Field>
+              <Field label="Země" htmlFor="billing_country">
+                <Input
+                  id="billing_country"
+                  value={user.billing_country}
+                  onChange={(e) =>
+                    update(
+                      "billing_country",
+                      e.target.value.toUpperCase().slice(0, 2),
+                    )
+                  }
+                  maxLength={2}
+                />
+              </Field>
+            </div>
+          )}
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
           <h2 className="text-lg font-semibold text-ink-900">
             Kondice a výkonnost
           </h2>

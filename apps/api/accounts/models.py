@@ -35,7 +35,30 @@ class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=30, blank=True)
     dob = models.DateField(null=True, blank=True)
     avatar_blob_id = models.CharField(max_length=255, blank=True)
+    # Legacy single-line address — kept so old data doesn't get dropped.
+    # New code reads/writes address_street / address_city / ... below.
     address = models.CharField(max_length=500, blank=True)
+
+    # Structured address (for invoice generation, contracts, mailings).
+    address_street = models.CharField(max_length=200, blank=True)
+    address_city = models.CharField(max_length=120, blank=True)
+    address_zip = models.CharField(max_length=20, blank=True)
+    address_country = models.CharField(max_length=2, blank=True, default="CZ")
+
+    # Optional separate billing address. has_billing_address gates whether
+    # the billing_* fields are used on invoices; otherwise we use address_*.
+    has_billing_address = models.BooleanField(default=False)
+    billing_name = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Company / person to bill (e.g. employer for B2B).",
+    )
+    billing_ico = models.CharField(max_length=15, blank=True)
+    billing_dic = models.CharField(max_length=15, blank=True)
+    billing_street = models.CharField(max_length=200, blank=True)
+    billing_city = models.CharField(max_length=120, blank=True)
+    billing_zip = models.CharField(max_length=20, blank=True)
+    billing_country = models.CharField(max_length=2, blank=True, default="CZ")
 
     # Emergency contact
     emergency_contact_name = models.CharField(max_length=200, blank=True)
