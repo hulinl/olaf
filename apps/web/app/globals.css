@@ -147,6 +147,22 @@ body {
      but a single bug shouldn't be allowed to widen the whole viewport and
      trigger the browser's "shrink-to-fit" zoom on mobile. */
   overflow-x: hidden;
+  /* Stop the viewport from ever being measured wider than the device.
+     Belt + suspenders with overflow-x: hidden. */
+  max-width: 100vw;
+}
+
+/* iOS Safari auto-zooms when an input/textarea/select is focused with
+   font-size < 16px, and the zoom-out animation sometimes leaves the
+   page rendered "wider than viewport" — what the user kept reporting
+   after saving the obsah form. Forcing 16px on small screens prevents
+   the zoom entirely. Above sm: we keep our designed text-sm. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 body {

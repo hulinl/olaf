@@ -86,7 +86,7 @@ export function ParticipantProfileDialog({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"
+        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:max-h-[85vh] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
@@ -103,7 +103,7 @@ export function ParticipantProfileDialog({
           </button>
         </div>
 
-        <div className="px-5 py-5">
+        <div className="overflow-y-auto px-5 py-5">
           {loading && (
             <div className="flex justify-center py-6">
               <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-border-strong border-t-brand" />

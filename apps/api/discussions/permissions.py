@@ -46,10 +46,16 @@ def can_access_event_wall(user, event: Event) -> bool:
         return False
     if is_workspace_owner(user, event.workspace):
         return True
-    return RSVP.objects.filter(
-        event=event,
-        user=user,
-    ).exclude(status=RSVP.STATUS_CANCELLED).exists()
+    # Pending_approval RSVPs don't yet have confirmed access — the
+    # owner might still reject them, so they shouldn't see the wall.
+    # Cancelled is obvious.
+    return (
+        RSVP.objects.filter(event=event, user=user)
+        .exclude(
+            status__in=[RSVP.STATUS_CANCELLED, RSVP.STATUS_PENDING_APPROVAL]
+        )
+        .exists()
+    )
 
 
 def can_moderate_workspace(user, workspace: Workspace) -> bool:

@@ -56,6 +56,10 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
+  // Collapsed by default — the section eats almost a full mobile
+  // viewport when expanded; owner expands when they want to act on
+  // it. Progress badge stays visible in the collapsed header.
+  const [expanded, setExpanded] = useState(false);
 
   async function reload() {
     try {
@@ -87,11 +91,25 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
   const grandDone = autoDone + manualDone;
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="text-base font-semibold text-ink-900">
-          Roadmapa
-        </h3>
+    <section className="rounded-2xl border border-border bg-surface shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl p-5 text-left focus-ring sm:p-6"
+      >
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className={[
+              "inline-block text-ink-500 transition-transform",
+              expanded ? "rotate-90" : "",
+            ].join(" ")}
+          >
+            ›
+          </span>
+          <h3 className="text-base font-semibold text-ink-900">Roadmapa</h3>
+        </div>
         <span
           className={[
             "inline-flex rounded-full px-3 py-0.5 text-xs font-semibold",
@@ -102,16 +120,21 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
         >
           {grandDone} / {grandTotal} hotovo
         </span>
-      </div>
-      <p className="mt-1 text-sm text-ink-500">
-        Bublinky stavu akce + tvůj vlastní to-do list. Kliknutí na auto-bublinku tě hodí tam, kde ji vyřešíš.
-      </p>
+      </button>
 
-      {error && (
-        <div className="mt-3">
-          <Alert variant="danger">{error}</Alert>
-        </div>
-      )}
+      {!expanded && null}
+
+      {expanded && (
+        <div className="border-t border-border p-5 sm:p-6">
+          <p className="text-sm text-ink-500">
+            Bublinky stavu akce + tvůj vlastní to-do list. Kliknutí na auto-bublinku tě hodí tam, kde ji vyřešíš.
+          </p>
+
+          {error && (
+            <div className="mt-3">
+              <Alert variant="danger">{error}</Alert>
+            </div>
+          )}
 
       {/* AUTO items as a horizontal scrollable trail */}
       <div className="mt-5">
@@ -240,7 +263,9 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
             ))
           )}
         </div>
-      </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
