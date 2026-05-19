@@ -256,7 +256,17 @@ def workspace_events(request: Request, slug: str) -> Response:
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    qs = Event.objects.filter(workspace=workspace).select_related("workspace")
+    # An event shows up in this workspace's list if it's *owned* by this
+    # workspace OR has been shared into it (Slice 3 cross-workspace m2m).
+    from django.db.models import Q
+
+    qs = (
+        Event.objects.filter(
+            Q(workspace=workspace) | Q(shared_workspaces=workspace)
+        )
+        .select_related("workspace")
+        .distinct()
+    )
     if viewer_role is None:
         qs = qs.exclude(status=Event.STATUS_DRAFT)
     qs = qs.order_by("-starts_at")

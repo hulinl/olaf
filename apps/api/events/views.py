@@ -262,9 +262,16 @@ def create_event(request: Request, workspace_slug: str) -> Response:
         )
 
     community_slugs = serializer.validated_data.pop("community_slugs", None)
+    shared_workspace_slugs = serializer.validated_data.pop(
+        "shared_workspace_slugs", None
+    )
     event = serializer.save(workspace=workspace)
     if community_slugs is not None:
         _set_event_communities(event, community_slugs)
+    if shared_workspace_slugs is not None:
+        _set_event_shared_workspaces(
+            event, shared_workspace_slugs, requesting_user=request.user
+        )
     return Response(
         EventPublicSerializer(event).data,
         status=status.HTTP_201_CREATED,
@@ -282,6 +289,33 @@ def _set_event_communities(event: Event, community_slugs: list[str]) -> None:
         workspace=event.workspace, slug__in=community_slugs
     )
     event.communities.set(matches)
+
+
+def _set_event_shared_workspaces(
+    event: Event, workspace_slugs: list[str], *, requesting_user
+) -> None:
+    """Replace shared_workspaces with the given slugs, but only attach
+    workspaces the requesting user actually owns. The primary owner
+    workspace (event.workspace) is never added here — it's already the
+    canonical owner via the FK."""
+    from workspaces.models import Workspace, WorkspaceMember
+
+    if not workspace_slugs:
+        event.shared_workspaces.clear()
+        return
+
+    owned_slugs = set(
+        WorkspaceMember.objects.filter(
+            user=requesting_user,
+            role=WorkspaceMember.ROLE_OWNER,
+        ).values_list("workspace__slug", flat=True)
+    )
+    target_slugs = [
+        s for s in workspace_slugs
+        if s in owned_slugs and s != event.workspace.slug
+    ]
+    matches = Workspace.objects.filter(slug__in=target_slugs)
+    event.shared_workspaces.set(matches)
 
 
 @api_view(["PATCH"])
@@ -316,9 +350,17 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
 
     has_communities = "community_slugs" in serializer.validated_data
     community_slugs = serializer.validated_data.pop("community_slugs", None)
+    has_shared = "shared_workspace_slugs" in serializer.validated_data
+    shared_workspace_slugs = serializer.validated_data.pop(
+        "shared_workspace_slugs", None
+    )
     event = serializer.save()
     if has_communities:
         _set_event_communities(event, community_slugs or [])
+    if has_shared:
+        _set_event_shared_workspaces(
+            event, shared_workspace_slugs or [], requesting_user=request.user
+        )
     return Response(EventPublicSerializer(event).data)
 
 

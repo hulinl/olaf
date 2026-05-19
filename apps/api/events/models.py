@@ -152,6 +152,20 @@ class Event(TenantScopedModel):
         help_text="Communities under the workspace where this event is listed.",
     )
 
+    # Cross-workspace sharing (Slice 3 of V1 plan). An event is owned by
+    # ONE workspace (the `workspace` FK above) but the creator can also
+    # publish it into other workspaces they own. Visitors of those
+    # workspaces see the event in the same lists as the owner's.
+    shared_workspaces = models.ManyToManyField(
+        "workspaces.Workspace",
+        blank=True,
+        related_name="shared_events",
+        help_text=(
+            "Additional workspaces (komunity) where this event appears. "
+            "Only workspaces the creator also owns may be added."
+        ),
+    )
+
     # Price (optional — events default to free; owner sets a price per event).
     # No payment processing here; this just propagates to the landing page +
     # later wires into RSVP.payment_due_amount (Slice 5).

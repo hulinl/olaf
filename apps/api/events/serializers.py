@@ -180,6 +180,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     enabled_questionnaire_sections = serializers.SerializerMethodField()
     community_slugs = serializers.SerializerMethodField()
+    shared_workspace_slugs = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -200,6 +201,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "status",
             "requires_approval",
             "community_slugs",
+            "shared_workspace_slugs",
             "blocks",
             "enabled_questionnaire_sections",
             "images",
@@ -232,6 +234,9 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     def get_community_slugs(self, obj: Event) -> list[str]:
         return list(obj.communities.values_list("slug", flat=True))
+
+    def get_shared_workspace_slugs(self, obj: Event) -> list[str]:
+        return list(obj.shared_workspaces.values_list("slug", flat=True))
 
 
 class EventSummarySerializer(serializers.ModelSerializer):
@@ -338,6 +343,15 @@ class EventWriteSerializer(serializers.ModelSerializer):
         write_only=True,
         help_text="Slugs of Communities to share the event into.",
     )
+    shared_workspace_slugs = serializers.ListField(
+        child=serializers.SlugField(),
+        required=False,
+        write_only=True,
+        help_text=(
+            "Slugs of additional Workspaces (komunity) where this event "
+            "should be visible. Validated server-side against owner status."
+        ),
+    )
 
     class Meta:
         model = Event
@@ -357,6 +371,7 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "status",
             "requires_approval",
             "community_slugs",
+            "shared_workspace_slugs",
             "blocks",
             "enabled_questionnaire_sections",
             "cancellation_reason",
