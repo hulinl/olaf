@@ -235,6 +235,40 @@ export interface RSVPDocumentsBundle {
   uploaded: RSVPDocument[];
 }
 
+export interface ChecklistAutoItem {
+  key: string;
+  title: string;
+  description: string;
+  done: boolean;
+  category: string;
+  action_href: string;
+}
+
+export interface ChecklistManualItem {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  done: boolean;
+  done_at: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistPreset {
+  key: string;
+  title: string;
+  description: string;
+  category: string;
+}
+
+export interface EventChecklist {
+  auto: ChecklistAutoItem[];
+  manual: ChecklistManualItem[];
+  presets: ChecklistPreset[];
+}
+
 export interface DiscussionTopic {
   id: number;
   parent_type: "workspace" | "event";
@@ -874,6 +908,53 @@ export const events = {
   myInvoice: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<Invoice>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvp/invoice/`,
+    ),
+  checklist: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<EventChecklist>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/`,
+    ),
+  addChecklistItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: { title: string; description?: string; category?: string },
+  ) =>
+    apiFetch<ChecklistManualItem>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  updateChecklistItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+    payload: Partial<{
+      title: string;
+      description: string;
+      category: string;
+      done: boolean;
+      sort_order: number;
+    }>,
+  ) =>
+    apiFetch<ChecklistManualItem>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/${itemId}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  deleteChecklistItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/${itemId}/`,
+      { method: "DELETE" },
+    ),
+  addChecklistFromPreset: (
+    workspaceSlug: string,
+    eventSlug: string,
+    key: string,
+  ) =>
+    apiFetch<ChecklistManualItem>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/from-preset/`,
+      { method: "POST", body: JSON.stringify({ key }) },
     ),
 };
 

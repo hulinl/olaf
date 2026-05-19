@@ -1204,3 +1204,164 @@ def invoice_qr(
     response = HttpResponse(png, content_type="image/png")
     response["Cache-Control"] = "private, max-age=300"
     return response
+
+
+# ---------------------------------------------------------------------------
+# Slice 11 — Event roadmap / checklist
+# ---------------------------------------------------------------------------
+
+
+def _load_event_for_owner(workspace_slug: str, event_slug: str, user):
+    """Common preamble for owner-only event endpoints."""
+    try:
+        event = Event.objects.select_related(
+            "workspace", "billing_profile"
+        ).get(workspace__slug=workspace_slug, slug=event_slug)
+    except Event.DoesNotExist:
+        return None, Response(status=status.HTTP_404_NOT_FOUND)
+    if not is_workspace_owner(user, event.workspace):
+        return None, Response(status=status.HTTP_403_FORBIDDEN)
+    return event, None
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_checklist(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner-only roadmap: auto-derived state items + manual items + presets."""
+    from .checklist import CHECKLIST_PRESETS, auto_items_for_event
+    from .models import EventChecklistItem
+    from .serializers import EventChecklistItemSerializer
+
+    event, err = _load_event_for_owner(workspace_slug, event_slug, request.user)
+    if err is not None:
+        return err
+
+    auto = auto_items_for_event(event)
+    manual = EventChecklistItem.objects.filter(event=event)
+    return Response(
+        {
+            "auto": [
+                {
+                    "key": a.key,
+                    "title": a.title,
+                    "description": a.description,
+                    "done": a.done,
+                    "category": a.category,
+                    "action_href": a.action_href,
+                }
+                for a in auto
+            ],
+            "manual": EventChecklistItemSerializer(manual, many=True).data,
+            "presets": CHECKLIST_PRESETS,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def checklist_items(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner adds a manual checklist item from scratch."""
+    from .models import EventChecklistItem
+    from .serializers import EventChecklistItemSerializer
+
+    event, err = _load_event_for_owner(workspace_slug, event_slug, request.user)
+    if err is not None:
+        return err
+
+    title = (request.data.get("title") or "").strip()
+    if not title:
+        return Response(
+            {"title": "Vyplň titulek."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    item = EventChecklistItem.objects.create(
+        event=event,
+        title=title[:200],
+        description=(request.data.get("description") or "").strip(),
+        category=(request.data.get("category") or "").strip()[:40],
+    )
+    return Response(
+        EventChecklistItemSerializer(item).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def checklist_item_detail(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    item_id: int,
+) -> Response:
+    from .models import EventChecklistItem
+    from .serializers import EventChecklistItemSerializer
+
+    event, err = _load_event_for_owner(workspace_slug, event_slug, request.user)
+    if err is not None:
+        return err
+
+    try:
+        item = EventChecklistItem.objects.get(pk=item_id, event=event)
+    except EventChecklistItem.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # PATCH — flip done, edit title/description/category/sort_order.
+    if "done" in request.data:
+        item.done = bool(request.data["done"])
+    if "title" in request.data:
+        title = str(request.data["title"]).strip()[:200]
+        if title:
+            item.title = title
+    if "description" in request.data:
+        item.description = str(request.data["description"]).strip()
+    if "category" in request.data:
+        item.category = str(request.data["category"]).strip()[:40]
+    if "sort_order" in request.data:
+        import contextlib
+
+        with contextlib.suppress(TypeError, ValueError):
+            item.sort_order = max(0, int(request.data["sort_order"]))
+    item.save()
+    return Response(EventChecklistItemSerializer(item).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def checklist_from_preset(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Spawn a fresh manual item from a preset key."""
+    from .checklist import CHECKLIST_PRESETS
+    from .models import EventChecklistItem
+    from .serializers import EventChecklistItemSerializer
+
+    event, err = _load_event_for_owner(workspace_slug, event_slug, request.user)
+    if err is not None:
+        return err
+
+    key = (request.data.get("key") or "").strip()
+    preset = next((p for p in CHECKLIST_PRESETS if p["key"] == key), None)
+    if preset is None:
+        return Response(
+            {"key": "Neznámý preset."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    item = EventChecklistItem.objects.create(
+        event=event,
+        title=preset["title"],
+        description=preset["description"],
+        category=preset["category"],
+    )
+    return Response(
+        EventChecklistItemSerializer(item).data,
+        status=status.HTTP_201_CREATED,
+    )

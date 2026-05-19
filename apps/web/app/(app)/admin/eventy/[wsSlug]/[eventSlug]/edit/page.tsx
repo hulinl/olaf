@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { EventChecklist } from "@/components/event-checklist";
 import { EventDangerZone } from "@/components/event-danger-zone";
 import { Alert } from "@/components/ui/card";
 import {
@@ -168,6 +169,8 @@ export default function EventEditCockpitPage({ params }: Props) {
           </a>
         </div>
       </header>
+
+      <EventChecklist workspaceSlug={wsSlug} eventSlug={eventSlug} />
 
       <section>
         <h2 className="text-lg font-semibold text-ink-900">Úpravy</h2>

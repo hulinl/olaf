@@ -764,3 +764,50 @@ def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
         variable_symbol=rsvp.variable_symbol,
     )
     return invoice
+
+
+class EventChecklistItem(models.Model):
+    """Owner-defined task on an event roadmap.
+
+    Pairs with the auto-derived items computed in events.checklist —
+    those don't live in the DB because they're a function of the
+    event's current state. These are the manual extras the owner adds
+    ("Sehnat dopravu", "Připravit prezentaci", ...).
+
+    `category` lets us colour/group items in the UI without coupling
+    to a fixed taxonomy — `risk`, `gear`, `comms`, `logistics`, or any
+    custom label the owner picks.
+    """
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="checklist_items"
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    category = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text="Free-text grouping label (risk / gear / comms / ...).",
+    )
+    done = models.BooleanField(default=False)
+    done_at = models.DateTimeField(null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_checklist_item"
+        ordering = ["done", "sort_order", "created_at"]
+        indexes = [models.Index(fields=["event", "done"])]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def save(self, *args, **kwargs):
+        # Stamp done_at automatically when toggled to True.
+        if self.done and self.done_at is None:
+            self.done_at = timezone.now()
+        elif not self.done:
+            self.done_at = None
+        super().save(*args, **kwargs)
