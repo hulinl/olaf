@@ -3,6 +3,27 @@
 Tento dokument převádí freeform brief z 2026-05-19 do prioritizovaných slices.
 Pořadí slices = pořadí implementace. Každý slice je samostatně mergeable + deploable.
 
+## Stav (aktualizováno 2026-05-19)
+
+**Hotovo + deployed na olaf.events:**
+
+| Slice | Co | PR |
+|---|---|---|
+| ✅ 1 | UX detaily (klikatelné řádky, secondary CTA) | #27 |
+| ✅ 2 | Event price + landing strip | #27 |
+| ✅ 3 | Cross-workspace sharing (Event.shared_workspaces m2m) | #29 |
+| ✅ 4 | User structured address + billing address | #28 |
+| ✅ 5 | QR Platba (SPAYD + auto-VS + email block) | #30 |
+| ✅ 6 | Participant payment zone (`<PaymentInstructionsPanel>`) | #30 |
+| ✅ 7 | Required documents per event + upload panel | #32 |
+| ✅ 8 | Invoices auto-generate on payment (V1 min — bez PDF) | #33 |
+| ✅ 9 | Členové komunity (list + detail) | #31 |
+
+**Zbývá pro V1.5:**
+- ⏳ Slice 10 — Nástěnka (komunikace) — Discussion model + per-komunita/event channel
+- ⏳ Slice 8 V1.5 — PDF render (WeasyPrint) + číslovací řady per workspace
+- ⏳ Fio banking webhook auto-reconciliation (nahradí "Označit zaplaceno" manual button)
+
 ---
 
 ## Sliče 1 — UX detaily (rychlé wins)
