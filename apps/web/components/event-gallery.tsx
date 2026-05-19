@@ -57,7 +57,7 @@ export function EventGallery({ images, chrome = true, tone = "canvas" }: Props) 
   const useMosaic = images.length >= 5;
 
   const grid = useMosaic ? (
-    <div className="grid h-[412px] grid-cols-1 grid-rows-[160px_160px_160px] gap-3 sm:h-[412px] sm:grid-cols-[2fr_1fr_1fr] sm:grid-rows-[200px_200px]">
+    <div className="grid grid-cols-1 gap-3 [grid-auto-rows:160px] sm:h-[412px] sm:grid-cols-[2fr_1fr_1fr] sm:grid-rows-[200px_200px] sm:[grid-auto-rows:auto]">
       {images.slice(0, 5).map((img, i) => {
         const src = assetUrl(img.url);
         if (!src) return null;

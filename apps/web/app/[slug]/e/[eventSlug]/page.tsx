@@ -78,7 +78,7 @@ export default async function EventLandingPage({ params }: Props) {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col">
+      <main className="flex flex-1 flex-col overflow-x-clip">
         {event.blocks && event.blocks.length > 0 && (() => {
           const heroBadge = cancelled ? (
             <span className="mb-4 inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
@@ -138,21 +138,12 @@ export default async function EventLandingPage({ params }: Props) {
             want one, with their own eyebrow + title. */}
 
         <footer className="border-t border-border bg-canvas">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex max-w-5xl items-center justify-center px-4 py-8 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500">
             <span>
-              © {new Date().getFullYear()} {event.workspace_name} ·{" "}
-              <Link
-                href={`/${event.workspace_slug}`}
-                className="underline hover:text-ink-900"
-              >
-                Profil
-              </Link>
-            </span>
-            <span>
+              © {new Date().getFullYear()}{" "}
               <Link href="/" className="hover:text-ink-900">
                 olaf
-              </Link>{" "}
-              · EU-hosted · GDPR-clean
+              </Link>
             </span>
           </div>
         </footer>
