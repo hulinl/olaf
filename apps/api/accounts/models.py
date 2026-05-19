@@ -1,6 +1,7 @@
 import secrets
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
@@ -205,3 +206,56 @@ class PasswordResetToken(models.Model):
     def mark_used(self) -> None:
         self.used_at = timezone.now()
         self.save(update_fields=["used_at"])
+
+
+class BillingProfile(models.Model):
+    """A creator's billing identity — what appears as "Dodavatel" on
+    invoices they issue. Each creator can keep multiple profiles
+    (e.g. personal IČO + s.r.o.) and pick one per event."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="billing_profiles",
+    )
+    label = models.CharField(
+        max_length=80,
+        help_text='Krátký popisek — např. "Osobně" / "Olaf Adventures s.r.o.".',
+    )
+    legal_name = models.CharField(
+        max_length=200,
+        help_text="Jméno / název firmy, jak má být na faktuře.",
+    )
+    ico = models.CharField(max_length=15, blank=True, default="")
+    dic = models.CharField(max_length=15, blank=True, default="")
+    address_street = models.CharField(max_length=200, blank=True, default="")
+    address_city = models.CharField(max_length=120, blank=True, default="")
+    address_zip = models.CharField(max_length=20, blank=True, default="")
+    address_country = models.CharField(max_length=2, blank=True, default="CZ")
+    iban = models.CharField(max_length=34, blank=True, default="")
+    bank_name = models.CharField(max_length=80, blank=True, default="")
+    is_default = models.BooleanField(
+        default=False,
+        help_text=(
+            "Default profile pre-selected when the user creates a new "
+            "paid event. Only one default per user."
+        ),
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounts_billingprofile"
+        ordering = ["-is_default", "label"]
+        indexes = [models.Index(fields=["user", "is_default"])]
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.legal_name})"
+
+    def save(self, *args, **kwargs):
+        # Enforce single default per user.
+        if self.is_default:
+            BillingProfile.objects.filter(
+                user=self.user, is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)

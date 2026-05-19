@@ -1095,3 +1095,84 @@ def my_invoice(
     except Exception:
         return Response(status=status.HTTP_404_NOT_FOUND)
     return Response(InvoiceSerializer(invoice).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def invoice_pdf(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    invoice_id: int,
+) -> HttpResponse:
+    """Stream the invoice as a PDF. Owner or the invoice's own
+    participant can download."""
+    from .invoice_pdf import render_invoice_pdf
+    from .models import Invoice
+
+    try:
+        invoice = Invoice.objects.select_related(
+            "rsvp", "rsvp__user", "rsvp__event", "rsvp__event__workspace"
+        ).get(
+            pk=invoice_id,
+            rsvp__event__workspace__slug=workspace_slug,
+            rsvp__event__slug=event_slug,
+        )
+    except Invoice.DoesNotExist:
+        return HttpResponse(status=404)
+
+    is_owner = is_workspace_owner(request.user, invoice.rsvp.event.workspace)
+    is_participant = invoice.rsvp.user_id == request.user.id
+    if not (is_owner or is_participant):
+        return HttpResponse(status=403)
+
+    pdf = render_invoice_pdf(invoice)
+    filename = f"{invoice.number}.pdf"
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def invoice_qr(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    invoice_id: int,
+) -> HttpResponse:
+    """Render the invoice's QR Platba as a PNG. Owner or the invoice's
+    own participant can fetch."""
+    from .models import Invoice
+    from .payments import build_qr_png, build_spayd_string
+
+    try:
+        invoice = Invoice.objects.select_related(
+            "rsvp", "rsvp__user", "rsvp__event", "rsvp__event__workspace"
+        ).get(
+            pk=invoice_id,
+            rsvp__event__workspace__slug=workspace_slug,
+            rsvp__event__slug=event_slug,
+        )
+    except Invoice.DoesNotExist:
+        return HttpResponse(status=404)
+
+    is_owner = is_workspace_owner(request.user, invoice.rsvp.event.workspace)
+    is_participant = invoice.rsvp.user_id == request.user.id
+    if not (is_owner or is_participant):
+        return HttpResponse(status=403)
+
+    if not invoice.supplier_iban or not invoice.total:
+        return HttpResponse(status=404)
+
+    spayd = build_spayd_string(
+        iban=invoice.supplier_iban,
+        amount=invoice.total,
+        currency=invoice.currency or "CZK",
+        variable_symbol=invoice.variable_symbol,
+        message=f"{invoice.supplier_name} — {invoice.number}",
+    )
+    png = build_qr_png(spayd)
+    response = HttpResponse(png, content_type="image/png")
+    response["Cache-Control"] = "private, max-age=300"
+    return response

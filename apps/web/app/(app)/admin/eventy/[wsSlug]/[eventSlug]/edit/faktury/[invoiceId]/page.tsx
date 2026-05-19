@@ -7,7 +7,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
-import { ApiError, type Invoice, events } from "@/lib/api";
+import { ApiError, type Invoice, assetUrl, events } from "@/lib/api";
 
 interface Props {
   params: Promise<{
@@ -111,14 +111,26 @@ export default function FakturaEditPage({ params }: Props) {
         ]}
       />
 
-      <header>
-        <p className="text-sm font-medium text-brand">Faktura {inv.number}</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
-          {inv.customer_name}
-        </h1>
-        <p className="mt-2 text-sm text-ink-500">
-          {inv.event_title} · {inv.user_email}
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-brand">Faktura {inv.number}</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
+            {inv.customer_name}
+          </h1>
+          <p className="mt-2 text-sm text-ink-500">
+            {inv.event_title} · {inv.user_email}
+          </p>
+        </div>
+        <a
+          href={assetUrl(
+            `/api/events/${wsSlug}/${eventSlug}/invoices/${inv.id}/pdf/`,
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-ring"
+        >
+          Stáhnout PDF ↓
+        </a>
       </header>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-6">

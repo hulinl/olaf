@@ -238,6 +238,7 @@ function AdminEventDetail({ params }: Props) {
                 <th className="px-4 py-3">Účastník</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Platba</th>
+                <th className="px-4 py-3 text-right">Faktura</th>
                 <th className="px-4 py-3 text-right">Smlouva</th>
                 <th className="px-4 py-3 text-right">Pojištění</th>
                 <th className="px-4 py-3">Přihlášen</th>
@@ -250,6 +251,7 @@ function AdminEventDetail({ params }: Props) {
                   rsvp={r}
                   wsSlug={wsSlug}
                   eventSlug={eventSlug}
+                  requiredDocs={event.required_documents ?? []}
                   onPaid={(updated) =>
                     setRsvps((prev) =>
                       prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev,
@@ -311,15 +313,20 @@ function RsvpRow({
   rsvp,
   wsSlug,
   eventSlug,
+  requiredDocs,
   onPaid,
 }: {
   rsvp: RSVPRecord;
   wsSlug: string;
   eventSlug: string;
+  requiredDocs: { key: string; label: string; required: boolean }[];
   onPaid: (updated: RSVPRecord) => void;
 }) {
   const [marking, setMarking] = useState(false);
   const created = new Date(rsvp.created_at);
+  const requiredKeys = new Set(requiredDocs.map((d) => d.key));
+  const uploadedKeys = new Set(rsvp.uploaded_doc_keys);
+  const verifiedKeys = new Set(rsvp.verified_doc_keys);
 
   async function handleMarkPaid() {
     if (marking) return;
@@ -366,9 +373,25 @@ function RsvpRow({
       <td className="whitespace-nowrap px-4 py-3 text-right">
         <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={marking} />
       </td>
-      {/* Smlouva / Pojištění — Slice 7 (required_documents). */}
-      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
-      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-300">—</td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        <InvoiceCell rsvp={rsvp} wsSlug={wsSlug} eventSlug={eventSlug} />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        <DocCell
+          docKey="smlouva"
+          required={requiredKeys.has("smlouva")}
+          uploaded={uploadedKeys.has("smlouva")}
+          verified={verifiedKeys.has("smlouva")}
+        />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        <DocCell
+          docKey="pojisteni"
+          required={requiredKeys.has("pojisteni")}
+          uploaded={uploadedKeys.has("pojisteni")}
+          verified={verifiedKeys.has("pojisteni")}
+        />
+      </td>
       <td className="whitespace-nowrap px-4 py-3 text-ink-500">
         {created.toLocaleDateString("cs-CZ", {
           day: "numeric",
@@ -377,6 +400,63 @@ function RsvpRow({
         })}
       </td>
     </tr>
+  );
+}
+
+function InvoiceCell({
+  rsvp,
+  wsSlug,
+  eventSlug,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  if (!rsvp.invoice_id) {
+    return <span className="text-ink-300">—</span>;
+  }
+  return (
+    <Link
+      href={`/admin/eventy/${wsSlug}/${eventSlug}/edit/faktury/${rsvp.invoice_id}`}
+      className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/15 text-success hover:bg-success/25"
+    >
+      Vystaveno →
+    </Link>
+  );
+}
+
+function DocCell({
+  docKey: _docKey,
+  required,
+  uploaded,
+  verified,
+}: {
+  docKey: string;
+  required: boolean;
+  uploaded: boolean;
+  verified: boolean;
+}) {
+  if (!required) {
+    return <span className="text-ink-300">—</span>;
+  }
+  if (verified) {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/15 text-success">
+        Ověřeno
+      </span>
+    );
+  }
+  if (uploaded) {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/10 text-success">
+        Doloženo
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-warning/15 text-warning">
+      Chybí
+    </span>
   );
 }
 

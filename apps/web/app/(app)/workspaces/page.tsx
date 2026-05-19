@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { ApiError, type Workspace, assetUrl, workspaces } from "@/lib/api";
 
@@ -37,20 +36,15 @@ export default function CommunitiesPage() {
   return (
     <main className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:py-12">
-        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-brand">Komunity</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-              Tvoje komunity
-            </h1>
-            <p className="mt-2 max-w-xl text-ink-500">
-              Komunity, ve kterých jsi člen nebo Owner. Klikni na komunitu,
-              abys viděl její akce a profil.
-            </p>
-          </div>
-          <LinkButton href="/workspaces/new" variant="primary" size="md">
-            + Vytvořit komunitu
-          </LinkButton>
+        <header className="mb-10">
+          <p className="text-sm font-medium text-brand">Komunity</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+            Tvoje komunity
+          </h1>
+          <p className="mt-2 max-w-xl text-ink-500">
+            Komunity, ve kterých jsi člen nebo Owner. Klikni na komunitu,
+            abys viděl její akce a profil.
+          </p>
         </header>
 
         {loading && (
@@ -69,14 +63,10 @@ export default function CommunitiesPage() {
                   Zatím nejsi v žádné komunitě
                 </h2>
                 <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                  Vytvoř si vlastní komunitu pro tvoje akce, nebo počkej až
-                  tě někdo pozve do svojí.
+                  Až tě někdo pozve do své komunity nebo se přihlásíš na
+                  akci, uvidíš tady její profil. Vlastní komunitu si
+                  vytvoříš ve <strong>Správci</strong>.
                 </p>
-                <div className="mt-5">
-                  <LinkButton href="/workspaces/new" variant="primary" size="md">
-                    + Vytvořit komunitu
-                  </LinkButton>
-                </div>
               </div>
             </CardSection>
           </Card>

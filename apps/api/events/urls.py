@@ -118,6 +118,16 @@ urlpatterns = [
         name="invoice-detail",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/invoices/<int:invoice_id>/pdf/",
+        views.invoice_pdf,
+        name="invoice-pdf",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/invoices/<int:invoice_id>/qr.png",
+        views.invoice_qr,
+        name="invoice-qr",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/invoice/",
         views.my_invoice,
         name="my-invoice",

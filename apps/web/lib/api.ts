@@ -73,6 +73,37 @@ export interface User {
   date_joined: string;
 }
 
+export interface BillingProfile {
+  id: number;
+  label: string;
+  legal_name: string;
+  ico: string;
+  dic: string;
+  address_street: string;
+  address_city: string;
+  address_zip: string;
+  address_country: string;
+  iban: string;
+  bank_name: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingProfileWritePayload {
+  label: string;
+  legal_name: string;
+  ico?: string;
+  dic?: string;
+  address_street?: string;
+  address_city?: string;
+  address_zip?: string;
+  address_country?: string;
+  iban?: string;
+  bank_name?: string;
+  is_default?: boolean;
+}
+
 export type QuestionnaireSection =
   | "tshirt_size"
   | "diet"
@@ -178,6 +209,8 @@ export interface Event extends EventSummary {
   price_amount: string | null;
   price_currency: string;
   price_note: string;
+  payment_in_cash: boolean;
+  billing_profile: number | null;
   required_documents: RequiredDocumentSpec[];
   my_rsvp?: MyRSVP | null;
 }
@@ -201,6 +234,32 @@ export interface RSVPDocumentsBundle {
   required: RequiredDocumentSpec[];
   uploaded: RSVPDocument[];
 }
+
+export type TodoItem =
+  | {
+      kind: "payment";
+      rsvp_id: number;
+      workspace_slug: string;
+      workspace_name: string;
+      event_slug: string;
+      event_title: string;
+      event_starts_at: string;
+      amount: string;
+      currency: string;
+      variable_symbol: string;
+      iban: string;
+    }
+  | {
+      kind: "document";
+      rsvp_id: number;
+      workspace_slug: string;
+      workspace_name: string;
+      event_slug: string;
+      event_title: string;
+      event_starts_at: string;
+      doc_key: string;
+      doc_label: string;
+    };
 
 export interface InvoiceItem {
   label: string;
@@ -306,6 +365,9 @@ export interface RSVPRecord extends MyRSVP {
   user_full_name: string;
   user_phone: string;
   attended: boolean | null;
+  uploaded_doc_keys: string[];
+  verified_doc_keys: string[];
+  invoice_id: number | null;
   updated_at: string;
 }
 
@@ -604,6 +666,8 @@ export interface EventWritePayload {
   price_amount?: string | null;
   price_currency?: string;
   price_note?: string;
+  payment_in_cash?: boolean;
+  billing_profile?: number | null;
   shared_workspace_slugs?: string[];
   required_documents?: RequiredDocumentSpec[];
 }
@@ -802,6 +866,26 @@ export const auth = {
       method: "POST",
     }),
   me: () => apiFetch<User>("/api/auth/me/"),
+  todo: () => apiFetch<TodoItem[]>("/api/auth/me/todo/"),
+  billingProfiles: () =>
+    apiFetch<BillingProfile[]>("/api/auth/me/billing-profiles/"),
+  createBillingProfile: (payload: BillingProfileWritePayload) =>
+    apiFetch<BillingProfile>("/api/auth/me/billing-profiles/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateBillingProfile: (
+    id: number,
+    payload: Partial<BillingProfileWritePayload>,
+  ) =>
+    apiFetch<BillingProfile>(`/api/auth/me/billing-profiles/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteBillingProfile: (id: number) =>
+    apiFetch<void>(`/api/auth/me/billing-profiles/${id}/`, {
+      method: "DELETE",
+    }),
   updateMe: (patch: Partial<User>) =>
     apiFetch<User>("/api/auth/me/", {
       method: "PATCH",

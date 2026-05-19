@@ -16,10 +16,18 @@ import {
 
 const STATUS_LABELS: Record<EventSummary["status"], string> = {
   draft: "Draft",
-  published: "Published",
-  closed: "Closed",
-  cancelled: "Cancelled",
-  completed: "Completed",
+  published: "Publikováno",
+  closed: "Uzavřeno",
+  cancelled: "Zrušeno",
+  completed: "Proběhlo",
+};
+
+const STATUS_TONE: Record<EventSummary["status"], string> = {
+  draft: "bg-surface-muted text-ink-500",
+  published: "bg-success/15 text-success",
+  closed: "bg-warning/15 text-warning",
+  cancelled: "bg-danger-soft text-danger",
+  completed: "bg-surface-muted text-ink-500",
 };
 
 interface Props {
@@ -231,8 +239,13 @@ function EventRow({
           className="flex flex-col gap-0.5 focus-ring"
         >
           <span className="font-medium text-ink-900">{event.title}</span>
-          <span className="flex items-center gap-2 text-xs text-ink-500">
-            <span className="font-mono uppercase tracking-wide">
+          <span className="flex flex-wrap items-center gap-2 text-xs text-ink-500">
+            <span
+              className={[
+                "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                STATUS_TONE[event.status],
+              ].join(" ")}
+            >
               {STATUS_LABELS[event.status]}
             </span>
             {event.location_text && <span>· {event.location_text}</span>}

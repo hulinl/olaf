@@ -188,3 +188,146 @@ def password_reset_confirm(request: Request) -> Response:
     token.mark_used()
 
     return Response({"detail": "Password updated. You can now log in."})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me_todo(request: Request) -> Response:
+    """Dashboard "Čeká na tebe" feed — concrete items the user still owes.
+
+    Two kinds in V1:
+      - payment: paid event whose RSVP.payment_status is still "pending".
+      - document: an event.required_documents entry marked required where
+        the user hasn't uploaded a matching RSVPDocument yet.
+
+    Each item carries the workspace + event slugs so the dashboard can
+    link straight to the public landing where the QR + upload panels
+    already render.
+    """
+    from events.models import RSVP, RSVPDocument
+
+    items: list[dict] = []
+
+    rsvps = (
+        RSVP.objects.filter(user=request.user)
+        .exclude(status__in=[RSVP.STATUS_CANCELLED, RSVP.STATUS_NO])
+        .select_related("event", "event__workspace")
+    )
+
+    for rsvp in rsvps:
+        event = rsvp.event
+
+        # Payment todo
+        if rsvp.payment_status == RSVP.PAYMENT_PENDING and rsvp.payment_due_amount:
+            items.append({
+                "kind": "payment",
+                "rsvp_id": rsvp.id,
+                "workspace_slug": event.workspace.slug,
+                "workspace_name": event.workspace.name,
+                "event_slug": event.slug,
+                "event_title": event.title,
+                "event_starts_at": event.starts_at,
+                "amount": str(rsvp.payment_due_amount),
+                "currency": rsvp.payment_currency or "CZK",
+                "variable_symbol": rsvp.variable_symbol,
+                "iban": event.workspace.payment_iban,
+            })
+
+        # Document todos
+        required = event.required_documents or []
+        if required:
+            uploaded_keys = set(
+                RSVPDocument.objects.filter(rsvp=rsvp).values_list(
+                    "key", flat=True
+                )
+            )
+            for spec in required:
+                key = spec.get("key")
+                if not key or not spec.get("required", True):
+                    continue
+                if key in uploaded_keys:
+                    continue
+                items.append({
+                    "kind": "document",
+                    "rsvp_id": rsvp.id,
+                    "workspace_slug": event.workspace.slug,
+                    "workspace_name": event.workspace.name,
+                    "event_slug": event.slug,
+                    "event_title": event.title,
+                    "event_starts_at": event.starts_at,
+                    "doc_key": key,
+                    "doc_label": spec.get("label") or key,
+                })
+
+    # Group by event for the UI — payment first, then docs (alpha by label).
+    items.sort(key=lambda i: (
+        0 if i["kind"] == "payment" else 1,
+        i["event_starts_at"],
+        i.get("doc_label", ""),
+    ))
+    return Response(items)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def billing_profiles_list(request: Request) -> Response:
+    """CRUD list for the current user's billing profiles."""
+    from .models import BillingProfile
+    from .serializers import BillingProfileSerializer
+
+    if request.method == "GET":
+        qs = BillingProfile.objects.filter(user=request.user)
+        return Response(BillingProfileSerializer(qs, many=True).data)
+
+    serializer = BillingProfileSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    profile = serializer.save(user=request.user)
+    # If this is the user's first profile, make it default automatically.
+    if (
+        not profile.is_default
+        and BillingProfile.objects.filter(user=request.user).count() == 1
+    ):
+        profile.is_default = True
+        profile.save(update_fields=["is_default"])
+    return Response(
+        BillingProfileSerializer(profile).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def billing_profile_detail(request: Request, profile_id: int) -> Response:
+    """Retrieve / update / delete one billing profile."""
+    from .models import BillingProfile
+    from .serializers import BillingProfileSerializer
+
+    try:
+        profile = BillingProfile.objects.get(pk=profile_id, user=request.user)
+    except BillingProfile.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        return Response(BillingProfileSerializer(profile).data)
+    if request.method == "DELETE":
+        was_default = profile.is_default
+        profile.delete()
+        # If we removed the default and there's another profile around,
+        # promote the most recent one so the user always has a default.
+        if was_default:
+            remaining = (
+                BillingProfile.objects.filter(user=request.user)
+                .order_by("-created_at")
+                .first()
+            )
+            if remaining:
+                remaining.is_default = True
+                remaining.save(update_fields=["is_default"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = BillingProfileSerializer(
+        profile, data=request.data, partial=True
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)

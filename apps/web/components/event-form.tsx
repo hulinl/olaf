@@ -8,6 +8,7 @@ import { DateTimeField } from "@/components/ui/date-time-field";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
+  type BillingProfile,
   type Event as OlafEvent,
   type EventWritePayload,
   QUESTIONNAIRE_SECTION_HINTS,
@@ -16,6 +17,7 @@ import {
   type QuestionnaireSection,
   type RequiredDocumentSpec,
   type Workspace,
+  auth,
   workspaces,
 } from "@/lib/api";
 
@@ -134,6 +136,13 @@ export function EventForm({
     initial?.price_currency || "CZK",
   );
   const [priceNote, setPriceNote] = useState(initial?.price_note ?? "");
+  const [paymentInCash, setPaymentInCash] = useState(
+    initial?.payment_in_cash ?? false,
+  );
+  const [billingProfileId, setBillingProfileId] = useState<number | null>(
+    initial?.billing_profile ?? null,
+  );
+  const [billingProfiles, setBillingProfiles] = useState<BillingProfile[]>([]);
 
   // Cross-workspace sharing (Slice 3): owner picks other komunity they own
   // where the event should appear. Always implicitly includes the primary
@@ -164,9 +173,24 @@ export function EventForm({
         // Non-blocking; the picker just stays hidden.
         if (!cancelled) setOwnedWorkspaces([]);
       });
+    auth
+      .billingProfiles()
+      .then((list) => {
+        if (cancelled) return;
+        setBillingProfiles(list);
+        // Pre-select user's default profile for new paid events.
+        if (initial == null && billingProfileId == null) {
+          const def = list.find((p) => p.is_default) ?? list[0];
+          if (def) setBillingProfileId(def.id);
+        }
+      })
+      .catch(() => {
+        // Silently — no profiles means the section just says "vytvoř si profil".
+      });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function updateTitle(value: string) {
@@ -198,6 +222,9 @@ export function EventForm({
         price_amount: isPaid && priceAmount ? priceAmount : null,
         price_currency: priceCurrency,
         price_note: isPaid ? priceNote : "",
+        payment_in_cash: isPaid ? paymentInCash : false,
+        billing_profile:
+          isPaid && !paymentInCash ? billingProfileId : null,
         shared_workspace_slugs: sharedSlugs,
         // Drop placeholder rows the owner added with "+ Přidat dokument"
         // but didn't fill in — those would fail server validation and
@@ -440,6 +467,60 @@ export function EventForm({
                   />
                 </Field>
               </div>
+              <div className="sm:col-span-2">
+                <label className="flex items-start gap-2 text-sm text-ink-900">
+                  <input
+                    type="checkbox"
+                    checked={paymentInCash}
+                    onChange={(e) => setPaymentInCash(e.target.checked)}
+                    className="mt-0.5 size-4 accent-brand"
+                  />
+                  <span className="flex flex-col">
+                    <span>Platba v hotovosti na místě</span>
+                    <span className="text-xs text-ink-500">
+                      Zaškrtni, pokud peníze vybíráš osobně. Vynechá se QR
+                      Platba i vystavení faktury — cena se zobrazí jen
+                      informativně.
+                    </span>
+                  </span>
+                </label>
+              </div>
+              {!paymentInCash && (
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Fakturovat z profilu *"
+                    htmlFor="billing-profile"
+                    hint='Z kterého tvého fakturačního profilu se vystaví faktura. Profily spravuješ v Nastavení → Profil.'
+                  >
+                    {billingProfiles.length === 0 ? (
+                      <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+                        Zatím nemáš žádný fakturační profil. Vytvoř ho
+                        v <strong>Nastavení → Profil</strong>, jinak se
+                        faktura nebude generovat.
+                      </p>
+                    ) : (
+                      <select
+                        id="billing-profile"
+                        value={billingProfileId ?? ""}
+                        onChange={(e) =>
+                          setBillingProfileId(
+                            e.target.value ? Number(e.target.value) : null,
+                          )
+                        }
+                        className="h-11 rounded-md border border-border bg-surface px-3 text-sm focus-ring"
+                      >
+                        <option value="">— vyber profil —</option>
+                        {billingProfiles.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                            {p.is_default ? " (výchozí)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </Field>
+                </div>
+              )}
             </div>
           )}
         </CardSection>

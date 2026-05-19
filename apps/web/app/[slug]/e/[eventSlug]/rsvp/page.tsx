@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, use, useEffect, useState } from "react";
 
-import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
-import { RequiredDocsPanel } from "@/components/required-docs-panel";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -220,30 +218,27 @@ export default function RSVPPage({ params }: Props) {
             {headline}
           </h1>
           <p className="mt-3 text-ink-700">
-            Poslali jsme ti potvrzení na e-mail. Detaily najdeš taky na
-            stránce akce.
+            Poslali jsme ti potvrzení na e-mail. Pokyny k platbě a další
+            kroky najdeš ve své účasti.
           </p>
         </div>
 
-        {/* Paid event → show payment instructions inline so they don't have
-            to hunt them down. The panel hides itself for free events.
-            Same for required docs — auto-hides when nothing is asked for. */}
-        <div className="mt-10 flex w-full max-w-xl flex-col gap-4 text-left">
-          <PaymentInstructionsPanel
-            workspaceSlug={slug}
-            eventSlug={eventSlug}
-          />
-          <RequiredDocsPanel workspaceSlug={slug} eventSlug={eventSlug} />
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <LinkButton
+            href={`/events/${slug}/${eventSlug}`}
+            variant="primary"
+            size="lg"
+          >
+            Moje účast →
+          </LinkButton>
+          <LinkButton
+            href={`/${slug}/e/${eventSlug}`}
+            variant="secondary"
+            size="lg"
+          >
+            Zpět na stránku akce
+          </LinkButton>
         </div>
-
-        <LinkButton
-          href={`/${slug}/e/${eventSlug}`}
-          variant="primary"
-          size="lg"
-          className="mt-8"
-        >
-          Zpět na stránku akce
-        </LinkButton>
       </main>
     );
   }

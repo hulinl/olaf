@@ -104,3 +104,30 @@ class UserSerializer(serializers.ModelSerializer):
             "date_joined",
         )
         read_only_fields = ("id", "email", "email_verified", "date_joined")
+
+
+from .models import BillingProfile  # noqa: E402
+
+
+class BillingProfileSerializer(serializers.ModelSerializer):
+    """Creator-side billing identity (Dodavatel on invoices)."""
+
+    class Meta:
+        model = BillingProfile
+        fields = (
+            "id",
+            "label",
+            "legal_name",
+            "ico",
+            "dic",
+            "address_street",
+            "address_city",
+            "address_zip",
+            "address_country",
+            "iban",
+            "bank_name",
+            "is_default",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
