@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SectionHead } from "@/components/ui/section-head";
 import { assetUrl, type EventImage } from "@/lib/api";
@@ -165,7 +165,7 @@ export function EventGallery({ images, chrome = true, tone = "canvas" }: Props) 
       <div className="mx-auto max-w-5xl px-4 py-10 sm:py-12">
         <SectionHead
           eyebrow="Galerie"
-          title="Z minulých kempů"
+          title="Fotky"
           tone={dark ? "dark" : "light"}
         />
         {grid}
@@ -191,41 +191,40 @@ function Lightbox({
   onPrev: () => void;
 }) {
   const src = assetUrl(image.url);
+
+  // Touch-swipe support — on phones the chevron buttons get covered
+  // by the image at max-w-[92vw], so users couldn't tap them.
+  // Track the first touch and decide left/right on touchend.
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const SWIPE_THRESHOLD = 50;
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = touchStart.current;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    touchStart.current = null;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx > 0) onPrev();
+    else onNext();
+  }
+
   return (
     <div
       role="dialog"
       aria-modal="true"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
     >
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Zavřít"
-        className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl text-white hover:bg-white/20 focus-ring"
-      >
-        ×
-      </button>
-      {total > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={onPrev}
-            aria-label="Předchozí"
-            className="absolute left-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl text-white hover:bg-white/20 focus-ring sm:left-8"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            aria-label="Další"
-            className="absolute right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl text-white hover:bg-white/20 focus-ring sm:right-8"
-          >
-            ›
-          </button>
-        </>
-      )}
-
+      {/* Image first so the buttons render on top of it without
+          needing explicit z-index. Without this the chevrons sat
+          behind the image at narrow widths and were untappable. */}
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -235,7 +234,36 @@ function Lightbox({
         />
       )}
 
-      <p className="absolute bottom-4 font-mono text-[11px] uppercase tracking-[0.14em] text-white/70">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Zavřít"
+        className="absolute right-3 top-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/70 text-2xl text-white shadow-lg ring-1 ring-white/20 hover:bg-black/90 focus-ring"
+      >
+        ×
+      </button>
+      {total > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={onPrev}
+            aria-label="Předchozí"
+            className="absolute left-2 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/70 text-3xl text-white shadow-lg ring-1 ring-white/20 hover:bg-black/90 focus-ring sm:left-6"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            aria-label="Další"
+            className="absolute right-2 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/70 text-3xl text-white shadow-lg ring-1 ring-white/20 hover:bg-black/90 focus-ring sm:right-6"
+          >
+            ›
+          </button>
+        </>
+      )}
+
+      <p className="absolute bottom-4 z-10 rounded-full bg-black/60 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-white">
         {index + 1} / {total}
       </p>
     </div>

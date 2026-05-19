@@ -536,24 +536,50 @@ export async function apiFetch<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
-  if (method !== "GET" && method !== "HEAD") {
+  const isWrite = method !== "GET" && method !== "HEAD";
+  if (isWrite) {
     await ensureCsrfToken();
   }
-  const csrf = getCookie("csrftoken");
   const isFormData =
     typeof FormData !== "undefined" && init.body instanceof FormData;
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    ...(init.body && !isFormData ? { "Content-Type": "application/json" } : {}),
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  if (csrf) headers["X-CSRFToken"] = csrf;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  const send = (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      ...(init.body && !isFormData
+        ? { "Content-Type": "application/json" }
+        : {}),
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (token) headers["X-CSRFToken"] = token;
+    return fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: "include",
+    });
+  };
+
+  let res = await send(getCookie("csrftoken"));
+
+  // Auto-retry once when the server rejects our CSRF token. Django
+  // rotates the token at login, so after a fresh session the cached
+  // cookie is stale; ensureCsrfToken re-fetches a new one and the
+  // request succeeds on retry without surfacing the error to the
+  // user.
+  if (isWrite && res.status === 403) {
+    const cloned = res.clone();
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await cloned.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    const detail = typeof body?.detail === "string" ? body.detail : "";
+    if (detail.toLowerCase().includes("csrf")) {
+      await fetch(`${API_URL}/api/auth/csrf/`, { credentials: "include" });
+      res = await send(getCookie("csrftoken"));
+    }
+  }
 
   let data: Record<string, unknown> = {};
   try {
