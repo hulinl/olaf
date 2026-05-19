@@ -56,13 +56,27 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # Draft events visible only to the creator (workspace owner).
+    # Draft events show a friendly placeholder to non-owners instead of
+    # 404 — the owner shares the URL with collaborators / participants
+    # before flipping to published, and seeing "not found" was confusing
+    # enough that people kept asking "did you delete it?" Owners still
+    # see the full landing in preview mode.
     if event.status == Event.STATUS_DRAFT and not is_workspace_owner(
         request.user, event.workspace
     ):
         return Response(
-            {"detail": "Event not found."},
-            status=status.HTTP_404_NOT_FOUND,
+            {
+                "is_draft_preview": True,
+                "title": event.title,
+                "workspace_name": event.workspace.name,
+                "workspace_slug": event.workspace.slug,
+                "workspace_logo_url": (
+                    event.workspace.logo.url
+                    if event.workspace.logo
+                    else None
+                ),
+            },
+            status=status.HTTP_200_OK,
         )
 
     serializer = EventPublicSerializer(event)

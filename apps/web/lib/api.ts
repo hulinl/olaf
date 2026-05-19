@@ -219,6 +219,14 @@ export interface Event extends EventSummary {
   i_am_owner?: boolean;
 }
 
+export interface EventDraftPreview {
+  is_draft_preview: true;
+  title: string;
+  workspace_name: string;
+  workspace_slug: string;
+  workspace_logo_url: string | null;
+}
+
 export interface RequiredDocumentSpec {
   key: string;
   label: string;
@@ -811,8 +819,20 @@ export interface EventWritePayload {
 }
 
 export const events = {
-  publicEvent: (workspaceSlug: string, eventSlug: string) =>
-    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/`),
+  publicEvent: async (workspaceSlug: string, eventSlug: string) => {
+    // Non-owners viewing a draft event get a slim "is_draft_preview"
+    // payload (200, not 404) so the public landing page can render a
+    // friendly placeholder. For everywhere else that expects a full
+    // Event (admin cockpit, participant zone, RSVP form), convert that
+    // to a 404 so callers' existing redirect logic kicks in.
+    const data = await apiFetch<Event & { is_draft_preview?: boolean }>(
+      `/api/events/${workspaceSlug}/${eventSlug}/`,
+    );
+    if ((data as { is_draft_preview?: boolean }).is_draft_preview) {
+      throw new ApiError(404, { detail: "Event not found." });
+    }
+    return data as Event;
+  },
   rsvp: (
     workspaceSlug: string,
     eventSlug: string,
