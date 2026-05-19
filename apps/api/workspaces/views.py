@@ -286,11 +286,12 @@ def workspace_members(request: Request, slug: str) -> Response:
     "Member" in V1 = anyone who's registered for an event the workspace
     owns (or shares — Slice 3). Owner-only because it includes email + phone.
     """
-    from django.db.models import Count, Max, Q as DQ
+    from django.db.models import Count, Max
+    from django.db.models import Q as DQ
     from django.utils import timezone
 
     from accounts.models import User
-    from events.models import Event, RSVP
+    from events.models import RSVP, Event
 
     try:
         workspace = Workspace.objects.get(slug=slug)
@@ -364,7 +365,7 @@ def workspace_member_detail(
     from django.db.models import Q as DQ
 
     from accounts.models import User
-    from events.models import Event, RSVP
+    from events.models import RSVP, Event
 
     try:
         workspace = Workspace.objects.get(slug=slug)
