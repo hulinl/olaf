@@ -332,6 +332,9 @@ export interface RSVPRecord extends MyRSVP {
   user_full_name: string;
   user_phone: string;
   attended: boolean | null;
+  uploaded_doc_keys: string[];
+  verified_doc_keys: string[];
+  invoice_id: number | null;
   updated_at: string;
 }
 

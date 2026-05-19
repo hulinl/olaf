@@ -302,6 +302,9 @@ class RSVPSerializer(serializers.ModelSerializer):
         source="user.get_full_name", read_only=True
     )
     user_phone = serializers.CharField(source="user.phone", read_only=True)
+    uploaded_doc_keys = serializers.SerializerMethodField()
+    verified_doc_keys = serializers.SerializerMethodField()
+    invoice_id = serializers.SerializerMethodField()
 
     class Meta:
         model = RSVP
@@ -319,10 +322,29 @@ class RSVPSerializer(serializers.ModelSerializer):
             "payment_currency",
             "variable_symbol",
             "paid_at",
+            "uploaded_doc_keys",
+            "verified_doc_keys",
+            "invoice_id",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_uploaded_doc_keys(self, obj: RSVP) -> list[str]:
+        return list(obj.documents.values_list("key", flat=True).distinct())
+
+    def get_verified_doc_keys(self, obj: RSVP) -> list[str]:
+        return list(
+            obj.documents.filter(verified_at__isnull=False)
+            .values_list("key", flat=True)
+            .distinct()
+        )
+
+    def get_invoice_id(self, obj: RSVP) -> int | None:
+        try:
+            return obj.invoice.id
+        except Exception:
+            return None
 
 
 class MyRSVPSerializer(serializers.ModelSerializer):
