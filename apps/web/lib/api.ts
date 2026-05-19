@@ -38,6 +38,19 @@ export interface User {
   dob: string | null;
   avatar_blob_id: string;
   address: string;
+  // Structured address (Slice 4 — for invoices)
+  address_street: string;
+  address_city: string;
+  address_zip: string;
+  address_country: string;
+  has_billing_address: boolean;
+  billing_name: string;
+  billing_ico: string;
+  billing_dic: string;
+  billing_street: string;
+  billing_city: string;
+  billing_zip: string;
+  billing_country: string;
   // Activity & performance
   fitness_level: "" | "beginner" | "intermediate" | "advanced";
   fitness_note: string;
