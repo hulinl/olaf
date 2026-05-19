@@ -16,10 +16,18 @@ import {
 
 const STATUS_LABELS: Record<EventSummary["status"], string> = {
   draft: "Draft",
-  published: "Published",
-  closed: "Closed",
-  cancelled: "Cancelled",
-  completed: "Completed",
+  published: "Publikováno",
+  closed: "Uzavřeno",
+  cancelled: "Zrušeno",
+  completed: "Proběhlo",
+};
+
+const STATUS_TONE: Record<EventSummary["status"], string> = {
+  draft: "bg-surface-muted text-ink-500",
+  published: "bg-success/15 text-success",
+  closed: "bg-warning/15 text-warning",
+  cancelled: "bg-danger-soft text-danger",
+  completed: "bg-surface-muted text-ink-500",
 };
 
 /**
@@ -162,15 +170,19 @@ function FilterTabs({
     { v: "past", label: "Minulé" },
     { v: "all", label: "Vše" },
   ];
+  // Pill-shaped segmented control: outer + inner both rounded-full, so
+  // the active button never appears to "leak" past the container — any
+  // radius mismatch we tried with rounded-md/lg + math padding kept
+  // showing visible edges on prod (screenshot 2026-05-19).
   return (
-    <div className="inline-flex w-fit rounded-md border border-border bg-surface p-[2px]">
+    <div className="inline-flex w-fit rounded-full border border-border bg-surface p-1">
       {tabs.map((t) => (
         <button
           key={t.v}
           type="button"
           onClick={() => onChange(t.v)}
           className={[
-            "rounded px-3 py-1.5 text-xs font-medium transition-colors focus-ring",
+            "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors focus-ring",
             filter === t.v
               ? "bg-ink-900 text-ink-inverse"
               : "text-ink-700 hover:bg-surface-muted",
@@ -217,8 +229,13 @@ function EventRow({ event }: { event: EventSummary }) {
           className="flex flex-col gap-0.5 focus-ring"
         >
           <span className="font-medium text-ink-900">{event.title}</span>
-          <span className="flex items-center gap-2 text-xs text-ink-500">
-            <span className="font-mono uppercase tracking-wide">
+          <span className="flex flex-wrap items-center gap-2 text-xs text-ink-500">
+            <span
+              className={[
+                "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                STATUS_TONE[event.status],
+              ].join(" ")}
+            >
               {STATUS_LABELS[event.status]}
             </span>
             {event.location_text && <span>· {event.location_text}</span>}

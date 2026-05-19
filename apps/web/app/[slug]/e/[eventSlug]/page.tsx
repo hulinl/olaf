@@ -9,7 +9,7 @@ import { RequiredDocsPanel } from "@/components/required-docs-panel";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
-import { assetUrl, type Event, formatEventPrice } from "@/lib/api";
+import { assetUrl, type Event } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
 interface Props {
@@ -59,7 +59,6 @@ export default async function EventLandingPage({ params }: Props) {
 
   const cancelled = event.status === "cancelled";
   const cta_href = `/${event.workspace_slug}/e/${event.slug}/rsvp`;
-  const priceLabel = formatEventPrice(event.price_amount, event.price_currency);
 
   return (
     <div data-theme="paper" className="bg-canvas text-ink-900">
@@ -131,21 +130,10 @@ export default async function EventLandingPage({ params }: Props) {
         })()}
 
 
-        {priceLabel && (
-          <section className="border-y border-border bg-brand/5">
-            <div className="mx-auto flex max-w-5xl flex-col items-center gap-1 px-4 py-6 text-center">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-500">
-                Cena
-              </p>
-              <p className="text-3xl font-semibold text-ink-900">
-                {priceLabel}
-              </p>
-              {event.price_note && (
-                <p className="text-sm text-ink-500">{event.price_note}</p>
-              )}
-            </div>
-          </section>
-        )}
+        {/* Price is rendered inside the included_split block now; the
+            standalone strip we added in Slice 2 turned into a duplicate
+            once the block pulls from event.price_*. Kept the
+            formatEventPrice helper import for reuse. */}
 
         {/* Logged-in participant: payment block + required-docs block.
             Both auto-hide when not applicable (free event, anon viewer,
