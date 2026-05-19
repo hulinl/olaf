@@ -246,6 +246,7 @@ resource caBackend 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'FRONTEND_URL', value: frontendBaseUrl }
             { name: 'CORS_ALLOWED_ORIGINS', value: frontendAllowedOrigins }
             { name: 'CSRF_TRUSTED_ORIGINS', value: frontendAllowedOrigins }
+            { name: 'COOKIE_DOMAIN', value: '.olaf.events' }
             { name: 'DJANGO_SECRET_KEY', secretRef: 'django-secret' }
             { name: 'DATABASE_URL', secretRef: 'pg-url' }
             { name: 'AZURE_COMMUNICATION_CONNECTION_STRING', secretRef: 'acs-conn' }

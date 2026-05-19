@@ -9,15 +9,27 @@ import { SectionHead } from "@/components/ui/section-head";
 const FEATURES = [
   {
     title: "Domov pro vaši partu",
-    body: "Veřejný profil komunity s vaším logem, popisem a všemi akcemi na jednom místě. Bez Facebooku, bez plovoucích e-mailů.",
+    body: "Veřejný profil komunity s logem, popisem a všemi akcemi na jednom místě. Účastníci vidí, kdo jste a kam chystáte další výpravu.",
   },
   {
     title: "Landing page bez vývojáře",
     body: "Skládáš stránku akce z bloků — hero, program, mapa, fotky, cena, FAQ. Co dáš dovnitř, to lidi vidí venku.",
   },
   {
-    title: "RSVP, jak ho chceš mít",
-    body: "Vlastní otázky podle typu akce (kondice, dieta, tričko, …), waitlist, schvalování. Profil účastníka se předvyplní sám.",
+    title: "Přihlášky, jak je chceš mít",
+    body: "Vlastní otázky podle akce (velikost trička, doprava, zdravotní omezení), waitlist, schvalování. Profil účastníka se předvyplní sám.",
+  },
+  {
+    title: "Nástěnka pro komunitu i akci",
+    body: "Témata, lajky, komentáře, e-mail při novém příspěvku. Vlastní prostor pro každou partu i pro konkrétní akci.",
+  },
+  {
+    title: "Platby a faktury bez chaosu",
+    body: "QR Platba s variabilním symbolem, automatické faktury v PDF, mark-as-paid jedním klikem. Hotovostní platby taky.",
+  },
+  {
+    title: "Role tvůrce — cockpit pro pořadatele",
+    body: "Roadmapa akce, checklist, scheduled připomínky účastníkům, profily přihlášených. Vidíš, co je hotovo a co řešit dnes.",
   },
 ];
 
@@ -51,7 +63,7 @@ export default function Home() {
             <p className="mt-6 max-w-xl text-balance text-lg text-ink-700 sm:text-xl">
               olaf je domov pro vaši outdoor partu, sportovní komunitu nebo
               firemní tým. Komunita má profil, akce mají landing page,
-              registrace má pořádek.
+              přihlášky mají pořádek a tvůrce má cockpit, kde to všechno řídí.
             </p>
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
               <LinkButton href="/signup" variant="primary" size="lg">
@@ -67,7 +79,7 @@ export default function Home() {
         {/* FEATURES */}
         <section className="bg-canvas">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
-            <div className="grid gap-5 sm:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((f) => (
                 <article
                   key={f.title}

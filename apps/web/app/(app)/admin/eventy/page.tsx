@@ -88,7 +88,7 @@ export default function AdminEventyTablePage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="text-sm font-medium text-brand">Správce</p>
+        <p className="text-sm font-medium text-brand">Tvůrce</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
           Moje akce
         </h1>
