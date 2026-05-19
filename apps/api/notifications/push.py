@@ -28,45 +28,49 @@ def _diag(msg: str) -> None:
 
 
 def _vapid_private_key() -> str:
-    """Return the VAPID private key as a real PEM string.
+    """Return the VAPID private key as what pywebpush expects.
 
-    Container App secrets mangle multiline values (newlines stripped
-    or escaped), so the canonical storage format is base64-encoded
-    PEM as a single line. Handle the common shapes defensively.
+    pywebpush hands the value directly to py_vapid.Vapid.from_string,
+    which despite its name DOES NOT accept a wrapped PEM — it expects
+    just the base64 body (no -----BEGIN/END----- banners, no newlines).
+    Container App secrets also mangle multiline values, so we
+    normalize multiple shapes into the single canonical form:
+
+        raw base64 of the DER-encoded PKCS8 key, all one line.
     """
     raw = (settings.VAPID_PRIVATE_KEY or "").strip()
     if not raw:
         return ""
-    _diag(f"raw len={len(raw)} starts={raw[:24]!r} ends={raw[-12:]!r}")
-    if "\\n" in raw:
-        decoded = raw.replace("\\n", "\n")
-        _diag(f"restored \\n escapes → {len(decoded)} chars")
-        return decoded
-    if "BEGIN" in raw and "\n" in raw:
-        _diag(f"PEM with newlines → {len(raw)} chars")
-        return raw
-    if "BEGIN" in raw and "\n" not in raw:
-        # PEM with newlines stripped — reconstruct by re-inserting
-        # newlines every 64 chars in the body.
+
+    # If the value is base64-encoded PEM (our prod storage format),
+    # decode it first to get back the PEM text.
+    if "BEGIN" not in raw and "\\n" not in raw:
         try:
-            header = "-----BEGIN PRIVATE KEY-----"
-            footer = "-----END PRIVATE KEY-----"
-            body = raw.replace(header, "").replace(footer, "").strip()
-            body = body.replace(" ", "")
-            chunks = [body[i : i + 64] for i in range(0, len(body), 64)]
-            rebuilt = "\n".join([header, *chunks, footer])
-            _diag(f"rebuilt PEM from stripped form → {len(rebuilt)} chars")
-            return rebuilt
+            decoded = base64.b64decode(raw).decode("ascii")
+            if "BEGIN" in decoded:
+                raw = decoded
         except Exception:
-            logger.exception("VAPID key rebuild failed")
-            return raw
-    try:
-        decoded = base64.b64decode(raw).decode("ascii")
-        _diag(f"base64-decoded → {len(decoded)} chars")
-        return decoded
-    except Exception:
-        logger.exception("VAPID key: all decode paths failed")
-        return raw
+            pass
+
+    # Restore literal \\n escapes if they slipped in.
+    if "\\n" in raw:
+        raw = raw.replace("\\n", "\n")
+
+    # Strip PEM banners and whitespace → just the base64 body.
+    if "BEGIN" in raw:
+        body_lines = [
+            line.strip()
+            for line in raw.splitlines()
+            if line.strip() and not line.lstrip().startswith("-----")
+        ]
+        body = "".join(body_lines)
+    else:
+        # Already raw base64 body.
+        body = raw.replace("\n", "").replace(" ", "")
+
+    # py-vapid's from_string uses urlsafe_b64decode, which only accepts
+    # the `-_` alphabet — standard base64 from PEMs uses `+/`. Translate.
+    return body.replace("+", "-").replace("/", "_")
 
 
 def _vapid_configured() -> bool:

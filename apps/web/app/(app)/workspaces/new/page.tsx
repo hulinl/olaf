@@ -41,9 +41,10 @@ export default function NewWorkspacePage() {
     setError(null);
     try {
       const ws = await workspaces.create({ slug, name, location, bio });
-      // Drop them straight into the edit page so they can finish the profile
-      // (cover, logo, socials) before publishing the first event.
-      router.push(`/workspaces/${ws.slug}/edit`);
+      // Drop them straight into the owner cockpit for the new komunita —
+      // the edit form moved under /admin/komunity/<slug>/edit when the
+      // Tvůrce shell consolidated.
+      router.push(`/admin/komunity/${ws.slug}/edit`);
     } catch (err) {
       setError(
         err instanceof ApiError
