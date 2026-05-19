@@ -11,6 +11,7 @@ import {
   type ChecklistAutoItem,
   type ChecklistManualItem,
   type ChecklistPreset,
+  type ChecklistRemindAudience,
   type EventChecklist,
   events,
 } from "@/lib/api";
@@ -206,6 +207,9 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
               <ManualRow
                 key={item.id}
                 item={item}
+                workspaceSlug={workspaceSlug}
+                eventSlug={eventSlug}
+                onMutate={reload}
                 onToggle={async () => {
                   try {
                     await events.updateChecklistItem(
@@ -270,71 +274,285 @@ function AutoBubble({ item }: { item: ChecklistAutoItem }) {
 
 function ManualRow({
   item,
+  workspaceSlug,
+  eventSlug,
   onToggle,
   onDelete,
+  onMutate,
 }: {
   item: ChecklistManualItem;
+  workspaceSlug: string;
+  eventSlug: string;
   onToggle: () => Promise<void>;
   onDelete: () => Promise<void>;
+  onMutate: () => Promise<void>;
 }) {
   const tone =
     CATEGORY_TONE[item.category] ?? "bg-surface-muted text-ink-700";
+  const [reminderOpen, setReminderOpen] = useState(false);
   return (
     <div
       className={[
-        "flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-start sm:gap-3",
+        "flex flex-col gap-2 rounded-md border p-3",
         item.done
           ? "border-success/30 bg-success/5"
           : "border-border bg-surface",
       ].join(" ")}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-label={item.done ? "Označit jako nesplněné" : "Označit jako splněné"}
-        className={[
-          "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold transition-colors",
-          item.done
-            ? "border-success bg-success text-white"
-            : "border-border bg-surface hover:bg-surface-muted",
-        ].join(" ")}
-      >
-        {item.done && "✓"}
-      </button>
-      <div className="flex-1">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <p
-            className={[
-              "text-sm font-medium",
-              item.done ? "text-ink-500 line-through" : "text-ink-900",
-            ].join(" ")}
-          >
-            {item.title}
-          </p>
-          {item.category && (
-            <span
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={item.done ? "Označit jako nesplněné" : "Označit jako splněné"}
+          className={[
+            "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold transition-colors",
+            item.done
+              ? "border-success bg-success text-white"
+              : "border-border bg-surface hover:bg-surface-muted",
+          ].join(" ")}
+        >
+          {item.done && "✓"}
+        </button>
+        <div className="flex-1">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <p
               className={[
-                "rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide",
-                tone,
+                "text-sm font-medium",
+                item.done ? "text-ink-500 line-through" : "text-ink-900",
               ].join(" ")}
             >
-              {CATEGORY_LABEL[item.category] ?? item.category}
-            </span>
+              {item.title}
+            </p>
+            {item.category && (
+              <span
+                className={[
+                  "rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide",
+                  tone,
+                ].join(" ")}
+              >
+                {CATEGORY_LABEL[item.category] ?? item.category}
+              </span>
+            )}
+            <ReminderBadge item={item} />
+          </div>
+          {item.description && (
+            <p className="mt-1 text-xs text-ink-500">{item.description}</p>
           )}
         </div>
-        {item.description && (
-          <p className="mt-1 text-xs text-ink-500">{item.description}</p>
-        )}
+        <div className="flex gap-3 sm:shrink-0">
+          <button
+            type="button"
+            onClick={() => setReminderOpen((v) => !v)}
+            className="text-xs text-ink-500 hover:text-brand"
+          >
+            {item.remind_at ? "Upravit připomínku" : "Připomenout"}
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-xs text-ink-500 hover:text-danger"
+          >
+            Smazat
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={onDelete}
-        className="text-xs text-ink-500 hover:text-danger sm:shrink-0"
-      >
-        Smazat
-      </button>
+      {reminderOpen && (
+        <ReminderEditor
+          item={item}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+          onClose={() => setReminderOpen(false)}
+          onSaved={async () => {
+            await onMutate();
+          }}
+        />
+      )}
     </div>
   );
+}
+
+function ReminderBadge({ item }: { item: ChecklistManualItem }) {
+  if (!item.remind_at) return null;
+  const when = new Date(item.remind_at);
+  const formatted = when.toLocaleString("cs-CZ", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const audienceLabel =
+    item.remind_audience === "participants" ? "účastníci" : "tobě";
+  const sent = item.remind_sent_at !== null;
+  return (
+    <span
+      className={[
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+        sent
+          ? "bg-success/15 text-success"
+          : "bg-brand/10 text-brand",
+      ].join(" ")}
+      title={sent ? `Odesláno ${new Date(item.remind_sent_at!).toLocaleString("cs-CZ")}` : undefined}
+    >
+      {sent ? "✓" : "⏰"} {formatted} ({audienceLabel})
+    </span>
+  );
+}
+
+function ReminderEditor({
+  item,
+  workspaceSlug,
+  eventSlug,
+  onClose,
+  onSaved,
+}: {
+  item: ChecklistManualItem;
+  workspaceSlug: string;
+  eventSlug: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const initial = item.remind_at
+    ? toLocalDateTimeInput(item.remind_at)
+    : defaultReminderTime();
+  const [when, setWhen] = useState(initial);
+  const [audience, setAudience] = useState<ChecklistRemindAudience>(
+    item.remind_audience,
+  );
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save(action: "save" | "clear" | "now") {
+    setBusy(true);
+    setErr(null);
+    try {
+      if (action === "clear") {
+        await events.updateChecklistItem(workspaceSlug, eventSlug, item.id, {
+          remind_at: null,
+        });
+      } else if (action === "now") {
+        await events.sendChecklistReminderNow(
+          workspaceSlug,
+          eventSlug,
+          item.id,
+        );
+      } else {
+        if (!when) {
+          setErr("Vyber datum a čas.");
+          return;
+        }
+        await events.updateChecklistItem(workspaceSlug, eventSlug, item.id, {
+          remind_at: new Date(when).toISOString(),
+          remind_audience: audience,
+        });
+      }
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Uložení selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-1 rounded-md border border-border bg-surface-muted/30 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+        Připomínka emailem
+      </p>
+      <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <Field label="Kdy" htmlFor={`when-${item.id}`}>
+          <Input
+            id={`when-${item.id}`}
+            type="datetime-local"
+            value={when}
+            onChange={(e) => setWhen(e.target.value)}
+          />
+        </Field>
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="text-xs font-medium text-ink-700">Komu</span>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={`aud-${item.id}`}
+              checked={audience === "creator"}
+              onChange={() => setAudience("creator")}
+              className="accent-brand"
+            />
+            <span>Jen mně (organizátorovi)</span>
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={`aud-${item.id}`}
+              checked={audience === "participants"}
+              onChange={() => setAudience("participants")}
+              className="accent-brand"
+            />
+            <span>Účastníkům + mně</span>
+          </label>
+        </div>
+      </div>
+      {err && (
+        <p className="mt-2 text-xs text-danger" role="alert">
+          {err}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          loading={busy}
+          onClick={() => save("save")}
+        >
+          Uložit
+        </Button>
+        <button
+          type="button"
+          onClick={() => save("now")}
+          disabled={busy}
+          className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50"
+        >
+          Odeslat hned
+        </button>
+        {item.remind_at && (
+          <button
+            type="button"
+            onClick={() => save("clear")}
+            disabled={busy}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-500 hover:text-danger hover:border-danger/40 disabled:opacity-50"
+          >
+            Zrušit připomínku
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto rounded-md px-3 py-1.5 text-xs text-ink-500 hover:text-ink-900"
+        >
+          Zavřít
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function toLocalDateTimeInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+function defaultReminderTime(): string {
+  // 09:00 tomorrow
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  t.setHours(9, 0, 0, 0);
+  return toLocalDateTimeInput(t.toISOString());
 }
 
 function PresetPicker({

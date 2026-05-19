@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useState } from "react";
 
+import { EventChecklist } from "@/components/event-checklist";
+import { ParticipantProfileDialog } from "@/components/participant-profile-dialog";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import {
@@ -73,6 +75,7 @@ function AdminEventDetail({ params }: Props) {
   const [rsvps, setRsvps] = useState<RSVPRecord[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileRsvpId, setProfileRsvpId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,6 +179,8 @@ function AdminEventDetail({ params }: Props) {
         </div>
       </header>
 
+      <EventChecklist workspaceSlug={wsSlug} eventSlug={eventSlug} />
+
       <div className="grid gap-3 sm:grid-cols-4">
         <StatTile
           label="Přihlášeno"
@@ -257,12 +262,20 @@ function AdminEventDetail({ params }: Props) {
                       prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev,
                     )
                   }
+                  onOpenProfile={() => setProfileRsvpId(r.id)}
                 />
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <ParticipantProfileDialog
+        workspaceSlug={wsSlug}
+        eventSlug={eventSlug}
+        rsvpId={profileRsvpId}
+        onClose={() => setProfileRsvpId(null)}
+      />
     </div>
   );
 }
@@ -315,12 +328,14 @@ function RsvpRow({
   eventSlug,
   requiredDocs,
   onPaid,
+  onOpenProfile,
 }: {
   rsvp: RSVPRecord;
   wsSlug: string;
   eventSlug: string;
   requiredDocs: { key: string; label: string; required: boolean }[];
   onPaid: (updated: RSVPRecord) => void;
+  onOpenProfile: () => void;
 }) {
   const [marking, setMarking] = useState(false);
   const created = new Date(rsvp.created_at);
@@ -345,15 +360,19 @@ function RsvpRow({
   return (
     <tr className="group hover:bg-brand/10">
       <td className="px-4 py-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium text-ink-900">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex flex-col items-start gap-0.5 rounded text-left transition-colors focus-ring hover:text-brand"
+        >
+          <span className="font-medium text-ink-900 group-hover:underline">
             {rsvp.user_full_name || "—"}
           </span>
           <span className="text-xs text-ink-500">{rsvp.user_email}</span>
           {rsvp.user_phone && (
             <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
           )}
-        </div>
+        </button>
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <span

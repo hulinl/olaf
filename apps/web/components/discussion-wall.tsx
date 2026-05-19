@@ -156,36 +156,96 @@ export function DiscussionWall({ scope, currentUserId }: Props) {
         />
       )}
 
-      <div className="mt-5 flex flex-col gap-3">
-        {topics === null ? (
-          <div className="flex justify-center py-6">
-            <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-          </div>
-        ) : topics.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
-            Zatím tu nikdo nic nenapsal. Buď první.
-          </p>
-        ) : (
-          topics.map((t) => (
-            <TopicCard
-              key={t.id}
-              topic={t}
-              open={openTopicId === t.id}
-              onToggle={() =>
-                setOpenTopicId(openTopicId === t.id ? null : t.id)
-              }
-              canDelete={scope.isModerator || t.author_id === currentUserId}
-              canModerate={scope.isModerator}
-              onDelete={() => handleDeleteTopic(t.id)}
-              onTogglePin={() => handleTogglePin(t)}
-              scope={scope}
-              currentUserId={currentUserId}
-              onCommentChange={listTopics}
-            />
-          ))
-        )}
-      </div>
+      <TopicList
+        topics={topics}
+        openTopicId={openTopicId}
+        setOpenTopicId={setOpenTopicId}
+        scope={scope}
+        currentUserId={currentUserId}
+        handleDeleteTopic={handleDeleteTopic}
+        handleTogglePin={handleTogglePin}
+        listTopics={listTopics}
+      />
     </section>
+  );
+}
+
+function TopicList({
+  topics,
+  openTopicId,
+  setOpenTopicId,
+  scope,
+  currentUserId,
+  handleDeleteTopic,
+  handleTogglePin,
+  listTopics,
+}: {
+  topics: DiscussionTopic[] | null;
+  openTopicId: number | null;
+  setOpenTopicId: (id: number | null) => void;
+  scope: Scope;
+  currentUserId: number;
+  handleDeleteTopic: (id: number) => Promise<void>;
+  handleTogglePin: (t: DiscussionTopic) => Promise<void>;
+  listTopics: () => Promise<void>;
+}) {
+  if (topics === null) {
+    return (
+      <div className="mt-5 flex justify-center py-6">
+        <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+      </div>
+    );
+  }
+  if (topics.length === 0) {
+    return (
+      <p className="mt-5 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
+        Zatím tu nikdo nic nenapsal. Buď první.
+      </p>
+    );
+  }
+
+  const pinned = topics.filter((t) => t.pinned);
+  const rest = topics.filter((t) => !t.pinned);
+
+  const renderCard = (t: DiscussionTopic) => (
+    <TopicCard
+      key={t.id}
+      topic={t}
+      open={openTopicId === t.id}
+      onToggle={() => setOpenTopicId(openTopicId === t.id ? null : t.id)}
+      canDelete={scope.isModerator || t.author_id === currentUserId}
+      canModerate={scope.isModerator}
+      onDelete={() => handleDeleteTopic(t.id)}
+      onTogglePin={() => handleTogglePin(t)}
+      scope={scope}
+      currentUserId={currentUserId}
+      onCommentChange={listTopics}
+    />
+  );
+
+  return (
+    <div className="mt-5 flex flex-col gap-6">
+      {pinned.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
+            <span aria-hidden>📌</span> Připnuté
+          </p>
+          <div className="flex flex-col gap-3 rounded-xl border border-brand/30 bg-brand/5 p-3">
+            {pinned.map(renderCard)}
+          </div>
+        </div>
+      )}
+      {rest.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {pinned.length > 0 && (
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              Ostatní příspěvky
+            </p>
+          )}
+          <div className="flex flex-col gap-3">{rest.map(renderCard)}</div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -299,6 +359,44 @@ function TopicCard({
   const [loading, setLoading] = useState(false);
   const [composerBody, setComposerBody] = useState("");
   const [posting, setPosting] = useState(false);
+  // Optimistic like state — seeded from the prop, owned locally so a
+  // toggle doesn't need a full list re-fetch. Reset when the topic id
+  // changes (e.g. after a delete + insert in the parent list).
+  const [liked, setLiked] = useState<boolean>(topic.i_liked);
+  const [likeCount, setLikeCount] = useState<number>(topic.like_count);
+  useEffect(() => {
+    setLiked(topic.i_liked);
+    setLikeCount(topic.like_count);
+  }, [topic.id, topic.i_liked, topic.like_count]);
+
+  async function handleToggleLike(e: React.MouseEvent) {
+    e.stopPropagation();
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount((n) => Math.max(0, n + (nextLiked ? 1 : -1)));
+    try {
+      const resp =
+        scope.kind === "workspace"
+          ? await discussions.toggleWorkspaceLike(
+              scope.slug,
+              topic.id,
+              nextLiked,
+            )
+          : await discussions.toggleEventLike(
+              scope.workspaceSlug,
+              scope.eventSlug,
+              topic.id,
+              nextLiked,
+            );
+      // Sync to server-truth in case of races (someone else liked too).
+      setLiked(resp.i_liked);
+      setLikeCount(resp.like_count);
+    } catch {
+      // Rollback on failure.
+      setLiked(!nextLiked);
+      setLikeCount((n) => Math.max(0, n + (nextLiked ? -1 : 1)));
+    }
+  }
 
   async function loadDetail() {
     setLoading(true);
@@ -400,7 +498,26 @@ function TopicCard({
                 : "komentářů"}
           </p>
         </div>
-        <span className="text-xs text-ink-500">{open ? "Skrýt" : "Otevřít"}</span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleToggleLike}
+            aria-pressed={liked}
+            aria-label={liked ? "Zrušit lajk" : "Lajknout"}
+            className={[
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-ring",
+              liked
+                ? "border-brand/40 bg-brand/10 text-brand"
+                : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+            ].join(" ")}
+          >
+            <span aria-hidden>{liked ? "♥" : "♡"}</span>
+            <span className="tabular-nums">{likeCount}</span>
+          </button>
+          <span className="text-xs text-ink-500">
+            {open ? "Skrýt" : "Otevřít"}
+          </span>
+        </div>
       </header>
 
       {open && (

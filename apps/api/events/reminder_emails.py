@@ -1,0 +1,92 @@
+"""Scheduled reminder e-mails for checklist items.
+
+Creators set `remind_at` on a checklist item and choose an audience:
+- creator     → only workspace owners get the mail
+- participants → all RSVP'd users + workspace owners
+
+Dispatch happens via the Celery periodic task in events.tasks.
+"""
+from __future__ import annotations
+
+from django.conf import settings
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils import timezone
+
+from accounts.models import User
+from workspaces.models import WorkspaceMember
+
+from .models import RSVP, EventChecklistItem
+
+
+def _frontend_url(path: str) -> str:
+    base = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return f"{base}{path}"
+
+
+def _event_cockpit_url(item: EventChecklistItem) -> str:
+    event = item.event
+    return _frontend_url(
+        f"/admin/komunity/{event.workspace.slug}/akce/{event.slug}/checklist"
+    )
+
+
+def _audience_for_item(item: EventChecklistItem) -> list[User]:
+    event = item.event
+    user_ids: set[int] = set()
+
+    owner_ids = WorkspaceMember.objects.filter(
+        workspace=event.workspace,
+    ).values_list("user_id", flat=True)
+    user_ids.update(owner_ids)
+
+    if item.remind_audience == EventChecklistItem.REMIND_AUDIENCE_PARTICIPANTS:
+        rsvp_ids = (
+            RSVP.objects.filter(event=event)
+            .exclude(status=RSVP.STATUS_CANCELLED)
+            .values_list("user_id", flat=True)
+        )
+        user_ids.update(rsvp_ids)
+
+    return list(User.objects.filter(id__in=user_ids))
+
+
+def send_checklist_reminder(item: EventChecklistItem) -> int:
+    """Send one reminder per recipient. Returns count sent."""
+    audience = _audience_for_item(item)
+    if not audience:
+        return 0
+
+    event = item.event
+    cockpit_url = _event_cockpit_url(item)
+    is_participants = (
+        item.remind_audience == EventChecklistItem.REMIND_AUDIENCE_PARTICIPANTS
+    )
+    subject = (
+        f"Připomínka — {event.title}: {item.title}"
+        if is_participants
+        else f"[Checklist] {event.title}: {item.title}"
+    )
+
+    sent = 0
+    for user in audience:
+        context = {
+            "item": item,
+            "event": event,
+            "recipient": user,
+            "cockpit_url": cockpit_url,
+            "is_participants": is_participants,
+        }
+        body = render_to_string("events/checklist_reminder.txt", context)
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+        sent += 1
+
+    item.remind_sent_at = timezone.now()
+    item.save(update_fields=["remind_sent_at", "updated_at"])
+    return sent

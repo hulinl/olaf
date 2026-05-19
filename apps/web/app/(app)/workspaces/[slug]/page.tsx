@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
+import { DiscussionWall } from "@/components/discussion-wall";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { WorkspaceMetaLine } from "@/components/ui/workspace-meta-line";
+import { useUser } from "@/lib/user-context";
 import {
   ApiError,
   type EventSummary,
@@ -31,6 +33,7 @@ const STATUS_LABELS: Record<EventSummary["status"], string> = {
 export default function WorkspaceDetailPage({ params }: Props) {
   const { slug } = use(params);
   const router = useRouter();
+  const user = useUser();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [eventList, setEventList] = useState<EventSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -249,6 +252,19 @@ export default function WorkspaceDetailPage({ params }: Props) {
             UI surface is hidden so the V1 audience doesn't see two levels of
             "komunita" with the same word. Re-enable here when the V1.5 slice
             ships. */}
+
+        {/* Nástěnka komunity — V1 backend gates this to WorkspaceMember
+            (= currently only owners), so we render the section only when
+            the viewer has access. When sub-communities / general membership
+            ship the gate widens automatically. */}
+        {isOwner && (
+          <section className="mt-12">
+            <DiscussionWall
+              scope={{ kind: "workspace", slug, isModerator: isOwner }}
+              currentUserId={user.id}
+            />
+          </section>
+        )}
       </section>
     </main>
   );

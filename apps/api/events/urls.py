@@ -73,6 +73,11 @@ urlpatterns = [
         name="rsvps",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/profile/",
+        views.participant_profile,
+        name="rsvp-profile",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/approve/",
         views.approve_rsvp,
         name="rsvp-approve",
@@ -146,6 +151,11 @@ urlpatterns = [
         "<slug:workspace_slug>/<slug:event_slug>/checklist/items/<int:item_id>/",
         views.checklist_item_detail,
         name="checklist-item-detail",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/checklist/items/<int:item_id>/send-now/",
+        views.checklist_item_send_now,
+        name="checklist-item-send-now",
     ),
     path(
         "<slug:workspace_slug>/<slug:event_slug>/checklist/from-preset/",

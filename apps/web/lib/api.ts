@@ -216,6 +216,7 @@ export interface Event extends EventSummary {
   billing_profile: number | null;
   required_documents: RequiredDocumentSpec[];
   my_rsvp?: MyRSVP | null;
+  i_am_owner?: boolean;
 }
 
 export interface RequiredDocumentSpec {
@@ -247,6 +248,8 @@ export interface ChecklistAutoItem {
   action_href: string;
 }
 
+export type ChecklistRemindAudience = "creator" | "participants";
+
 export interface ChecklistManualItem {
   id: number;
   title: string;
@@ -255,6 +258,9 @@ export interface ChecklistManualItem {
   done: boolean;
   done_at: string | null;
   sort_order: number;
+  remind_at: string | null;
+  remind_audience: ChecklistRemindAudience;
+  remind_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -283,9 +289,17 @@ export interface DiscussionTopic {
   author_id: number | null;
   author_name: string;
   comment_count: number;
+  like_count: number;
+  i_liked: boolean;
   last_activity_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TopicLikeResponse {
+  topic_id: number;
+  like_count: number;
+  i_liked: boolean;
 }
 
 export interface DiscussionComment {
@@ -444,6 +458,28 @@ export interface RSVPRecord extends MyRSVP {
   verified_doc_keys: string[];
   invoice_id: number | null;
   updated_at: string;
+}
+
+export interface ParticipantProfile {
+  rsvp_id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    zip: string;
+    country: string;
+    legacy: string;
+  };
+  emergency_contact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
 }
 
 export class ApiError extends Error {
@@ -845,6 +881,14 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/approve/`,
       { method: "POST" },
     ),
+  participantProfile: (
+    workspaceSlug: string,
+    eventSlug: string,
+    rsvpId: number,
+  ) =>
+    apiFetch<ParticipantProfile>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/profile/`,
+    ),
   rejectRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,
@@ -935,11 +979,22 @@ export const events = {
       category: string;
       done: boolean;
       sort_order: number;
+      remind_at: string | null;
+      remind_audience: ChecklistRemindAudience;
     }>,
   ) =>
     apiFetch<ChecklistManualItem>(
       `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/${itemId}/`,
       { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  sendChecklistReminderNow: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+  ) =>
+    apiFetch<ChecklistManualItem>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/${itemId}/send-now/`,
+      { method: "POST" },
     ),
   deleteChecklistItem: (
     workspaceSlug: string,
@@ -1062,6 +1117,21 @@ export const discussions = {
     apiFetch<void>(
       `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/${commentId}/`,
       { method: "DELETE" },
+    ),
+  toggleWorkspaceLike: (slug: string, topicId: number, liked: boolean) =>
+    apiFetch<TopicLikeResponse>(
+      `/api/discussions/workspace/${slug}/topics/${topicId}/like/`,
+      { method: liked ? "POST" : "DELETE" },
+    ),
+  toggleEventLike: (
+    workspaceSlug: string,
+    eventSlug: string,
+    topicId: number,
+    liked: boolean,
+  ) =>
+    apiFetch<TopicLikeResponse>(
+      `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/like/`,
+      { method: liked ? "POST" : "DELETE" },
     ),
 };
 

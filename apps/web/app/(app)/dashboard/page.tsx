@@ -281,7 +281,12 @@ function EventMini({
 }
 
 function TodoCard({ item }: { item: TodoItem }) {
-  const eventHref = `/events/${item.workspace_slug}/${item.event_slug}`;
+  // Deep-link straight to the section the user actually needs to act
+  // on — payment lands on #platba, document upload on #dokumenty. The
+  // ?tab=registrace pin guarantees we land on the management tab, not
+  // on the discussion wall.
+  const anchor = item.kind === "payment" ? "platba" : "dokumenty";
+  const eventHref = `/events/${item.workspace_slug}/${item.event_slug}?tab=registrace#${anchor}`;
   const eventDate = new Date(item.event_starts_at).toLocaleDateString("cs-CZ", {
     day: "numeric",
     month: "short",

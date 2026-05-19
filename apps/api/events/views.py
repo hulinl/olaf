@@ -76,6 +76,11 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
         payload["my_rsvp"] = (
             MyRSVPSerializer(my_rsvp).data if my_rsvp else None
         )
+        payload["i_am_owner"] = is_workspace_owner(
+            request.user, event.workspace
+        )
+    else:
+        payload["i_am_owner"] = False
 
     return Response(payload)
 
@@ -768,6 +773,56 @@ def reject_rsvp(
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def participant_profile(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Owner view of a participant's profile basics (name, phone, address,
+    emergency contact). Surfaces just enough for the owner to call/identify
+    the person without exposing internal user fields.
+    """
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        rsvp = RSVP.objects.select_related("user").get(pk=rsvp_id, event=event)
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    user = rsvp.user
+    if user is None:
+        return Response(
+            {"detail": "Účastník registrovaný bez účtu — profil není dostupný."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response(
+        {
+            "rsvp_id": rsvp.id,
+            "user_id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "full_name": user.get_full_name() or user.email,
+            "email": user.email,
+            "phone": user.phone,
+            "address": {
+                "street": user.address_street,
+                "city": user.address_city,
+                "zip": user.address_zip,
+                "country": user.address_country,
+                # Legacy single-line, only shown when structured is empty.
+                "legacy": user.address,
+            },
+            "emergency_contact": {
+                "name": user.emergency_contact_name,
+                "phone": user.emergency_contact_phone,
+                "relationship": user.emergency_contact_relationship,
+            },
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Response:
     """Owner-only list of RSVPs for an event (with questionnaire answers)."""
     try:
@@ -1330,7 +1385,49 @@ def checklist_item_detail(
 
         with contextlib.suppress(TypeError, ValueError):
             item.sort_order = max(0, int(request.data["sort_order"]))
+
+    if "remind_at" in request.data:
+        from django.utils.dateparse import parse_datetime
+
+        raw = request.data["remind_at"]
+        new_remind_at = parse_datetime(raw) if raw else None
+        if new_remind_at != item.remind_at:
+            item.remind_at = new_remind_at
+            item.remind_sent_at = None
+    if "remind_audience" in request.data:
+        candidate = str(request.data["remind_audience"]).strip()
+        valid = {c for c, _ in EventChecklistItem.REMIND_AUDIENCE_CHOICES}
+        if candidate in valid:
+            item.remind_audience = candidate
+
     item.save()
+    return Response(EventChecklistItemSerializer(item).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def checklist_item_send_now(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    item_id: int,
+) -> Response:
+    """Owner override — force-send the reminder for this item right now."""
+    from .models import EventChecklistItem
+    from .serializers import EventChecklistItemSerializer
+    from .tasks import send_checklist_reminder_now_task
+
+    event, err = _load_event_for_owner(workspace_slug, event_slug, request.user)
+    if err is not None:
+        return err
+
+    try:
+        item = EventChecklistItem.objects.get(pk=item_id, event=event)
+    except EventChecklistItem.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    send_checklist_reminder_now_task.delay(item.pk)
+    item.refresh_from_db()
     return Response(EventChecklistItemSerializer(item).data)
 
 

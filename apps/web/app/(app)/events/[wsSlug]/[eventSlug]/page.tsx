@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { DiscussionWall } from "@/components/discussion-wall";
 import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
 import { RequiredDocsPanel } from "@/components/required-docs-panel";
-import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { useUser } from "@/lib/user-context";
 import {
@@ -41,26 +40,32 @@ const RSVP_STATUS_TONE: Record<string, string> = {
   no: "bg-surface-muted text-ink-500",
 };
 
+type TabKey = "nastenka" | "registrace";
+
 /**
- * Participant's "moje účast" page for a single event.
+ * Participant's event hub.
  *
- * This is the canonical place for everything the participant cares
- * about: status, payment instructions (QR), required documents
- * (upload), and the issued invoice (if any). The public landing
- * (/[ws]/e/[event]) stays presentation-only.
+ * Two tabs:
+ *   - Nástěnka — event-wide discussion wall (community side)
+ *   - Moje rezervace — personal: status, platba (QR), required documents,
+ *     invoice + PDF, zrušit registraci
  *
- * Loads everything in parallel; each panel self-handles its empty
- * state, so the page renders cleanly whether the event is free, has
- * no required docs, or hasn't been paid yet.
+ * The split keeps the social feed and the personal admin out of each
+ * other's way: scrolling the wall doesn't bury the QR code, and
+ * managing payment doesn't drown out new posts.
  */
 export default function MyEventPage({ params }: Props) {
   const { wsSlug, eventSlug } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useUser();
   const [event, setEvent] = useState<OlafEvent | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialTab: TabKey =
+    searchParams.get("tab") === "registrace" ? "registrace" : "nastenka";
+  const [tab, setTab] = useState<TabKey>(initialTab);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +80,17 @@ export default function MyEventPage({ params }: Props) {
           if (!cancelled) setInvoice(inv);
         } catch {
           // ignore
+        }
+        // No RSVP yet? Default to the management tab so the user lands
+        // on the "Přihlásit se" CTA instead of an empty wall. Skip when
+        // the URL already specifies a tab — that's an explicit deep-link
+        // (e.g. dashboard "Doložit dokument" → ?tab=registrace#dokumenty).
+        if (
+          !cancelled &&
+          !ev.my_rsvp &&
+          !searchParams.get("tab")
+        ) {
+          setTab("registrace");
         }
       } catch (err) {
         if (cancelled) return;
@@ -94,7 +110,22 @@ export default function MyEventPage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [wsSlug, eventSlug, router]);
+  }, [wsSlug, eventSlug, router, searchParams]);
+
+  // After the page mounts and the right tab is active, honor any
+  // #section hash from the deep-link (dashboard → ?tab=registrace#dokumenty).
+  // We delay one frame so the panel anchors are in the DOM.
+  useEffect(() => {
+    if (loading || tab !== "registrace") return;
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const id = window.requestAnimationFrame(() => {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [loading, tab]);
 
   if (loading) {
     return (
@@ -115,6 +146,7 @@ export default function MyEventPage({ params }: Props) {
   if (!event) return null;
 
   const my = event.my_rsvp;
+  const hasActiveRsvp = !!my && my.status !== "cancelled";
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
   const sameDay = starts.toDateString() === ends.toDateString();
@@ -144,160 +176,284 @@ export default function MyEventPage({ params }: Props) {
           <p className="mt-2 text-sm text-ink-500">
             {dateLabel}
             {event.location_text && ` · ${event.location_text}`} ·{" "}
-            <Link
+            <a
               href={`/${wsSlug}/e/${eventSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="underline hover:text-ink-900"
             >
               Otevřít stránku akce ↗
-            </Link>
+            </a>
           </p>
         </header>
 
-        {/* RSVP status summary — header pill on the right mirrors every
-            other section's status placement. Price lives on the invoice
-            / payment panel below, no need to duplicate it here. */}
-        {my && (
-          <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h3 className="text-base font-semibold text-ink-900">
-                Status registrace
-              </h3>
-              <div className="flex items-center gap-2">
-                {my.waitlist_position != null && (
-                  <span className="text-xs text-ink-500">
-                    pořadí #{my.waitlist_position}
-                  </span>
-                )}
-                <span
-                  className={[
-                    "inline-flex rounded-full px-3 py-0.5 text-xs font-semibold",
-                    RSVP_STATUS_TONE[my.status] ??
-                      "bg-surface-muted text-ink-500",
-                  ].join(" ")}
-                >
-                  {RSVP_STATUS_LABEL[my.status] ?? my.status}
+        <TabBar tab={tab} onChange={setTab} />
+
+        <div className="rounded-2xl border border-border bg-surface-muted/30 p-1">
+          <div className="rounded-xl bg-canvas p-4 sm:p-6">
+            {tab === "nastenka" ? (
+              hasActiveRsvp || event.i_am_owner ? (
+                <DiscussionWall
+                  scope={{
+                    kind: "event",
+                    workspaceSlug: wsSlug,
+                    eventSlug,
+                    isModerator: !!event.i_am_owner,
+                  }}
+                  currentUserId={user.id}
+                />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
+                  <h3 className="text-base font-semibold text-ink-900">
+                    Nástěnka je pro přihlášené
+                  </h3>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                    Diskuze k akci se otevře jakmile potvrdíš svou účast.
+                  </p>
+                  <Link
+                    href={`/${wsSlug}/e/${eventSlug}/rsvp`}
+                    className="mt-4 inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90"
+                  >
+                    Přihlásit se →
+                  </Link>
+                </div>
+              )
+            ) : (
+              <MyReservationPanel
+                event={event}
+                invoice={invoice}
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+              />
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function TabBar({
+  tab,
+  onChange,
+}: {
+  tab: TabKey;
+  onChange: (next: TabKey) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Sekce akce"
+      className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-surface-muted/50 p-1.5"
+    >
+      <TabButton
+        active={tab === "nastenka"}
+        onClick={() => onChange("nastenka")}
+        label="Nástěnka"
+        hint="Příspěvky a diskuze"
+        icon="💬"
+      />
+      <TabButton
+        active={tab === "registrace"}
+        onClick={() => onChange("registrace")}
+        label="Moje registrace"
+        hint="Status, platba, dokumenty"
+        icon="🎟"
+      />
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  label,
+  hint,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  hint: string;
+  icon: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={[
+        "flex flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left transition-colors focus-ring sm:flex-row sm:items-center sm:gap-3",
+        active
+          ? "bg-surface text-ink-900 shadow-sm ring-1 ring-brand/40"
+          : "text-ink-500 hover:bg-surface/60 hover:text-ink-900",
+      ].join(" ")}
+    >
+      <span aria-hidden className="text-lg sm:text-xl">
+        {icon}
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-[11px] text-ink-500">{hint}</span>
+      </span>
+    </button>
+  );
+}
+
+function MyReservationPanel({
+  event,
+  invoice,
+  wsSlug,
+  eventSlug,
+}: {
+  event: OlafEvent;
+  invoice: Invoice | null;
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const my = event.my_rsvp;
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-1 border-b border-border pb-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Sekce
+        </p>
+        <h2 className="text-xl font-semibold text-ink-900">Moje registrace</h2>
+        <p className="text-sm text-ink-500">
+          Status přihlášky, pokyny k platbě, povinné dokumenty a faktura.
+        </p>
+      </header>
+
+      {/* RSVP status summary */}
+      {my && (
+        <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h3 className="text-base font-semibold text-ink-900">
+              Status registrace
+            </h3>
+            <div className="flex items-center gap-2">
+              {my.waitlist_position != null && (
+                <span className="text-xs text-ink-500">
+                  pořadí #{my.waitlist_position}
                 </span>
-              </div>
+              )}
+              <span
+                className={[
+                  "inline-flex rounded-full px-3 py-0.5 text-xs font-semibold",
+                  RSVP_STATUS_TONE[my.status] ??
+                    "bg-surface-muted text-ink-500",
+                ].join(" ")}
+              >
+                {RSVP_STATUS_LABEL[my.status] ?? my.status}
+              </span>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {!my && (
-          <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-6 text-sm text-ink-500">
-            Na tuto akci nejsi přihlášen/á.{" "}
-            <Link
-              href={`/${wsSlug}/e/${eventSlug}/rsvp`}
-              className="font-medium text-brand underline"
-            >
-              Přihlásit se →
-            </Link>
-          </div>
-        )}
+      {!my && (
+        <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-6 text-sm text-ink-500">
+          Na tuto akci nejsi přihlášen/á.{" "}
+          <Link
+            href={`/${wsSlug}/e/${eventSlug}/rsvp`}
+            className="font-medium text-brand underline"
+          >
+            Přihlásit se →
+          </Link>
+        </div>
+      )}
 
+      <div id="platba" className="scroll-mt-24">
         <PaymentInstructionsPanel
           workspaceSlug={wsSlug}
           eventSlug={eventSlug}
         />
+      </div>
 
+      <div id="dokumenty" className="scroll-mt-24">
         <RequiredDocsPanel workspaceSlug={wsSlug} eventSlug={eventSlug} />
+      </div>
 
-        {invoice && (
-          <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-ink-900">
-                  Faktura
-                </h3>
-                <p className="mt-1 text-sm text-ink-500">
-                  {invoice.number} · vystavena{" "}
-                  {new Date(invoice.issued_at).toLocaleDateString("cs-CZ", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-              <span className="inline-flex rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
-                {invoice.status === "paid" ? "Zaplaceno" : invoice.status}
-              </span>
-            </div>
-            <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
-              <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-                <dt className="text-ink-500">Částka</dt>
-                <dd className="font-semibold text-ink-900">
-                  {formatEventPrice(invoice.total, invoice.currency)}
-                </dd>
-                <dt className="text-ink-500">Variabilní symbol</dt>
-                <dd className="font-mono text-ink-900">
-                  {invoice.variable_symbol || "—"}
-                </dd>
-                <dt className="text-ink-500">Dodavatel</dt>
-                <dd className="text-ink-700">{invoice.supplier_name}</dd>
-                <dt className="text-ink-500">Odběratel</dt>
-                <dd className="text-ink-700">{invoice.customer_name}</dd>
-              </dl>
-              {invoice.has_qr && (
-                <div className="flex flex-col items-center gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={assetUrl(
-                      `/api/events/${wsSlug}/${eventSlug}/invoices/${invoice.id}/qr.png`,
-                    )}
-                    alt="QR Platba"
-                    width={160}
-                    height={160}
-                    className="rounded-md border border-border bg-white p-2"
-                  />
-                  <span className="text-[10px] uppercase tracking-[0.16em] text-ink-500">
-                    QR Platba
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="mt-4">
-              <a
-                href={assetUrl(
-                  `/api/events/${wsSlug}/${eventSlug}/invoices/${invoice.id}/pdf/`,
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-ring"
-              >
-                Stáhnout PDF ↓
-              </a>
-            </div>
-          </section>
-        )}
-
-        {/* Cancel registration */}
-        {my &&
-          my.status !== "cancelled" &&
-          event.status !== "cancelled" && (
-            <div className="rounded-md border border-danger/30 bg-danger-soft/30 p-4 text-sm text-ink-700">
-              <p>
-                Chceš svojí registraci zrušit? Klik níže ji okamžitě zruší
-                a uvolní místo dalšímu zájemci.
+      {invoice && (
+        <section
+          id="faktura"
+          className="scroll-mt-24 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-ink-900">Faktura</h3>
+              <p className="mt-1 text-sm text-ink-500">
+                {invoice.number} · vystavena{" "}
+                {new Date(invoice.issued_at).toLocaleDateString("cs-CZ", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
               </p>
-              <CancelRsvpButton wsSlug={wsSlug} eventSlug={eventSlug} />
             </div>
-          )}
+            <span className="inline-flex rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
+              {invoice.status === "paid" ? "Zaplaceno" : invoice.status}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+              <dt className="text-ink-500">Částka</dt>
+              <dd className="font-semibold text-ink-900">
+                {formatEventPrice(invoice.total, invoice.currency)}
+              </dd>
+              <dt className="text-ink-500">Variabilní symbol</dt>
+              <dd className="font-mono text-ink-900">
+                {invoice.variable_symbol || "—"}
+              </dd>
+              <dt className="text-ink-500">Dodavatel</dt>
+              <dd className="text-ink-700">{invoice.supplier_name}</dd>
+              <dt className="text-ink-500">Odběratel</dt>
+              <dd className="text-ink-700">{invoice.customer_name}</dd>
+            </dl>
+            {invoice.has_qr && (
+              <div className="flex flex-col items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={assetUrl(
+                    `/api/events/${wsSlug}/${eventSlug}/invoices/${invoice.id}/qr.png`,
+                  )}
+                  alt="QR Platba"
+                  width={160}
+                  height={160}
+                  className="rounded-md border border-border bg-white p-2"
+                />
+                <span className="text-[10px] uppercase tracking-[0.16em] text-ink-500">
+                  QR Platba
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="mt-4">
+            <a
+              href={assetUrl(
+                `/api/events/${wsSlug}/${eventSlug}/invoices/${invoice.id}/pdf/`,
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-ring"
+            >
+              Stáhnout PDF ↓
+            </a>
+          </div>
+        </section>
+      )}
 
-        {/* Nástěnka — visible to anyone with an active RSVP (or owner).
-            Backend filters topics + comments to the event scope so other
-            events' threads stay separate. */}
-        {my && my.status !== "cancelled" && (
-          <DiscussionWall
-            scope={{
-              kind: "event",
-              workspaceSlug: wsSlug,
-              eventSlug,
-              isModerator: false,
-            }}
-            currentUserId={user.id}
-          />
-        )}
-      </section>
-    </main>
+      {my && my.status !== "cancelled" && event.status !== "cancelled" && (
+        <div className="rounded-md border border-danger/30 bg-danger-soft/30 p-4 text-sm text-ink-700">
+          <p>
+            Chceš svojí registraci zrušit? Klik níže ji okamžitě zruší a
+            uvolní místo dalšímu zájemci.
+          </p>
+          <CancelRsvpButton wsSlug={wsSlug} eventSlug={eventSlug} />
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -44,6 +44,8 @@ class CommentSerializer(serializers.ModelSerializer):
 class TopicSerializer(serializers.ModelSerializer):
     author_id = serializers.IntegerField(source="author.id", read_only=True)
     author_name = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    i_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Topic
@@ -58,6 +60,8 @@ class TopicSerializer(serializers.ModelSerializer):
             "author_id",
             "author_name",
             "comment_count",
+            "like_count",
+            "i_liked",
             "last_activity_at",
             "created_at",
             "updated_at",
@@ -69,6 +73,8 @@ class TopicSerializer(serializers.ModelSerializer):
             "author_id",
             "author_name",
             "comment_count",
+            "like_count",
+            "i_liked",
             "last_activity_at",
             "created_at",
             "updated_at",
@@ -78,6 +84,23 @@ class TopicSerializer(serializers.ModelSerializer):
         if obj.author is None:
             return "[smazaný uživatel]"
         return obj.author.get_full_name() or obj.author.email
+
+    def get_like_count(self, obj: Topic) -> int:
+        # Prefer the annotated value (avoids N+1 from list views) and
+        # fall back to a per-row count.
+        cached = getattr(obj, "_like_count", None)
+        if cached is not None:
+            return int(cached)
+        return obj.likes.count()
+
+    def get_i_liked(self, obj: Topic) -> bool:
+        cached = getattr(obj, "_i_liked", None)
+        if cached is not None:
+            return bool(cached)
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.likes.filter(user=request.user).exists()
 
 
 class TopicDetailSerializer(TopicSerializer):

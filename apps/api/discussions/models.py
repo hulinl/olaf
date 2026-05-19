@@ -108,3 +108,32 @@ class Comment(models.Model):
         Topic.objects.filter(pk=topic_id).update(
             comment_count=models.F("comment_count") - 1,
         )
+
+
+class TopicLike(models.Model):
+    """One user's "like" on one topic. Stored as a row rather than a
+    counter so we can show who liked a post (V1.5) without rebuilding
+    the schema.
+    """
+
+    topic = models.ForeignKey(
+        Topic, on_delete=models.CASCADE, related_name="likes"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="topic_likes",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "discussions_topic_like"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["topic", "user"], name="uniq_topic_like_per_user"
+            ),
+        ]
+        indexes = [models.Index(fields=["topic", "created_at"])]
+
+    def __str__(self) -> str:
+        return f"Like by {self.user_id} on topic {self.topic_id}"
