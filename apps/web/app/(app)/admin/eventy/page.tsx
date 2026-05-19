@@ -9,9 +9,7 @@ import { Alert } from "@/components/ui/card";
 import {
   ApiError,
   type EventSummary,
-  type Workspace,
   events,
-  workspaces,
 } from "@/lib/api";
 
 const STATUS_LABELS: Record<EventSummary["status"], string> = {
@@ -45,7 +43,6 @@ const STATUS_TONE: Record<EventSummary["status"], string> = {
 export default function AdminEventyTablePage() {
   const router = useRouter();
   const [ownedEvents, setOwnedEvents] = useState<EventSummary[] | null>(null);
-  const [hasWorkspace, setHasWorkspace] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"upcoming" | "past" | "all">("upcoming");
@@ -54,12 +51,8 @@ export default function AdminEventyTablePage() {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, ev] = await Promise.all([
-          workspaces.mine(),
-          events.owner(),
-        ]);
+        const ev = await events.owner();
         if (cancelled) return;
-        setHasWorkspace(ws.some((w: Workspace) => w.my_role === "owner"));
         setOwnedEvents(ev);
       } catch (err) {
         if (cancelled) return;
@@ -100,11 +93,9 @@ export default function AdminEventyTablePage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs filter={filter} onChange={setFilter} />
-        {hasWorkspace && (
-          <LinkButton href="/admin/eventy/new" variant="secondary" size="md">
-            + Vytvořit akci
-          </LinkButton>
-        )}
+        <LinkButton href="/admin/eventy/new" variant="primary" size="md">
+          + Vytvořit akci
+        </LinkButton>
       </div>
 
       {loading && (
@@ -125,9 +116,8 @@ export default function AdminEventyTablePage() {
                 : "Zatím žádné akce"}
           </h3>
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-            {hasWorkspace
-              ? "Vytvoř svojí první akci."
-              : "Nejdřív si založ komunitu, pak v ní vytvoř akci."}
+            Vytvoř svojí první akci. Komunitu mít nemusíš — akce má vlastní
+            stránku a registraci.
           </p>
         </div>
       )}
