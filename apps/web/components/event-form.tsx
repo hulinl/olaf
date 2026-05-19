@@ -175,7 +175,12 @@ export function EventForm({
         price_currency: priceCurrency,
         price_note: isPaid ? priceNote : "",
         shared_workspace_slugs: sharedSlugs,
-        required_documents: requiredDocs,
+        // Drop placeholder rows the owner added with "+ Přidat dokument"
+        // but didn't fill in — those would fail server validation and
+        // shouldn't block saving the rest of the form.
+        required_documents: requiredDocs.filter(
+          (d) => d.key.trim() && d.label.trim(),
+        ),
       };
       const event = await onSubmit(payload);
       onSuccess(event);
