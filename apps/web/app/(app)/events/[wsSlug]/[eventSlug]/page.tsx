@@ -146,7 +146,10 @@ export default function MyEventPage({ params }: Props) {
   if (!event) return null;
 
   const my = event.my_rsvp;
-  const hasActiveRsvp = !!my && my.status !== "cancelled";
+  // Pending_approval doesn't grant wall access yet — owner might
+  // still reject. Mirror the backend gate (can_access_event_wall).
+  const hasActiveRsvp =
+    !!my && my.status !== "cancelled" && my.status !== "pending_approval";
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
   const sameDay = starts.toDateString() === ends.toDateString();
@@ -170,21 +173,24 @@ export default function MyEventPage({ params }: Props) {
 
         <header>
           <p className="text-sm font-medium text-brand">Moje účast</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
             {event.title}
           </h1>
           <p className="mt-2 text-sm text-ink-500">
             {dateLabel}
-            {event.location_text && ` · ${event.location_text}`} ·{" "}
-            <a
-              href={`/${wsSlug}/e/${eventSlug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-ink-900"
-            >
-              Otevřít stránku akce ↗
-            </a>
+            {event.location_text && ` · ${event.location_text}`}
           </p>
+          {/* Public landing link on its own line — used to be inline
+              after the date and would wrap mid-link on phones, leaving
+              the ↗ orphaned on a new row. */}
+          <a
+            href={`/${wsSlug}/e/${eventSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-sm text-ink-500 underline hover:text-ink-900"
+          >
+            <span className="whitespace-nowrap">Otevřít stránku akce ↗</span>
+          </a>
         </header>
 
         <TabBar tab={tab} onChange={setTab} />
@@ -202,6 +208,16 @@ export default function MyEventPage({ params }: Props) {
                   }}
                   currentUserId={user.id}
                 />
+              ) : my?.status === "pending_approval" ? (
+                <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
+                  <h3 className="text-base font-semibold text-ink-900">
+                    Čekáš na schválení
+                  </h3>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                    Tvoje přihláška čeká na schválení pořadatelem. Diskuzi
+                    k akci uvidíš, jakmile přihlášku schválí.
+                  </p>
+                </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
                   <h3 className="text-base font-semibold text-ink-900">
@@ -244,21 +260,17 @@ function TabBar({
     <div
       role="tablist"
       aria-label="Sekce akce"
-      className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-surface-muted/50 p-1.5"
+      className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-surface-muted/50 p-1"
     >
       <TabButton
         active={tab === "nastenka"}
         onClick={() => onChange("nastenka")}
         label="Nástěnka"
-        hint="Příspěvky a diskuze"
-        icon="💬"
       />
       <TabButton
         active={tab === "registrace"}
         onClick={() => onChange("registrace")}
         label="Moje registrace"
-        hint="Status, platba, dokumenty"
-        icon="🎟"
       />
     </div>
   );
@@ -268,14 +280,10 @@ function TabButton({
   active,
   onClick,
   label,
-  hint,
-  icon,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  hint: string;
-  icon: string;
 }) {
   return (
     <button
@@ -284,19 +292,13 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={[
-        "flex flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left transition-colors focus-ring sm:flex-row sm:items-center sm:gap-3",
+        "rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-ring",
         active
-          ? "bg-surface text-ink-900 shadow-sm ring-1 ring-brand/40"
-          : "text-ink-500 hover:bg-surface/60 hover:text-ink-900",
+          ? "bg-surface text-ink-900 shadow-sm"
+          : "text-ink-500 hover:text-ink-900",
       ].join(" ")}
     >
-      <span aria-hidden className="text-lg sm:text-xl">
-        {icon}
-      </span>
-      <span className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold">{label}</span>
-        <span className="text-[11px] text-ink-500">{hint}</span>
-      </span>
+      {label}
     </button>
   );
 }

@@ -236,38 +236,66 @@ function AdminEventDetail({ params }: Props) {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-muted/60">
-              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                <th className="px-4 py-3">Účastník</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Platba</th>
-                <th className="px-4 py-3 text-right">Faktura</th>
-                <th className="px-4 py-3 text-right">Smlouva</th>
-                <th className="px-4 py-3 text-right">Pojištění</th>
-                <th className="px-4 py-3">Přihlášen</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredRsvps.map((r) => (
-                <RsvpRow
-                  key={r.id}
-                  rsvp={r}
-                  wsSlug={wsSlug}
-                  eventSlug={eventSlug}
-                  requiredDocs={event.required_documents ?? []}
-                  onPaid={(updated) =>
-                    setRsvps((prev) =>
-                      prev ? prev.map((x) => (x.id === updated.id ? updated : x)) : prev,
-                    )
-                  }
-                  onOpenProfile={() => setProfileRsvpId(r.id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Mobile: card list. The 7-col table on a phone forced
+              horizontal scroll AND hid the approve/reject CTAs that
+              are critical for pending_approval flows. */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {filteredRsvps.map((r) => (
+              <RsvpCard
+                key={r.id}
+                rsvp={r}
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+                onUpdate={(updated) =>
+                  setRsvps((prev) =>
+                    prev
+                      ? prev.map((x) => (x.id === updated.id ? updated : x))
+                      : prev,
+                  )
+                }
+                onOpenProfile={() => setProfileRsvpId(r.id)}
+              />
+            ))}
+          </div>
+          {/* sm+: full table */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted/60">
+                <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                  <th className="px-4 py-3">Účastník</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Platba</th>
+                  <th className="px-4 py-3 text-right">Faktura</th>
+                  <th className="px-4 py-3 text-right">Smlouva</th>
+                  <th className="px-4 py-3 text-right">Pojištění</th>
+                  <th className="px-4 py-3">Přihlášen</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredRsvps.map((r) => (
+                  <RsvpRow
+                    key={r.id}
+                    rsvp={r}
+                    wsSlug={wsSlug}
+                    eventSlug={eventSlug}
+                    requiredDocs={event.required_documents ?? []}
+                    onUpdate={(updated) =>
+                      setRsvps((prev) =>
+                        prev
+                          ? prev.map((x) =>
+                              x.id === updated.id ? updated : x,
+                            )
+                          : prev,
+                      )
+                    }
+                    onOpenProfile={() => setProfileRsvpId(r.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <ParticipantProfileDialog
@@ -327,33 +355,60 @@ function RsvpRow({
   wsSlug,
   eventSlug,
   requiredDocs,
-  onPaid,
+  onUpdate,
   onOpenProfile,
 }: {
   rsvp: RSVPRecord;
   wsSlug: string;
   eventSlug: string;
   requiredDocs: { key: string; label: string; required: boolean }[];
-  onPaid: (updated: RSVPRecord) => void;
+  onUpdate: (updated: RSVPRecord) => void;
   onOpenProfile: () => void;
 }) {
-  const [marking, setMarking] = useState(false);
+  const [busy, setBusy] = useState<"paid" | "approve" | "reject" | null>(null);
   const created = new Date(rsvp.created_at);
   const requiredKeys = new Set(requiredDocs.map((d) => d.key));
   const uploadedKeys = new Set(rsvp.uploaded_doc_keys);
   const verifiedKeys = new Set(rsvp.verified_doc_keys);
 
   async function handleMarkPaid() {
-    if (marking) return;
+    if (busy) return;
     if (!confirm("Označit jako zaplaceno?")) return;
-    setMarking(true);
+    setBusy("paid");
     try {
       const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
-      onPaid(updated);
+      onUpdate(updated);
     } catch {
       // Quietly fail; admin can retry.
     } finally {
-      setMarking(false);
+      setBusy(null);
+    }
+  }
+
+  async function handleApprove() {
+    if (busy) return;
+    setBusy("approve");
+    try {
+      const updated = await events.approveRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet, admin can retry */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleReject() {
+    if (busy) return;
+    if (!confirm("Zamítnout tuto registraci?")) return;
+    setBusy("reject");
+    try {
+      const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -375,22 +430,42 @@ function RsvpRow({
         </button>
       </td>
       <td className="whitespace-nowrap px-4 py-3">
-        <span
-          className={[
-            "inline-flex rounded px-2 py-0.5 text-xs font-medium",
-            RSVP_STATUS_TONE[rsvp.status],
-          ].join(" ")}
-        >
-          {RSVP_STATUS_LABEL[rsvp.status]}
-        </span>
-        {rsvp.waitlist_position != null && (
-          <span className="ml-2 text-xs text-ink-500">
-            #{rsvp.waitlist_position}
+        <div className="flex flex-col gap-1.5">
+          <span
+            className={[
+              "inline-flex w-fit rounded px-2 py-0.5 text-xs font-medium",
+              RSVP_STATUS_TONE[rsvp.status],
+            ].join(" ")}
+          >
+            {RSVP_STATUS_LABEL[rsvp.status]}
+            {rsvp.waitlist_position != null && (
+              <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+            )}
           </span>
-        )}
+          {rsvp.status === "pending_approval" && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={busy !== null}
+                className="rounded-md bg-success px-2 py-0.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-50 focus-ring"
+              >
+                {busy === "approve" ? "..." : "Schválit"}
+              </button>
+              <button
+                type="button"
+                onClick={handleReject}
+                disabled={busy !== null}
+                className="rounded-md border border-danger/40 bg-surface px-2 py-0.5 text-[11px] font-medium text-danger hover:bg-danger-soft disabled:opacity-50 focus-ring"
+              >
+                {busy === "reject" ? "..." : "Zamítnout"}
+              </button>
+            </div>
+          )}
+        </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={marking} />
+        <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={busy === "paid"} />
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
         <InvoiceCell rsvp={rsvp} wsSlug={wsSlug} eventSlug={eventSlug} />
@@ -511,6 +586,130 @@ function PaymentCell({
       >
         {marking ? "..." : "Označit zaplaceno"}
       </button>
+    </div>
+  );
+}
+
+function RsvpCard({
+  rsvp,
+  wsSlug,
+  eventSlug,
+  onUpdate,
+  onOpenProfile,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+  onUpdate: (updated: RSVPRecord) => void;
+  onOpenProfile: () => void;
+}) {
+  const [busy, setBusy] = useState<"paid" | "approve" | "reject" | null>(null);
+
+  async function handleApprove() {
+    setBusy("approve");
+    try {
+      const updated = await events.approveRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function handleReject() {
+    if (!confirm("Zamítnout tuto registraci?")) return;
+    setBusy("reject");
+    try {
+      const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function handleMarkPaid() {
+    if (!confirm("Označit jako zaplaceno?")) return;
+    setBusy("paid");
+    try {
+      const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex flex-col items-start gap-0.5 text-left focus-ring"
+        >
+          <span className="text-sm font-semibold text-ink-900">
+            {rsvp.user_full_name || "—"}
+          </span>
+          <span className="text-xs text-ink-500">{rsvp.user_email}</span>
+          {rsvp.user_phone && (
+            <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
+          )}
+        </button>
+        <span
+          className={[
+            "inline-flex shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+            RSVP_STATUS_TONE[rsvp.status],
+          ].join(" ")}
+        >
+          {RSVP_STATUS_LABEL[rsvp.status]}
+          {rsvp.waitlist_position != null && (
+            <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+          )}
+        </span>
+      </div>
+
+      {rsvp.status === "pending_approval" && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleApprove}
+            disabled={busy !== null}
+            className="flex-1 rounded-md bg-success px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 focus-ring"
+          >
+            {busy === "approve" ? "..." : "Schválit"}
+          </button>
+          <button
+            type="button"
+            onClick={handleReject}
+            disabled={busy !== null}
+            className="flex-1 rounded-md border border-danger/40 bg-surface px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-50 focus-ring"
+          >
+            {busy === "reject" ? "..." : "Zamítnout"}
+          </button>
+        </div>
+      )}
+
+      {rsvp.payment_status !== "waived" && (
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="text-ink-500">Platba</span>
+          {rsvp.payment_status === "paid" ? (
+            <span className="inline-flex rounded bg-success/15 px-2 py-0.5 font-medium text-success">
+              Zaplaceno
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleMarkPaid}
+              disabled={busy !== null}
+              className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
+            >
+              {busy === "paid" ? "..." : "Označit zaplaceno"}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
