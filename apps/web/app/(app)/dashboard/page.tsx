@@ -8,9 +8,12 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import {
   ApiError,
   type EventSummary,
+  type TodoItem,
   type Workspace,
   assetUrl,
+  auth,
   events,
+  formatEventPrice,
   workspaces,
 } from "@/lib/api";
 import { useUser } from "@/lib/user-context";
@@ -19,6 +22,7 @@ export default function DashboardPage() {
   const user = useUser();
   const [myWorkspaces, setMyWorkspaces] = useState<Workspace[] | null>(null);
   const [myEvents, setMyEvents] = useState<EventSummary[] | null>(null);
+  const [todos, setTodos] = useState<TodoItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,13 +30,15 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, mine] = await Promise.all([
+        const [ws, mine, todoList] = await Promise.all([
           workspaces.mine(),
           events.mine().catch(() => [] as EventSummary[]),
+          auth.todo().catch(() => [] as TodoItem[]),
         ]);
         if (cancelled) return;
         setMyWorkspaces(ws);
         setMyEvents(mine);
+        setTodos(todoList);
       } catch (err) {
         if (cancelled) return;
         setError(
@@ -77,17 +83,22 @@ export default function DashboardPage() {
 
         {!loading && !error && (
           <>
-            {/* Co se po tobě chce — placeholder; konkrétní obsah přijde
-                s RSVP.payment_status + RSVP.required_docs (V1.5). */}
             <Section title="Čeká na tebe">
-              <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-6 text-sm text-ink-500">
-                <p className="font-medium text-ink-900">Vše vyřízeno 🎉</p>
-                <p className="mt-1 max-w-md">
-                  Tady uvidíš věci, které po tobě chtějí pořadatelé akcí, na
-                  které ses přihlásil — třeba zaplatit, doložit pojištění
-                  nebo poslat smlouvu.
-                </p>
-              </div>
+              {!todos || todos.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-6 text-sm text-ink-500">
+                  <p className="font-medium text-ink-900">Vše vyřízeno 🎉</p>
+                  <p className="mt-1 max-w-md">
+                    Tady uvidíš věci, které po tobě chtějí pořadatelé akcí
+                    — třeba zaplatit nebo nahrát dokument.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {todos.map((item, i) => (
+                    <TodoCard key={`${item.kind}-${item.rsvp_id}-${i}`} item={item} />
+                  ))}
+                </div>
+              )}
             </Section>
 
             <Section title="Moje nadcházející akce" href="/events">
@@ -265,6 +276,70 @@ function EventMini({
         <strong className="text-ink-900">{event.confirmed_count}</strong>
         {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
       </p>
+    </Link>
+  );
+}
+
+function TodoCard({ item }: { item: TodoItem }) {
+  const eventHref = `/${item.workspace_slug}/e/${item.event_slug}`;
+  const eventDate = new Date(item.event_starts_at).toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  if (item.kind === "payment") {
+    const amount = formatEventPrice(item.amount, item.currency);
+    return (
+      <Link
+        href={eventHref}
+        className="flex flex-col gap-3 rounded-2xl border border-warning/30 bg-warning/5 p-5 transition-colors hover:border-warning hover:bg-warning/10 focus-ring sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-warning">
+            Zaplatit
+          </p>
+          <p className="mt-1 text-base font-semibold text-ink-900">
+            {item.event_title}
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            {item.workspace_name} · {eventDate}
+            {item.variable_symbol && (
+              <>
+                {" · VS "}
+                <span className="font-mono">{item.variable_symbol}</span>
+              </>
+            )}
+          </p>
+        </div>
+        <div className="text-right sm:shrink-0">
+          <p className="text-xl font-semibold text-ink-900">{amount}</p>
+          <p className="mt-1 text-xs text-ink-500">
+            {item.iban ? "Otevřít QR Platbu →" : "Otevřít platební info →"}
+          </p>
+        </div>
+      </Link>
+    );
+  }
+
+  // Document todo
+  return (
+    <Link
+      href={eventHref}
+      className="flex flex-col gap-3 rounded-2xl border border-warning/30 bg-warning/5 p-5 transition-colors hover:border-warning hover:bg-warning/10 focus-ring sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-warning">
+          Doložit
+        </p>
+        <p className="mt-1 text-base font-semibold text-ink-900">
+          {item.doc_label}
+        </p>
+        <p className="mt-1 text-xs text-ink-500">
+          {item.event_title} · {item.workspace_name} · {eventDate}
+        </p>
+      </div>
+      <p className="text-xs text-ink-500 sm:shrink-0">Nahrát soubor →</p>
     </Link>
   );
 }

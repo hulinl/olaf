@@ -202,6 +202,32 @@ export interface RSVPDocumentsBundle {
   uploaded: RSVPDocument[];
 }
 
+export type TodoItem =
+  | {
+      kind: "payment";
+      rsvp_id: number;
+      workspace_slug: string;
+      workspace_name: string;
+      event_slug: string;
+      event_title: string;
+      event_starts_at: string;
+      amount: string;
+      currency: string;
+      variable_symbol: string;
+      iban: string;
+    }
+  | {
+      kind: "document";
+      rsvp_id: number;
+      workspace_slug: string;
+      workspace_name: string;
+      event_slug: string;
+      event_title: string;
+      event_starts_at: string;
+      doc_key: string;
+      doc_label: string;
+    };
+
 export interface InvoiceItem {
   label: string;
   qty: number;
@@ -802,6 +828,7 @@ export const auth = {
       method: "POST",
     }),
   me: () => apiFetch<User>("/api/auth/me/"),
+  todo: () => apiFetch<TodoItem[]>("/api/auth/me/todo/"),
   updateMe: (patch: Partial<User>) =>
     apiFetch<User>("/api/auth/me/", {
       method: "PATCH",
