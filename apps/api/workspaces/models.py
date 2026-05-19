@@ -55,6 +55,18 @@ class Workspace(models.Model):
         help_text="Days from registration the participant has to pay.",
     )
 
+    # "Personal" workspaces are lazy-created so any user can spin up an
+    # event without first founding a community. They're a regular
+    # tenant under the hood (events live there, owner can edit logo
+    # etc.), but hidden from public community discovery and from the
+    # "Moje komunity" dashboard tile — they're a tenant container, not
+    # a community to be browsed.
+    is_personal = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Lazy-created on first event when the user has no community.",
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

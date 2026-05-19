@@ -101,6 +101,40 @@ def create_workspace(request: Request) -> Response:
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def my_personal_workspace(request: Request) -> Response:
+    """Get-or-create the user's personal workspace.
+
+    Personal workspaces are lazy tenant containers so any user can spin
+    up an event without first founding a community. The slug is
+    deterministic (`personal-<user_id>`) so URLs stay stable; the user
+    can rename + repurpose later via the standard edit endpoints.
+
+    Hidden from /api/workspaces/ public discovery and from `mine` if
+    the user has other workspaces — they're plumbing, not a destination.
+    """
+    user = request.user
+    full_name = user.get_full_name() or user.email.split("@", 1)[0]
+    workspace, _ = Workspace.objects.get_or_create(
+        slug=f"personal-{user.id}",
+        defaults={
+            "name": f"{full_name} — můj prostor",
+            "is_personal": True,
+            "default_tz": "Europe/Prague",
+            "visibility": Workspace.VISIBILITY_UNLISTED,
+        },
+    )
+    WorkspaceMember.objects.get_or_create(
+        workspace=workspace,
+        user=user,
+        defaults={"role": WorkspaceMember.ROLE_OWNER},
+    )
+    data = WorkspacePublicSerializer(workspace, context={"request": request}).data
+    data["my_role"] = WorkspaceMember.ROLE_OWNER
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def my_workspaces(request: Request) -> Response:
     """Workspaces the current user belongs to (any role).
 
@@ -110,6 +144,7 @@ def my_workspaces(request: Request) -> Response:
     memberships = (
         WorkspaceMember.objects.filter(user=request.user)
         .select_related("workspace")
+        .exclude(workspace__is_personal=True)
         .order_by("workspace__name")
     )
     out = []

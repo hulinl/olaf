@@ -521,22 +521,24 @@ export function EventForm({
         </CardSection>
       </Card>
 
-      {ownedWorkspaces && ownedWorkspaces.length >= 2 && (
+      {(() => {
+        const shareCandidates = (ownedWorkspaces ?? []).filter(
+          (w) => w.slug !== workspaceSlug,
+        );
+        if (shareCandidates.length === 0) return null;
+        return (
         <Card>
           <CardSection>
             <h2 className="text-base font-semibold text-ink-900">
-              Sdílení do dalších komunit
+              Sdílet do komunit
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              Akce automaticky patří do komunity <strong>{workspaceSlug}</strong>
-              {" "}(té, kde jsi ji vytvořil). Pokud spravuješ víc komunit a
-              chceš akci ukázat i jejich členům, zaškrtni je tu — akce se
-              objeví na profilu každé z nich.
+              Akce má vlastní stránku a registraci nezávisle na komunitě.
+              Pokud chceš, můžeš ji ukázat i členům některé ze svých
+              komunit — objeví se na jejich profilu a v jejich feedu akcí.
             </p>
             <div className="mt-4 grid grid-cols-1 gap-2">
-              {ownedWorkspaces
-                .filter((w) => w.slug !== workspaceSlug)
-                .map((w) => {
+              {shareCandidates.map((w) => {
                   const checked = sharedSlugs.includes(w.slug);
                   return (
                     <label
@@ -571,7 +573,8 @@ export function EventForm({
             </div>
           </CardSection>
         </Card>
-      )}
+        );
+      })()}
 
       <Card>
         <CardSection>

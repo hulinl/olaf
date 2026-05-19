@@ -14,25 +14,39 @@ import {
 } from "@/lib/api";
 
 /**
- * Workspace-agnostic event creation. Auto-picks user's primary owned
- * workspace; if multiple, presents a chooser. Owner can publish the event
- * into communities afterwards from the event settings (Sdílení).
+ * New-event flow. Event is first-class — the user doesn't need a community
+ * to create one. Backend lazy-creates a personal workspace ("Můj prostor")
+ * the first time the user lands here; the event drops into it by default.
+ *
+ * If the user also owns one or more communities (workspaces), we surface a
+ * "Vytvořit pod" dropdown so they can pick a community as the event's home
+ * — and the EventForm's "Sdílet do komunit" picker lets them publish into
+ * additional communities afterwards.
  */
 export default function NewEventPage() {
   const router = useRouter();
-  const [mine, setMine] = useState<Workspace[] | null>(null);
-  const [chosen, setChosen] = useState<Workspace | null>(null);
+  const [personal, setPersonal] = useState<Workspace | null>(null);
+  const [communities, setCommunities] = useState<Workspace[]>([]);
+  const [chosenSlug, setChosenSlug] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const ws = await workspaces.mine();
+        // Personal workspace is lazy-created on first call — safe to
+        // fire unconditionally on every visit.
+        const [p, mine] = await Promise.all([
+          workspaces.personal(),
+          workspaces.mine(),
+        ]);
         if (cancelled) return;
-        const owned = ws.filter((w) => w.my_role === "owner");
-        setMine(owned);
-        if (owned.length === 1) setChosen(owned[0]);
+        setPersonal(p);
+        const ownedCommunities = mine.filter((w) => w.my_role === "owner");
+        setCommunities(ownedCommunities);
+        // Default: personal workspace. Owner can switch via dropdown if
+        // they want the event homed under a community instead.
+        setChosenSlug(p.slug);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -42,7 +56,7 @@ export default function NewEventPage() {
         setError(
           err instanceof ApiError
             ? err.message
-            : "Nepovedlo se načíst tvoje komunity.",
+            : "Nepovedlo se připravit novou akci.",
         );
       }
     })();
@@ -52,63 +66,15 @@ export default function NewEventPage() {
   }, [router]);
 
   const crumbs = [
-    { label: "Eventy", href: "/admin/eventy" },
+    { label: "Akce", href: "/admin/eventy" },
     { label: "Nová akce" },
   ];
 
   if (error) return <Alert variant="danger">{error}</Alert>;
-
-  if (mine === null) {
+  if (!personal || !chosenSlug) {
     return (
       <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-      </div>
-    );
-  }
-
-  if (mine.length === 0) {
-    return (
-      <div className="flex flex-col gap-6">
-        <Breadcrumbs items={crumbs} />
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
-            Nemáš žádnou komunitu
-          </h1>
-          <p className="mt-2 text-ink-500">
-            Akce vytváří vlastník komunity. Zatím nejsi vlastníkem žádné.
-          </p>
-        </header>
-      </div>
-    );
-  }
-
-  if (!chosen) {
-    return (
-      <div className="flex flex-col gap-6">
-        <Breadcrumbs items={crumbs} />
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
-            Vyber komunitu
-          </h1>
-          <p className="mt-2 text-ink-500">
-            Pod kterou komunitou chceš akci vytvořit?
-          </p>
-        </header>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {mine.map((w) => (
-            <button
-              key={w.slug}
-              type="button"
-              onClick={() => setChosen(w)}
-              className="rounded-md border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-muted focus-ring"
-            >
-              <p className="font-medium text-ink-900">{w.name}</p>
-              {w.location && (
-                <p className="mt-1 text-sm text-ink-500">{w.location}</p>
-              )}
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -123,19 +89,77 @@ export default function NewEventPage() {
           Vytvoř novou akci
         </h1>
         <p className="mt-2 text-ink-500">
-          Po uložení akce ji můžeš nasdílet do svých komunit. Můžeš ji
-          nechat jako Draft a publikovat až později.
+          Akce má vlastní stránku a registrace. Pokud chceš, můžeš ji
+          publikovat i do svých komunit níže ve formuláři.
         </p>
       </header>
 
+      {communities.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Vytvořit pod
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <HomeChip
+              label="Můj prostor"
+              hint="Akce mimo komunitu"
+              slug={personal.slug}
+              active={chosenSlug === personal.slug}
+              onSelect={setChosenSlug}
+            />
+            {communities.map((w) => (
+              <HomeChip
+                key={w.slug}
+                label={w.name}
+                hint="Akce komunity"
+                slug={w.slug}
+                active={chosenSlug === w.slug}
+                onSelect={setChosenSlug}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <EventForm
-        workspaceSlug={chosen.slug}
-        onSubmit={(payload) => events.create(chosen.slug, payload)}
+        workspaceSlug={chosenSlug}
+        onSubmit={(payload) => events.create(chosenSlug, payload)}
         onSuccess={(event) =>
-          router.push(`/admin/eventy/${chosen.slug}/${event.slug}/edit`)
+          router.push(`/admin/eventy/${chosenSlug}/${event.slug}/edit`)
         }
         submitLabel="Vytvořit akci"
       />
     </div>
+  );
+}
+
+function HomeChip({
+  label,
+  hint,
+  slug,
+  active,
+  onSelect,
+}: {
+  label: string;
+  hint: string;
+  slug: string;
+  active: boolean;
+  onSelect: (slug: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(slug)}
+      aria-pressed={active}
+      className={[
+        "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors focus-ring",
+        active
+          ? "border-brand bg-brand/5 text-ink-900 ring-1 ring-brand/40"
+          : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
+      ].join(" ")}
+    >
+      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-[11px] text-ink-500">{hint}</span>
+    </button>
   );
 }

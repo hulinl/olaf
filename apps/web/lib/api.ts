@@ -640,6 +640,7 @@ export const workspaces = {
       `/api/workspaces/${slug}/members/${userId}/`,
     ),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
+  personal: () => apiFetch<Workspace>("/api/workspaces/personal/"),
   create: (payload: WorkspaceCreatePayload) =>
     apiFetch<Workspace>("/api/workspaces/", {
       method: "POST",
