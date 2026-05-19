@@ -101,7 +101,9 @@ export function EventForm({
 
   const [startsAt, setStartsAt] = useState(toLocalInput(initial?.starts_at));
   const [endsAt, setEndsAt] = useState(toLocalInput(initial?.ends_at));
-  const [tz, setTz] = useState(initial?.tz ?? "Europe/Prague");
+  // Fixed for V1 — see comment in the render where the tz field used to
+  // be. setTz isn't bound to UI anymore; keep the constant for payload.
+  const tz = initial?.tz ?? "Europe/Prague";
 
   const [location, setLocation] = useState(initial?.location_text ?? "");
   const [meetingPoint, setMeetingPoint] = useState(
@@ -301,17 +303,10 @@ export function EventForm({
                 onChange={setEndsAt}
               />
             </Field>
-            <Field
-              label="Časové pásmo"
-              htmlFor="tz"
-              hint="IANA timezone, např. Europe/Prague."
-            >
-              <Input
-                id="tz"
-                value={tz}
-                onChange={(e) => setTz(e.target.value)}
-              />
-            </Field>
+            {/* Timezone is fixed to Europe/Prague for V1 — owners didn't
+                know what to put here and the field added friction. The
+                state is still tracked behind the scenes so existing
+                events with custom tz keep working. */}
             <div className="sm:col-span-2">
               <Field
                 label="Krátký intro"

@@ -167,7 +167,7 @@ function PriceCard({
       </div>
       <div className="shrink-0 sm:max-w-xs sm:border-l sm:border-white/15 sm:pl-14 sm:text-right">
         <p
-          className="text-6xl font-semibold text-ink-inverse sm:text-7xl"
+          className="text-5xl font-semibold text-ink-inverse sm:text-7xl"
           style={{ letterSpacing: "-0.04em", lineHeight: 1 }}
         >
           {value}

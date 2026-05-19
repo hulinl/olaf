@@ -678,9 +678,11 @@ def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
     Idempotent: if an invoice already exists, returns it unchanged. The
     caller (mark_rsvp_paid) catches the "already exists" case.
 
-    Skips invoice generation entirely when:
-      - event has no price (free event), or
-      - event.payment_in_cash is set (owner takes cash on site).
+    Skips invoice generation only for free events. Cash-on-site events
+    DO generate an invoice — the owner marks the RSVP paid manually
+    after collecting the money, which fires this generator the same way
+    as bank-transfer events do. Standardizes the participant's
+    "Stáhnout fakturu" experience regardless of payment method.
     """
     try:
         return rsvp.invoice
@@ -691,9 +693,8 @@ def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
     workspace = event.workspace
     user = rsvp.user
 
-    if not event.price_amount or event.payment_in_cash:
-        # No invoice for free or cash-only events.
-        raise ValueError("Event does not generate invoices.")
+    if not event.price_amount:
+        raise ValueError("Event has no price — no invoice to issue.")
 
     supplier = _resolve_supplier_for_event(event)
 

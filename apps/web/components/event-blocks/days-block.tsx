@@ -75,7 +75,7 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
                       </p>
                     )}
                     <p
-                      className="text-6xl font-semibold leading-none"
+                      className="text-5xl font-semibold leading-none sm:text-6xl"
                       style={{ letterSpacing: "-0.035em" }}
                     >
                       {num}
