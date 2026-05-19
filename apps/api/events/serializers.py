@@ -564,3 +564,25 @@ class InvoiceSerializer(serializers.ModelSerializer):
         i.e. there's an IBAN (snapshot or workspace fallback) + amount."""
         iban = obj.supplier_iban or obj.rsvp.event.workspace.payment_iban
         return bool(iban and obj.total)
+
+
+from .models import EventChecklistItem  # noqa: E402
+
+
+class EventChecklistItemSerializer(serializers.ModelSerializer):
+    """Manual checklist item — owner-created task on an event."""
+
+    class Meta:
+        model = EventChecklistItem
+        fields = (
+            "id",
+            "title",
+            "description",
+            "category",
+            "done",
+            "done_at",
+            "sort_order",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "done_at", "created_at", "updated_at")

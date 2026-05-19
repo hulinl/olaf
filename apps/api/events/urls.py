@@ -132,4 +132,24 @@ urlpatterns = [
         views.my_invoice,
         name="my-invoice",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/checklist/",
+        views.event_checklist,
+        name="checklist",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/checklist/items/",
+        views.checklist_items,
+        name="checklist-items",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/checklist/items/<int:item_id>/",
+        views.checklist_item_detail,
+        name="checklist-item-detail",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/checklist/from-preset/",
+        views.checklist_from_preset,
+        name="checklist-from-preset",
+    ),
 ]
