@@ -92,6 +92,10 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
                 Dashboard
               </NavLink>
 
+              <NavLink href="/events" pathname={pathname}>
+                Akce
+              </NavLink>
+
               <NavDropdown
                 label="Komunity"
                 pathname={pathname}
@@ -117,10 +121,6 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
                   Všechny komunity
                 </DropdownLink>
               </NavDropdown>
-
-              <NavLink href="/events" pathname={pathname}>
-                Akce
-              </NavLink>
             </nav>
           </div>
 
@@ -358,6 +358,16 @@ function MobileDrawer({
             Dashboard
           </DrawerLink>
 
+          <DrawerSection label="Akce">
+            <DrawerSubLink
+              href="/events"
+              pathname={pathname}
+              onClose={onClose}
+            >
+              Moje akce
+            </DrawerSubLink>
+          </DrawerSection>
+
           <DrawerSection label="Komunity">
             {workspaces?.map((w) => (
               <DrawerSubLink
@@ -375,16 +385,6 @@ function MobileDrawer({
               onClose={onClose}
             >
               Všechny komunity
-            </DrawerSubLink>
-          </DrawerSection>
-
-          <DrawerSection label="Akce">
-            <DrawerSubLink
-              href="/events"
-              pathname={pathname}
-              onClose={onClose}
-            >
-              Moje akce
             </DrawerSubLink>
           </DrawerSection>
 
