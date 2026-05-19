@@ -10,6 +10,7 @@ keys configured still works (just no push delivered).
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from collections.abc import Iterable
@@ -20,8 +21,31 @@ from pywebpush import WebPushException, webpush
 logger = logging.getLogger("notifications.push")
 
 
+def _vapid_private_key() -> str:
+    """Return the VAPID private key as a real PEM string.
+
+    Container App secrets / Azure env vars mangle multiline values
+    (newlines get stripped or escaped), so the canonical storage
+    format is base64-encoded PEM as a single line. If the raw value
+    already looks like a PEM (contains "BEGIN"), use it as-is. If it
+    contains literal "\\n" escapes, restore them. Otherwise try
+    base64 decode.
+    """
+    raw = settings.VAPID_PRIVATE_KEY or ""
+    if not raw:
+        return ""
+    if "BEGIN" in raw and "\n" in raw:
+        return raw
+    if "\\n" in raw:
+        return raw.replace("\\n", "\n")
+    try:
+        return base64.b64decode(raw).decode("ascii")
+    except Exception:
+        return raw  # last-ditch — pywebpush will surface the real error
+
+
 def _vapid_configured() -> bool:
-    return bool(settings.VAPID_PRIVATE_KEY) and bool(settings.VAPID_PUBLIC_KEY)
+    return bool(_vapid_private_key()) and bool(settings.VAPID_PUBLIC_KEY)
 
 
 def _send_one(subscription, payload: dict) -> bool:
@@ -40,7 +64,7 @@ def _send_one(subscription, payload: dict) -> bool:
                 },
             },
             data=json.dumps(payload),
-            vapid_private_key=settings.VAPID_PRIVATE_KEY,
+            vapid_private_key=_vapid_private_key(),
             vapid_claims={"sub": settings.VAPID_SUBJECT},
         )
         return True
