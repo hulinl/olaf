@@ -796,10 +796,38 @@ class EventChecklistItem(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
+    REMIND_AUDIENCE_CREATOR = "creator"
+    REMIND_AUDIENCE_PARTICIPANTS = "participants"
+    REMIND_AUDIENCE_CHOICES = [
+        (REMIND_AUDIENCE_CREATOR, "Creator (owner-only e-mail)"),
+        (REMIND_AUDIENCE_PARTICIPANTS, "Participants (RSVP'd users + owner)"),
+    ]
+    remind_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When to dispatch the reminder e-mail. Null = no reminder.",
+    )
+    remind_audience = models.CharField(
+        max_length=20,
+        choices=REMIND_AUDIENCE_CHOICES,
+        default=REMIND_AUDIENCE_CREATOR,
+    )
+    remind_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Stamped after dispatch_due_reminders sends the mail.",
+    )
+
     class Meta:
         db_table = "events_checklist_item"
         ordering = ["done", "sort_order", "created_at"]
-        indexes = [models.Index(fields=["event", "done"])]
+        indexes = [
+            models.Index(fields=["event", "done"]),
+            models.Index(
+                fields=["remind_at", "remind_sent_at"],
+                name="checklist_due_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.title

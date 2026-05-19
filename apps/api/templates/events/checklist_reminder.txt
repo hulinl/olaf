@@ -1,0 +1,12 @@
+Ahoj{% if recipient.first_name %} {{ recipient.first_name }}{% endif %},
+
+{% if is_participants %}organizátor akce „{{ event.title }}" tě upozorňuje:{% else %}připomínka k akci „{{ event.title }}":{% endif %}
+
+  „{{ item.title }}"
+
+{% if item.description %}{{ item.description }}
+
+{% endif %}Otevřít checklist:
+  {{ cockpit_url }}
+
+— olaf

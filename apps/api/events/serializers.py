@@ -582,7 +582,26 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
             "done",
             "done_at",
             "sort_order",
+            "remind_at",
+            "remind_audience",
+            "remind_sent_at",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "done_at", "created_at", "updated_at")
+        read_only_fields = (
+            "id",
+            "done_at",
+            "remind_sent_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def update(self, instance, validated_data):
+        # If owner changes remind_at, clear the "already sent" stamp so the
+        # next dispatcher tick will pick the item up again.
+        if (
+            "remind_at" in validated_data
+            and validated_data["remind_at"] != instance.remind_at
+        ):
+            instance.remind_sent_at = None
+        return super().update(instance, validated_data)

@@ -148,6 +148,11 @@ urlpatterns = [
         name="checklist-item-detail",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/checklist/items/<int:item_id>/send-now/",
+        views.checklist_item_send_now,
+        name="checklist-item-send-now",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/checklist/from-preset/",
         views.checklist_from_preset,
         name="checklist-from-preset",

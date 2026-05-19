@@ -247,6 +247,8 @@ export interface ChecklistAutoItem {
   action_href: string;
 }
 
+export type ChecklistRemindAudience = "creator" | "participants";
+
 export interface ChecklistManualItem {
   id: number;
   title: string;
@@ -255,6 +257,9 @@ export interface ChecklistManualItem {
   done: boolean;
   done_at: string | null;
   sort_order: number;
+  remind_at: string | null;
+  remind_audience: ChecklistRemindAudience;
+  remind_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -935,11 +940,22 @@ export const events = {
       category: string;
       done: boolean;
       sort_order: number;
+      remind_at: string | null;
+      remind_audience: ChecklistRemindAudience;
     }>,
   ) =>
     apiFetch<ChecklistManualItem>(
       `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/${itemId}/`,
       { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  sendChecklistReminderNow: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+  ) =>
+    apiFetch<ChecklistManualItem>(
+      `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/${itemId}/send-now/`,
+      { method: "POST" },
     ),
   deleteChecklistItem: (
     workspaceSlug: string,

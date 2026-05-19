@@ -1330,7 +1330,49 @@ def checklist_item_detail(
 
         with contextlib.suppress(TypeError, ValueError):
             item.sort_order = max(0, int(request.data["sort_order"]))
+
+    if "remind_at" in request.data:
+        from django.utils.dateparse import parse_datetime
+
+        raw = request.data["remind_at"]
+        new_remind_at = parse_datetime(raw) if raw else None
+        if new_remind_at != item.remind_at:
+            item.remind_at = new_remind_at
+            item.remind_sent_at = None
+    if "remind_audience" in request.data:
+        candidate = str(request.data["remind_audience"]).strip()
+        valid = {c for c, _ in EventChecklistItem.REMIND_AUDIENCE_CHOICES}
+        if candidate in valid:
+            item.remind_audience = candidate
+
     item.save()
+    return Response(EventChecklistItemSerializer(item).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def checklist_item_send_now(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    item_id: int,
+) -> Response:
+    """Owner override — force-send the reminder for this item right now."""
+    from .models import EventChecklistItem
+    from .serializers import EventChecklistItemSerializer
+    from .tasks import send_checklist_reminder_now_task
+
+    event, err = _load_event_for_owner(workspace_slug, event_slug, request.user)
+    if err is not None:
+        return err
+
+    try:
+        item = EventChecklistItem.objects.get(pk=item_id, event=event)
+    except EventChecklistItem.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    send_checklist_reminder_now_task.delay(item.pk)
+    item.refresh_from_db()
     return Response(EventChecklistItemSerializer(item).data)
 
 
