@@ -31,6 +31,14 @@ SEED_TZ = "Europe/Prague"
 
 
 def seed(apps, schema_editor):
+    # Skip seeding under the Django test runner — test fixtures
+    # create their own "olafadventures" workspace and we'd collide
+    # on the unique slug constraint.
+    import sys
+
+    if "test" in sys.argv:
+        return
+
     Workspace = apps.get_model("workspaces", "Workspace")
     WorkspaceMember = apps.get_model("workspaces", "WorkspaceMember")
     User = apps.get_model("accounts", "User")
