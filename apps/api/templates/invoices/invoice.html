@@ -4,28 +4,32 @@
   <meta charset="utf-8" />
   <title>Faktura {{ invoice.number }}</title>
   <style>
-    @page { size: A4; margin: 24mm 18mm; }
-    body { font-family: "Helvetica", "Arial", sans-serif; color: #1c2331; font-size: 11pt; line-height: 1.45; }
-    h1 { font-size: 22pt; margin: 0 0 4mm 0; letter-spacing: -0.02em; }
-    .number { color: #5a6678; font-size: 10pt; letter-spacing: 0.04em; text-transform: uppercase; }
-    .parties { display: flex; gap: 12mm; margin-top: 10mm; }
+    @page { size: A4; margin: 16mm 16mm; }
+    body { font-family: "Helvetica", "Arial", sans-serif; color: #1c2331; font-size: 10pt; line-height: 1.4; }
+    h1 { font-size: 14pt; margin: 0 0 2mm 0; letter-spacing: -0.01em; font-weight: 600; }
+    .number { color: #5a6678; font-size: 9pt; letter-spacing: 0.04em; text-transform: uppercase; }
+    .parties { display: flex; gap: 10mm; margin-top: 6mm; }
     .party { flex: 1; }
-    .party h3 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.12em; color: #5a6678; margin: 0 0 2mm 0; font-weight: 600; }
-    .party .name { font-weight: 600; font-size: 12pt; }
-    .party .line { color: #34404f; }
-    .meta { margin-top: 8mm; display: flex; gap: 6mm; }
+    .party h3 { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.12em; color: #5a6678; margin: 0 0 1.5mm 0; font-weight: 600; }
+    .party .name { font-weight: 600; font-size: 11pt; }
+    .party .line { color: #34404f; margin: 0; }
+    .meta { margin-top: 5mm; display: flex; gap: 6mm; }
     .meta div { flex: 1; }
-    .meta dt { color: #5a6678; font-size: 9pt; letter-spacing: 0.08em; text-transform: uppercase; }
+    .meta dt { color: #5a6678; font-size: 8pt; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5mm; }
     .meta dd { margin: 0; font-weight: 500; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10mm; }
-    th { text-align: left; padding: 3mm 2mm; border-bottom: 1px solid #d0d6df; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.08em; color: #5a6678; }
-    td { padding: 3mm 2mm; border-bottom: 1px solid #ecf0f4; }
+    .items { width: 100%; border-collapse: collapse; margin-top: 6mm; }
+    .items th { text-align: left; padding: 2mm; border-bottom: 1px solid #d0d6df; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em; color: #5a6678; }
+    .items td { padding: 2mm; border-bottom: 1px solid #ecf0f4; }
     .text-right { text-align: right; }
-    .totals { margin-top: 6mm; width: 60%; margin-left: 40%; }
+    .totals-row { display: flex; gap: 10mm; margin-top: 4mm; align-items: flex-start; }
+    .qr-block { width: 36mm; flex-shrink: 0; text-align: center; }
+    .qr-block img { width: 36mm; height: 36mm; border: 1px solid #d0d6df; padding: 1.5mm; background: #fff; box-sizing: border-box; }
+    .qr-block .label { margin: 1mm 0 0 0; font-size: 8pt; letter-spacing: 0.08em; color: #5a6678; text-transform: uppercase; font-weight: 600; }
+    .totals { flex: 1; border-collapse: collapse; }
     .totals tr td { border: none; padding: 1mm 2mm; }
-    .totals tr.total td { border-top: 2px solid #1c2331; font-weight: 700; padding-top: 3mm; font-size: 13pt; }
-    .notes { margin-top: 10mm; color: #34404f; }
-    .footer { margin-top: 14mm; padding-top: 4mm; border-top: 1px solid #ecf0f4; color: #8493a4; font-size: 9pt; text-align: center; }
+    .totals tr.total td { border-top: 2px solid #1c2331; font-weight: 700; padding-top: 2.5mm; font-size: 12pt; }
+    .notes { margin-top: 6mm; color: #34404f; font-size: 9.5pt; }
+    .footer { margin-top: 8mm; padding-top: 2mm; border-top: 1px solid #ecf0f4; color: #8493a4; font-size: 8pt; text-align: center; }
   </style>
 </head>
 <body>
@@ -68,7 +72,7 @@
     </div>
   </dl>
 
-  <table>
+  <table class="items">
     <thead>
       <tr>
         <th>Položka</th>
@@ -89,29 +93,30 @@
     </tbody>
   </table>
 
-  <table class="totals">
-    <tr>
-      <td>Mezisoučet</td>
-      <td class="text-right">{{ subtotal }} {{ invoice.currency }}</td>
-    </tr>
-    {% if invoice.vat_rate %}
-    <tr>
-      <td>DPH ({{ invoice.vat_rate }} %)</td>
-      <td class="text-right">{{ vat_amount }} {{ invoice.currency }}</td>
-    </tr>
+  <div class="totals-row">
+    {% if qr_data_uri %}
+    <div class="qr-block">
+      <img src="{{ qr_data_uri }}" alt="QR Platba" />
+      <p class="label">QR Platba</p>
+    </div>
     {% endif %}
-    <tr class="total">
-      <td>Celkem k úhradě</td>
-      <td class="text-right">{{ total }} {{ invoice.currency }}</td>
-    </tr>
-  </table>
-
-  {% if qr_data_uri %}
-  <div style="margin-top: 10mm; text-align: center;">
-    <img src="{{ qr_data_uri }}" alt="QR Platba" style="width: 40mm; height: 40mm; border: 1px solid #d0d6df; padding: 2mm; background: #fff;" />
-    <p style="margin: 2mm 0 0 0; font-size: 9pt; letter-spacing: 0.08em; color: #5a6678; text-transform: uppercase; font-weight: 600;">QR Platba</p>
+    <table class="totals">
+      <tr>
+        <td>Mezisoučet</td>
+        <td class="text-right">{{ subtotal }} {{ invoice.currency }}</td>
+      </tr>
+      {% if invoice.vat_rate %}
+      <tr>
+        <td>DPH ({{ invoice.vat_rate }} %)</td>
+        <td class="text-right">{{ vat_amount }} {{ invoice.currency }}</td>
+      </tr>
+      {% endif %}
+      <tr class="total">
+        <td>Celkem k úhradě</td>
+        <td class="text-right">{{ total }} {{ invoice.currency }}</td>
+      </tr>
+    </table>
   </div>
-  {% endif %}
 
   {% if invoice.notes %}
   <p class="notes">{{ invoice.notes|linebreaksbr }}</p>
