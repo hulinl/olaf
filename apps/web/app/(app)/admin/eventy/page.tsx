@@ -79,25 +79,25 @@ export default function AdminEventyTablePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-brand">Správce</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Moje akce
-          </h1>
-          <p className="mt-2 max-w-2xl text-ink-500">
-            Tabulkový přehled tvých akcí. Klikni na řádek pro detail
-            účastníků, nebo otevři menu pro editaci.
-          </p>
-        </div>
+      <header>
+        <p className="text-sm font-medium text-brand">Správce</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+          Moje akce
+        </h1>
+        <p className="mt-2 max-w-2xl text-ink-500">
+          Tabulkový přehled tvých akcí. Klikni na řádek pro detail
+          účastníků, nebo otevři menu pro editaci.
+        </p>
+      </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterTabs filter={filter} onChange={setFilter} />
         {hasWorkspace && (
-          <LinkButton href="/admin/eventy/new" variant="primary" size="md">
+          <LinkButton href="/admin/eventy/new" variant="secondary" size="md">
             + Vytvořit akci
           </LinkButton>
         )}
-      </header>
-
-      <FilterTabs filter={filter} onChange={setFilter} />
+      </div>
 
       {loading && (
         <div className="flex justify-center py-12">
@@ -163,14 +163,14 @@ function FilterTabs({
     { v: "all", label: "Vše" },
   ];
   return (
-    <div className="inline-flex w-fit rounded-md border border-border bg-surface p-1">
+    <div className="inline-flex w-fit rounded-md border border-border bg-surface p-[2px]">
       {tabs.map((t) => (
         <button
           key={t.v}
           type="button"
           onClick={() => onChange(t.v)}
           className={[
-            "rounded-[5px] px-3 py-1.5 text-xs font-medium transition-colors focus-ring",
+            "rounded px-3 py-1.5 text-xs font-medium transition-colors focus-ring",
             filter === t.v
               ? "bg-ink-900 text-ink-inverse"
               : "text-ink-700 hover:bg-surface-muted",

@@ -146,14 +146,9 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
       </div>
 
       <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-xl font-semibold text-ink-900">
-            Akce sdílené v této komunitě
-          </h2>
-          <LinkButton href="/admin/eventy/new" variant="secondary" size="md">
-            + Vytvořit akci
-          </LinkButton>
-        </div>
+        <h2 className="text-xl font-semibold text-ink-900">
+          Akce této komunity
+        </h2>
         {eventList.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
             <h3 className="text-base font-semibold text-ink-900">
