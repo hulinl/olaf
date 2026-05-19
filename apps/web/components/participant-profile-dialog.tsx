@@ -82,11 +82,11 @@ export function ParticipantProfileDialog({
       role="dialog"
       aria-modal="true"
       aria-label="Profil účastníka"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:max-h-[85vh] sm:rounded-2xl"
+        className="flex max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-surface shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">

@@ -262,6 +262,10 @@ class Event(TenantScopedModel):
         return self.rsvps.filter(status=RSVP.STATUS_WAITLIST).count()
 
     @property
+    def pending_approval_count(self) -> int:
+        return self.rsvps.filter(status=RSVP.STATUS_PENDING_APPROVAL).count()
+
+    @property
     def is_at_capacity(self) -> bool:
         if self.capacity is None:
             return False

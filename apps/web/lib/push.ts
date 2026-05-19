@@ -104,9 +104,14 @@ export async function unsubscribePush(): Promise<void> {
   await sub.unsubscribe();
 }
 
-export async function sendTestPush(): Promise<number> {
-  const res = await apiFetch<{ sent: number }>("/api/auth/me/push-test/", {
+export interface PushTestResult {
+  sent: number;
+  subscriptions: number;
+  vapid_configured: boolean;
+}
+
+export async function sendTestPush(): Promise<PushTestResult> {
+  return await apiFetch<PushTestResult>("/api/auth/me/push-test/", {
     method: "POST",
   });
-  return res.sent;
 }

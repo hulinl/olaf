@@ -251,6 +251,7 @@ class EventSummarySerializer(serializers.ModelSerializer):
         source="confirmed_rsvp_count", read_only=True
     )
     waitlist_count = serializers.IntegerField(read_only=True)
+    pending_approval_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Event
@@ -268,6 +269,7 @@ class EventSummarySerializer(serializers.ModelSerializer):
             "workspace_slug",
             "confirmed_count",
             "waitlist_count",
+            "pending_approval_count",
         )
         read_only_fields = fields
 

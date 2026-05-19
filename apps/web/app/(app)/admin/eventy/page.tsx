@@ -188,6 +188,11 @@ function EventCard({ event }: { event: EventSummary }) {
         <span className="text-xs text-ink-500">{dateLabel}</span>
       </div>
       <p className="text-base font-semibold text-ink-900">{event.title}</p>
+      {event.pending_approval_count > 0 && (
+        <p className="rounded-md bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
+          ⚠ Čeká {event.pending_approval_count} na schválení
+        </p>
+      )}
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-ink-500">
         <dt>Přihlášeno</dt>
         <dd className="text-right font-medium text-ink-900 tabular-nums">

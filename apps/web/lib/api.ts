@@ -182,6 +182,7 @@ export interface EventSummary {
   workspace_slug: string;
   confirmed_count: number;
   waitlist_count: number;
+  pending_approval_count: number;
 }
 
 export interface EventImage {

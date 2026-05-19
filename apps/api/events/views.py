@@ -514,9 +514,15 @@ def event_images(
         event.images.order_by("-sort_order").values_list("sort_order", flat=True).first()
         or 0
     ) + 1
+    # Phones upload 3-5 MB JPEGs at 4000+ px; an event landing with
+    # 20 of those is multiple megabytes per pageview. Downscale to
+    # 1600px on the long side + re-encode JPEG at quality 82 before
+    # we persist, keeping the original aspect ratio. Result: 200-400
+    # KB per image, fast load on 4G + PWA.
+    processed = _downscale_upload(upload)
     img = EventImage.objects.create(
         event=event,
-        image=upload,
+        image=processed,
         alt_text=request.data.get("alt_text", "") or "",
         sort_order=next_order,
     )
@@ -524,6 +530,47 @@ def event_images(
         EventImageSerializer(img).data,
         status=status.HTTP_201_CREATED,
     )
+
+
+def _downscale_upload(upload):
+    """Return a Django ContentFile downscaled + re-encoded as JPEG.
+    Falls back to the original file if Pillow can't open it (e.g.
+    unsupported format), so we never block a valid upload on this."""
+    import io
+
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+    from PIL import Image
+
+    MAX_DIM = 1600
+    QUALITY = 82
+
+    try:
+        upload.seek(0)
+        img = Image.open(upload)
+        img = img.convert("RGB")  # Drop alpha; JPEG output anyway.
+        w, h = img.size
+        scale = min(1.0, MAX_DIM / max(w, h))
+        if scale < 1.0:
+            new_size = (int(w * scale), int(h * scale))
+            img = img.resize(new_size, Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=QUALITY, optimize=True)
+        buf.seek(0)
+        original_name = getattr(upload, "name", "image") or "image"
+        stem = original_name.rsplit(".", 1)[0][:60]
+        return InMemoryUploadedFile(
+            buf,
+            "image",
+            f"{stem}.jpg",
+            "image/jpeg",
+            buf.getbuffer().nbytes,
+            None,
+        )
+    except Exception:
+        # Pillow couldn't process — store the original so the owner
+        # at least sees their upload. Resize can be re-applied later.
+        upload.seek(0)
+        return upload
 
 
 @api_view(["DELETE"])
