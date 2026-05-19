@@ -217,6 +217,8 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "price_amount",
             "price_currency",
             "price_note",
+            "payment_in_cash",
+            "billing_profile",
             "required_documents",
             "created_at",
         )
@@ -411,6 +413,8 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "price_amount",
             "price_currency",
             "price_note",
+            "payment_in_cash",
+            "billing_profile",
             "required_documents",
         )
 

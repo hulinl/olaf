@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/settings/profile", label: "Profile" },
-  { href: "/settings/notifications", label: "Notifications" },
-  { href: "/settings/account", label: "Account" },
+  { href: "/settings/profile", label: "Profil" },
+  { href: "/settings/fakturace", label: "Fakturace" },
+  { href: "/settings/notifications", label: "Notifikace" },
+  { href: "/settings/account", label: "Účet" },
 ];
 
 function isActive(pathname: string, href: string) {

@@ -11,6 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
         curl \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        libffi-dev \
+        libcairo2 \
+        libgdk-pixbuf-2.0-0 \
+        libxml2 \
+        shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/

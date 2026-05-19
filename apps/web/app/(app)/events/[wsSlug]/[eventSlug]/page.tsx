@@ -12,6 +12,7 @@ import {
   ApiError,
   type Event as OlafEvent,
   type Invoice,
+  assetUrl,
   events,
   formatEventPrice,
 } from "@/lib/api";
@@ -236,9 +237,18 @@ export default function MyEventPage({ params }: Props) {
               <dt className="text-ink-500">Odběratel</dt>
               <dd className="text-ink-700">{invoice.customer_name}</dd>
             </dl>
-            {/* TODO V1.5: PDF download link via WeasyPrint. For now the
-                invoice is structured-data only — the owner has the full
-                editable view in admin. */}
+            <div className="mt-4">
+              <a
+                href={assetUrl(
+                  `/api/events/${wsSlug}/${eventSlug}/invoices/${invoice.id}/pdf/`,
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-ring"
+              >
+                Stáhnout PDF ↓
+              </a>
+            </div>
           </section>
         )}
 

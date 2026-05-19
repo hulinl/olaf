@@ -266,3 +266,68 @@ def me_todo(request: Request) -> Response:
         i.get("doc_label", ""),
     ))
     return Response(items)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def billing_profiles_list(request: Request) -> Response:
+    """CRUD list for the current user's billing profiles."""
+    from .models import BillingProfile
+    from .serializers import BillingProfileSerializer
+
+    if request.method == "GET":
+        qs = BillingProfile.objects.filter(user=request.user)
+        return Response(BillingProfileSerializer(qs, many=True).data)
+
+    serializer = BillingProfileSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    profile = serializer.save(user=request.user)
+    # If this is the user's first profile, make it default automatically.
+    if (
+        not profile.is_default
+        and BillingProfile.objects.filter(user=request.user).count() == 1
+    ):
+        profile.is_default = True
+        profile.save(update_fields=["is_default"])
+    return Response(
+        BillingProfileSerializer(profile).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def billing_profile_detail(request: Request, profile_id: int) -> Response:
+    """Retrieve / update / delete one billing profile."""
+    from .models import BillingProfile
+    from .serializers import BillingProfileSerializer
+
+    try:
+        profile = BillingProfile.objects.get(pk=profile_id, user=request.user)
+    except BillingProfile.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        return Response(BillingProfileSerializer(profile).data)
+    if request.method == "DELETE":
+        was_default = profile.is_default
+        profile.delete()
+        # If we removed the default and there's another profile around,
+        # promote the most recent one so the user always has a default.
+        if was_default:
+            remaining = (
+                BillingProfile.objects.filter(user=request.user)
+                .order_by("-created_at")
+                .first()
+            )
+            if remaining:
+                remaining.is_default = True
+                remaining.save(update_fields=["is_default"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = BillingProfileSerializer(
+        profile, data=request.data, partial=True
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
