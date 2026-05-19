@@ -383,12 +383,43 @@ function MobileDrawer({
 
           <DrawerSection label="Tvůrce">
             <DrawerSubLink
-              href="/admin"
+              href="/admin/eventy"
               pathname={pathname}
               onClose={onClose}
             >
-              Otevřít sekci tvůrce
+              Akce
             </DrawerSubLink>
+            <DrawerSubLink
+              href="/admin/komunity"
+              pathname={pathname}
+              onClose={onClose}
+            >
+              Komunity
+            </DrawerSubLink>
+            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
+              Platby
+              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
+                Brzy
+              </span>
+            </span>
+            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
+              Dokumenty
+              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
+                Brzy
+              </span>
+            </span>
+            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
+              Smlouvy
+              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
+                Brzy
+              </span>
+            </span>
+            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
+              Členové
+              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
+                Brzy
+              </span>
+            </span>
           </DrawerSection>
         </nav>
       </div>

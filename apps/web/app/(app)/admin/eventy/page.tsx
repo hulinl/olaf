@@ -123,28 +123,86 @@ export default function AdminEventyTablePage() {
       )}
 
       {!loading && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-muted/60">
-              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                <th className="px-4 py-3">Akce</th>
-                <th className="px-4 py-3">Termín</th>
-                <th className="px-4 py-3 text-right">Přihlášeno</th>
-                <th className="px-4 py-3 text-right">Waitlist</th>
-                <th className="px-4 py-3 text-right">Platby</th>
-                <th className="px-4 py-3 text-right">Smlouvy</th>
-                <th className="px-4 py-3 text-right">Pojištění</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((e) => (
-                <EventRow key={`${e.workspace_slug}/${e.slug}`} event={e} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Mobile: card list — the 7-column table doesn't fit on
+              a 360px-wide screen and forcing horizontal scroll is
+              clunky for the "scan my events" use case. */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {rows.map((e) => (
+              <EventCard key={`${e.workspace_slug}/${e.slug}`} event={e} />
+            ))}
+          </div>
+          {/* sm+: full table */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted/60">
+                <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                  <th className="px-4 py-3">Akce</th>
+                  <th className="px-4 py-3">Termín</th>
+                  <th className="px-4 py-3 text-right">Přihlášeno</th>
+                  <th className="px-4 py-3 text-right">Waitlist</th>
+                  <th className="px-4 py-3 text-right">Platby</th>
+                  <th className="px-4 py-3 text-right">Smlouvy</th>
+                  <th className="px-4 py-3 text-right">Pojištění</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((e) => (
+                  <EventRow key={`${e.workspace_slug}/${e.slug}`} event={e} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+function EventCard({ event }: { event: EventSummary }) {
+  const href = `/admin/eventy/${event.workspace_slug}/${event.slug}`;
+  const starts = new Date(event.starts_at);
+  const dateLabel = starts.toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const capacity =
+    event.capacity != null
+      ? `${event.confirmed_count} / ${event.capacity}`
+      : String(event.confirmed_count);
+  return (
+    <Link
+      href={href}
+      className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm transition-colors hover:border-brand hover:bg-brand/5 focus-ring"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className={[
+            "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+            STATUS_TONE[event.status],
+          ].join(" ")}
+        >
+          {STATUS_LABELS[event.status]}
+        </span>
+        <span className="text-xs text-ink-500">{dateLabel}</span>
+      </div>
+      <p className="text-base font-semibold text-ink-900">{event.title}</p>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-ink-500">
+        <dt>Přihlášeno</dt>
+        <dd className="text-right font-medium text-ink-900 tabular-nums">
+          {capacity}
+        </dd>
+        {event.waitlist_count > 0 && (
+          <>
+            <dt>Waitlist</dt>
+            <dd className="text-right font-medium text-warning tabular-nums">
+              {event.waitlist_count}
+            </dd>
+          </>
+        )}
+      </dl>
+    </Link>
   );
 }
 
