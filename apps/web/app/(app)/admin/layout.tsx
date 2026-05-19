@@ -83,8 +83,11 @@ export default function AdminLayout({
             </div>
           </aside>
 
-          {/* MAIN */}
-          <main className="min-w-0 flex-1">{children}</main>
+          {/* MAIN — overflow-x-clip is a defensive net so a wide
+              child (large image preview, long URL, table) can't push
+              the whole viewport wide. min-w-0 is what lets the
+              flex child actually shrink below its content width. */}
+          <main className="min-w-0 flex-1 overflow-x-clip">{children}</main>
         </div>
       </div>
     </div>

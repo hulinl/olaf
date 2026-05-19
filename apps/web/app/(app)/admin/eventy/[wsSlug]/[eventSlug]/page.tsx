@@ -179,9 +179,7 @@ function AdminEventDetail({ params }: Props) {
         </div>
       </header>
 
-      <EventChecklist workspaceSlug={wsSlug} eventSlug={eventSlug} />
-
-      <div className="grid grid-cols-4 gap-2 sm:gap-3">
+      <div className="grid grid-cols-4 items-stretch gap-2 sm:gap-3">
         <StatTile
           label="Přihlášeno"
           value={`${confirmed.length}${event.capacity != null ? ` / ${event.capacity}` : ""}`}
@@ -209,6 +207,8 @@ function AdminEventDetail({ params }: Props) {
           active={filter === "cancelled"}
         />
       </div>
+
+      <EventChecklist workspaceSlug={wsSlug} eventSlug={eventSlug} />
 
       {filter !== "all" && (
         <div className="flex items-center gap-3 text-sm">
@@ -296,7 +296,7 @@ function StatTile({
   const body = (
     <div
       className={[
-        "rounded-xl border bg-surface p-2.5 transition-colors sm:rounded-2xl sm:p-5",
+        "flex h-full flex-col justify-between rounded-xl border bg-surface p-2.5 transition-colors sm:rounded-2xl sm:p-5",
         active
           ? "border-brand bg-brand/5"
           : tone === "warning"
@@ -318,7 +318,7 @@ function StatTile({
       </p>
     </div>
   );
-  if (href) return <Link href={href}>{body}</Link>;
+  if (href) return <Link href={href} className="block h-full focus-ring">{body}</Link>;
   return body;
 }
 

@@ -164,17 +164,14 @@ export default function EventBlocksPage({ params }: Props) {
         }}
       />
 
-      <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 backdrop-blur">
-        <p className="text-sm text-ink-500">
-          {dirty
-            ? "Máš neuložené změny."
-            : savedAt
-              ? `Uloženo v ${savedAt.toLocaleTimeString("cs-CZ", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}.`
-              : "Vše uloženo."}
-        </p>
+      {/* Sticky save bar — only visible while there are unsaved
+          changes. After a save the bar collapses; users were thinking
+          the "Uloženo v hh:mm" message was a transient toast and got
+          annoyed when it stuck around overlapping content (especially
+          on mobile). */}
+      {dirty && (
+      <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-md border border-border bg-canvas/95 p-3 shadow-lg backdrop-blur">
+        <p className="text-sm text-ink-500">Máš neuložené změny.</p>
         <Button
           type="button"
           variant="primary"
@@ -186,6 +183,15 @@ export default function EventBlocksPage({ params }: Props) {
           Uložit
         </Button>
       </div>
+      )}
+      {!dirty && savedAt && (
+        <p className="text-center text-xs text-ink-500">
+          Uloženo v {savedAt.toLocaleTimeString("cs-CZ", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}.
+        </p>
+      )}
     </div>
   );
 }
