@@ -99,6 +99,9 @@ class UserSerializer(serializers.ModelSerializer):
             "emergency_contact_name",
             "emergency_contact_phone",
             "emergency_contact_relationship",
+            # Notifications
+            "notify_on_discussion_reply",
+            "notify_on_discussion_announce",
             # System
             "email_verified",
             "date_joined",

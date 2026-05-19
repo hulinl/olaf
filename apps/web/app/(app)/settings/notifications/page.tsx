@@ -1,77 +1,137 @@
 "use client";
 
-import { Card, CardSection } from "@/components/ui/card";
+import { FormEvent, useEffect, useState } from "react";
 
-const CATEGORIES: { title: string; items: string[] }[] = [
-  {
-    title: "Account",
-    items: [
-      "Email verification, password reset",
-      "Granted or revoked Event Admin role",
-    ],
-  },
-  {
-    title: "Communities",
-    items: [
-      "Community invitation",
-      "Membership approved or declined",
-      "New event in a community you belong to",
-    ],
-  },
-  {
-    title: "Events",
-    items: [
-      "RSVP confirmation",
-      "RSVP reminder 24 h before event",
-      "Event updated (date, location)",
-      "Event cancelled",
-      "Promoted from waitlist to confirmed",
-      "Document pending acknowledgement or upload",
-    ],
-  },
-];
+import { Button } from "@/components/ui/button";
+import { Alert, Card, CardSection } from "@/components/ui/card";
+import { ApiError, type User, auth } from "@/lib/api";
+
+type NotifyPrefs = Pick<
+  User,
+  "notify_on_discussion_reply" | "notify_on_discussion_announce"
+>;
 
 export default function NotificationsSettingsPage() {
+  const [prefs, setPrefs] = useState<NotifyPrefs | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    auth
+      .me()
+      .then((u) =>
+        setPrefs({
+          notify_on_discussion_reply: u.notify_on_discussion_reply,
+          notify_on_discussion_announce: u.notify_on_discussion_announce,
+        }),
+      )
+      .catch((err) =>
+        setError(err instanceof ApiError ? err.message : "Načtení selhalo."),
+      );
+  }, []);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!prefs) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await auth.updateMe(prefs);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Uložení selhalo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggle<K extends keyof NotifyPrefs>(key: K) {
+    setPrefs((p) => (p ? { ...p, [key]: !p[key] } : p));
+  }
+
+  if (!prefs) {
+    return (
+      <div className="flex justify-center py-12">
+        <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <Card>
         <CardSection>
-          <h2 className="text-lg font-semibold text-ink-900">Notifications</h2>
+          <h2 className="text-lg font-semibold text-ink-900">Notifikace</h2>
           <p className="mt-1 text-sm text-ink-500">
-            Choose how olaf reaches you. The matrix lands with Slice 8 — until
-            then, all transactional emails (verification, password reset, RSVP
-            confirmations) are sent by default.
+            Transakční e-maily (potvrzení registrace, pokyny k platbě)
+            chodí vždy. Tady spravuješ co ti chodí ze záležitostí komunit
+            a akcí.
           </p>
         </CardSection>
       </Card>
 
       <Card>
         <CardSection>
-          <h3 className="text-base font-semibold text-ink-900">
-            What you&apos;ll be able to toggle
-          </h3>
+          <h3 className="text-base font-semibold text-ink-900">Nástěnka</h3>
           <p className="mt-1 text-sm text-ink-500">
-            Per-row email and (eventually) push toggles, grouped by purpose.
+            E-maily o tématech a komentářích v komunitách a na akcích.
           </p>
-          <div className="mt-6 flex flex-col gap-6">
-            {CATEGORIES.map((cat) => (
-              <div key={cat.title}>
-                <h4 className="text-sm font-semibold text-ink-700">
-                  {cat.title}
-                </h4>
-                <ul className="mt-2 flex flex-col gap-1.5 text-sm text-ink-500">
-                  {cat.items.map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <span className="mt-1.5 inline-block size-1.5 shrink-0 rounded-full bg-border-strong" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className="mt-5 flex flex-col gap-3">
+            <ToggleRow
+              label="Upozorňovat na odpovědi v mých tématech"
+              hint="Když ti někdo odpoví na téma, které jsi založil/a."
+              checked={prefs.notify_on_discussion_reply}
+              onChange={() => toggle("notify_on_discussion_reply")}
+            />
+            <ToggleRow
+              label="Upozorňovat na nová témata v komunitách a akcích"
+              hint="Když owner nebo jiný člen otevře nové téma v komunitě, kde jsi člen, nebo na akci, kam jsi přihlášen/a."
+              checked={prefs.notify_on_discussion_announce}
+              onChange={() => toggle("notify_on_discussion_announce")}
+            />
           </div>
         </CardSection>
       </Card>
-    </div>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+      {saved && !error && (
+        <Alert variant="success">Předvolby uloženy.</Alert>
+      )}
+
+      <div>
+        <Button type="submit" variant="primary" size="md" loading={saving}>
+          {saving ? "Ukládám…" : "Uložit"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 has-[input:checked]:border-brand">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="mt-0.5 size-4 accent-brand"
+      />
+      <span className="flex flex-col">
+        <span className="text-sm font-medium text-ink-900">{label}</span>
+        {hint && <span className="mt-0.5 text-xs text-ink-500">{hint}</span>}
+      </span>
+    </label>
   );
 }

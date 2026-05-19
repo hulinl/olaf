@@ -129,6 +129,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Notification preferences (Slice 12 — discussion notify).
+    notify_on_discussion_reply = models.BooleanField(
+        default=True,
+        help_text="Email me when someone replies on a topic I started.",
+    )
+    notify_on_discussion_announce = models.BooleanField(
+        default=True,
+        help_text=(
+            "Email me when a new topic appears in a komunita I'm a member "
+            "of, or on an event I'm RSVP'd to."
+        ),
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"

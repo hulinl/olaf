@@ -1,0 +1,14 @@
+Ahoj{% if topic.author.first_name %} {{ topic.author.first_name }}{% endif %},
+
+{{ author_name }} přidal/a odpověď do tvého tématu „{{ topic.title }}" ({{ parent_label }}).
+
+---
+{{ comment.body }}
+---
+
+Otevřít na olaf.events:
+  {{ topic_url }}
+
+Nechceš dostávat tyto e-maily? V Nastavení → Profil vypni „Upozorňovat na odpovědi v mých tématech".
+
+— olaf

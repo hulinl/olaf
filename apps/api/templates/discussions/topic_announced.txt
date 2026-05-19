@@ -1,0 +1,16 @@
+Ahoj{% if recipient.first_name %} {{ recipient.first_name }}{% endif %},
+
+{{ author_name }} otevřel/a nové téma v {{ parent_label }}:
+
+  „{{ topic.title }}"
+
+{% if topic.body %}---
+{{ topic.body }}
+---{% endif %}
+
+Připojit se k diskuzi:
+  {{ topic_url }}
+
+Nechceš dostávat tyto e-maily? V Nastavení → Profil vypni „Upozorňovat na nová témata v komunitách a akcích".
+
+— olaf
