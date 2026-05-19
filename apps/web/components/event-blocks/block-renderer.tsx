@@ -22,6 +22,13 @@ interface Props {
   images?: EventImage[];
   /** Visual tone for this block — assigned by the page based on position. */
   tone?: BlockTone;
+  /** Single source of truth for price/currency/note (event-level).
+   *  Included_split block prefers these over its own legacy payload. */
+  eventPrice?: {
+    amount: string | null;
+    currency: string;
+    note: string;
+  };
 }
 
 export function BlockRenderer({
@@ -31,6 +38,7 @@ export function BlockRenderer({
   heroBadge,
   images = [],
   tone = "canvas",
+  eventPrice,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -50,7 +58,13 @@ export function BlockRenderer({
     case "days":
       return <DaysBlock payload={block.payload} tone={tone} />;
     case "included_split":
-      return <IncludedSplitBlock payload={block.payload} tone={tone} />;
+      return (
+        <IncludedSplitBlock
+          payload={block.payload}
+          tone={tone}
+          eventPrice={eventPrice}
+        />
+      );
     case "gallery":
       return (
         <GalleryBlock payload={block.payload} images={images} tone={tone} />

@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
 import { Field, Input } from "@/components/ui/field";
+import { formatEventPrice } from "@/lib/api";
 import type {
   BlockListItem,
   IncludedSplitBlockPayload,
@@ -9,11 +12,28 @@ import type {
 interface Props {
   payload: IncludedSplitBlockPayload;
   onChange: (p: IncludedSplitBlockPayload) => void;
+  /** Single source of truth for price/currency/note — pulled from
+   *  Event.price_amount/_currency/_note set in /edit/detaily. Editing
+   *  the values here would diverge from what the rest of the app uses
+   *  (RSVP payment amount, QR Platba, faktura), so we lock them. */
+  eventPrice?: {
+    amount: string | null;
+    currency: string;
+    note: string;
+  };
+  workspaceSlug?: string;
+  eventSlug?: string;
 }
 
 type ListKey = "included" | "not_included";
 
-export function IncludedSplitForm({ payload, onChange }: Props) {
+export function IncludedSplitForm({
+  payload,
+  onChange,
+  eventPrice,
+  workspaceSlug,
+  eventSlug,
+}: Props) {
   function updateItem(
     key: ListKey,
     i: number,
@@ -36,6 +56,21 @@ export function IncludedSplitForm({ payload, onChange }: Props) {
     onChange({ ...payload, [key]: list.filter((_, idx) => idx !== i) });
   }
 
+  // Mirror the event-level price into the block payload so the public
+  // renderer doesn't need to know about both sources. Falls back to the
+  // legacy in-block values for events with no price_amount set.
+  const priceValue = eventPrice?.amount ?? payload.price_value ?? "";
+  const priceUnit = eventPrice?.currency || payload.price_unit || "";
+  const priceNote = eventPrice?.note ?? payload.price_note ?? "";
+  const formattedPrice = eventPrice?.amount
+    ? formatEventPrice(eventPrice.amount, eventPrice.currency)
+    : "";
+
+  const detailsHref =
+    workspaceSlug && eventSlug
+      ? `/admin/eventy/${workspaceSlug}/${eventSlug}/edit/detaily`
+      : null;
+
   return (
     <div className="flex flex-col gap-6">
       <ListEditor
@@ -53,34 +88,55 @@ export function IncludedSplitForm({ payload, onChange }: Props) {
         onUpdate={(i, p) => updateItem("not_included", i, p)}
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label="Cena (hodnota)">
-          <Input
-            placeholder="8 900"
-            value={payload.price_value ?? ""}
-            onChange={(e) =>
-              onChange({ ...payload, price_value: e.target.value })
-            }
-          />
-        </Field>
-        <Field label="Jednotka">
-          <Input
-            placeholder="Kč / osoba"
-            value={payload.price_unit ?? ""}
-            onChange={(e) =>
-              onChange({ ...payload, price_unit: e.target.value })
-            }
-          />
-        </Field>
-        <Field label="Poznámka">
-          <Input
-            placeholder="záloha 3 000 Kč při přihlášení"
-            value={payload.price_note ?? ""}
-            onChange={(e) =>
-              onChange({ ...payload, price_note: e.target.value })
-            }
-          />
-        </Field>
+      <div className="rounded-md border border-border bg-surface-muted/40 p-4">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <p className="text-sm font-medium text-ink-900">
+            Cena, jednotka, poznámka
+          </p>
+          {detailsHref && (
+            <Link
+              href={detailsHref}
+              className="text-xs font-medium text-brand hover:underline"
+            >
+              Upravit v detailech akce →
+            </Link>
+          )}
+        </div>
+        <p className="mb-3 text-xs text-ink-500">
+          Tato pole se dotahují z <strong>Detailů akce</strong> (sekce
+          „Cena"), aby zůstala konzistentní s pokyny k platbě a fakturou.
+          Tady je nemůžeš měnit.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Cena (hodnota)">
+            <Input
+              value={
+                formattedPrice
+                  ? formattedPrice.split(" ")[0]
+                  : priceValue || ""
+              }
+              disabled
+              readOnly
+              placeholder="Nastav v detailech akce"
+            />
+          </Field>
+          <Field label="Jednotka / měna">
+            <Input
+              value={priceUnit}
+              disabled
+              readOnly
+              placeholder="CZK"
+            />
+          </Field>
+          <Field label="Poznámka">
+            <Input
+              value={priceNote}
+              disabled
+              readOnly
+              placeholder="záloha při přihlášení..."
+            />
+          </Field>
+        </div>
       </div>
     </div>
   );

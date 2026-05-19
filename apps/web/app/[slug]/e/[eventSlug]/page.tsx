@@ -119,6 +119,11 @@ export default async function EventLandingPage({ params }: Props) {
                   fallbackCtaHref={cta_href}
                   heroBadge={i === heroIndex ? heroBadge : undefined}
                   images={event.images}
+                  eventPrice={{
+                    amount: event.price_amount,
+                    currency: event.price_currency,
+                    note: event.price_note,
+                  }}
                 />
               ))}
             </>
