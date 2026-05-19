@@ -140,7 +140,17 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatTile label="Členů" value={String(workspace.member_count ?? 1)} />
+        <Link
+          href={`/admin/komunity/${slug}/clenove`}
+          className="rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-brand hover:bg-brand/10 focus-ring"
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            Členů
+          </p>
+          <p className="mt-2 text-3xl font-semibold text-ink-900">
+            {workspace.member_count ?? 1}
+          </p>
+        </Link>
         <StatTile label="Nadcházející akce" value={String(upcoming.length)} />
         <StatTile label="Minulé akce" value={String(past.length)} />
       </div>

@@ -12,4 +12,10 @@ urlpatterns = [
     path("<slug:slug>/events/", views.workspace_events, name="events"),
     path("<slug:slug>/logo/", views.workspace_logo, name="logo"),
     path("<slug:slug>/cover/", views.workspace_cover, name="cover"),
+    path("<slug:slug>/members/", views.workspace_members, name="members"),
+    path(
+        "<slug:slug>/members/<int:user_id>/",
+        views.workspace_member_detail,
+        name="member-detail",
+    ),
 ]
