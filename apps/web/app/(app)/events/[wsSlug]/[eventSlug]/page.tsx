@@ -223,20 +223,43 @@ export default function MyEventPage({ params }: Props) {
                   })}
                 </p>
               </div>
-              <span className="rounded-full bg-success/15 px-3 py-0.5 text-xs font-semibold text-success">
+              <span className="inline-flex rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
                 {invoice.status === "paid" ? "Zaplaceno" : invoice.status}
               </span>
             </div>
-            <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-              <dt className="text-ink-500">Částka</dt>
-              <dd className="font-semibold text-ink-900">
-                {formatEventPrice(invoice.total, invoice.currency)}
-              </dd>
-              <dt className="text-ink-500">Dodavatel</dt>
-              <dd className="text-ink-700">{invoice.supplier_name}</dd>
-              <dt className="text-ink-500">Odběratel</dt>
-              <dd className="text-ink-700">{invoice.customer_name}</dd>
-            </dl>
+            <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
+              <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+                <dt className="text-ink-500">Částka</dt>
+                <dd className="font-semibold text-ink-900">
+                  {formatEventPrice(invoice.total, invoice.currency)}
+                </dd>
+                <dt className="text-ink-500">Variabilní symbol</dt>
+                <dd className="font-mono text-ink-900">
+                  {invoice.variable_symbol || "—"}
+                </dd>
+                <dt className="text-ink-500">Dodavatel</dt>
+                <dd className="text-ink-700">{invoice.supplier_name}</dd>
+                <dt className="text-ink-500">Odběratel</dt>
+                <dd className="text-ink-700">{invoice.customer_name}</dd>
+              </dl>
+              {invoice.supplier_iban && (
+                <div className="flex flex-col items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={assetUrl(
+                      `/api/events/${wsSlug}/${eventSlug}/invoices/${invoice.id}/qr.png`,
+                    )}
+                    alt="QR Platba"
+                    width={160}
+                    height={160}
+                    className="rounded-md border border-border bg-white p-2"
+                  />
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-ink-500">
+                    QR Platba
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="mt-4">
               <a
                 href={assetUrl(

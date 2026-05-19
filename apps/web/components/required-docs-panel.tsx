@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   type RSVPDocumentsBundle,
+  assetUrl,
   events,
 } from "@/lib/api";
 
@@ -138,36 +139,53 @@ function DocRow({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const verified = !!uploaded?.verified_at;
+  const fileUrl = uploaded?.url ? assetUrl(uploaded.url) : undefined;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border p-3">
-      <div className="flex flex-col">
+    <div className="flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-1 flex-col">
         <p className="text-sm font-medium text-ink-900">
           {label}
           {required && <span className="ml-1 text-danger">*</span>}
         </p>
         {uploaded ? (
-          <p className="text-xs text-ink-500">
-            {uploaded.original_name || "soubor"} ·{" "}
-            <a
-              href={uploaded.url ?? "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-ink-900"
-            >
-              stáhnout
-            </a>
-            {verified && (
-              <span className="ml-2 rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-success">
-                Ověřeno
-              </span>
+          <p className="truncate text-xs text-ink-500">
+            {uploaded.original_name || "soubor"}
+            {fileUrl && (
+              <>
+                {" · "}
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-ink-900"
+                >
+                  stáhnout
+                </a>
+              </>
             )}
           </p>
         ) : (
           <p className="text-xs text-ink-500">Zatím nenahráno.</p>
         )}
       </div>
-      <div className="flex items-center gap-2">
+
+      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+        {/* Status pill — mirrors the payment panel's badge so the
+            participant zone reads consistently from row to row. */}
+        {verified ? (
+          <span className="inline-flex rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
+            Ověřeno
+          </span>
+        ) : uploaded ? (
+          <span className="inline-flex rounded-full bg-success/15 px-3 py-0.5 text-xs font-semibold text-success">
+            Nahráno
+          </span>
+        ) : (
+          <span className="inline-flex rounded-full bg-warning/15 px-3 py-0.5 text-xs font-semibold text-warning">
+            Čeká
+          </span>
+        )}
         {!verified && (
           <>
             <input
@@ -188,10 +206,10 @@ function DocRow({
               className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50"
             >
               {busy
-                ? "Nahrávám..."
+                ? "Nahrávám…"
                 : uploaded
                   ? "Nahrát jiné"
-                  : "Nahrát soubor"}
+                  : "Nahrát"}
             </button>
             {uploaded && onDelete && (
               <button

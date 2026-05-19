@@ -89,22 +89,32 @@
     </tbody>
   </table>
 
-  <table class="totals">
-    <tr>
-      <td>Mezisoučet</td>
-      <td class="text-right">{{ subtotal }} {{ invoice.currency }}</td>
-    </tr>
-    {% if invoice.vat_rate %}
-    <tr>
-      <td>DPH ({{ invoice.vat_rate }} %)</td>
-      <td class="text-right">{{ vat_amount }} {{ invoice.currency }}</td>
-    </tr>
+  <div style="display: flex; gap: 14mm; margin-top: 6mm; align-items: flex-start;">
+    <div style="flex: 1;">
+      <table class="totals" style="margin-left: 0; width: 100%;">
+        <tr>
+          <td>Mezisoučet</td>
+          <td class="text-right">{{ subtotal }} {{ invoice.currency }}</td>
+        </tr>
+        {% if invoice.vat_rate %}
+        <tr>
+          <td>DPH ({{ invoice.vat_rate }} %)</td>
+          <td class="text-right">{{ vat_amount }} {{ invoice.currency }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total">
+          <td>Celkem k úhradě</td>
+          <td class="text-right">{{ total }} {{ invoice.currency }}</td>
+        </tr>
+      </table>
+    </div>
+    {% if qr_data_uri %}
+    <div style="width: 38mm; text-align: center;">
+      <img src="{{ qr_data_uri }}" alt="QR Platba" style="width: 36mm; height: 36mm; border: 1px solid #d0d6df; padding: 2mm; background: #fff;" />
+      <p style="margin: 1.5mm 0 0 0; font-size: 8pt; letter-spacing: 0.08em; color: #5a6678; text-transform: uppercase;">QR Platba</p>
+    </div>
     {% endif %}
-    <tr class="total">
-      <td>Celkem k úhradě</td>
-      <td class="text-right">{{ total }} {{ invoice.currency }}</td>
-    </tr>
-  </table>
+  </div>
 
   {% if invoice.notes %}
   <p class="notes">{{ invoice.notes|linebreaksbr }}</p>
