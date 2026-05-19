@@ -202,3 +202,10 @@ LOGGING = {
         "session.debug": {"handlers": ["console"], "level": "WARNING"},
     },
 }
+
+# Web Push (VAPID) — read from env. Empty values disable push entirely;
+# subscribe endpoint returns 503 so the frontend can show "push není
+# k dispozici" instead of failing silently.
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="")
+VAPID_SUBJECT = env("VAPID_SUBJECT", default="mailto:no-reply@olaf.events")

@@ -73,6 +73,18 @@ provision() {
     echo "  preserving current image: $current_image"
   fi
 
+  # Web Push VAPID keys — generated outside the script with py-vapid.
+  # Empty values disable push at the backend layer (subscribe endpoint
+  # returns 503), so first-time provisioning without keys is fine.
+  local vapid_public=""
+  local vapid_private=""
+  if [[ -f "$SECRETS/vapid_public_key" ]]; then
+    vapid_public=$(cat "$SECRETS/vapid_public_key")
+  fi
+  if [[ -f "$SECRETS/vapid_private_key" ]]; then
+    vapid_private=$(cat "$SECRETS/vapid_private_key")
+  fi
+
   echo "==> Deploying Bicep template..."
   az deployment group create \
     --resource-group "$RG" \
@@ -83,6 +95,8 @@ provision() {
       githubRepo="$GITHUB_REPO" \
       githubBranch="$GITHUB_BRANCH" \
       githubToken="$github_token" \
+      vapidPublicKey="$vapid_public" \
+      vapidPrivateKey="$vapid_private" \
       $image_param \
     --query 'properties.outputs' -o json > "$SECRETS/last_outputs.json"
   echo "  outputs:"

@@ -56,6 +56,13 @@ param githubToken string = ''
 @description('Initial container image for the backend Container App. Real image is swapped in by deploy.sh release.')
 param backendInitialImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
+@description('Web Push VAPID public key (base64-url uncompressed P-256 point). Exposed to the frontend; empty disables push.')
+param vapidPublicKey string = ''
+
+@secure()
+@description('Web Push VAPID private key (PEM). Empty disables push.')
+param vapidPrivateKey string = ''
+
 @description('Link the customer-managed olaf.events domain to Communication Services. Must be false on first provision — the domain is created in pending-verification state and ACS rejects the link until it flips Verified. Flipped to true on 2026-05-18 after DKIM/SPF/Domain finished verifying.')
 param linkCustomEmailDomain bool = true
 
@@ -231,6 +238,7 @@ resource caBackend 'Microsoft.App/containerApps@2024-03-01' = {
         { name: 'pg-url', value: 'postgres://${postgresAdmin}:${postgresPassword}@${postgres.properties.fullyQualifiedDomainName}:5432/${postgresDatabase}?sslmode=require' }
         { name: 'acs-conn', value: comm.listKeys().primaryConnectionString }
         { name: 'storage-conn', value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=core.windows.net' }
+        { name: 'vapid-private', value: vapidPrivateKey }
       ]
     }
     template: {
@@ -254,6 +262,9 @@ resource caBackend 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storage.name }
             { name: 'AZURE_STORAGE_CONTAINER_MEDIA', value: 'media' }
             { name: 'DEFAULT_FROM_EMAIL', value: 'noreply@olaf.events' }
+            { name: 'VAPID_PUBLIC_KEY', value: vapidPublicKey }
+            { name: 'VAPID_PRIVATE_KEY', secretRef: 'vapid-private' }
+            { name: 'VAPID_SUBJECT', value: 'mailto:noreply@olaf.events' }
           ]
         }
       ]
