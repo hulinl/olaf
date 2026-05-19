@@ -1035,12 +1035,23 @@ def event_invoices(
     if not is_workspace_owner(request.user, event.workspace):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
+    from .models import refresh_invoice_supplier
+
     qs = (
         Invoice.objects.filter(rsvp__event=event)
-        .select_related("rsvp", "rsvp__user", "rsvp__event")
+        .select_related(
+            "rsvp",
+            "rsvp__user",
+            "rsvp__event",
+            "rsvp__event__workspace",
+            "rsvp__event__billing_profile",
+        )
         .order_by("-issued_at")
     )
-    return Response(InvoiceSerializer(qs, many=True).data)
+    # Live-sync supplier_* on every read — billing profile changes flow
+    # into existing invoices without manual regen.
+    invoices = [refresh_invoice_supplier(inv) for inv in qs]
+    return Response(InvoiceSerializer(invoices, many=True).data)
 
 
 @api_view(["GET", "PATCH"])
@@ -1071,6 +1082,9 @@ def invoice_detail(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
+        from .models import refresh_invoice_supplier
+
+        invoice = refresh_invoice_supplier(invoice)
         return Response(InvoiceSerializer(invoice).data)
 
     serializer = InvoiceSerializer(invoice, data=request.data, partial=True)
@@ -1085,6 +1099,7 @@ def my_invoice(
     request: Request, workspace_slug: str, event_slug: str
 ) -> Response:
     """Participant read-only view of their own invoice for an event."""
+    from .models import refresh_invoice_supplier
     from .serializers import InvoiceSerializer
 
     rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
@@ -1094,6 +1109,7 @@ def my_invoice(
         invoice = rsvp.invoice
     except Exception:
         return Response(status=status.HTTP_404_NOT_FOUND)
+    invoice = refresh_invoice_supplier(invoice)
     return Response(InvoiceSerializer(invoice).data)
 
 
@@ -1108,11 +1124,15 @@ def invoice_pdf(
     """Stream the invoice as a PDF. Owner or the invoice's own
     participant can download."""
     from .invoice_pdf import render_invoice_pdf
-    from .models import Invoice
+    from .models import Invoice, refresh_invoice_supplier
 
     try:
         invoice = Invoice.objects.select_related(
-            "rsvp", "rsvp__user", "rsvp__event", "rsvp__event__workspace"
+            "rsvp",
+            "rsvp__user",
+            "rsvp__event",
+            "rsvp__event__workspace",
+            "rsvp__event__billing_profile",
         ).get(
             pk=invoice_id,
             rsvp__event__workspace__slug=workspace_slug,
@@ -1125,6 +1145,10 @@ def invoice_pdf(
     is_participant = invoice.rsvp.user_id == request.user.id
     if not (is_owner or is_participant):
         return HttpResponse(status=403)
+
+    # Live-sync supplier_* from the current billing profile so the PDF
+    # always reflects the latest. Customer fields stay snapshotted.
+    invoice = refresh_invoice_supplier(invoice)
 
     pdf = render_invoice_pdf(invoice)
     filename = f"{invoice.number}.pdf"
