@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
-import { EventGallery } from "@/components/event-gallery";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
@@ -130,12 +129,13 @@ export default async function EventLandingPage({ params }: Props) {
 
         {/* Public landing is presentation-only. Participant zone (payment
             + docs + invoice) lives at /events/[ws]/[event] and on the
-            dashboard's "Čeká na tebe" feed — landing stays clean. */}
-
-        {event.images.length > 0 &&
-          !event.blocks.some((b) => b.type === "gallery") && (
-            <EventGallery images={event.images} />
-          )}
+            dashboard's "Čeká na tebe" feed — landing stays clean.
+            Gallery used to auto-render here when images existed, with a
+            hardcoded "Z minulých kempů" headline; that surprised owners
+            (random title showing up on their non-camp event) and broke
+            the layout near the footer. Galleries are now opt-in: the
+            owner adds a Gallery block via the page builder when they
+            want one, with their own eyebrow + title. */}
 
         <footer className="border-t border-border bg-canvas">
           <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
