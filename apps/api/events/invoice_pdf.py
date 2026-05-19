@@ -35,13 +35,14 @@ def render_invoice_pdf(invoice: Invoice) -> bytes:
 def _qr_data_uri_for_invoice(invoice: Invoice) -> str | None:
     """Build a SPAYD QR PNG and return it as a `data:image/png;base64,...`
     string suitable for inline embedding in the invoice template.
-    Returns None when the invoice has no IBAN (can't build a QR Platba)."""
-    if not invoice.supplier_iban or not invoice.total:
+    Returns None when no IBAN is available (snapshot + workspace fallback)."""
+    iban = invoice.supplier_iban or invoice.rsvp.event.workspace.payment_iban
+    if not iban or not invoice.total:
         return None
     from .payments import build_qr_png, build_spayd_string
 
     spayd = build_spayd_string(
-        iban=invoice.supplier_iban,
+        iban=iban,
         amount=invoice.total,
         currency=invoice.currency or "CZK",
         variable_symbol=invoice.variable_symbol,

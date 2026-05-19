@@ -20,9 +20,10 @@ interface Props {
  *  - the event has no required_documents,
  *  - or the API otherwise can't load (silent).
  *
- * Each required document row shows the current uploaded file (if any)
- * with a "nahrát jiné" + "smazat" action, or an upload prompt if not.
- * Verified files are read-only.
+ * Status pill on the section header (top-right) mirrors how the
+ * Payment + RSVP-status + Invoice cards render — so the participant
+ * page reads consistently. Per-row chrome is just the file info and
+ * action buttons; the badge stays at the section level.
  */
 export function RequiredDocsPanel({ workspaceSlug, eventSlug }: Props) {
   const [bundle, setBundle] = useState<RSVPDocumentsBundle | null>(null);
@@ -76,11 +77,36 @@ export function RequiredDocsPanel({ workspaceSlug, eventSlug }: Props) {
     }
   }
 
+  // Summary stats — only count *required* docs against uploaded ones.
+  // Optional docs don't show up in the warning state.
+  const requiredItems = bundle.required.filter((d) => d.required);
+  const requiredFulfilled = requiredItems.filter((d) =>
+    bundle.uploaded.some((u) => u.key === d.key),
+  );
+  const allDone =
+    requiredItems.length > 0 &&
+    requiredFulfilled.length === requiredItems.length;
+  const allVerified =
+    allDone &&
+    requiredItems.every((d) =>
+      bundle.uploaded.some(
+        (u) => u.key === d.key && u.verified_at != null,
+      ),
+    );
+
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-      <h3 className="text-base font-semibold text-ink-900">
-        Požadované dokumenty
-      </h3>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h3 className="text-base font-semibold text-ink-900">
+          Požadované dokumenty
+        </h3>
+        <SummaryBadge
+          fulfilled={requiredFulfilled.length}
+          total={requiredItems.length}
+          allDone={allDone}
+          allVerified={allVerified}
+        />
+      </div>
       <p className="mt-1 text-sm text-ink-500">
         Pro účast je potřeba doložit. Nahraj soubor (PDF / obrázek).
       </p>
@@ -111,6 +137,39 @@ export function RequiredDocsPanel({ workspaceSlug, eventSlug }: Props) {
         })}
       </div>
     </section>
+  );
+}
+
+function SummaryBadge({
+  fulfilled,
+  total,
+  allDone,
+  allVerified,
+}: {
+  fulfilled: number;
+  total: number;
+  allDone: boolean;
+  allVerified: boolean;
+}) {
+  if (total === 0) return null;
+  if (allVerified) {
+    return (
+      <span className="inline-flex rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
+        Vše ověřeno
+      </span>
+    );
+  }
+  if (allDone) {
+    return (
+      <span className="inline-flex rounded-full bg-success/15 px-3 py-0.5 text-xs font-semibold text-success">
+        Vše doloženo
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded-full bg-warning/15 px-3 py-0.5 text-xs font-semibold text-warning">
+      {fulfilled} / {total} doloženo
+    </span>
   );
 }
 
@@ -164,28 +223,18 @@ function DocRow({
                 </a>
               </>
             )}
+            {verified && (
+              <span className="ml-2 font-medium text-success">· ověřeno</span>
+            )}
           </p>
         ) : (
           <p className="text-xs text-ink-500">Zatím nenahráno.</p>
         )}
       </div>
 
+      {/* Actions only — the summary status lives on the section header.
+          Verified docs stay read-only (no replace/delete). */}
       <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-        {/* Status pill — mirrors the payment panel's badge so the
-            participant zone reads consistently from row to row. */}
-        {verified ? (
-          <span className="inline-flex rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
-            Ověřeno
-          </span>
-        ) : uploaded ? (
-          <span className="inline-flex rounded-full bg-success/15 px-3 py-0.5 text-xs font-semibold text-success">
-            Nahráno
-          </span>
-        ) : (
-          <span className="inline-flex rounded-full bg-warning/15 px-3 py-0.5 text-xs font-semibold text-warning">
-            Čeká
-          </span>
-        )}
         {!verified && (
           <>
             <input
