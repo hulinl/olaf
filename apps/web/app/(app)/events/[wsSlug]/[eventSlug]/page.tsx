@@ -40,7 +40,7 @@ const RSVP_STATUS_TONE: Record<string, string> = {
   no: "bg-surface-muted text-ink-500",
 };
 
-type TabKey = "nastenka" | "rezervace";
+type TabKey = "nastenka" | "registrace";
 
 /**
  * Participant's event hub.
@@ -80,7 +80,7 @@ export default function MyEventPage({ params }: Props) {
         }
         // No RSVP yet? Default to the management tab so the user lands
         // on the "Přihlásit se" CTA instead of an empty wall.
-        if (!cancelled && !ev.my_rsvp) setTab("rezervace");
+        if (!cancelled && !ev.my_rsvp) setTab("registrace");
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -161,41 +161,45 @@ export default function MyEventPage({ params }: Props) {
 
         <TabBar tab={tab} onChange={setTab} />
 
-        {tab === "nastenka" ? (
-          hasActiveRsvp ? (
-            <DiscussionWall
-              scope={{
-                kind: "event",
-                workspaceSlug: wsSlug,
-                eventSlug,
-                isModerator: false,
-              }}
-              currentUserId={user.id}
-            />
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
-              <h3 className="text-base font-semibold text-ink-900">
-                Nástěnka je pro přihlášené
-              </h3>
-              <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                Diskuze k akci se otevře jakmile potvrdíš svou účast.
-              </p>
-              <Link
-                href={`/${wsSlug}/e/${eventSlug}/rsvp`}
-                className="mt-4 inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90"
-              >
-                Přihlásit se →
-              </Link>
-            </div>
-          )
-        ) : (
-          <MyReservationPanel
-            event={event}
-            invoice={invoice}
-            wsSlug={wsSlug}
-            eventSlug={eventSlug}
-          />
-        )}
+        <div className="rounded-2xl border border-border bg-surface-muted/30 p-1">
+          <div className="rounded-xl bg-canvas p-4 sm:p-6">
+            {tab === "nastenka" ? (
+              hasActiveRsvp || event.i_am_owner ? (
+                <DiscussionWall
+                  scope={{
+                    kind: "event",
+                    workspaceSlug: wsSlug,
+                    eventSlug,
+                    isModerator: !!event.i_am_owner,
+                  }}
+                  currentUserId={user.id}
+                />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
+                  <h3 className="text-base font-semibold text-ink-900">
+                    Nástěnka je pro přihlášené
+                  </h3>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                    Diskuze k akci se otevře jakmile potvrdíš svou účast.
+                  </p>
+                  <Link
+                    href={`/${wsSlug}/e/${eventSlug}/rsvp`}
+                    className="mt-4 inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90"
+                  >
+                    Přihlásit se →
+                  </Link>
+                </div>
+              )
+            ) : (
+              <MyReservationPanel
+                event={event}
+                invoice={invoice}
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+              />
+            )}
+          </div>
+        </div>
       </section>
     </main>
   );
@@ -212,17 +216,21 @@ function TabBar({
     <div
       role="tablist"
       aria-label="Sekce akce"
-      className="flex gap-1 rounded-lg border border-border bg-surface-muted/40 p-1"
+      className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-surface-muted/50 p-1.5"
     >
       <TabButton
         active={tab === "nastenka"}
         onClick={() => onChange("nastenka")}
         label="Nástěnka"
+        hint="Příspěvky a diskuze"
+        icon="💬"
       />
       <TabButton
-        active={tab === "rezervace"}
-        onClick={() => onChange("rezervace")}
-        label="Moje rezervace"
+        active={tab === "registrace"}
+        onClick={() => onChange("registrace")}
+        label="Moje registrace"
+        hint="Status, platba, dokumenty"
+        icon="🎟"
       />
     </div>
   );
@@ -232,10 +240,14 @@ function TabButton({
   active,
   onClick,
   label,
+  hint,
+  icon,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
+  hint: string;
+  icon: string;
 }) {
   return (
     <button
@@ -244,13 +256,19 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={[
-        "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-ring",
+        "flex flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left transition-colors focus-ring sm:flex-row sm:items-center sm:gap-3",
         active
-          ? "bg-surface text-ink-900 shadow-sm"
-          : "text-ink-500 hover:text-ink-900",
+          ? "bg-surface text-ink-900 shadow-sm ring-1 ring-brand/40"
+          : "text-ink-500 hover:bg-surface/60 hover:text-ink-900",
       ].join(" ")}
     >
-      {label}
+      <span aria-hidden className="text-lg sm:text-xl">
+        {icon}
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-[11px] text-ink-500">{hint}</span>
+      </span>
     </button>
   );
 }
@@ -269,6 +287,16 @@ function MyReservationPanel({
   const my = event.my_rsvp;
   return (
     <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-1 border-b border-border pb-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Sekce
+        </p>
+        <h2 className="text-xl font-semibold text-ink-900">Moje registrace</h2>
+        <p className="text-sm text-ink-500">
+          Status přihlášky, pokyny k platbě, povinné dokumenty a faktura.
+        </p>
+      </header>
+
       {/* RSVP status summary */}
       {my && (
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">

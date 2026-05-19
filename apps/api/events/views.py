@@ -76,6 +76,11 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
         payload["my_rsvp"] = (
             MyRSVPSerializer(my_rsvp).data if my_rsvp else None
         )
+        payload["i_am_owner"] = is_workspace_owner(
+            request.user, event.workspace
+        )
+    else:
+        payload["i_am_owner"] = False
 
     return Response(payload)
 

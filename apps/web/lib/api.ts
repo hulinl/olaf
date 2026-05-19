@@ -216,6 +216,7 @@ export interface Event extends EventSummary {
   billing_profile: number | null;
   required_documents: RequiredDocumentSpec[];
   my_rsvp?: MyRSVP | null;
+  i_am_owner?: boolean;
 }
 
 export interface RequiredDocumentSpec {
