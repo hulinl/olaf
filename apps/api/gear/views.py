@@ -5,7 +5,7 @@ import contextlib
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -14,6 +14,7 @@ from .serializers import (
     GearItemSerializer,
     GearListEntrySerializer,
     GearListSerializer,
+    PublicGearListSerializer,
 )
 
 # ---------------------------------------------------------------------------
@@ -102,8 +103,34 @@ def gear_list_detail(request: Request, list_id: int) -> Response:
             glist.name = n[:200]
     if "description" in request.data:
         glist.description = str(request.data["description"]).strip()
+    if "visibility" in request.data:
+        v = str(request.data["visibility"]).strip()
+        valid = {c for c, _ in GearList.VISIBILITY_CHOICES}
+        if v in valid:
+            glist.visibility = v
     glist.save()
     return Response(GearListSerializer(glist).data)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_gear_list(request: Request, slug: str) -> Response:
+    """Public landing for a shared gear list.
+
+    Anyone with the URL can view if visibility is unlisted OR public.
+    Private lists 404 to non-owners (no existence leak)."""
+    try:
+        glist = GearList.objects.select_related("user").prefetch_related(
+            "entries__item"
+        ).get(slug=slug)
+    except GearList.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    is_owner = (
+        request.user.is_authenticated and request.user.id == glist.user_id
+    )
+    if glist.visibility == GearList.VISIBILITY_PRIVATE and not is_owner:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(PublicGearListSerializer(glist).data)
 
 
 @api_view(["POST"])

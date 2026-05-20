@@ -19,4 +19,9 @@ urlpatterns = [
         views.gear_list_entry_detail,
         name="list-entry-detail",
     ),
+    path(
+        "lists/by-slug/<slug:slug>/",
+        views.public_gear_list,
+        name="list-by-slug",
+    ),
 ]

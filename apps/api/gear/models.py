@@ -61,6 +61,15 @@ class GearItem(models.Model):
 class GearList(models.Model):
     """A named bundle of items the user packs together — e.g. trip kit."""
 
+    VISIBILITY_PRIVATE = "private"
+    VISIBILITY_UNLISTED = "unlisted"
+    VISIBILITY_PUBLIC = "public"
+    VISIBILITY_CHOICES = [
+        (VISIBILITY_PRIVATE, "Private — only the owner can see it"),
+        (VISIBILITY_UNLISTED, "Unlisted — anyone with the URL can see it"),
+        (VISIBILITY_PUBLIC, "Public — indexable + share-friendly"),
+    ]
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -73,6 +82,20 @@ class GearList(models.Model):
         through="GearListItem",
         related_name="lists",
     )
+    # Random URL-safe slug, picked at create time so the public path
+    # /gear/<slug> is stable. Not derived from the name so renames
+    # don't break shared links.
+    slug = models.SlugField(
+        max_length=22,
+        unique=True,
+        db_index=True,
+        blank=True,
+    )
+    visibility = models.CharField(
+        max_length=20,
+        choices=VISIBILITY_CHOICES,
+        default=VISIBILITY_PRIVATE,
+    )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,6 +106,17 @@ class GearList(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            import secrets
+
+            for _ in range(8):
+                candidate = secrets.token_urlsafe(12)[:16]
+                if not GearList.objects.filter(slug=candidate).exists():
+                    self.slug = candidate
+                    break
+        super().save(*args, **kwargs)
 
 
 class GearListItem(models.Model):
