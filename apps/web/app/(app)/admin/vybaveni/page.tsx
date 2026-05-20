@@ -66,8 +66,8 @@ export default function GearSettingsPage() {
           Tvůj gear
         </h1>
         <p className="mt-2 max-w-2xl text-ink-500">
-          Osobní katalog vybavení — z těchto položek skládáš listy pro
-          konkrétní akce (např. „Beskická 7"). Každý list jde sdílet
+          Osobní katalog vybavení — z těchto položek skládáš seznamy pro
+          konkrétní akce (např. „Beskická 7"). Každý seznam jde sdílet
           odkazem a v budoucnu připojit k eventu.
         </p>
       </header>
@@ -307,7 +307,7 @@ function ImportSection({ onChange }: { onChange: () => Promise<void> }) {
             <p className="mt-1 text-sm text-ink-500">
               Máš svůj gear v Notion databázi? Exportuj ji jako CSV (View
               → ⋯ → Export → Format: CSV) a nahraj sem. Položky se
-              upsertují podle názvu, listy podle Notion UUID — re-import
+              upsertují podle názvu, seznamy podle Notion UUID — re-import
               je bezpečný.
             </p>
           </div>
@@ -329,8 +329,9 @@ function ImportSection({ onChange }: { onChange: () => Promise<void> }) {
                 {busy ? "Importuju…" : "Vyber CSV soubor"}
               </span>
               <span className="text-xs text-ink-500">
-                Očekávané sloupce: name, category, link, gear list, unit
-                weight [grams], qty, type, specific type, price.
+                Očekávané sloupce: name, category, link, gear list (název
+                seznamu), unit weight [grams], qty, type, specific type,
+                price.
               </span>
               <input
                 type="file"
@@ -346,7 +347,7 @@ function ImportSection({ onChange }: { onChange: () => Promise<void> }) {
                 Import dokončen — {result.rows} řádků zpracováno.
                 Vytvořeno {result.items_created} položek,{" "}
                 {result.items_backfilled} doplněno o chybějící pole.
-                Listů: {result.lists_total}. Vazeb položka↔list:{" "}
+                Seznamů: {result.lists_total}. Vazeb položka↔seznam:{" "}
                 {result.edges_created}.
               </Alert>
             )}
@@ -707,7 +708,7 @@ function ItemSection({
                   }
                   className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-700 focus-ring sm:flex-1"
                 >
-                  <option value="">Všechny listy</option>
+                  <option value="">Všechny seznamy</option>
                   {lists.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
@@ -786,54 +787,59 @@ function ItemsByCategoryView({
     });
   }
 
-  // Render all groups expanded — flat scrollable list with each
-  // category as an inline header row + its items table beneath. The
-  // previous click-to-expand was extra friction on mobile where the
-  // owner just wanted to scan everything; scrolling is cheaper than
-  // tapping 12 chevrons.
+  // Single <table> with one <tbody> per category. Splitting into
+  // multiple sibling tables loses column alignment across groups
+  // because each table sizes its own columns; one table with
+  // table-fixed + a shared <colgroup> guarantees identical column
+  // widths down the page.
   return (
-    <div className="mt-4 flex flex-col gap-5">
-      {ordered.map((g) => (
-        <div key={g.key}>
-          <div className="flex items-baseline gap-2 px-1 pb-2">
-            <h4 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-700">
-              {g.name}
-            </h4>
-            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-500 tabular-nums">
-              {g.items.length}{" "}
-              {g.items.length === 1
-                ? "položka"
-                : g.items.length < 5
-                  ? "položky"
-                  : "položek"}
-            </span>
-          </div>
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-muted/30">
-                <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                  <th className="px-3 py-2">Položka</th>
-                  <th className="px-3 py-2 text-right">Váha</th>
-                  <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
-                  <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {g.items.map((i) => (
-                  <ItemRow
-                    key={i.id}
-                    item={i}
-                    categories={categories}
-                    lists={lists}
-                    onChange={onChange}
-                    hideCategoryCell
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
+    <div className="mt-4 overflow-x-auto rounded-md border border-border">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col />
+          <col className="w-[110px]" />
+          <col className="hidden lg:table-column lg:w-[28%]" />
+          <col className="hidden lg:table-column" />
+        </colgroup>
+        <thead className="bg-surface-muted/30">
+          <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+            <th className="px-3 py-2">Položka</th>
+            <th className="px-3 py-2 text-right">Váha</th>
+            <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
+            <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
+          </tr>
+        </thead>
+        {ordered.map((g) => (
+          <tbody key={g.key} className="divide-y divide-border">
+            <tr className="bg-surface-muted/20">
+              <td
+                colSpan={4}
+                className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-700"
+              >
+                {g.name}
+                <span className="ml-2 font-mono text-[10px] tracking-wide text-ink-500 tabular-nums">
+                  {g.items.length}{" "}
+                  {g.items.length === 1
+                    ? "položka"
+                    : g.items.length < 5
+                      ? "položky"
+                      : "položek"}
+                </span>
+              </td>
+            </tr>
+            {g.items.map((i) => (
+              <ItemRow
+                key={i.id}
+                item={i}
+                categories={categories}
+                lists={lists}
+                onChange={onChange}
+                hideCategoryCell
+              />
+            ))}
+          </tbody>
+        ))}
+      </table>
     </div>
   );
 }
@@ -1176,9 +1182,9 @@ function ItemEditor({
           položku" picker after they're created. */}
       {initial && lists.length > 0 && (
         <Field
-          label="Listy"
+          label="Seznamy"
           htmlFor="gi-lists"
-          hint="Položka může být ve více listech zároveň. Klikni — uloží se rovnou."
+          hint="Položka může být ve více seznamech zároveň. Klikni — uloží se rovnou."
         >
           <div id="gi-lists" className="flex flex-wrap gap-2">
             {lists.map((l) => {
@@ -1263,7 +1269,7 @@ function ListSection({
             className="flex items-baseline gap-3 text-left focus-ring"
           >
             <h3 className="text-base font-semibold text-ink-900">
-              Listy ({lists.length})
+              Seznamy ({lists.length})
             </h3>
             <span
               aria-hidden
@@ -1281,7 +1287,7 @@ function ListSection({
               size="md"
               onClick={() => setComposerOpen(true)}
             >
-              + Nový list
+              + Nový seznam
             </Button>
           )}
         </div>
@@ -1314,8 +1320,8 @@ function ListSection({
 
         {open && (lists.length === 0 ? (
           <p className="mt-4 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
-            Zatím žádný list. Vytvoř si první (např. „Beskická 7") a pak do
-            něj přidej položky z katalogu.
+            Zatím žádný seznam. Vytvoř si první (např. „Beskická 7") a pak
+            do něj přidej položky z katalogu.
           </p>
         ) : (
           <div className="mt-4 flex flex-col gap-2">
@@ -1361,7 +1367,7 @@ function ListCard({
   const [itemsOpen, setItemsOpen] = useState(true);
 
   async function handleDelete() {
-    if (!confirm(`Smazat list „${list.name}"?`)) return;
+    if (!confirm(`Smazat seznam „${list.name}"?`)) return;
     await gear.deleteList(list.id);
     await onChange();
   }
@@ -1389,13 +1395,13 @@ function ListCard({
 
       {isOpen && (
         <div className="border-t border-border px-4 py-4">
+          {/* Order is deliberate: Dashboard (the at-a-glance numbers)
+              → Položky (the actual content) → Sdílení (a setting you
+              touch rarely). The earlier order put Sdílení in the
+              middle which pushed the items table below the fold. */}
           {list.entries.length > 0 && <ListDashboard list={list} />}
-          <SharePanel list={list} onChange={onChange} />
 
-          {/* Items as a tabulka (matches the main Položky table layout
-              so the formatting is consistent). Collapsible so a long
-              list doesn't push everything below it off the screen. */}
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-4 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => setItemsOpen((v) => !v)}
@@ -1413,141 +1419,52 @@ function ListCard({
                 ›
               </span>
             </button>
+            {availableItems.length > 0 && !pickerOpen && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted"
+              >
+                + Přidat položku
+              </button>
+            )}
           </div>
+
+          {pickerOpen && (
+            <div className="mt-2">
+              <ItemPicker
+                items={availableItems}
+                onPick={async (id) => {
+                  await gear.addItemToList(list.id, id);
+                  setPickerOpen(false);
+                  await onChange();
+                }}
+                onClose={() => setPickerOpen(false)}
+              />
+            </div>
+          )}
 
           {itemsOpen &&
             (list.entries.length === 0 ? (
               <p className="mt-2 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
-                List je prázdný. Přidej položky z katalogu.
+                Seznam je prázdný. Přidej položky z katalogu.
               </p>
             ) : (
-              <div className="mt-2 -mx-4 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b border-border">
-                    <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                      <th className="px-4 py-2">Položka</th>
-                      <th className="hidden px-3 py-2 sm:table-cell">
-                        Kategorie
-                      </th>
-                      <th className="px-3 py-2 text-right">Váha</th>
-                      <th className="hidden px-3 py-2 lg:table-cell">
-                        Odkaz
-                      </th>
-                      <th className="px-3 py-2 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {list.entries.map((e) => {
-                      const weightLabel =
-                        e.item.weight_g == null
-                          ? "—"
-                          : e.quantity > 1
-                            ? `${e.quantity}× ${e.item.weight_g} g`
-                            : e.item.weight_g >= 1000
-                              ? `${(e.item.weight_g / 1000).toFixed(2)} kg`
-                              : `${e.item.weight_g} g`;
-                      return (
-                        <tr key={e.id} className="align-top">
-                          <td className="px-4 py-2">
-                            <span className="font-medium text-ink-900">
-                              {e.item.name}
-                            </span>
-                            {/* Mobile fallback: collapse category +
-                                link hints under the name when their
-                                columns are hidden. */}
-                            <span className="ml-2 text-xs text-ink-500 sm:hidden">
-                              {e.item.category && <>{e.item.category}</>}
-                              {e.item.url && (
-                                <span className="ml-2 text-brand">↗</span>
-                              )}
-                            </span>
-                          </td>
-                          <td className="hidden whitespace-nowrap px-3 py-2 text-ink-700 sm:table-cell">
-                            {e.item.category ? (
-                              <span className="rounded bg-surface-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
-                                {e.item.category}
-                              </span>
-                            ) : (
-                              <span className="text-ink-300">—</span>
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums text-ink-700">
-                            {weightLabel}
-                          </td>
-                          <td className="hidden max-w-[1px] px-3 py-2 lg:table-cell">
-                            {e.item.url ? (
-                              <a
-                                href={e.item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(ev) => ev.stopPropagation()}
-                                className="block truncate text-brand hover:underline"
-                                title={e.item.url}
-                              >
-                                {new URL(e.item.url).hostname.replace(
-                                  /^www\./,
-                                  "",
-                                )}{" "}
-                                ↗
-                              </a>
-                            ) : (
-                              <span className="text-ink-300">—</span>
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right">
-                            <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-                              {e.item.url && (e.click_count ?? 0) > 0 && (
-                                <span
-                                  title="Počet prokliků na affiliate odkaz"
-                                  className="rounded bg-brand/10 px-1.5 py-0.5 font-mono tabular-nums text-brand"
-                                >
-                                  {e.click_count}↗
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await gear.removeListEntry(list.id, e.id);
-                                  await onChange();
-                                }}
-                                className="text-ink-500 hover:text-danger"
-                              >
-                                Odebrat
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <ListEntriesByCategoryView
+                listId={list.id}
+                entries={list.entries}
+                onChange={onChange}
+              />
             ))}
 
+          <div className="mt-6 border-t border-border pt-4">
+            <SharePanel list={list} onChange={onChange} />
+          </div>
+
           <div className="mt-3 flex flex-wrap gap-2">
-            {availableItems.length > 0 ? (
-              !pickerOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted"
-                >
-                  + Přidat položku
-                </button>
-              ) : (
-                <ItemPicker
-                  items={availableItems}
-                  onPick={async (id) => {
-                    await gear.addItemToList(list.id, id);
-                    setPickerOpen(false);
-                    await onChange();
-                  }}
-                  onClose={() => setPickerOpen(false)}
-                />
-              )
-            ) : (
+            {availableItems.length === 0 && (
               <span className="text-xs text-ink-500">
-                Všechny tvoje položky jsou už v tomto listu.
+                Všechny tvoje položky jsou už v tomto seznamu.
               </span>
             )}
             <button
@@ -1555,11 +1472,149 @@ function ListCard({
               onClick={handleDelete}
               className="ml-auto text-xs font-medium text-ink-500 hover:text-danger"
             >
-              Smazat list
+              Smazat seznam
             </button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Items inside a single list — grouped by category, same single-
+ *  table-multiple-tbody layout as the main "Položky" view so columns
+ *  line up across stacked groups and the overall look matches. */
+function ListEntriesByCategoryView({
+  listId,
+  entries,
+  onChange,
+}: {
+  listId: number;
+  entries: GearList["entries"];
+  onChange: () => Promise<void>;
+}) {
+  type Group = { key: string; name: string; entries: GearList["entries"] };
+  const groups = new Map<string, GearList["entries"]>();
+  for (const e of entries) {
+    const key = e.item.category || "Bez kategorie";
+    const arr = groups.get(key) ?? [];
+    arr.push(e);
+    groups.set(key, arr);
+  }
+  const ordered: Group[] = [];
+  // Preserve insertion order from entries; "Bez kategorie" last.
+  for (const [name, es] of groups.entries()) {
+    if (name === "Bez kategorie") continue;
+    ordered.push({ key: name, name, entries: es });
+  }
+  const uncat = groups.get("Bez kategorie");
+  if (uncat && uncat.length > 0) {
+    ordered.push({ key: "Bez kategorie", name: "Bez kategorie", entries: uncat });
+  }
+
+  return (
+    <div className="mt-2 overflow-x-auto rounded-md border border-border">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col />
+          <col className="w-[120px]" />
+          <col className="hidden lg:table-column lg:w-[26%]" />
+          <col className="w-[100px]" />
+        </colgroup>
+        <thead className="bg-surface-muted/30">
+          <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+            <th className="px-3 py-2">Položka</th>
+            <th className="px-3 py-2 text-right">Váha</th>
+            <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
+            <th className="px-3 py-2 text-right"></th>
+          </tr>
+        </thead>
+        {ordered.map((g) => (
+          <tbody key={g.key} className="divide-y divide-border">
+            <tr className="bg-surface-muted/20">
+              <td
+                colSpan={4}
+                className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-700"
+              >
+                {g.name}
+                <span className="ml-2 font-mono text-[10px] tracking-wide text-ink-500 tabular-nums">
+                  {g.entries.length}{" "}
+                  {g.entries.length === 1
+                    ? "položka"
+                    : g.entries.length < 5
+                      ? "položky"
+                      : "položek"}
+                </span>
+              </td>
+            </tr>
+            {g.entries.map((e) => {
+              const weightLabel =
+                e.item.weight_g == null
+                  ? "—"
+                  : e.quantity > 1
+                    ? `${e.quantity}× ${e.item.weight_g} g`
+                    : e.item.weight_g >= 1000
+                      ? `${(e.item.weight_g / 1000).toFixed(2)} kg`
+                      : `${e.item.weight_g} g`;
+              return (
+                <tr key={e.id} className="align-top">
+                  <td className="px-3 py-2">
+                    <span className="font-medium text-ink-900">
+                      {e.item.name}
+                    </span>
+                    <span className="ml-2 text-xs text-ink-500 lg:hidden">
+                      {e.item.url && (
+                        <span className="text-brand">↗</span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums text-ink-700">
+                    {weightLabel}
+                  </td>
+                  <td className="hidden max-w-[1px] px-3 py-2 lg:table-cell">
+                    {e.item.url ? (
+                      <a
+                        href={e.item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(ev) => ev.stopPropagation()}
+                        className="block truncate text-brand hover:underline"
+                        title={e.item.url}
+                      >
+                        {new URL(e.item.url).hostname.replace(/^www\./, "")} ↗
+                      </a>
+                    ) : (
+                      <span className="text-ink-300">—</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+                      {e.item.url && (e.click_count ?? 0) > 0 && (
+                        <span
+                          title="Počet prokliků na affiliate odkaz"
+                          className="rounded bg-brand/10 px-1.5 py-0.5 font-mono tabular-nums text-brand"
+                        >
+                          {e.click_count}↗
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await gear.removeListEntry(listId, e.id);
+                          await onChange();
+                        }}
+                        className="text-ink-500 hover:text-danger"
+                      >
+                        Odebrat
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        ))}
+      </table>
     </div>
   );
 }
@@ -1803,7 +1858,7 @@ function SharePanel({
         </div>
       ) : (
         <p className="text-xs text-ink-500">
-          List nevidí nikdo jiný. Přepni na „Nelistované" pro sdílení
+          Seznam nevidí nikdo jiný. Přepni na „Nelistované" pro sdílení
           odkazem nebo „Veřejné" pro indexovatelnou stránku.
         </p>
       )}

@@ -627,7 +627,7 @@ export function EventForm({
             Doporučené vybavení
           </h2>
           <p className="mt-1 text-sm text-ink-500">
-            Přiřaď jeden ze svých gear listů jako doporučené vybavení.
+            Přiřaď jeden ze svých gear seznamů jako doporučené vybavení.
             Na public stránce eventu se ukáže jako bare seznam (jména +
             kategorie); přihlášený účastník dostane interaktivní
             checklist s odškrtáváním.
@@ -635,7 +635,7 @@ export function EventForm({
 
           {gearLists.length === 0 ? (
             <p className="mt-3 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
-              Zatím nemáš žádný gear list. Vytvoř si ho v{" "}
+              Zatím nemáš žádný gear seznam. Vytvoř si ho v{" "}
               <strong>Tvůrce → Vybavení</strong>.
             </p>
           ) : (
@@ -649,7 +649,7 @@ export function EventForm({
                 }
                 className="flex-1 min-w-[220px] rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
               >
-                <option value="">— žádný gear list —</option>
+                <option value="">— žádný gear seznam —</option>
                 {gearLists.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name} ({l.item_count}{" "}
