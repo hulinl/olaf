@@ -16,11 +16,12 @@ import {
 } from "@/lib/api";
 
 /**
- * /settings/gear — user-scoped gear catalog + named lists.
+ * /admin/vybaveni — user-scoped gear catalog + named lists.
  *
  * Two sections: Vybavení (items library) at top, Listy (assemblies)
  * below. Items can live in 0..N lists; lists are reusable across
- * trips. Public sharing + event integration is V2.
+ * trips. Each opened list gets a dashboard (total weight + by-category
+ * breakdown). Public sharing via /gear/<slug>.
  */
 export default function GearSettingsPage() {
   const [items, setItems] = useState<GearItem[] | null>(null);
@@ -51,16 +52,17 @@ export default function GearSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardSection>
-          <h2 className="text-lg font-semibold text-ink-900">Vybavení</h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Tvoje osobní katalog vybavení — z těchto položek pak skládáš
-            listy pro konkrétní akce (např. „Beskická 7"). Váha v gramech,
-            URL ideálně přímo na e-shop.
-          </p>
-        </CardSection>
-      </Card>
+      <header>
+        <p className="text-sm font-medium text-brand">Vybavení</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+          Tvůj gear
+        </h1>
+        <p className="mt-2 max-w-2xl text-ink-500">
+          Osobní katalog vybavení — z těchto položek skládáš listy pro
+          konkrétní akce (např. „Beskická 7"). Každý list jde sdílet
+          odkazem a v budoucnu připojit k eventu.
+        </p>
+      </header>
 
       {error && <Alert variant="danger">{error}</Alert>}
 
@@ -652,6 +654,7 @@ function ListCard({
 
       {isOpen && (
         <div className="border-t border-border px-4 py-4">
+          {list.entries.length > 0 && <ListDashboard list={list} />}
           <SharePanel list={list} onChange={onChange} />
           {list.entries.length === 0 ? (
             <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
@@ -779,6 +782,93 @@ function ItemPicker({
             )}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Inline dashboard for an opened gear list. Shows total weight + a
+ *  per-category breakdown so the owner sees what's eating their
+ *  pack-weight budget without leaving the page. No chart lib — bars
+ *  are CSS-sized to keep the bundle tiny. */
+function ListDashboard({ list }: { list: GearList }) {
+  // Aggregate per-category from entries. Items without a category fall
+  // into "Bez kategorie" rather than vanishing from the visualisation.
+  const byCategory = new Map<string, { weight: number; count: number }>();
+  let weightedItems = 0;
+  for (const e of list.entries) {
+    const cat = (e.item.category || "Bez kategorie").trim();
+    const w = (e.item.weight_g ?? 0) * e.quantity;
+    if (e.item.weight_g != null) weightedItems += e.quantity;
+    const prev = byCategory.get(cat) ?? { weight: 0, count: 0 };
+    byCategory.set(cat, {
+      weight: prev.weight + w,
+      count: prev.count + e.quantity,
+    });
+  }
+
+  const rows = [...byCategory.entries()]
+    .sort((a, b) => b[1].weight - a[1].weight);
+  const totalKg = list.total_weight_g / 1000;
+  const maxWeight = Math.max(1, ...rows.map(([, v]) => v.weight));
+  const missingWeight = list.item_count - weightedItems;
+
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-md border border-border bg-surface-muted/30 p-3">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Přehled
+        </p>
+        <span className="text-sm">
+          <span className="font-semibold text-ink-900 tabular-nums">
+            {totalKg.toFixed(2)} kg
+          </span>{" "}
+          <span className="text-ink-500">celkem</span>
+        </span>
+        <span className="text-sm">
+          <span className="font-semibold text-ink-900 tabular-nums">
+            {list.item_count}
+          </span>{" "}
+          <span className="text-ink-500">ks</span>
+        </span>
+        {missingWeight > 0 && (
+          <span className="text-xs text-warning">
+            {missingWeight} bez váhy
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {rows.map(([cat, { weight, count }]) => {
+          const pct = (weight / maxWeight) * 100;
+          const sharePct = list.total_weight_g
+            ? (weight / list.total_weight_g) * 100
+            : 0;
+          return (
+            <div key={cat} className="flex flex-col gap-0.5">
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="font-medium text-ink-900">{cat}</span>
+                <span className="font-mono tabular-nums text-ink-500">
+                  {count} ks ·{" "}
+                  {weight > 0
+                    ? `${(weight / 1000).toFixed(2)} kg`
+                    : "—"}
+                  {weight > 0 && (
+                    <span className="ml-1 text-ink-300">
+                      ({sharePct.toFixed(0)} %)
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-sm bg-surface">
+                <div
+                  className="h-full bg-brand"
+                  style={{ width: `${Math.max(pct, weight > 0 ? 3 : 0)}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
