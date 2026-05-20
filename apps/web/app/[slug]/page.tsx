@@ -145,23 +145,6 @@ export default async function WorkspaceProfilePage({ params }: Props) {
             />
           )}
           <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 px-4 py-20 sm:py-24">
-            <span
-              className={
-                cover
-                  ? "inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.12] px-4 py-1.5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md"
-                  : "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em] text-ink-900"
-              }
-            >
-              <span
-                aria-hidden
-                className="text-brand"
-                style={{ fontSize: "0.85em", lineHeight: 1 }}
-              >
-                ●
-              </span>
-              Komunita
-            </span>
-
             <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-7">
               <div
                 className={[
@@ -325,6 +308,80 @@ function EventCard({
   const cover = assetUrl(event.cover_url);
   const dateLabel = formatEventDateRange(event.starts_at, event.ends_at);
   const cancelled = event.status === "cancelled";
+  const price = formatEventPrice(event.price_amount, event.price_currency);
+
+  // Cinematic variant — when a cover exists, the whole card becomes
+  // the photo with a gradient + text overlay. Without a cover we fall
+  // back to the older surface/text layout.
+  if (cover) {
+    return (
+      <Link
+        href={`/${workspaceSlug}/e/${event.slug}`}
+        className={[
+          "group relative isolate flex aspect-[4/5] flex-col justify-end overflow-hidden rounded-2xl shadow-md transition-all focus-ring",
+          muted
+            ? "opacity-90 hover:opacity-100"
+            : "hover:-translate-y-0.5 hover:shadow-lg",
+        ].join(" ")}
+      >
+        <div
+          className="absolute inset-0 -z-10 transition-transform duration-300 group-hover:scale-[1.02]"
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.20) 45%, rgba(0,0,0,0.82) 100%), url(${cover})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="flex flex-col gap-2 p-6 text-ink-inverse">
+          <p
+            className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white/85"
+            style={{ textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}
+          >
+            {dateLabel}
+            {event.location_text && <> · {event.location_text}</>}
+          </p>
+          <h3
+            className="text-2xl font-semibold sm:text-3xl"
+            style={{
+              letterSpacing: "-0.025em",
+              lineHeight: 1.1,
+              textShadow: "0 2px 14px rgba(0,0,0,0.55)",
+            }}
+          >
+            {event.title}
+          </h3>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-white/90">
+            {price && (
+              <span
+                className="font-semibold tabular-nums"
+                style={{ textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}
+              >
+                {price}
+              </span>
+            )}
+            {!cancelled && (
+              <span
+                className="text-white/80"
+                style={{ textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}
+              >
+                <strong className="text-white">{event.confirmed_count}</strong>
+                {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
+                přihlášeno
+              </span>
+            )}
+            {cancelled && (
+              <span className="rounded bg-danger px-2 py-0.5 text-xs font-semibold text-white">
+                ZRUŠENO
+              </span>
+            )}
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  // No-cover fallback — keep the original textual card so the grid
+  // doesn't develop ugly blank tiles for events without a hero photo.
   return (
     <Link
       href={`/${workspaceSlug}/e/${event.slug}`}
@@ -335,16 +392,6 @@ function EventCard({
           : "border-border bg-surface hover:-translate-y-0.5 hover:shadow-md",
       ].join(" ")}
     >
-      {cover && (
-        <div
-          className="aspect-[16/9] w-full bg-surface-muted"
-          style={{
-            backgroundImage: `url(${cover})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-      )}
       <div className="flex flex-1 flex-col p-6">
         <p className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-ink-500">
           {dateLabel}
@@ -356,20 +403,16 @@ function EventCard({
         >
           {event.title}
         </h3>
-        {(() => {
-          const price = formatEventPrice(event.price_amount, event.price_currency);
-          if (!price) return null;
-          return (
-            <p className="mt-2 text-sm">
-              <span className="font-semibold text-ink-900 tabular-nums">
-                {price}
-              </span>
-              {event.price_note && (
-                <span className="ml-1 text-ink-500">· {event.price_note}</span>
-              )}
-            </p>
-          );
-        })()}
+        {price && (
+          <p className="mt-2 text-sm">
+            <span className="font-semibold text-ink-900 tabular-nums">
+              {price}
+            </span>
+            {event.price_note && (
+              <span className="ml-1 text-ink-500">· {event.price_note}</span>
+            )}
+          </p>
+        )}
         <div className="mt-auto pt-5 text-sm text-ink-500">
           {cancelled ? (
             <span className="font-medium text-danger">Zrušeno</span>
