@@ -184,7 +184,38 @@ export default function WorkspaceDetailPage({ params }: Props) {
           <p className="mt-6 max-w-2xl text-ink-700">{workspace.bio}</p>
         )}
 
-        <section className="mt-12">
+        {/* Rozcestník — jump-to anchors for the page's sections. Small
+            viewports otherwise hide Nástěnka entirely; this gives the
+            visitor a one-tap path to it from the top. */}
+        <nav
+          aria-label="Sekce komunity"
+          className="mt-8 flex flex-wrap gap-2 text-sm"
+        >
+          <a
+            href="#nadchazejici-akce"
+            className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            Nadcházející akce
+          </a>
+          {past.length > 0 && (
+            <a
+              href="#minule-akce"
+              className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              Minulé akce
+            </a>
+          )}
+          {isOwner && (
+            <a
+              href="#nastenka"
+              className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              Nástěnka
+            </a>
+          )}
+        </nav>
+
+        <section id="nadchazejici-akce" className="mt-12 scroll-mt-20">
           <div className="mb-5">
             <h2 className="text-xl font-semibold text-ink-900">
               Nadcházející akce
@@ -230,7 +261,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
         </section>
 
         {past.length > 0 && (
-          <section className="mt-12">
+          <section id="minule-akce" className="mt-12 scroll-mt-20">
             <h2 className="mb-5 text-xl font-semibold text-ink-900">
               Minulé akce
             </h2>
@@ -258,7 +289,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
             the viewer has access. When sub-communities / general membership
             ship the gate widens automatically. */}
         {isOwner && (
-          <section className="mt-12">
+          <section id="nastenka" className="mt-12 scroll-mt-20">
             <DiscussionWall
               scope={{ kind: "workspace", slug, isModerator: isOwner }}
               currentUserId={user.id}
