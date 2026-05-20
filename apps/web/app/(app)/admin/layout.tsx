@@ -17,10 +17,10 @@ interface NavItem {
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/eventy", label: "Akce" },
   { href: "/admin/komunity", label: "Komunity" },
+  { href: "/admin/lide", label: "Lidé" },
   { href: "/admin/platby", label: "Platby", comingSoon: true },
   { href: "/admin/dokumenty", label: "Dokumenty", comingSoon: true },
   { href: "/admin/smlouvy", label: "Smlouvy", comingSoon: true },
-  { href: "/admin/clenove", label: "Členové", comingSoon: true },
 ];
 
 /**

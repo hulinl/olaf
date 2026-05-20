@@ -469,6 +469,46 @@ export interface RSVPRecord extends MyRSVP {
   updated_at: string;
 }
 
+export interface PersonSummary {
+  user_id: number;
+  full_name: string;
+  email: string;
+  phone: string;
+  event_count: number;
+  last_rsvp_at: string | null;
+}
+
+export interface PersonEventEntry {
+  workspace_slug: string;
+  event_slug: string;
+  event_title: string;
+  event_starts_at: string;
+  rsvp_status: string;
+  rsvp_created_at: string;
+}
+
+export interface PersonDetail {
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    zip: string;
+    country: string;
+    legacy: string;
+  };
+  emergency_contact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  events: PersonEventEntry[];
+}
+
 export interface ParticipantProfile {
   rsvp_id: number;
   user_id: number;
@@ -937,6 +977,9 @@ export const events = {
     apiFetch<ParticipantProfile>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/profile/`,
     ),
+  people: () => apiFetch<PersonSummary[]>("/api/auth/me/people/"),
+  person: (userId: number) =>
+    apiFetch<PersonDetail>(`/api/auth/me/people/${userId}/`),
   rejectRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,
