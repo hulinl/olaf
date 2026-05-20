@@ -145,10 +145,14 @@ body {
   /* Hard guard against horizontal scroll. We chase individual overflowing
      children (long URLs in form previews, gallery grids, etc.) one by one,
      but a single bug shouldn't be allowed to widen the whole viewport and
-     trigger the browser's "shrink-to-fit" zoom on mobile. */
-  overflow-x: hidden;
+     trigger the browser's "shrink-to-fit" zoom on mobile.
+     `overflow-x: clip` instead of `hidden` because `hidden` on an ancestor
+     of a `position: sticky` element kills the stickiness on iOS Safari —
+     the top header silently scrolls away. `clip` provides the same
+     visual containment without creating a scroll context. */
+  overflow-x: clip;
   /* Stop the viewport from ever being measured wider than the device.
-     Belt + suspenders with overflow-x: hidden. */
+     Belt + suspenders with overflow-x: clip. */
   max-width: 100vw;
 }
 
