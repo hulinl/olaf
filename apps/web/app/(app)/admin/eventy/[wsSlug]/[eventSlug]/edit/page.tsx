@@ -13,6 +13,7 @@ import {
   type Event as OlafEvent,
   type EventCollaborator,
   type Workspace,
+  type WorkspaceMemberSummary,
   auth,
   events,
   workspaces,
@@ -362,10 +363,12 @@ function CollaboratorsSection({
   eventSlug: string;
 }) {
   const [list, setList] = useState<EventCollaborator[] | null>(null);
-  const [email, setEmail] = useState("");
+  const [people, setPeople] = useState<WorkspaceMemberSummary[] | null>(null);
+  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [highlight, setHighlight] = useState(0);
 
   async function reload() {
     try {
@@ -376,20 +379,54 @@ function CollaboratorsSection({
     }
   }
 
+  // Lidé load lazily — most edits won't touch the spolutvůrci section, so
+  // we only fetch when the user actually opens the picker.
+  async function loadPeople() {
+    if (people !== null) return;
+    try {
+      const p = await workspaces.members(wsSlug);
+      setPeople(p);
+    } catch {
+      // Non-fatal: fall back to plain email input.
+      setPeople([]);
+    }
+  }
+
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsSlug, eventSlug]);
 
-  async function handleAdd(e: FormEvent) {
-    e.preventDefault();
-    const v = email.trim().toLowerCase();
+  // Filtered suggestion list:
+  // - exclude anyone already a collaborator
+  // - exclude the current user (handled implicitly — add API rejects them)
+  // - free-text match on name + email
+  const usedEmails = new Set((list ?? []).map((c) => c.email.toLowerCase()));
+  const q = query.trim().toLowerCase();
+  const suggestions = (people ?? [])
+    .filter((p) => !usedEmails.has(p.email.toLowerCase()))
+    .filter((p) => {
+      if (!q) return true;
+      return (
+        p.email.toLowerCase().includes(q) ||
+        p.full_name.toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 8);
+
+  const queryLooksLikeEmail = /^\S+@\S+\.\S+$/.test(query.trim());
+  const exactMatch = suggestions.find(
+    (s) => s.email.toLowerCase() === q,
+  );
+
+  async function addByEmail(emailRaw: string) {
+    const v = emailRaw.trim().toLowerCase();
     if (!v) return;
     setBusy(true);
     setError(null);
     try {
       await events.addCollaborator(wsSlug, eventSlug, v);
-      setEmail("");
+      setQuery("");
       setAdding(false);
       await reload();
     } catch (err) {
@@ -403,6 +440,21 @@ function CollaboratorsSection({
     }
   }
 
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    // Enter on a highlighted suggestion picks it; otherwise treat as
+    // free-form email (lets the owner invite someone not in Lidé).
+    if (suggestions.length > 0 && highlight < suggestions.length) {
+      await addByEmail(suggestions[highlight].email);
+      return;
+    }
+    if (queryLooksLikeEmail) {
+      await addByEmail(query);
+      return;
+    }
+    setError("Vyber někoho ze seznamu nebo napiš platný e-mail.");
+  }
+
   async function handleRemove(c: EventCollaborator) {
     if (!confirm(`Odebrat ${c.full_name} ze spolutvůrců?`)) return;
     try {
@@ -413,13 +465,26 @@ function CollaboratorsSection({
     }
   }
 
+  function openPicker() {
+    setAdding(true);
+    loadPeople();
+  }
+
+  function closePicker() {
+    setAdding(false);
+    setQuery("");
+    setError(null);
+    setHighlight(0);
+  }
+
   return (
     <section>
       <h2 className="text-lg font-semibold text-ink-900">Spolutvůrci</h2>
       <p className="mt-1 text-sm text-ink-500">
         Pozvi další lidi, kteří budou tuhle akci řídit s tebou. Uvidí ji
         u sebe v Tvůrci a budou ji moct upravovat, schvalovat registrace,
-        vystavovat faktury. Musí mít účet na olafu.
+        vystavovat faktury. Vyber ze seznamu Lidé (kdo se kdy přihlásil
+        na akci) nebo napiš e-mail kohokoliv jiného s účtem na olafu.
       </p>
 
       <div className="mt-3 flex flex-col gap-2">
@@ -427,7 +492,7 @@ function CollaboratorsSection({
           <p className="text-sm text-ink-500">Načítám…</p>
         ) : list.length === 0 ? (
           <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
-            Zatím jen ty. Přidej e-mail spolutvůrce níže.
+            Zatím jen ty. Přidej spolutvůrce níže.
           </p>
         ) : (
           list.map((c) => (
@@ -460,36 +525,106 @@ function CollaboratorsSection({
       {!adding ? (
         <button
           type="button"
-          onClick={() => setAdding(true)}
+          onClick={openPicker}
           className="mt-3 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
         >
           + Přidat spolutvůrce
         </button>
       ) : (
-        <form onSubmit={handleAdd} className="mt-3 flex flex-wrap items-end gap-2">
-          <div className="flex-1 min-w-[220px]">
-            <Field label="E-mail spolutvůrce" htmlFor="collab-email">
-              <Input
-                id="collab-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="kamarad@email.cz"
-              />
-            </Field>
-          </div>
-          <div className="flex items-end gap-2">
-            <Button type="submit" variant="primary" size="md" loading={busy}>
+        <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-2">
+          <Field
+            label="Najdi v Lidé nebo napiš e-mail"
+            htmlFor="collab-search"
+            hint={
+              people && people.length === 0
+                ? "V této komunitě zatím nikdo nemá registraci. Napiš e-mail spolutvůrce — musí mít účet na olafu."
+                : "Začni psát jméno nebo e-mail. Někdo mimo seznam? Napiš celý e-mail a stiskni Enter."
+            }
+          >
+            <Input
+              id="collab-search"
+              autoFocus
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setHighlight(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown" && suggestions.length > 0) {
+                  e.preventDefault();
+                  setHighlight((h) => Math.min(h + 1, suggestions.length - 1));
+                } else if (e.key === "ArrowUp" && suggestions.length > 0) {
+                  e.preventDefault();
+                  setHighlight((h) => Math.max(h - 1, 0));
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  closePicker();
+                }
+              }}
+              placeholder="např. Jana nebo jana@email.cz"
+            />
+          </Field>
+
+          {suggestions.length > 0 ? (
+            <ul
+              role="listbox"
+              className="max-h-64 overflow-y-auto rounded-md border border-border bg-surface"
+            >
+              {suggestions.map((p, i) => (
+                <li
+                  key={p.id}
+                  role="option"
+                  aria-selected={i === highlight}
+                  className={[
+                    "cursor-pointer border-b border-border px-3 py-2 text-sm last:border-b-0",
+                    i === highlight
+                      ? "bg-brand/10"
+                      : "hover:bg-surface-muted",
+                  ].join(" ")}
+                  onMouseEnter={() => setHighlight(i)}
+                  onClick={() => addByEmail(p.email)}
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-medium text-ink-900">
+                      {p.full_name || p.email}
+                    </span>
+                    {p.total_rsvps > 0 && (
+                      <span className="font-mono text-[10px] uppercase tracking-wide text-ink-500">
+                        {p.total_rsvps}× registrace
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-ink-500">{p.email}</span>
+                </li>
+              ))}
+            </ul>
+          ) : q && people !== null ? (
+            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-xs text-ink-500">
+              V Lidé nikoho takového nevidíme.{" "}
+              {queryLooksLikeEmail
+                ? "Stiskni Enter pro pozvání e-mailem."
+                : "Napiš celý e-mail pro pozvání někoho mimo seznam."}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap items-end gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              loading={busy}
+              disabled={
+                busy ||
+                (!exactMatch &&
+                  !queryLooksLikeEmail &&
+                  suggestions.length === 0)
+              }
+            >
               {busy ? "Přidávám…" : "Přidat"}
             </Button>
             <button
               type="button"
-              onClick={() => {
-                setAdding(false);
-                setEmail("");
-                setError(null);
-              }}
+              onClick={closePicker}
               className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted"
             >
               Zrušit
