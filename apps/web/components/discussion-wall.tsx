@@ -460,6 +460,62 @@ function TopicCard({
     await onCommentChange();
   }
 
+  async function handleToggleCommentLike(c: DiscussionComment) {
+    const nextLiked = !c.i_liked;
+    // Optimistic update on the local detail snapshot.
+    setDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            comments: prev.comments.map((x) =>
+              x.id === c.id
+                ? {
+                    ...x,
+                    i_liked: nextLiked,
+                    like_count: Math.max(
+                      0,
+                      x.like_count + (nextLiked ? 1 : -1),
+                    ),
+                  }
+                : x,
+            ),
+          }
+        : prev,
+    );
+    try {
+      const resp =
+        scope.kind === "workspace"
+          ? await discussions.toggleWorkspaceCommentLike(
+              scope.slug,
+              topic.id,
+              c.id,
+              nextLiked,
+            )
+          : await discussions.toggleEventCommentLike(
+              scope.workspaceSlug,
+              scope.eventSlug,
+              topic.id,
+              c.id,
+              nextLiked,
+            );
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              comments: prev.comments.map((x) =>
+                x.id === c.id
+                  ? { ...x, i_liked: resp.i_liked, like_count: resp.like_count }
+                  : x,
+              ),
+            }
+          : prev,
+      );
+    } catch {
+      // Roll back to server-truth on failure.
+      await loadDetail();
+    }
+  }
+
   return (
     <article className="rounded-md border border-border bg-surface">
       <header
@@ -498,7 +554,7 @@ function TopicCard({
                 : "komentářů"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleToggleLike}
@@ -514,6 +570,34 @@ function TopicCard({
             <span aria-hidden>{liked ? "♥" : "♡"}</span>
             <span className="tabular-nums">{likeCount}</span>
           </button>
+          {open && canModerate && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin();
+              }}
+              title={topic.pinned ? "Odepnout" : "Připnout"}
+              aria-label={topic.pinned ? "Odepnout" : "Připnout"}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              <span aria-hidden>{topic.pinned ? "📌" : "📍"}</span>
+            </button>
+          )}
+          {open && canDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              title="Smazat téma"
+              aria-label="Smazat téma"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 hover:text-danger focus-ring"
+            >
+              <span aria-hidden>×</span>
+            </button>
+          )}
           <span className="text-xs text-ink-500">
             {open ? "Skrýt" : "Otevřít"}
           </span>
@@ -526,29 +610,6 @@ function TopicCard({
             <p className="whitespace-pre-wrap text-sm text-ink-700">
               {topic.body}
             </p>
-          )}
-
-          {(canDelete || canModerate) && (
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
-              {canModerate && (
-                <button
-                  type="button"
-                  onClick={onTogglePin}
-                  className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted"
-                >
-                  {topic.pinned ? "Odepnout" : "Připnout"}
-                </button>
-              )}
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-500 hover:text-danger"
-                >
-                  Smazat téma
-                </button>
-              )}
-            </div>
           )}
 
           <div className="mt-5 flex flex-col gap-3">
@@ -589,6 +650,25 @@ function TopicCard({
                 <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">
                   {c.body}
                 </p>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleCommentLike(c)}
+                    aria-pressed={c.i_liked}
+                    aria-label={c.i_liked ? "Zrušit lajk" : "Lajknout"}
+                    className={[
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus-ring",
+                      c.i_liked
+                        ? "border-brand/40 bg-brand/10 text-brand"
+                        : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+                    ].join(" ")}
+                  >
+                    <span aria-hidden>{c.i_liked ? "♥" : "♡"}</span>
+                    {c.like_count > 0 && (
+                      <span className="tabular-nums">{c.like_count}</span>
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
             {detail?.comments.length === 0 && (
