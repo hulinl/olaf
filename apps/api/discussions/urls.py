@@ -31,6 +31,11 @@ urlpatterns = [
         views.workspace_topic_like,
         name="workspace-topic-like",
     ),
+    path(
+        "workspace/<slug:slug>/topics/<int:topic_id>/comments/<int:comment_id>/like/",
+        views.workspace_comment_like,
+        name="workspace-comment-like",
+    ),
     # Event wall
     path(
         "event/<slug:workspace_slug>/<slug:event_slug>/topics/",
@@ -56,5 +61,10 @@ urlpatterns = [
         "event/<slug:workspace_slug>/<slug:event_slug>/topics/<int:topic_id>/like/",
         views.event_topic_like,
         name="event-topic-like",
+    ),
+    path(
+        "event/<slug:workspace_slug>/<slug:event_slug>/topics/<int:topic_id>/comments/<int:comment_id>/like/",
+        views.event_comment_like,
+        name="event-comment-like",
     ),
 ]

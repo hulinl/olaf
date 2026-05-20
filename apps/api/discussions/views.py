@@ -208,7 +208,7 @@ def workspace_topic_comments(
 
     send_comment_notification_task.delay(comment.pk)
     return Response(
-        CommentSerializer(comment).data, status=status.HTTP_201_CREATED
+        CommentSerializer(comment, context={"request": request}).data, status=status.HTTP_201_CREATED
     )
 
 
@@ -387,7 +387,7 @@ def event_topic_comments(
 
     send_comment_notification_task.delay(comment.pk)
     return Response(
-        CommentSerializer(comment).data, status=status.HTTP_201_CREATED
+        CommentSerializer(comment, context={"request": request}).data, status=status.HTTP_201_CREATED
     )
 
 
@@ -485,4 +485,72 @@ def event_topic_like(
     except Topic.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     return _toggle_like(request, topic)
+
+
+def _toggle_comment_like(request, comment) -> Response:
+    """Mirror of _toggle_like for Comment. Returns updated count + i_liked
+    so the UI can refresh in place."""
+    from .models import CommentLike
+
+    if request.method == "POST":
+        CommentLike.objects.get_or_create(comment=comment, user=request.user)
+    else:
+        CommentLike.objects.filter(
+            comment=comment, user=request.user
+        ).delete()
+    return Response(
+        {
+            "comment_id": comment.id,
+            "like_count": comment.likes.count(),
+            "i_liked": request.method == "POST",
+        }
+    )
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def workspace_comment_like(
+    request: Request, slug: str, topic_id: int, comment_id: int
+) -> Response:
+    workspace = _resolve_workspace(slug)
+    if workspace is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_access_workspace_wall(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    try:
+        comment = Comment.objects.select_related("topic").get(
+            pk=comment_id,
+            topic_id=topic_id,
+            topic__parent_type=Topic.PARENT_WORKSPACE,
+            topic__parent_id=workspace.id,
+        )
+    except Comment.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return _toggle_comment_like(request, comment)
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def event_comment_like(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    topic_id: int,
+    comment_id: int,
+) -> Response:
+    event = _resolve_event(workspace_slug, event_slug)
+    if event is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_access_event_wall(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    try:
+        comment = Comment.objects.select_related("topic").get(
+            pk=comment_id,
+            topic_id=topic_id,
+            topic__parent_type=Topic.PARENT_EVENT,
+            topic__parent_id=event.id,
+        )
+    except Comment.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return _toggle_comment_like(request, comment)
 

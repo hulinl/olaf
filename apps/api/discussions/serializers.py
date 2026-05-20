@@ -12,6 +12,8 @@ class CommentSerializer(serializers.ModelSerializer):
     author_email = serializers.CharField(
         source="author.email", read_only=True, default=""
     )
+    like_count = serializers.SerializerMethodField()
+    i_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -22,6 +24,8 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_id",
             "author_name",
             "author_email",
+            "like_count",
+            "i_liked",
             "created_at",
             "updated_at",
         )
@@ -31,6 +35,8 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_id",
             "author_name",
             "author_email",
+            "like_count",
+            "i_liked",
             "created_at",
             "updated_at",
         )
@@ -39,6 +45,15 @@ class CommentSerializer(serializers.ModelSerializer):
         if obj.author is None:
             return "[smazaný uživatel]"
         return obj.author.get_full_name() or obj.author.email
+
+    def get_like_count(self, obj: Comment) -> int:
+        return obj.likes.count()
+
+    def get_i_liked(self, obj: Comment) -> bool:
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        return obj.likes.filter(user=request.user).exists()
 
 
 class TopicSerializer(serializers.ModelSerializer):
