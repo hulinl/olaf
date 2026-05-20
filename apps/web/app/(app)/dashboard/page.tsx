@@ -253,29 +253,51 @@ function EventMini({
   ownerView?: boolean;
 }) {
   const starts = new Date(event.starts_at);
+  const cover = assetUrl(event.cover_url);
+  const price = formatEventPrice(event.price_amount, event.price_currency);
   const href = ownerView
     ? `/admin/eventy/${event.workspace_slug}/${event.slug}`
     : `/events/${event.workspace_slug}/${event.slug}`;
   return (
     <Link
       href={href}
-      className="block rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
+      className="flex overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
     >
-      <p className="text-xs text-ink-500">
-        {starts.toLocaleDateString("cs-CZ", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })}
-      </p>
-      <p className="mt-1 font-medium text-ink-900">{event.title}</p>
-      {event.location_text && (
-        <p className="mt-0.5 text-xs text-ink-500">{event.location_text}</p>
+      {cover && (
+        <div
+          aria-hidden
+          className="hidden h-auto w-28 shrink-0 bg-surface-muted sm:block"
+          style={{
+            backgroundImage: `url(${cover})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
       )}
-      <p className="mt-3 text-xs text-ink-500">
-        <strong className="text-ink-900">{event.confirmed_count}</strong>
-        {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
-      </p>
+      <div className="flex flex-1 flex-col p-4">
+        <p className="text-xs text-ink-500">
+          {starts.toLocaleDateString("cs-CZ", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+        </p>
+        <p className="mt-1 font-medium text-ink-900">{event.title}</p>
+        {event.location_text && (
+          <p className="mt-0.5 text-xs text-ink-500">{event.location_text}</p>
+        )}
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 text-xs text-ink-500">
+          <span>
+            <strong className="text-ink-900">{event.confirmed_count}</strong>
+            {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
+          </span>
+          {price && (
+            <span className="font-semibold tabular-nums text-ink-900">
+              {price}
+            </span>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }

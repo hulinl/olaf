@@ -185,6 +185,9 @@ export interface EventSummary {
   confirmed_count: number;
   waitlist_count: number;
   pending_approval_count: number;
+  price_amount: string | null;
+  price_currency: string;
+  price_note: string;
 }
 
 export interface EventImage {
@@ -804,16 +807,27 @@ export const workspaces = {
     ),
   membersCsvUrl: (slug: string) =>
     `${API_URL}/api/workspaces/${slug}/members.csv`,
-  addExistingMember: (slug: string, userId: number) =>
+  addExistingMember: (
+    slug: string,
+    userId: number,
+    role: "member" | "admin" = "member",
+  ) =>
     apiFetch<{ user_id: number; role: WorkspaceRole; created: boolean }>(
       `/api/workspaces/${slug}/members/add/`,
-      { method: "POST", body: JSON.stringify({ user_id: userId }) },
+      {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId, role }),
+      },
     ),
   listInvitations: (slug: string) =>
     apiFetch<WorkspaceInvitationSummary[]>(
       `/api/workspaces/${slug}/invitations/`,
     ),
-  createInvitation: (slug: string, email: string) =>
+  createInvitation: (
+    slug: string,
+    email: string,
+    role: "member" | "admin" = "member",
+  ) =>
     apiFetch<
       | {
           mode: "direct";
@@ -830,7 +844,7 @@ export const workspaces = {
         }
     >(`/api/workspaces/${slug}/invitations/`, {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, role }),
     }),
   cancelInvitation: (slug: string, invitationId: number) =>
     apiFetch<void>(`/api/workspaces/${slug}/invitations/${invitationId}/`, {

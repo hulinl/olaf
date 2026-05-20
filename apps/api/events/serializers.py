@@ -302,6 +302,9 @@ class EventSummarySerializer(serializers.ModelSerializer):
             "confirmed_count",
             "waitlist_count",
             "pending_approval_count",
+            "price_amount",
+            "price_currency",
+            "price_note",
         )
         read_only_fields = fields
 
