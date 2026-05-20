@@ -2,20 +2,25 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 
+from django.http import HttpResponseRedirect
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import GearItem, GearList, GearListItem
+from .models import GearItem, GearLinkClick, GearList, GearListItem
 from .serializers import (
     GearItemSerializer,
     GearListEntrySerializer,
     GearListSerializer,
     PublicGearListSerializer,
+    _apply_affiliate_partners,
 )
+
+_BOT_HINTS = ("bot", "crawler", "spider", "preview", "fetch", "monitor", "scrape")
 
 # ---------------------------------------------------------------------------
 # Items
@@ -131,6 +136,60 @@ def public_gear_list(request: Request, slug: str) -> Response:
     if glist.visibility == GearList.VISIBILITY_PRIVATE and not is_owner:
         return Response(status=status.HTTP_404_NOT_FOUND)
     return Response(PublicGearListSerializer(glist).data)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def gear_link_click(request: Request, slug: str, entry_id: int):
+    """Redirect endpoint that logs an outbound click then 302s to the
+    item's affiliate-rewritten URL. Mounted under /api/gear/g/ so the
+    path stays short for human-visible status bars.
+
+    Owner clicks are tracked but easy to filter out later via ip_hash
+    if needed. Obvious bots are skipped so counts reflect humans."""
+    try:
+        entry = (
+            GearListItem.objects.select_related(
+                "gear_list", "item", "item__user"
+            )
+            .get(pk=entry_id, gear_list__slug=slug)
+        )
+    except GearListItem.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    glist = entry.gear_list
+    is_owner = (
+        request.user.is_authenticated and request.user.id == glist.user_id
+    )
+    if glist.visibility == GearList.VISIBILITY_PRIVATE and not is_owner:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    partners = getattr(entry.item.user, "affiliate_partners", None) or []
+    target = _apply_affiliate_partners(entry.item.url, partners)
+    if not target:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Best-effort logging — never let tracking break the redirect.
+    ua = request.META.get("HTTP_USER_AGENT", "")[:300]
+    if not any(b in ua.lower() for b in _BOT_HINTS):
+        ip = (
+            request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+            or request.META.get("REMOTE_ADDR", "")
+        )
+        ip_hash = (
+            hashlib.sha256(f"{ip}:gear".encode()).hexdigest()[:32]
+            if ip
+            else ""
+        )
+        with contextlib.suppress(Exception):
+            GearLinkClick.objects.create(
+                entry=entry,
+                ip_hash=ip_hash,
+                user_agent=ua,
+                referer=request.META.get("HTTP_REFERER", "")[:600],
+            )
+
+    return HttpResponseRedirect(target)
 
 
 @api_view(["POST"])

@@ -145,3 +145,31 @@ class GearListItem(models.Model):
 
     def __str__(self) -> str:
         return f"{self.item_id} x{self.quantity} in list {self.gear_list_id}"
+
+
+class GearLinkClick(models.Model):
+    """A single outbound click on a gear-list entry's affiliate link.
+
+    One row per visit (not deduplicated) so the owner can see raw
+    interest over time. ip_hash is a salted SHA-256 prefix — we only
+    keep it so future per-day deduping can layer on without leaking
+    raw IPs. UA + referer are diagnostic and capped to short strings.
+    """
+
+    entry = models.ForeignKey(
+        GearListItem,
+        on_delete=models.CASCADE,
+        related_name="clicks",
+    )
+    ip_hash = models.CharField(max_length=64, blank=True, default="")
+    user_agent = models.CharField(max_length=300, blank=True, default="")
+    referer = models.URLField(max_length=600, blank=True, default="")
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "gear_link_click"
+        indexes = [models.Index(fields=["entry", "created_at"])]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"click on entry {self.entry_id} at {self.created_at:%Y-%m-%d %H:%M}"

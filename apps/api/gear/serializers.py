@@ -63,11 +63,22 @@ class GearListEntrySerializer(serializers.ModelSerializer):
     item_id = serializers.PrimaryKeyRelatedField(
         queryset=GearItem.objects.all(), source="item", write_only=True
     )
+    click_count = serializers.SerializerMethodField()
 
     class Meta:
         model = GearListItem
-        fields = ("id", "item", "item_id", "quantity", "sort_order", "note")
-        read_only_fields = ("id",)
+        fields = (
+            "id", "item", "item_id", "quantity", "sort_order", "note",
+            "click_count",
+        )
+        read_only_fields = ("id", "click_count")
+
+    def get_click_count(self, obj: GearListItem) -> int:
+        # Public landing requests don't need this count — only owners
+        # see it in /settings/gear. The serializer-level annotation
+        # would be cheaper but the lists are small (single-digit items
+        # typical) so a count() per entry is fine.
+        return obj.clicks.count()
 
 
 class GearListSerializer(serializers.ModelSerializer):
