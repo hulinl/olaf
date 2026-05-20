@@ -11,6 +11,15 @@ on:
 # against, so the previews weren't earning their cost. CI (build
 # + tsc + lint) still runs on PRs via .github/workflows/ci.yml.
 
+# Azure SWA accepts one deploy at a time per environment. Rapid-fire
+# merges (5 PRs in 3 s) used to race and 4/5 would fail with
+# "No matching Static Web App environment was found". Concurrency
+# group serialises them; cancel-in-progress=false so each commit
+# actually gets deployed (we don't want to skip versions).
+concurrency:
+  group: swa-prod-deploy
+  cancel-in-progress: false
+
 jobs:
   build_and_deploy_job:
     runs-on: ubuntu-latest
