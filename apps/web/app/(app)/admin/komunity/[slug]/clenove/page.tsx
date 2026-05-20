@@ -42,6 +42,7 @@ export default function KomunityMembersPage({ params }: Props) {
   const [filterTagIds, setFilterTagIds] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,27 +243,39 @@ export default function KomunityMembersPage({ params }: Props) {
 
         return (
           <>
-            {selectedIds.size > 0 && tags.length > 0 && (
+            {selectedIds.size > 0 && (
               <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
                 <span className="text-xs font-medium text-brand">
                   {selectedIds.size} vybráno
                 </span>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-                  Hromadně přiřadit / odebrat tag
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => bulkToggle(t.id)}
-                      disabled={bulkBusy}
-                      className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50"
-                    >
-                      {t.name}
-                    </button>
-                  ))}
-                </div>
+                {tags.length > 0 && (
+                  <>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                      Tagy
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => bulkToggle(t.id)}
+                          disabled={bulkBusy}
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50"
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setBulkEmailOpen(true)}
+                  disabled={bulkBusy}
+                  className="rounded-md border border-brand bg-brand px-3 py-1 text-xs font-semibold text-brand-ink hover:opacity-90 disabled:opacity-50"
+                >
+                  ✉ Odeslat e-mail
+                </button>
                 <button
                   type="button"
                   onClick={() => setSelectedIds(new Set())}
@@ -362,6 +375,20 @@ export default function KomunityMembersPage({ params }: Props) {
           tags={tags}
           onChange={(next) => setTags(next)}
           onClose={() => setTagManagerOpen(false)}
+        />
+      )}
+
+      {bulkEmailOpen && (
+        <BulkEmailDialog
+          wsSlug={slug}
+          recipients={(members ?? []).filter((m) =>
+            selectedIds.has(m.id),
+          )}
+          onClose={() => setBulkEmailOpen(false)}
+          onSent={() => {
+            setBulkEmailOpen(false);
+            setSelectedIds(new Set());
+          }}
         />
       )}
     </div>
@@ -927,5 +954,155 @@ function TagChip({ tag }: { tag: Pick<PersonTag, "name" | "color"> }) {
     >
       {tag.name}
     </span>
+  );
+}
+
+function BulkEmailDialog({
+  wsSlug,
+  recipients,
+  onClose,
+  onSent,
+}: {
+  wsSlug: string;
+  recipients: WorkspaceMemberSummary[];
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    sent: number;
+    skipped: number;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!subject.trim() || !body.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await workspaces.bulkEmailMembers(wsSlug, {
+        user_ids: recipients.map((m) => m.id),
+        subject: subject.trim(),
+        body: body.trim(),
+      });
+      setResult(r);
+      // Auto-close after a moment so the owner sees the count.
+      setTimeout(() => onSent(), 1500);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Odeslání selhalo.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink-900">
+            Odeslat e-mail
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-ink-500 hover:text-ink-900"
+          >
+            Zavřít ×
+          </button>
+        </div>
+
+        <p className="text-sm text-ink-500">
+          Odešle se {recipients.length}{" "}
+          {recipients.length === 1
+            ? "příjemci"
+            : recipients.length < 5
+              ? "příjemcům"
+              : "příjemcům"}
+          . Každý dostane samostatný e-mail (vidí jen sebe). Odpovědi
+          chodí na tvůj e-mail jako Reply-To.
+        </p>
+
+        <div className="max-h-24 overflow-y-auto rounded-md border border-border bg-surface-muted/30 px-3 py-2 text-xs text-ink-500">
+          {recipients.slice(0, 8).map((r) => (
+            <div key={r.id}>
+              {r.full_name || "—"} · {r.email}
+            </div>
+          ))}
+          {recipients.length > 8 && (
+            <div className="mt-1 italic">
+              + {recipients.length - 8} dalších…
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-ink-700">
+              Předmět
+            </span>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={200}
+              placeholder="Krátká věta, co je uvnitř"
+              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-ink-700">
+              Text e-mailu
+            </span>
+            <textarea
+              rows={8}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Napiš text… (podpis se přidá automaticky)"
+              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+          </label>
+        </div>
+
+        {error && <Alert variant="danger">{error}</Alert>}
+        {result && (
+          <Alert variant="success">
+            Odesláno: {result.sent}
+            {result.skipped > 0 && ` · přeskočeno: ${result.skipped}`}
+          </Alert>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy || !subject.trim() || !body.trim()}
+            className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+          >
+            {busy ? "Odesílám…" : `Odeslat (${recipients.length})`}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+          >
+            Zrušit
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

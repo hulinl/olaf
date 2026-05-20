@@ -913,6 +913,14 @@ export const workspaces = {
       `/api/workspaces/_/join/${token}/accept/`,
       { method: "POST" },
     ),
+  bulkEmailMembers: (
+    slug: string,
+    payload: { user_ids: number[]; subject: string; body: string },
+  ) =>
+    apiFetch<{ sent: number; skipped: number }>(
+      `/api/workspaces/${slug}/members/bulk-email/`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
   reconcilePayments: async (slug: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
