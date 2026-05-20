@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ADMIN_NAV } from "@/app/(app)/admin/layout";
 import { type Workspace, workspaces as workspacesApi } from "@/lib/api";
 
 import { Logo } from "./logo";
@@ -382,45 +383,34 @@ function MobileDrawer({
           </DrawerSection>
 
           <DrawerSection label="Tvůrce">
-            <DrawerSubLink
-              href="/admin/eventy"
-              pathname={pathname}
-              onClose={onClose}
-            >
-              Akce
-            </DrawerSubLink>
-            <DrawerSubLink
-              href="/admin/komunity"
-              pathname={pathname}
-              onClose={onClose}
-            >
-              Komunity
-            </DrawerSubLink>
-            <DrawerSubLink
-              href="/admin/lide"
-              pathname={pathname}
-              onClose={onClose}
-            >
-              Lidé
-            </DrawerSubLink>
-            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
-              Platby
-              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
-                Brzy
-              </span>
-            </span>
-            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
-              Dokumenty
-              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
-                Brzy
-              </span>
-            </span>
-            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
-              Smlouvy
-              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
-                Brzy
-              </span>
-            </span>
+            {/* Pulled from ADMIN_NAV (the same source the desktop
+                sidebar reads) so adding a new admin section
+                automatically surfaces in the mobile drawer. The
+                previous hard-coded list was the reason iPhone users
+                couldn't find Vybavení + Platby even after the
+                desktop sidebar already had them. */}
+            {ADMIN_NAV.map((item) =>
+              item.comingSoon ? (
+                <span
+                  key={item.href}
+                  className="flex items-center justify-between px-3 py-2 text-sm text-ink-300"
+                >
+                  {item.label}
+                  <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
+                    Brzy
+                  </span>
+                </span>
+              ) : (
+                <DrawerSubLink
+                  key={item.href}
+                  href={item.href}
+                  pathname={pathname}
+                  onClose={onClose}
+                >
+                  {item.label}
+                </DrawerSubLink>
+              ),
+            )}
           </DrawerSection>
         </nav>
       </div>
