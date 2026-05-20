@@ -40,6 +40,15 @@ export const viewport: Viewport = {
   themeColor: "#000000",
 };
 
+// Opt every route out of Next.js's default static prerender. Static
+// pages get `Cache-Control: s-maxage=31536000` which Azure SWA's CDN
+// edge respects — meaning a deployed PWA on iPhone happily served
+// month-old HTML even after clearing Safari data. Forcing dynamic
+// makes every response carry no-cache and the edge stops holding
+// stale shells. Public pages we still want cached can opt back in
+// per-route via `export const revalidate = N`.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
