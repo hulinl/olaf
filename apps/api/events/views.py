@@ -1087,6 +1087,55 @@ def toggle_rsvp_organizer(
     return Response(RSVPSerializer(rsvp).data)
 
 
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def rsvp_gear_checklist(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Toggle a single gear-checklist item for the requester's own RSVP.
+
+    Body: {item_id: int, is_checked: bool}.
+
+    The state lives on RSVP.gear_checklist (dict[str item_id, str ISO
+    timestamp]). Setting is_checked=true upserts the timestamp; false
+    deletes the key. We don't validate item_id against the event's
+    recommended_gear_list — the FE only shows real items, and even a
+    stale id at worst clutters the JSON (no security implication)."""
+    try:
+        event = Event.objects.get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        rsvp = RSVP.objects.get(event=event, user=request.user)
+    except RSVP.DoesNotExist:
+        return Response(
+            {"detail": "Nemáš registraci na tuto akci."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    raw_id = request.data.get("item_id")
+    is_checked = bool(request.data.get("is_checked"))
+    try:
+        item_id_str = str(int(raw_id))
+    except (TypeError, ValueError):
+        return Response(
+            {"item_id": "Neplatné ID položky."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    state = dict(rsvp.gear_checklist or {})
+    if is_checked:
+        state[item_id_str] = timezone.now().isoformat()
+    else:
+        state.pop(item_id_str, None)
+    rsvp.gear_checklist = state
+    rsvp.save(update_fields=["gear_checklist", "updated_at"])
+    return Response({"gear_checklist": state})
+
+
 # ---------------------------------------------------------------------------
 # Slice 7 — RSVP documents (uploads tied to required_documents)
 # ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ const RSVP_STATUS_TONE: Record<string, string> = {
   no: "bg-surface-muted text-ink-500",
 };
 
-type TabKey = "nastenka" | "registrace";
+type TabKey = "nastenka" | "registrace" | "vybaveni";
 
 /**
  * Participant's event hub.
@@ -193,7 +193,14 @@ export default function MyEventPage({ params }: Props) {
           </a>
         </header>
 
-        <TabBar tab={tab} onChange={setTab} />
+        <TabBar
+          tab={tab}
+          onChange={setTab}
+          hasGear={
+            !!event.recommended_gear_list &&
+            event.recommended_gear_list.entries.length > 0
+          }
+        />
 
         {/* The participant zone is a "framed card" for registration /
             documents — but the nástěnka is itself already a bordered
@@ -253,6 +260,17 @@ export default function MyEventPage({ params }: Props) {
                   </Link>
                 </div>
               )
+            ) : tab === "vybaveni" ? (
+              event.recommended_gear_list && my ? (
+                <GearChecklistPanel
+                  list={event.recommended_gear_list}
+                  initialState={my.gear_checklist ?? {}}
+                  wsSlug={wsSlug}
+                  eventSlug={eventSlug}
+                />
+              ) : (
+                <p className="text-sm text-ink-500">Žádný gear list není přiřazen.</p>
+              )
             ) : (
               <MyReservationPanel
                 event={event}
@@ -268,18 +286,145 @@ export default function MyEventPage({ params }: Props) {
   );
 }
 
+function GearChecklistPanel({
+  list,
+  initialState,
+  wsSlug,
+  eventSlug,
+}: {
+  list: NonNullable<OlafEvent["recommended_gear_list"]>;
+  initialState: Record<string, string>;
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const [state, setState] = useState(initialState);
+  const total = list.entries.length;
+  const done = list.entries.filter((e) => state[String(e.id)]).length;
+
+  async function toggle(itemId: number, next: boolean) {
+    const key = String(itemId);
+    // Optimistic
+    setState((prev) => {
+      const copy = { ...prev };
+      if (next) copy[key] = new Date().toISOString();
+      else delete copy[key];
+      return copy;
+    });
+    try {
+      const r = await events.toggleGearChecklistItem(
+        wsSlug,
+        eventSlug,
+        itemId,
+        next,
+      );
+      setState(r.gear_checklist);
+    } catch {
+      // Rollback
+      setState((prev) => {
+        const copy = { ...prev };
+        if (next) delete copy[key];
+        else copy[key] = new Date().toISOString();
+        return copy;
+      });
+    }
+  }
+
+  // Group entries by category for visual grouping.
+  const byCategory = new Map<string, typeof list.entries>();
+  for (const e of list.entries) {
+    const cat = e.category || "Ostatní";
+    const arr = byCategory.get(cat) ?? [];
+    arr.push(e);
+    byCategory.set(cat, arr);
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Doporučené vybavení · {list.name}
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-ink-900">
+            Co si vzít s sebou
+          </h2>
+        </div>
+        <div className="text-sm text-ink-500">
+          <strong className="text-ink-900 tabular-nums">{done}</strong>{" "}
+          / {total} odškrtáno
+        </div>
+      </header>
+
+      {/* Progress bar */}
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-muted">
+        <div
+          className="h-full bg-brand transition-all"
+          style={{ width: total > 0 ? `${(done / total) * 100}%` : "0%" }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {[...byCategory.entries()].map(([cat, items]) => (
+          <div key={cat}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              {cat}
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {items.map((e) => {
+                const checked = !!state[String(e.id)];
+                return (
+                  <li key={e.id}>
+                    <label
+                      className={[
+                        "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors",
+                        checked
+                          ? "border-brand/40 bg-brand/5 text-ink-500 line-through"
+                          : "border-border bg-surface text-ink-900 hover:bg-surface-muted",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(ev) => toggle(e.id, ev.target.checked)}
+                        className="size-4 accent-brand"
+                      />
+                      <span className="flex-1">
+                        {e.name}
+                        {e.quantity > 1 && (
+                          <span className="ml-1 font-mono text-xs text-ink-500">
+                            ×{e.quantity}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TabBar({
   tab,
   onChange,
+  hasGear,
 }: {
   tab: TabKey;
   onChange: (next: TabKey) => void;
+  hasGear: boolean;
 }) {
   return (
     <div
       role="tablist"
       aria-label="Sekce akce"
-      className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-surface-muted/50 p-1"
+      className={[
+        "grid gap-1 rounded-xl border border-border bg-surface-muted/50 p-1",
+        hasGear ? "grid-cols-3" : "grid-cols-2",
+      ].join(" ")}
     >
       <TabButton
         active={tab === "nastenka"}
@@ -289,8 +434,15 @@ function TabBar({
       <TabButton
         active={tab === "registrace"}
         onClick={() => onChange("registrace")}
-        label="Moje registrace"
+        label="Registrace"
       />
+      {hasGear && (
+        <TabButton
+          active={tab === "vybaveni"}
+          onClick={() => onChange("vybaveni")}
+          label="Vybavení"
+        />
+      )}
     </div>
   );
 }

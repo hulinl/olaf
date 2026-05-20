@@ -118,6 +118,11 @@ urlpatterns = [
         name="rsvp-toggle-organizer",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvp/gear-checklist/",
+        views.rsvp_gear_checklist,
+        name="rsvp-gear-checklist",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/documents/",
         views.my_rsvp_documents,
         name="rsvp-documents",

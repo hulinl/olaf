@@ -153,6 +153,68 @@ export default async function EventLandingPage({ params }: Props) {
           );
         })()}
 
+        {/* Doporučené vybavení — bare list of names + categories. When
+            the owner has attached a GearList via Event.recommended_gear_list
+            we render it here as an auto-section near the bottom (after
+            all the block-builder blocks). The participant zone shows the
+            same items as an interactive checklist. URLs / prices stay
+            owner-side; this is the generic packing-plan view. */}
+        {event.recommended_gear_list &&
+          event.recommended_gear_list.entries.length > 0 && (
+            <section className="bg-canvas">
+              <div className="mx-auto max-w-3xl px-4 py-14 sm:py-16">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                  Doporučené vybavení
+                </p>
+                <h2 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+                  Co si vzít s sebou
+                </h2>
+                {(() => {
+                  const byCategory = new Map<
+                    string,
+                    typeof event.recommended_gear_list.entries
+                  >();
+                  for (const e of event.recommended_gear_list.entries) {
+                    const cat = e.category || "Ostatní";
+                    const arr = byCategory.get(cat) ?? [];
+                    arr.push(e);
+                    byCategory.set(cat, arr);
+                  }
+                  return (
+                    <div className="mt-6 flex flex-col gap-5">
+                      {[...byCategory.entries()].map(([cat, items]) => (
+                        <div key={cat}>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                            {cat}
+                          </p>
+                          <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                            {items.map((e) => (
+                              <li
+                                key={e.id}
+                                className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900"
+                              >
+                                {e.name}
+                                {e.quantity > 1 && (
+                                  <span className="ml-1 font-mono text-xs text-ink-500">
+                                    ×{e.quantity}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                <p className="mt-6 text-xs text-ink-500">
+                  Přihlášení účastníci dostanou tenhle seznam ve své
+                  registrační zóně jako interaktivní checklist.
+                </p>
+              </div>
+            </section>
+          )}
+
 
         {/* Public landing is presentation-only. Participant zone (payment
             + docs + invoice) lives at /events/[ws]/[event] and on the
