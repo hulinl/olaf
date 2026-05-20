@@ -67,6 +67,17 @@ class Workspace(models.Model):
         help_text="Lazy-created on first event when the user has no community.",
     )
 
+    # Public-link invitation token. NULL = link disabled. Owner toggles
+    # via the invite UI; rotating regenerates the token and breaks old
+    # URLs. Anyone with a valid token can self-join — no approval step
+    # in V1 (deflection enough; owner can kick + rotate).
+    public_invite_token = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -186,3 +197,71 @@ class PersonProfile(models.Model):
 
     def __str__(self) -> str:
         return f"profile(ws={self.workspace_id}, user={self.user_id})"
+
+
+class WorkspaceInvitation(models.Model):
+    """Owner-initiated e-mail invitation to join a workspace.
+
+    Stays in `pending` until the recipient clicks the link in the e-mail
+    and the auth backend creates / signs them in. On accept we create
+    the matching WorkspaceMember row and flip the status to `accepted`
+    so re-clicking is a no-op."""
+
+    STATUS_PENDING = "pending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_ACCEPTED, "Accepted"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="invitations"
+    )
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=20,
+        default=WorkspaceMember.ROLE_MEMBER,
+        choices=WorkspaceMember.ROLE_CHOICES,
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sent_workspace_invitations",
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_workspace_invitations",
+    )
+
+    class Meta:
+        db_table = "workspaces_invitation"
+        indexes = [models.Index(fields=["workspace", "status"])]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"invite({self.email} → {self.workspace_id}, {self.status})"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            import secrets
+
+            for _ in range(8):
+                candidate = secrets.token_urlsafe(24)[:32]
+                if not WorkspaceInvitation.objects.filter(
+                    token=candidate
+                ).exists():
+                    self.token = candidate
+                    break
+        super().save(*args, **kwargs)

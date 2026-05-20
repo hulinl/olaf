@@ -5,6 +5,29 @@ from . import views
 app_name = "workspaces"
 
 urlpatterns = [
+    # Token-based public lookups MUST come before `<slug:slug>/...` routes
+    # — slug regex includes `_`, so otherwise `_/invitations/abc/` would
+    # match workspace_invitations(slug="_").
+    path(
+        "_/invitations/<str:token>/",
+        views.invitation_lookup,
+        name="invitation-lookup",
+    ),
+    path(
+        "_/invitations/<str:token>/accept/",
+        views.invitation_accept,
+        name="invitation-accept",
+    ),
+    path(
+        "_/join/<str:token>/",
+        views.public_invite_lookup,
+        name="public-invite-lookup",
+    ),
+    path(
+        "_/join/<str:token>/accept/",
+        views.public_invite_accept,
+        name="public-invite-accept",
+    ),
     path("", views.create_workspace, name="create"),
     path("mine/", views.my_workspaces, name="mine"),
     path("personal/", views.my_personal_workspace, name="personal"),
@@ -59,5 +82,25 @@ urlpatterns = [
         "<slug:slug>/payments/reconcile/",
         views.workspace_payments_reconcile,
         name="payments-reconcile",
+    ),
+    path(
+        "<slug:slug>/members/add/",
+        views.workspace_add_existing_member,
+        name="add-existing-member",
+    ),
+    path(
+        "<slug:slug>/invitations/",
+        views.workspace_invitations,
+        name="invitations",
+    ),
+    path(
+        "<slug:slug>/invitations/<int:invitation_id>/",
+        views.workspace_invitation_detail,
+        name="invitation-detail",
+    ),
+    path(
+        "<slug:slug>/invite-link/",
+        views.workspace_invite_link,
+        name="invite-link",
     ),
 ]

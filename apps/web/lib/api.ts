@@ -703,6 +703,14 @@ export interface PersonTag {
   sort_order: number;
 }
 
+export interface WorkspaceInvitationSummary {
+  id: number;
+  email: string;
+  status: string;
+  invited_by_name: string;
+  created_at: string;
+}
+
 export interface WorkspaceMemberRSVP {
   id: number;
   event_slug: string;
@@ -796,6 +804,73 @@ export const workspaces = {
     ),
   membersCsvUrl: (slug: string) =>
     `${API_URL}/api/workspaces/${slug}/members.csv`,
+  addExistingMember: (slug: string, userId: number) =>
+    apiFetch<{ user_id: number; role: WorkspaceRole; created: boolean }>(
+      `/api/workspaces/${slug}/members/add/`,
+      { method: "POST", body: JSON.stringify({ user_id: userId }) },
+    ),
+  listInvitations: (slug: string) =>
+    apiFetch<WorkspaceInvitationSummary[]>(
+      `/api/workspaces/${slug}/invitations/`,
+    ),
+  createInvitation: (slug: string, email: string) =>
+    apiFetch<
+      | {
+          mode: "direct";
+          user_id: number;
+          role: WorkspaceRole;
+          created: boolean;
+        }
+      | {
+          mode: "invited";
+          id: number;
+          email: string;
+          status: string;
+          created_at: string;
+        }
+    >(`/api/workspaces/${slug}/invitations/`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  cancelInvitation: (slug: string, invitationId: number) =>
+    apiFetch<void>(`/api/workspaces/${slug}/invitations/${invitationId}/`, {
+      method: "DELETE",
+    }),
+  getInviteLink: (slug: string) =>
+    apiFetch<{ public_invite_token: string; invite_url: string }>(
+      `/api/workspaces/${slug}/invite-link/`,
+    ),
+  generateInviteLink: (slug: string) =>
+    apiFetch<{ public_invite_token: string; invite_url: string }>(
+      `/api/workspaces/${slug}/invite-link/`,
+      { method: "POST" },
+    ),
+  revokeInviteLink: (slug: string) =>
+    apiFetch<{ public_invite_token: string; invite_url: string }>(
+      `/api/workspaces/${slug}/invite-link/`,
+      { method: "DELETE" },
+    ),
+  lookupInvitation: (token: string) =>
+    apiFetch<{
+      email: string;
+      status: string;
+      workspace: { slug: string; name: string; bio: string };
+      invited_by_name: string;
+    }>(`/api/workspaces/_/invitations/${token}/`),
+  acceptInvitation: (token: string) =>
+    apiFetch<{ workspace_slug: string }>(
+      `/api/workspaces/_/invitations/${token}/accept/`,
+      { method: "POST" },
+    ),
+  lookupPublicInvite: (token: string) =>
+    apiFetch<{ workspace: { slug: string; name: string; bio: string } }>(
+      `/api/workspaces/_/join/${token}/`,
+    ),
+  acceptPublicInvite: (token: string) =>
+    apiFetch<{ workspace_slug: string; role: WorkspaceRole; created: boolean }>(
+      `/api/workspaces/_/join/${token}/accept/`,
+      { method: "POST" },
+    ),
   reconcilePayments: async (slug: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
