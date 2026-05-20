@@ -195,8 +195,24 @@ export default function MyEventPage({ params }: Props) {
 
         <TabBar tab={tab} onChange={setTab} />
 
-        <div className="rounded-2xl border border-border bg-surface-muted/30 p-1">
-          <div className="rounded-xl bg-canvas p-4 sm:p-6">
+        {/* The participant zone is a "framed card" for registration /
+            documents — but the nástěnka is itself already a bordered
+            section, so wrapping it in the same frame doubles up the
+            chrome and steals horizontal real estate. Skip the inner
+            canvas + padding wrapper when nastenka is active so the
+            wall gets the full width of the page. */}
+        <div
+          className={
+            tab === "nastenka"
+              ? ""
+              : "rounded-2xl border border-border bg-surface-muted/30 p-1"
+          }
+        >
+          <div
+            className={
+              tab === "nastenka" ? "" : "rounded-xl bg-canvas p-4 sm:p-6"
+            }
+          >
             {tab === "nastenka" ? (
               hasActiveRsvp || event.i_am_owner ? (
                 <DiscussionWall
