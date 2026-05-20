@@ -47,6 +47,7 @@ const ADD_OPTIONS: BlockType[] = [
   "map",
   "faq",
   "practical",
+  "gear",
 ];
 
 export function Builder({
