@@ -158,7 +158,7 @@ export interface Workspace {
   payment_due_days: number;
   created_at: string;
   /** Present on /workspaces/mine/ + /workspaces/{slug}/detail/ for auth'd members. */
-  my_role?: "owner" | null;
+  my_role?: "owner" | "admin" | null;
   /** Present on /workspaces/{slug}/detail/. */
   member_count?: number;
 }
@@ -663,6 +663,8 @@ export interface WorkspaceCreatePayload {
   default_tz?: string;
 }
 
+export type WorkspaceRole = "owner" | "admin" | "member" | null;
+
 export interface WorkspaceMemberSummary {
   id: number;
   email: string;
@@ -674,6 +676,7 @@ export interface WorkspaceMemberSummary {
   upcoming_rsvps: number;
   past_rsvps: number;
   last_rsvp_at: string | null;
+  role: WorkspaceRole;
 }
 
 export interface WorkspaceMemberRSVP {
@@ -713,6 +716,16 @@ export const workspaces = {
   memberDetail: (slug: string, userId: number) =>
     apiFetch<WorkspaceMemberDetail>(
       `/api/workspaces/${slug}/members/${userId}/`,
+    ),
+  promoteMember: (slug: string, userId: number) =>
+    apiFetch<{ user_id: number; role: WorkspaceRole }>(
+      `/api/workspaces/${slug}/members/${userId}/promote/`,
+      { method: "POST" },
+    ),
+  demoteMember: (slug: string, userId: number) =>
+    apiFetch<{ user_id: number; role: WorkspaceRole }>(
+      `/api/workspaces/${slug}/members/${userId}/demote/`,
+      { method: "POST" },
     ),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
   personal: () => apiFetch<Workspace>("/api/workspaces/personal/"),

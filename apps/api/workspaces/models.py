@@ -86,9 +86,19 @@ class Workspace(models.Model):
 class WorkspaceMember(models.Model):
     """User's role within a workspace (PRD §4.3, §4.8)."""
 
+    # Two-tier admin model: the workspace creator is OWNER (super-admin
+    # in user-speak). They can promote any member to ADMIN. Admins can
+    # do everything owners can EXCEPT delete the workspace, promote/
+    # demote other admins, or remove the owner. Owner can demote
+    # themselves only when handing over to another owner — guarded
+    # at the endpoint layer.
     ROLE_OWNER = "owner"
+    ROLE_ADMIN = "admin"
+    ROLE_MEMBER = "member"
     ROLE_CHOICES = [
         (ROLE_OWNER, "Owner"),
+        (ROLE_ADMIN, "Admin"),
+        (ROLE_MEMBER, "Member"),
     ]
 
     workspace = models.ForeignKey(
