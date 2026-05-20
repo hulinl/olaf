@@ -146,6 +146,7 @@ export default async function EventLandingPage({ params }: Props) {
                     currency: event.price_currency,
                     note: event.price_note,
                   }}
+                  gearListsBySlug={event.gear_lists_by_slug}
                 />
               ))}
             </>

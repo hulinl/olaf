@@ -88,6 +88,13 @@ export interface FaqBlockPayload {
   items: FaqItem[];
 }
 
+export interface GearBlockPayload {
+  eyebrow?: string;
+  title?: string;
+  /** Slug of a GearList owned by the event creator (must be unlisted or public). */
+  list_slug: string;
+}
+
 export interface PracticalBlockPayload {
   eyebrow?: string;
   title?: string;
@@ -112,7 +119,8 @@ export type EventBlock =
   | { id: string; type: "gallery"; payload: GalleryBlockPayload }
   | { id: string; type: "map"; payload: MapBlockPayload }
   | { id: string; type: "faq"; payload: FaqBlockPayload }
-  | { id: string; type: "practical"; payload: PracticalBlockPayload };
+  | { id: string; type: "practical"; payload: PracticalBlockPayload }
+  | { id: string; type: "gear"; payload: GearBlockPayload };
 
 export type BlockType = EventBlock["type"];
 
@@ -134,6 +142,7 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   map: "Mapa — jedna trasa (embed)",
   faq: "FAQ — časté dotazy",
   practical: "Praktické info — doprava, ubytování, výbava, náročnost",
+  gear: "Vybavení — odkaz na tvůj gear list",
 };
 
 /** Detect Mapy.cz / mapy.com URLs we should embed as iframe. */

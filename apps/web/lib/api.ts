@@ -201,6 +201,9 @@ export interface Event extends EventSummary {
   waitlist_enabled: boolean;
   requires_approval: boolean;
   blocks: EventBlock[];
+  /** Inline payload for every `gear` block on this event's landing.
+   *  Map of slug → PublicGearList. Private lists are omitted. */
+  gear_lists_by_slug?: Record<string, PublicGearList>;
   enabled_questionnaire_sections: QuestionnaireSection[];
   community_slugs: string[];
   shared_workspace_slugs: string[];
