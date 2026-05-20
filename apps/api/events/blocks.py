@@ -172,12 +172,27 @@ def _validate_gear(payload: dict) -> None:
     fetch. Slug existence and visibility are checked at render time,
     not save time, so an owner can attach a list before flipping it
     public (or have it gracefully empty out if they later make it
-    private)."""
+    private).
+
+    Optional `featured_entry_ids` (list of ints) narrows the rendered
+    items to a curated subset on the public landing — owner picks the
+    "top N" via checkboxes in the editor. Empty / missing = render
+    every entry (back-compat with blocks created before this slice).
+    """
     _expect_str(payload.get("eyebrow", ""), "eyebrow")
     _expect_str(payload.get("title", ""), "title")
     _expect_str(
         payload.get("list_slug", ""), "list_slug", allow_blank=False
     )
+    if "featured_entry_ids" in payload:
+        ids = payload["featured_entry_ids"]
+        if not isinstance(ids, list):
+            raise ValueError("'featured_entry_ids' must be a list of ints")
+        for i, x in enumerate(ids):
+            if not isinstance(x, int) or x < 0:
+                raise ValueError(
+                    f"'featured_entry_ids[{i}]' must be a non-negative int"
+                )
 
 
 BLOCK_SCHEMAS: dict[str, Any] = {
