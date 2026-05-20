@@ -39,6 +39,9 @@ export default function KomunityMembersPage({ params }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [filterTagIds, setFilterTagIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,49 +140,221 @@ export default function KomunityMembersPage({ params }: Props) {
         </div>
       </header>
 
-      {members.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
-          <h3 className="text-base font-semibold text-ink-900">
-            Zatím žádní členové
-          </h3>
-          <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-            Jakmile se někdo přihlásí na akci, objeví se tady.
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-muted/60">
-              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                <th className="px-4 py-3">Člen</th>
-                <th className="px-4 py-3">Kontakt</th>
-                <th className="px-4 py-3">Tagy</th>
-                <th className="px-4 py-3 text-right">Celkem</th>
-                <th className="px-4 py-3 text-right">Nadch.</th>
-                <th className="px-4 py-3 text-right">Min.</th>
-                <th className="px-4 py-3">Poslední</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {members.map((m) => (
-                <MemberRow
-                  key={m.id}
-                  member={m}
-                  wsSlug={slug}
-                  tags={tags}
-                  iAmSuperAdmin={isOwner}
-                  expanded={expandedRowId === m.id}
-                  onToggleExpand={() =>
-                    setExpandedRowId(expandedRowId === m.id ? null : m.id)
-                  }
-                  onPatch={(patch) => patchMember(m.id, patch)}
-                />
-              ))}
-            </tbody>
-          </table>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Filtr
+          </span>
+          {tags.map((t) => {
+            const on = filterTagIds.has(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setFilterTagIds((prev) => {
+                    const next = new Set(prev);
+                    if (on) next.delete(t.id);
+                    else next.add(t.id);
+                    return next;
+                  });
+                }}
+                className={[
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  on
+                    ? "border-brand bg-brand/15 text-brand"
+                    : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
+                ].join(" ")}
+                style={
+                  on && t.color
+                    ? { borderColor: t.color, color: t.color }
+                    : undefined
+                }
+              >
+                {on && <span aria-hidden>✓</span>}
+                {t.name}
+              </button>
+            );
+          })}
+          {filterTagIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterTagIds(new Set())}
+              className="text-xs font-medium text-ink-500 hover:text-ink-900"
+            >
+              Vymazat filtr
+            </button>
+          )}
         </div>
       )}
+
+      {(() => {
+        // OR-mode filter: a person stays if they carry ANY of the chosen
+        // tags. Most natural fit for "show me everyone tagged Stálice or
+        // Beskydy core" workflows.
+        const filtered =
+          filterTagIds.size === 0
+            ? members
+            : members.filter((m) =>
+                (m.tag_ids ?? []).some((id) => filterTagIds.has(id)),
+              );
+
+        async function bulkToggle(tagId: number) {
+          // Snapshot current members so TS narrowing survives across
+          // awaits inside this async closure.
+          const snapshot = members ?? [];
+          const ids = [...selectedIds];
+          if (ids.length === 0) return;
+          // Apply if ANY selected member doesn't have the tag yet —
+          // otherwise detach. Mirrors the gmail "apply label" semantics.
+          const someoneMissing = ids.some(
+            (id) =>
+              !(snapshot.find((m) => m.id === id)?.tag_ids ?? []).includes(
+                tagId,
+              ),
+          );
+          setBulkBusy(true);
+          try {
+            for (const memberId of ids) {
+              const m = snapshot.find((x) => x.id === memberId);
+              if (!m) continue;
+              const has = (m.tag_ids ?? []).includes(tagId);
+              if (someoneMissing && !has) {
+                const r = await workspaces.attachMemberTag(
+                  slug,
+                  memberId,
+                  tagId,
+                );
+                patchMember(memberId, { tag_ids: r.tag_ids });
+              } else if (!someoneMissing && has) {
+                const r = await workspaces.detachMemberTag(
+                  slug,
+                  memberId,
+                  tagId,
+                );
+                patchMember(memberId, { tag_ids: r.tag_ids });
+              }
+            }
+          } finally {
+            setBulkBusy(false);
+          }
+        }
+
+        return (
+          <>
+            {selectedIds.size > 0 && tags.length > 0 && (
+              <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
+                <span className="text-xs font-medium text-brand">
+                  {selectedIds.size} vybráno
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                  Hromadně přiřadit / odebrat tag
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => bulkToggle(t.id)}
+                      disabled={bulkBusy}
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50"
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="ml-auto text-xs font-medium text-ink-500 hover:text-ink-900"
+                >
+                  Zrušit výběr
+                </button>
+              </div>
+            )}
+
+            {filtered.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
+                <h3 className="text-base font-semibold text-ink-900">
+                  {members.length === 0
+                    ? "Zatím žádní členové"
+                    : "Žádné lidi v aktivním filtru"}
+                </h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                  {members.length === 0
+                    ? "Jakmile se někdo přihlásí na akci, objeví se tady."
+                    : "Zruš filtr nahoře nebo zvol jiný tag."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-muted/60">
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                      <th className="w-8 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          aria-label="Vybrat vše"
+                          checked={
+                            filtered.length > 0 &&
+                            filtered.every((m) => selectedIds.has(m.id))
+                          }
+                          onChange={(e) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) {
+                                filtered.forEach((m) => next.add(m.id));
+                              } else {
+                                filtered.forEach((m) => next.delete(m.id));
+                              }
+                              return next;
+                            });
+                          }}
+                        />
+                      </th>
+                      <th className="px-4 py-3">Člen</th>
+                      <th className="px-4 py-3">Kontakt</th>
+                      <th className="px-4 py-3">Tagy</th>
+                      <th className="px-4 py-3 text-right">Celkem</th>
+                      <th className="px-4 py-3 text-right">Nadch.</th>
+                      <th className="px-4 py-3 text-right">Min.</th>
+                      <th className="px-4 py-3">Poslední</th>
+                      <th className="px-4 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.map((m) => (
+                      <MemberRow
+                        key={m.id}
+                        member={m}
+                        wsSlug={slug}
+                        tags={tags}
+                        iAmSuperAdmin={isOwner}
+                        expanded={expandedRowId === m.id}
+                        onToggleExpand={() =>
+                          setExpandedRowId(
+                            expandedRowId === m.id ? null : m.id,
+                          )
+                        }
+                        onPatch={(patch) => patchMember(m.id, patch)}
+                        selected={selectedIds.has(m.id)}
+                        onToggleSelected={() =>
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(m.id)) next.delete(m.id);
+                            else next.add(m.id);
+                            return next;
+                          })
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {tagManagerOpen && (
         <TagManageDialog
@@ -205,6 +380,8 @@ function MemberRow({
   expanded,
   onToggleExpand,
   onPatch,
+  selected,
+  onToggleSelected,
 }: {
   member: WorkspaceMemberSummary;
   wsSlug: string;
@@ -213,6 +390,8 @@ function MemberRow({
   expanded: boolean;
   onToggleExpand: () => void;
   onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  selected: boolean;
+  onToggleSelected: () => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -274,8 +453,20 @@ function MemberRow({
     <>
       <tr
         onClick={openProfileFromRowClick}
-        className="group cursor-pointer hover:bg-brand/10"
+        className={[
+          "group cursor-pointer hover:bg-brand/10",
+          selected ? "bg-brand/5" : "",
+        ].join(" ")}
       >
+        <td className="px-3 py-3 align-top">
+          <input
+            type="checkbox"
+            aria-label={`Vybrat ${member.full_name || member.email}`}
+            checked={selected}
+            onChange={onToggleSelected}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </td>
         <td className="px-4 py-3">
           <Link href={profileHref} className="flex flex-col focus-ring">
             <div className="flex items-baseline gap-2">
@@ -392,7 +583,7 @@ function MemberRow({
 
       {expanded && (
         <tr className="bg-surface-muted/40">
-          <td colSpan={8} className="px-4 py-3">
+          <td colSpan={9} className="px-4 py-3">
             <MemberCrmEditor
               member={member}
               wsSlug={wsSlug}
