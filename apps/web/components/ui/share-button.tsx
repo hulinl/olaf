@@ -79,17 +79,23 @@ export function ShareButton({
       {state === "copied" ? (
         <>
           <span aria-hidden>✓</span>
-          <span>Zkopírováno</span>
+          <span className={isGhost ? "" : "hidden sm:inline"}>
+            Zkopírováno
+          </span>
         </>
       ) : state === "shared" ? (
         <>
           <span aria-hidden>✓</span>
-          <span>Sdíleno</span>
+          <span className={isGhost ? "" : "hidden sm:inline"}>Sdíleno</span>
         </>
       ) : (
         <>
           <ShareIcon />
-          <span>{label}</span>
+          {/* Ghost variant (Tvůrce header) keeps the label always
+              visible — there's room. Soft variant lives in the cramped
+              public header next to OwnerCockpitLink + auth indicator,
+              so on mobile we render only the icon. */}
+          <span className={isGhost ? "" : "hidden sm:inline"}>{label}</span>
         </>
       )}
     </button>

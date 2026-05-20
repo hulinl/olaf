@@ -65,10 +65,13 @@ export function PublicAuthIndicator() {
   }
 
   return (
-    <div className="flex items-center gap-3 text-sm">
+    <div className="flex items-center gap-2 text-sm sm:gap-3">
+      {/* Dashboard chip is hidden on the cramped mobile public header.
+          UserMenu (the avatar) is the universal entry-point — opens a
+          dropdown that includes "Dashboard" + sign-out. */}
       <Link
         href="/dashboard"
-        className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
+        className="hidden rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring sm:inline-block"
       >
         Dashboard
       </Link>
