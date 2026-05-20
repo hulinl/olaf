@@ -534,7 +534,7 @@ export function DiscussionThread({
           ) : composerAttachment ? (
             // Non-image attachment — show a file pill with the name.
             <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-surface-muted/40 px-3 py-1.5 text-xs">
-              <span aria-hidden>📎</span>
+              <PaperclipIcon />
               <span className="font-medium text-ink-900">
                 {composerAttachment.name}
               </span>
@@ -568,7 +568,7 @@ export function DiscussionThread({
               className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-within:ring-2 focus-within:ring-brand/40"
               title="Přidat přílohu"
             >
-              <span aria-hidden>📎</span>
+              <PaperclipIcon />
               <span>
                 {composerAttachment ? "Změnit přílohu" : "Přidat přílohu"}
               </span>
@@ -706,9 +706,31 @@ function CommentAttachment({ url, name }: { url: string; name: string }) {
       rel="noopener noreferrer"
       className="mt-2 inline-flex items-center gap-2 rounded-md border border-border bg-surface-muted/40 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
     >
-      <span aria-hidden>📎</span>
+      <PaperclipIcon />
       <span>{name || "soubor"}</span>
       <span aria-hidden className="text-ink-500">↓</span>
     </a>
+  );
+}
+
+/** Minimal paperclip glyph — replaces the 📎 emoji which on most
+ *  platforms renders as a colorful cropped image at this size. The
+ *  SVG is just a clean stroke so it sits next to text comfortably. */
+function PaperclipIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="inline-block"
+    >
+      <path d="M11.5 5L7.2 9.3a2 2 0 1 0 2.8 2.8L13.6 8.5a3.5 3.5 0 0 0-4.95-4.95L4.5 7.7a5 5 0 0 0 7.07 7.07L13.5 12.8" />
+    </svg>
   );
 }

@@ -344,20 +344,21 @@ function TopicCard({
                 ? "komentáře"
                 : "komentářů"}
           </span>
+          {/* Like is rendered as its own glyph + count — no leading
+              "·" separator so when the metadata wraps to a second line
+              the heart doesn't dangle behind a stray dot. */}
           {topic.like_count > 0 && (
-            <>
-              <span aria-hidden>·</span>
-              <span
-                className={
-                  topic.i_liked
-                    ? "font-medium text-brand"
-                    : "text-ink-500"
-                }
-              >
-                <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>{" "}
-                <span className="tabular-nums">{topic.like_count}</span>
-              </span>
-            </>
+            <span
+              className={[
+                "inline-flex items-center gap-1",
+                topic.i_liked
+                  ? "font-medium text-brand"
+                  : "text-ink-500",
+              ].join(" ")}
+            >
+              <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
+              <span className="tabular-nums">{topic.like_count}</span>
+            </span>
           )}
         </div>
       </Link>

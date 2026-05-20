@@ -1147,6 +1147,7 @@ function ListSection({
   items: GearItem[];
   onChange: () => Promise<void>;
 }) {
+  const [open, setOpen] = useState(true);
   const [openListId, setOpenListId] = useState<number | null>(null);
   const [newListName, setNewListName] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
@@ -1164,11 +1165,25 @@ function ListSection({
   return (
     <Card>
       <CardSection>
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h3 className="text-base font-semibold text-ink-900">
-            Listy ({lists.length})
-          </h3>
-          {!composerOpen && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-baseline gap-3 text-left focus-ring"
+          >
+            <h3 className="text-base font-semibold text-ink-900">
+              Listy ({lists.length})
+            </h3>
+            <span
+              aria-hidden
+              className={
+                open ? "rotate-90 text-ink-500" : "text-ink-500"
+              }
+            >
+              ›
+            </span>
+          </button>
+          {open && !composerOpen && (
             <Button
               type="button"
               variant="secondary"
@@ -1180,7 +1195,7 @@ function ListSection({
           )}
         </div>
 
-        {composerOpen && (
+        {open && composerOpen && (
           <form onSubmit={handleCreate} className="mt-4 flex flex-wrap gap-2">
             <Input
               required
@@ -1206,7 +1221,7 @@ function ListSection({
           </form>
         )}
 
-        {lists.length === 0 ? (
+        {open && (lists.length === 0 ? (
           <p className="mt-4 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
             Zatím žádný list. Vytvoř si první (např. „Beskická 7") a pak do
             něj přidej položky z katalogu.
@@ -1226,7 +1241,7 @@ function ListSection({
               />
             ))}
           </div>
-        )}
+        ))}
       </CardSection>
     </Card>
   );
