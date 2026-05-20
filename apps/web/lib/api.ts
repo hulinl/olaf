@@ -1302,3 +1302,97 @@ export const auth = {
       body: JSON.stringify({ token, password }),
     }),
 };
+
+// ===========================================================================
+// Gear lists
+// ===========================================================================
+
+export interface GearItem {
+  id: number;
+  name: string;
+  weight_g: number | null;
+  url: string;
+  category: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GearListEntry {
+  id: number;
+  item: GearItem;
+  quantity: number;
+  sort_order: number;
+  note: string;
+}
+
+export interface GearList {
+  id: number;
+  name: string;
+  description: string;
+  entries: GearListEntry[];
+  item_count: number;
+  total_weight_g: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GearItemWritePayload {
+  name?: string;
+  weight_g?: number | null;
+  url?: string;
+  category?: string;
+  note?: string;
+}
+
+export const gear = {
+  listItems: () => apiFetch<GearItem[]>("/api/gear/items/"),
+  createItem: (payload: GearItemWritePayload) =>
+    apiFetch<GearItem>("/api/gear/items/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateItem: (id: number, payload: GearItemWritePayload) =>
+    apiFetch<GearItem>(`/api/gear/items/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteItem: (id: number) =>
+    apiFetch<void>(`/api/gear/items/${id}/`, { method: "DELETE" }),
+
+  listLists: () => apiFetch<GearList[]>("/api/gear/lists/"),
+  createList: (name: string, description?: string) =>
+    apiFetch<GearList>("/api/gear/lists/", {
+      method: "POST",
+      body: JSON.stringify({ name, description: description ?? "" }),
+    }),
+  updateList: (
+    id: number,
+    payload: { name?: string; description?: string },
+  ) =>
+    apiFetch<GearList>(`/api/gear/lists/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteList: (id: number) =>
+    apiFetch<void>(`/api/gear/lists/${id}/`, { method: "DELETE" }),
+  getList: (id: number) => apiFetch<GearList>(`/api/gear/lists/${id}/`),
+  addItemToList: (listId: number, itemId: number, quantity = 1) =>
+    apiFetch<GearListEntry>(`/api/gear/lists/${listId}/items/`, {
+      method: "POST",
+      body: JSON.stringify({ item_id: itemId, quantity }),
+    }),
+  updateListEntry: (
+    listId: number,
+    entryId: number,
+    payload: { quantity?: number; note?: string; sort_order?: number },
+  ) =>
+    apiFetch<GearListEntry>(
+      `/api/gear/lists/${listId}/items/${entryId}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  removeListEntry: (listId: number, entryId: number) =>
+    apiFetch<void>(`/api/gear/lists/${listId}/items/${entryId}/`, {
+      method: "DELETE",
+    }),
+};
