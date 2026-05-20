@@ -713,24 +713,24 @@ function CommentAttachment({ url, name }: { url: string; name: string }) {
   );
 }
 
-/** Minimal paperclip glyph — replaces the 📎 emoji which on most
- *  platforms renders as a colorful cropped image at this size. The
- *  SVG is just a clean stroke so it sits next to text comfortably. */
+/** Paperclip glyph — replaces the 📎 emoji which on most platforms
+ *  renders as a colorful cropped image at this size. Standard
+ *  feather-icons paperclip stroke; renders cleanly down to 14px. */
 function PaperclipIcon() {
   return (
     <svg
       aria-hidden
-      viewBox="0 0 16 16"
-      width="14"
-      height="14"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
       className="inline-block"
     >
-      <path d="M11.5 5L7.2 9.3a2 2 0 1 0 2.8 2.8L13.6 8.5a3.5 3.5 0 0 0-4.95-4.95L4.5 7.7a5 5 0 0 0 7.07 7.07L13.5 12.8" />
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
     </svg>
   );
 }
