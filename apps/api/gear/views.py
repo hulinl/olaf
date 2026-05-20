@@ -13,8 +13,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .imports import import_notion_gear_csv
-from .models import GearItem, GearLinkClick, GearList, GearListItem
+from .models import GearCategory, GearItem, GearLinkClick, GearList, GearListItem
 from .serializers import (
+    GearCategorySerializer,
     GearItemSerializer,
     GearListEntrySerializer,
     GearListSerializer,
@@ -33,13 +34,20 @@ _BOT_HINTS = ("bot", "crawler", "spider", "preview", "fetch", "monitor", "scrape
 @permission_classes([IsAuthenticated])
 def gear_items(request: Request) -> Response:
     if request.method == "GET":
-        qs = GearItem.objects.filter(user=request.user)
-        return Response(GearItemSerializer(qs, many=True).data)
-    serializer = GearItemSerializer(data=request.data)
+        qs = GearItem.objects.filter(user=request.user).select_related(
+            "category_obj"
+        )
+        return Response(
+            GearItemSerializer(qs, many=True, context={"request": request}).data
+        )
+    serializer = GearItemSerializer(
+        data=request.data, context={"request": request}
+    )
     serializer.is_valid(raise_exception=True)
     item = serializer.save(user=request.user)
     return Response(
-        GearItemSerializer(item).data, status=status.HTTP_201_CREATED
+        GearItemSerializer(item, context={"request": request}).data,
+        status=status.HTTP_201_CREATED,
     )
 
 
@@ -47,18 +55,83 @@ def gear_items(request: Request) -> Response:
 @permission_classes([IsAuthenticated])
 def gear_item_detail(request: Request, item_id: int) -> Response:
     try:
-        item = GearItem.objects.get(pk=item_id, user=request.user)
+        item = GearItem.objects.select_related("category_obj").get(
+            pk=item_id, user=request.user
+        )
     except GearItem.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if request.method == "DELETE":
         item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     if request.method == "GET":
-        return Response(GearItemSerializer(item).data)
-    serializer = GearItemSerializer(item, data=request.data, partial=True)
+        return Response(
+            GearItemSerializer(item, context={"request": request}).data
+        )
+    serializer = GearItemSerializer(
+        item, data=request.data, partial=True, context={"request": request}
+    )
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# Categories — first-class per-user dictionary
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def gear_categories(request: Request) -> Response:
+    if request.method == "GET":
+        qs = GearCategory.objects.filter(user=request.user)
+        return Response(GearCategorySerializer(qs, many=True).data)
+    name = (request.data.get("name") or "").strip()
+    if not name:
+        return Response(
+            {"name": "Kategorie musí mít název."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    cat, _ = GearCategory.objects.get_or_create(
+        user=request.user, name=name[:60]
+    )
+    return Response(
+        GearCategorySerializer(cat).data, status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def gear_category_detail(request: Request, category_id: int) -> Response:
+    """Rename / reorder / delete a category.
+
+    Delete clears the FK on every item that pointed at it (SET_NULL); the
+    items themselves stay. The legacy denormalised string also gets
+    cleared so the UI doesn't show a ghost name."""
+    try:
+        cat = GearCategory.objects.get(pk=category_id, user=request.user)
+    except GearCategory.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        # Wipe the cached string on items that referenced this category
+        # before the SET_NULL fires.
+        GearItem.objects.filter(category_obj=cat).update(category="")
+        cat.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if "name" in request.data:
+        n = str(request.data["name"]).strip()
+        if n:
+            cat.name = n[:60]
+    if "sort_order" in request.data:
+        with contextlib.suppress(TypeError, ValueError):
+            cat.sort_order = int(request.data["sort_order"])
+    cat.save()
+    # Keep the denormalised string in sync on every item that uses this
+    # category.
+    GearItem.objects.filter(category_obj=cat).update(category=cat.name)
+    return Response(GearCategorySerializer(cat).data)
 
 
 # ---------------------------------------------------------------------------
