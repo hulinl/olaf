@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { Alert } from "@/components/ui/card";
+import { WorkspaceInviteSection } from "@/components/workspace-invite-section";
 import {
   ApiError,
   type PersonTag,
@@ -24,13 +25,32 @@ interface Props {
 }
 
 /**
+ * Standalone /admin/komunity/[slug]/clenove route — back-link header
+ * around the CRM view. Same view is mounted inside the "Členové" tab
+ * of /admin/komunity/[slug] so the two surfaces stay in lockstep.
+ */
+export default function KomunityMembersPage({ params }: Props) {
+  const { slug } = use(params);
+  return (
+    <div className="flex flex-col gap-6">
+      <Link
+        href={`/admin/komunity/${slug}`}
+        className="text-sm text-ink-500 hover:text-ink-900"
+      >
+        ← Zpět na komunitu
+      </Link>
+      <MembersCrmView slug={slug} />
+    </div>
+  );
+}
+
+/**
  * Members of a komunita — V1 definition: anyone who's registered for at
  * least one event in this workspace (owned or shared) OR carries an
  * explicit role. The owner uses this page as a CRM: poznámky, tagy,
  * CSV export.
  */
-export default function KomunityMembersPage({ params }: Props) {
-  const { slug } = use(params);
+export function MembersCrmView({ slug }: { slug: string }) {
   const router = useRouter();
   const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -38,6 +58,7 @@ export default function KomunityMembersPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [invitePanelOpen, setInvitePanelOpen] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const [filterTagIds, setFilterTagIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,15 +123,13 @@ export default function KomunityMembersPage({ params }: Props) {
   const isOwnerOrAdmin =
     workspace?.my_role === "owner" || workspace?.my_role === "admin";
 
+  async function refreshMembers() {
+    const list = await workspaces.members(slug).catch(() => null);
+    if (list) setMembers(list);
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        href={`/admin/komunity/${slug}`}
-        className="text-sm text-ink-500 hover:text-ink-900"
-      >
-        ← Zpět na komunitu
-      </Link>
-
       <header className="flex flex-col gap-4">
         <div>
           <p className="text-sm font-medium text-brand">Členové</p>
@@ -124,6 +143,15 @@ export default function KomunityMembersPage({ params }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              onClick={() => setInvitePanelOpen((v) => !v)}
+              className="inline-flex items-center justify-center rounded-md border border-brand bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90 focus-ring"
+            >
+              {invitePanelOpen ? "Skrýt pozvánky" : "+ Pozvat člena"}
+            </button>
+          )}
           {isOwnerOrAdmin && (
             <button
               type="button"
@@ -141,6 +169,14 @@ export default function KomunityMembersPage({ params }: Props) {
           </a>
         </div>
       </header>
+
+      {invitePanelOpen && isOwnerOrAdmin && (
+        <WorkspaceInviteSection
+          wsSlug={slug}
+          defaultOpen
+          onInvited={refreshMembers}
+        />
+      )}
 
       <div className="relative">
         <input
