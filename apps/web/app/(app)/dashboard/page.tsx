@@ -22,6 +22,9 @@ export default function DashboardPage() {
   const user = useUser();
   const [myWorkspaces, setMyWorkspaces] = useState<Workspace[] | null>(null);
   const [myEvents, setMyEvents] = useState<EventSummary[] | null>(null);
+  const [ownedEvents, setOwnedEvents] = useState<EventSummary[] | null>(
+    null,
+  );
   const [todos, setTodos] = useState<TodoItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,14 +33,16 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, mine, todoList] = await Promise.all([
+        const [ws, mine, owned, todoList] = await Promise.all([
           workspaces.mine(),
           events.mine().catch(() => [] as EventSummary[]),
+          events.owner().catch(() => [] as EventSummary[]),
           auth.todo().catch(() => [] as TodoItem[]),
         ]);
         if (cancelled) return;
         setMyWorkspaces(ws);
         setMyEvents(mine);
+        setOwnedEvents(owned);
         setTodos(todoList);
       } catch (err) {
         if (cancelled) return;
@@ -119,6 +124,30 @@ export default function DashboardPage() {
                 </div>
               )}
             </Section>
+
+            {/* "Moje pořádané akce" — owner-side view. Earlier dashboard
+                only showed events the user had RSVPed to, so creators
+                couldn't see their own work without going to /admin.
+                Section auto-hides when the user manages nothing. */}
+            {(() => {
+              const upcomingOwned = (ownedEvents ?? []).filter(
+                (e) => new Date(e.ends_at).getTime() >= Date.now(),
+              );
+              if (upcomingOwned.length === 0) return null;
+              return (
+                <Section title="Moje pořádané akce" href="/admin/eventy">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {upcomingOwned.slice(0, 4).map((e) => (
+                      <EventMini
+                        key={`owner-${e.workspace_slug}/${e.slug}`}
+                        event={e}
+                        ownerView
+                      />
+                    ))}
+                  </div>
+                </Section>
+              );
+            })()}
 
             <Section title="Moje komunity" href="/workspaces">
               {(myWorkspaces?.length ?? 0) === 0 ? (
