@@ -51,6 +51,8 @@ export function DiscussionThread({
   const [composerBody, setComposerBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  /** When set, the composer at the bottom is "replying to" this comment. */
+  const [replyTo, setReplyTo] = useState<DiscussionComment | null>(null);
 
   async function loadDetail() {
     setLoading(true);
@@ -153,17 +155,25 @@ export function DiscussionThread({
     setPosting(true);
     try {
       const body = composerBody.trim();
+      const parent = replyTo?.id ?? null;
       if (scope.kind === "workspace") {
-        await discussions.addWorkspaceComment(scope.slug, topicId, body);
+        await discussions.addWorkspaceComment(
+          scope.slug,
+          topicId,
+          body,
+          parent,
+        );
       } else {
         await discussions.addEventComment(
           scope.workspaceSlug,
           scope.eventSlug,
           topicId,
           body,
+          parent,
         );
       }
       setComposerBody("");
+      setReplyTo(null);
       await loadDetail();
     } catch (err) {
       setError(
@@ -369,76 +379,105 @@ export function DiscussionThread({
         <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-500">
           Komentáře ({detail.comments.length})
         </h2>
-        {detail.comments.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
-            Zatím žádný komentář. Buď první.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {detail.comments.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-md border border-border bg-surface px-4 py-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-sm font-semibold text-ink-900">
-                    {c.author_name}
-                  </p>
-                  <p className="text-xs text-ink-500">
-                    {new Date(c.created_at).toLocaleString("cs-CZ", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">
-                  {c.body}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleCommentLike(c)}
-                    aria-pressed={c.i_liked}
-                    className={[
-                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus-ring",
-                      c.i_liked
-                        ? "border-brand/40 bg-brand/10 text-brand"
-                        : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
-                    ].join(" ")}
-                  >
-                    <span aria-hidden>{c.i_liked ? "♥" : "♡"}</span>
-                    {c.like_count > 0 && (
-                      <span className="tabular-nums">{c.like_count}</span>
-                    )}
-                  </button>
-                  {(canModerate || c.author_id === currentUserId) && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteComment(c)}
-                      className="text-[11px] text-ink-500 hover:text-danger"
-                    >
-                      Smazat
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        {(() => {
+          // Group comments: top-level (no parent) get their own card;
+          // replies render indented underneath. Single-level threading
+          // means we don't need recursion.
+          const topLevel = detail.comments.filter((c) => !c.parent);
+          const repliesByParent = new Map<number, DiscussionComment[]>();
+          for (const c of detail.comments) {
+            if (c.parent == null) continue;
+            const arr = repliesByParent.get(c.parent) ?? [];
+            arr.push(c);
+            repliesByParent.set(c.parent, arr);
+          }
+          if (topLevel.length === 0) {
+            return (
+              <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
+                Zatím žádný komentář. Buď první.
+              </p>
+            );
+          }
+          return (
+            <ul className="flex flex-col gap-3">
+              {topLevel.map((c) => (
+                <li key={c.id} className="flex flex-col gap-2">
+                  <CommentCard
+                    c={c}
+                    canModerate={canModerate}
+                    currentUserId={currentUserId}
+                    onToggleLike={() => handleToggleCommentLike(c)}
+                    onDelete={() => handleDeleteComment(c)}
+                    onReply={() => {
+                      setReplyTo(c);
+                      // Scroll the composer into view on mobile.
+                      const el = document.getElementById(
+                        "thread-composer",
+                      );
+                      el?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                    }}
+                  />
+                  {(repliesByParent.get(c.id) ?? []).map((r) => (
+                    <CommentCard
+                      key={r.id}
+                      c={r}
+                      nested
+                      canModerate={canModerate}
+                      currentUserId={currentUserId}
+                      onToggleLike={() => handleToggleCommentLike(r)}
+                      onDelete={() => handleDeleteComment(r)}
+                      onReply={() => {
+                        // Replying to a reply still attaches to the
+                        // top-level parent (backend normalizes too).
+                        setReplyTo(c);
+                        const el = document.getElementById(
+                          "thread-composer",
+                        );
+                        el?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                      }}
+                    />
+                  ))}
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
       </section>
 
       {!detail.locked && (
         <form
+          id="thread-composer"
           onSubmit={handlePostComment}
           className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5"
         >
+          {replyTo && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-1.5 text-xs">
+              <span className="text-ink-700">
+                Odpovídáš{" "}
+                <strong className="text-ink-900">{replyTo.author_name}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                className="font-medium text-ink-500 hover:text-ink-900"
+              >
+                × Zrušit reply
+              </button>
+            </div>
+          )}
           <textarea
             rows={3}
             value={composerBody}
             onChange={(e) => setComposerBody(e.target.value)}
-            placeholder="Napiš komentář…"
+            placeholder={
+              replyTo ? `Odpověď ${replyTo.author_name}…` : "Napiš komentář…"
+            }
             className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
           />
           <div className="flex items-center gap-2">
@@ -449,11 +488,91 @@ export function DiscussionThread({
               loading={posting}
               disabled={!composerBody.trim() || posting}
             >
-              {posting ? "Odesílám…" : "Odeslat komentář"}
+              {posting
+                ? "Odesílám…"
+                : replyTo
+                  ? "Odeslat odpověď"
+                  : "Odeslat komentář"}
             </Button>
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+function CommentCard({
+  c,
+  nested,
+  canModerate,
+  currentUserId,
+  onToggleLike,
+  onDelete,
+  onReply,
+}: {
+  c: DiscussionComment;
+  nested?: boolean;
+  canModerate: boolean;
+  currentUserId: number;
+  onToggleLike: () => Promise<void>;
+  onDelete: () => Promise<void>;
+  onReply: () => void;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-md border border-border bg-surface px-4 py-3",
+        nested ? "ml-6 border-l-2 border-l-brand/30 sm:ml-10" : "",
+      ].join(" ")}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-semibold text-ink-900">{c.author_name}</p>
+        <p className="text-xs text-ink-500">
+          {new Date(c.created_at).toLocaleString("cs-CZ", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
+      </div>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">
+        {c.body}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onToggleLike()}
+          aria-pressed={c.i_liked}
+          className={[
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus-ring",
+            c.i_liked
+              ? "border-brand/40 bg-brand/10 text-brand"
+              : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+          ].join(" ")}
+        >
+          <span aria-hidden>{c.i_liked ? "♥" : "♡"}</span>
+          {c.like_count > 0 && (
+            <span className="tabular-nums">{c.like_count}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onReply}
+          className="text-[11px] font-medium text-ink-500 hover:text-ink-900"
+        >
+          Odpovědět
+        </button>
+        {(canModerate || c.author_id === currentUserId) && (
+          <button
+            type="button"
+            onClick={() => onDelete()}
+            className="text-[11px] text-ink-500 hover:text-danger"
+          >
+            Smazat
+          </button>
+        )}
+      </div>
     </div>
   );
 }

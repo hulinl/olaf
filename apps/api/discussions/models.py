@@ -70,10 +70,22 @@ class Topic(models.Model):
 
 
 class Comment(models.Model):
-    """A reply on a Topic. Flat threading in V1."""
+    """A reply on a Topic. Single-level threading: a comment may point
+    at another comment via `parent`, and we render replies indented
+    underneath their parent. We deliberately don't allow reply-to-a-
+    reply (would balloon into deeply nested trees) — clicking Reply on
+    a nested comment still attaches the new comment to the top-level
+    parent."""
 
     topic = models.ForeignKey(
         Topic, on_delete=models.CASCADE, related_name="comments"
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
     )
     body = models.TextField()
     author = models.ForeignKey(

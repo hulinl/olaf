@@ -201,8 +201,18 @@ def workspace_topic_comments(
             {"body": "Napiš zprávu."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    # Reply-to handling: only one level deep. If the requested parent
+    # is itself a reply, climb to its root so we never grow trees.
+    parent = None
+    parent_id = request.data.get("parent")
+    if parent_id:
+        try:
+            candidate = Comment.objects.get(pk=parent_id, topic=topic)
+            parent = candidate.parent or candidate
+        except Comment.DoesNotExist:
+            pass
     comment = Comment.objects.create(
-        topic=topic, body=body, author=request.user
+        topic=topic, body=body, author=request.user, parent=parent
     )
     from .tasks import send_comment_notification_task
 
@@ -380,8 +390,16 @@ def event_topic_comments(
             {"body": "Napiš zprávu."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    parent = None
+    parent_id = request.data.get("parent")
+    if parent_id:
+        try:
+            candidate = Comment.objects.get(pk=parent_id, topic=topic)
+            parent = candidate.parent or candidate
+        except Comment.DoesNotExist:
+            pass
     comment = Comment.objects.create(
-        topic=topic, body=body, author=request.user
+        topic=topic, body=body, author=request.user, parent=parent
     )
     from .tasks import send_comment_notification_task
 
