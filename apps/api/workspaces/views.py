@@ -975,6 +975,128 @@ def workspace_members_csv(request: Request, slug: str):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def workspace_members_bulk_email(
+    request: Request, slug: str
+) -> Response:
+    """Owner-only: send one e-mail to a curated subset of the Lidé roster.
+
+    Body: {user_ids: int[], subject: str, body: str}.
+
+    Each recipient gets their own message (separate To: header) so they
+    don't see each other's addresses. The owner is set as Reply-To so
+    replies go back to them, not to the platform inbox.
+
+    Bounded to people who already RSVPed to (or hold a role in) this
+    workspace — same surface the Lidé endpoint exposes — so owners
+    can't spray to arbitrary user ids.
+    """
+    from django.conf import settings as _s
+    from django.core.mail import EmailMessage
+    from django.db.models import Q as DQ
+
+    from accounts.models import User
+    from events.models import RSVP, Event
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    user_ids = request.data.get("user_ids")
+    subject = (request.data.get("subject") or "").strip()
+    body = (request.data.get("body") or "").strip()
+    if not isinstance(user_ids, list) or not user_ids:
+        return Response(
+            {"user_ids": "Vyber alespoň jednoho člověka."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not subject:
+        return Response(
+            {"subject": "Vyplň předmět."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    if not body:
+        return Response(
+            {"body": "Vyplň text e-mailu."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # Safety cap — owner sprays to a huge selection would be both a
+    # spam vector and a tarpit for the worker. 200 is well above any
+    # real OLAF community size for V1.
+    if len(user_ids) > 200:
+        return Response(
+            {"user_ids": "Max 200 příjemců na jedno odeslání."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Roster scope mirrors workspace_members — anyone who's RSVPed
+    # to an event in this workspace OR holds a role.
+    event_ids = list(
+        Event.objects.filter(
+            DQ(workspace=workspace) | DQ(shared_workspaces=workspace)
+        ).values_list("id", flat=True).distinct()
+    )
+    role_user_ids = list(
+        WorkspaceMember.objects.filter(workspace=workspace).values_list(
+            "user_id", flat=True
+        )
+    )
+    eligible_ids = set(
+        User.objects.filter(
+            DQ(rsvps__event_id__in=event_ids) | DQ(id__in=role_user_ids)
+        )
+        .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
+        .values_list("id", flat=True)
+        .distinct()
+    )
+
+    sent = 0
+    skipped = 0
+    from_addr = getattr(_s, "DEFAULT_FROM_EMAIL", "olaf@olaf.events")
+    reply_to = (
+        [request.user.email] if request.user.email else None
+    )
+    # Footer reminds the recipient where the e-mail came from so it
+    # doesn't read as platform spam.
+    footer = (
+        f"\n\n— {request.user.get_full_name() or request.user.email}"
+        f" · {workspace.name}"
+    )
+    for uid in user_ids:
+        try:
+            uid_int = int(uid)
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        if uid_int not in eligible_ids:
+            skipped += 1
+            continue
+        try:
+            recipient = User.objects.get(pk=uid_int)
+        except User.DoesNotExist:
+            skipped += 1
+            continue
+        if not recipient.email:
+            skipped += 1
+            continue
+        try:
+            EmailMessage(
+                subject=subject,
+                body=body + footer,
+                from_email=from_addr,
+                to=[recipient.email],
+                reply_to=reply_to,
+            ).send(fail_silently=True)
+            sent += 1
+        except Exception:
+            skipped += 1
+
+    return Response({"sent": sent, "skipped": skipped})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
 def workspace_payments_reconcile(request: Request, slug: str) -> Response:
     """Upload a Fio bank CSV ("Stažení v CSV") and auto-mark every

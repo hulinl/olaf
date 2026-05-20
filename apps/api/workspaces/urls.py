@@ -103,4 +103,9 @@ urlpatterns = [
         views.workspace_invite_link,
         name="invite-link",
     ),
+    path(
+        "<slug:slug>/members/bulk-email/",
+        views.workspace_members_bulk_email,
+        name="members-bulk-email",
+    ),
 ]
