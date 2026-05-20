@@ -796,6 +796,45 @@ export const workspaces = {
     ),
   membersCsvUrl: (slug: string) =>
     `${API_URL}/api/workspaces/${slug}/members.csv`,
+  reconcilePayments: async (slug: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiFetch<{
+      total_rows: number;
+      credits: number;
+      matched: Array<{
+        tx: {
+          date: string | null;
+          amount: string;
+          variable_symbol: string;
+          message: string;
+          counterparty: string;
+        };
+        rsvp_id: number;
+        event_title: string;
+        user_full_name: string;
+        user_email: string;
+        amount_mismatch: boolean;
+      }>;
+      unmatched: Array<{
+        date: string | null;
+        amount: string;
+        variable_symbol: string;
+        message: string;
+        counterparty: string;
+      }>;
+      already_paid: Array<{
+        date: string | null;
+        amount: string;
+        variable_symbol: string;
+        message: string;
+        counterparty: string;
+      }>;
+    }>(`/api/workspaces/${slug}/payments/reconcile/`, {
+      method: "POST",
+      body: form,
+    });
+  },
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
   personal: () => apiFetch<Workspace>("/api/workspaces/personal/"),
   create: (payload: WorkspaceCreatePayload) =>

@@ -19,7 +19,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/komunity", label: "Komunity" },
   { href: "/admin/lide", label: "Lidé" },
   { href: "/admin/vybaveni", label: "Vybavení" },
-  { href: "/admin/platby", label: "Platby", comingSoon: true },
+  { href: "/admin/platby", label: "Platby" },
   { href: "/admin/dokumenty", label: "Dokumenty", comingSoon: true },
   { href: "/admin/smlouvy", label: "Smlouvy", comingSoon: true },
 ];
