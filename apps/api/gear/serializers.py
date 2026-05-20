@@ -79,10 +79,11 @@ class GearListSerializer(serializers.ModelSerializer):
         model = GearList
         fields = (
             "id", "name", "description", "entries", "item_count",
-            "total_weight_g", "created_at", "updated_at",
+            "total_weight_g", "slug", "visibility",
+            "created_at", "updated_at",
         )
         read_only_fields = (
-            "id", "entries", "item_count", "total_weight_g",
+            "id", "entries", "item_count", "total_weight_g", "slug",
             "created_at", "updated_at",
         )
 
@@ -95,3 +96,35 @@ class GearListSerializer(serializers.ModelSerializer):
             if e.item.weight_g:
                 total += e.item.weight_g * e.quantity
         return total
+
+
+class PublicGearListSerializer(serializers.ModelSerializer):
+    """Slim payload for the public /gear/<slug> view. Owner attribution
+    + entries with affiliate-rewritten display_url, no internal IDs we
+    don't need on a public page."""
+
+    entries = GearListEntrySerializer(many=True, read_only=True)
+    item_count = serializers.SerializerMethodField()
+    total_weight_g = serializers.SerializerMethodField()
+    owner_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GearList
+        fields = (
+            "name", "description", "slug", "entries",
+            "item_count", "total_weight_g", "owner_name",
+            "created_at", "updated_at",
+        )
+
+    def get_item_count(self, obj: GearList) -> int:
+        return sum(e.quantity for e in obj.entries.all())
+
+    def get_total_weight_g(self, obj: GearList) -> int:
+        total = 0
+        for e in obj.entries.select_related("item"):
+            if e.item.weight_g:
+                total += e.item.weight_g * e.quantity
+        return total
+
+    def get_owner_name(self, obj: GearList) -> str:
+        return obj.user.get_full_name() or obj.user.email

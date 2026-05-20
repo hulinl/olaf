@@ -9,6 +9,7 @@ import {
   ApiError,
   type GearItem,
   type GearList,
+  type GearListVisibility,
   type User,
   auth,
   gear,
@@ -651,6 +652,7 @@ function ListCard({
 
       {isOpen && (
         <div className="border-t border-border px-4 py-4">
+          <SharePanel list={list} onChange={onChange} />
           {list.entries.length === 0 ? (
             <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
               List je prázdný. Přidej položky z katalogu.
@@ -770,6 +772,89 @@ function ItemPicker({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SharePanel({
+  list,
+  onChange,
+}: {
+  list: GearList;
+  onChange: () => Promise<void>;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const publicUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/gear/${list.slug}`
+      : `/gear/${list.slug}`;
+
+  async function setVisibility(v: GearListVisibility) {
+    setBusy(true);
+    try {
+      await gear.updateList(list.id, { visibility: v });
+      await onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const isPublic =
+    list.visibility === "unlisted" || list.visibility === "public";
+
+  return (
+    <div className="mb-4 flex flex-col gap-2 rounded-md border border-border bg-surface-muted/30 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Sdílení
+        </p>
+        <select
+          disabled={busy}
+          value={list.visibility}
+          onChange={(e) =>
+            setVisibility(e.target.value as GearListVisibility)
+          }
+          className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink-700 focus-ring"
+        >
+          <option value="private">Soukromé (jen já)</option>
+          <option value="unlisted">Nelistované (kdo má odkaz)</option>
+          <option value="public">Veřejné</option>
+        </select>
+      </div>
+      {isPublic ? (
+        <div className="flex items-center gap-2">
+          <input
+            readOnly
+            value={publicUrl}
+            className="flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink-700 focus-ring"
+            onFocus={(e) => e.target.select()}
+          />
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded-md border border-border bg-surface px-2 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted"
+          >
+            {copied ? "✓" : "Kopírovat"}
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-ink-500">
+          List nevidí nikdo jiný. Přepni na „Nelistované" pro sdílení
+          odkazem nebo „Veřejné" pro indexovatelnou stránku.
+        </p>
+      )}
     </div>
   );
 }

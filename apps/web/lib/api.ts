@@ -1375,6 +1375,8 @@ export interface GearListEntry {
   note: string;
 }
 
+export type GearListVisibility = "private" | "unlisted" | "public";
+
 export interface GearList {
   id: number;
   name: string;
@@ -1382,6 +1384,20 @@ export interface GearList {
   entries: GearListEntry[];
   item_count: number;
   total_weight_g: number;
+  slug: string;
+  visibility: GearListVisibility;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicGearList {
+  name: string;
+  description: string;
+  slug: string;
+  entries: GearListEntry[];
+  item_count: number;
+  total_weight_g: number;
+  owner_name: string;
   created_at: string;
   updated_at: string;
 }
@@ -1417,7 +1433,11 @@ export const gear = {
     }),
   updateList: (
     id: number,
-    payload: { name?: string; description?: string },
+    payload: {
+      name?: string;
+      description?: string;
+      visibility?: GearListVisibility;
+    },
   ) =>
     apiFetch<GearList>(`/api/gear/lists/${id}/`, {
       method: "PATCH",
