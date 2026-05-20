@@ -557,44 +557,11 @@ def event_images(
 
 
 def _downscale_upload(upload):
-    """Return a Django ContentFile downscaled + re-encoded as JPEG.
-    Falls back to the original file if Pillow can't open it (e.g.
-    unsupported format), so we never block a valid upload on this."""
-    import io
+    """Backward-compat shim — keep call sites working while the shared
+    helper migrates. Delegates to events.image_utils."""
+    from .image_utils import downscale_upload
 
-    from django.core.files.uploadedfile import InMemoryUploadedFile
-    from PIL import Image
-
-    MAX_DIM = 1600
-    QUALITY = 82
-
-    try:
-        upload.seek(0)
-        img = Image.open(upload)
-        img = img.convert("RGB")  # Drop alpha; JPEG output anyway.
-        w, h = img.size
-        scale = min(1.0, MAX_DIM / max(w, h))
-        if scale < 1.0:
-            new_size = (int(w * scale), int(h * scale))
-            img = img.resize(new_size, Image.LANCZOS)
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=QUALITY, optimize=True)
-        buf.seek(0)
-        original_name = getattr(upload, "name", "image") or "image"
-        stem = original_name.rsplit(".", 1)[0][:60]
-        return InMemoryUploadedFile(
-            buf,
-            "image",
-            f"{stem}.jpg",
-            "image/jpeg",
-            buf.getbuffer().nbytes,
-            None,
-        )
-    except Exception:
-        # Pillow couldn't process — store the original so the owner
-        # at least sees their upload. Resize can be re-applied later.
-        upload.seek(0)
-        return upload
+    return downscale_upload(upload)
 
 
 @api_view(["DELETE"])
@@ -748,7 +715,12 @@ def event_cover(
 
     if event.cover:
         event.cover.delete(save=False)
-    event.cover = upload
+    # Same downscale + JPEG re-encode pipeline as the gallery uploads —
+    # owners drop iPhone-original 4000+ px JPEGs in here and the public
+    # landing pays the load-time cost on every visit otherwise.
+    from .image_utils import downscale_upload
+
+    event.cover = downscale_upload(upload)
     event.save(update_fields=["cover", "updated_at"])
     return Response(EventPublicSerializer(event).data)
 
