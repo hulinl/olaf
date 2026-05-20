@@ -55,4 +55,9 @@ urlpatterns = [
         views.person_tag_assignment,
         name="member-tag",
     ),
+    path(
+        "<slug:slug>/payments/reconcile/",
+        views.workspace_payments_reconcile,
+        name="payments-reconcile",
+    ),
 ]

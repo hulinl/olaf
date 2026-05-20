@@ -959,3 +959,72 @@ def workspace_members_csv(request: Request, slug: str):
     response = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+# ---------------------------------------------------------------------------
+# Fio bank reconciliation (V1.5 — replaces "Označit zaplaceno" manual flow)
+# ---------------------------------------------------------------------------
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def workspace_payments_reconcile(request: Request, slug: str) -> Response:
+    """Upload a Fio bank CSV ("Stažení v CSV") and auto-mark every
+    matched RSVP as paid. Returns a summary so the owner can see what
+    landed + what still needs manual handling.
+
+    Permissions: workspace owner/admin only — manipulating payment
+    state isn't something co-creators should do.
+    """
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    upload = request.FILES.get("file")
+    if upload is None:
+        return Response(
+            {"file": "Nahraj CSV výpis z Fia (Účet → Stažení v CSV)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if upload.size > 4 * 1024 * 1024:
+        return Response(
+            {"file": "Výpis je moc velký (max 4 MB)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from events.payments_reconcile import reconcile_workspace
+
+    result = reconcile_workspace(workspace=workspace, csv_content=upload.read())
+
+    def _tx_dict(tx):
+        return {
+            "date": tx.when.isoformat() if tx.when else None,
+            "amount": str(tx.amount),
+            "variable_symbol": tx.variable_symbol,
+            "message": tx.message,
+            "counterparty": tx.counterparty,
+        }
+
+    return Response(
+        {
+            "total_rows": result.total_rows,
+            "credits": result.credits,
+            "matched": [
+                {
+                    "tx": _tx_dict(m.tx),
+                    "rsvp_id": m.rsvp_id,
+                    "event_title": m.event_title,
+                    "user_full_name": m.user_full_name,
+                    "user_email": m.user_email,
+                    "amount_mismatch": m.amount_mismatch,
+                }
+                for m in result.matched
+            ],
+            "unmatched": [_tx_dict(t) for t in result.unmatched],
+            "already_paid": [_tx_dict(t) for t in result.already_paid],
+        }
+    )
