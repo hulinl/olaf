@@ -604,9 +604,12 @@ function ItemSection({
             Žádné položky. Začni přidáním prvního kusu vybavení.
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-md border border-border">
+          // No outer border — the Card already provides one, doubling
+          // it up made it look like "table inside a table". Header gets
+          // a bottom border instead.
+          <div className="mt-4 -mx-3 overflow-x-auto sm:-mx-4">
             <table className="w-full text-sm">
-              <thead className="bg-surface-muted/60">
+              <thead className="border-b border-border">
                 <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                   <th className="px-3 py-2">Položka</th>
                   <th className="hidden px-3 py-2 sm:table-cell">Kategorie</th>
@@ -615,7 +618,7 @@ function ItemSection({
                   <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-surface">
+              <tbody className="divide-y divide-border">
                 {items.map((i) => (
                   <ItemRow
                     key={i.id}
