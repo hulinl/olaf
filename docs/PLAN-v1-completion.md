@@ -40,7 +40,7 @@ Plus všechno mimo původní slice plán:
 
 ---
 
-## ✅ Day 1 V1.5+ — shipped 2026-05-20
+## ✅ V1.5+ — shipped 2026-05-20
 
 | Feature | PR |
 |---|---|
@@ -54,6 +54,14 @@ Plus všechno mimo původní slice plán:
 | Gear click tracking (redirect + counts) | #70 |
 | Share buttons (event + komunita, admin + public) | #71 |
 | Co-creator picker from Lidé | #72 |
+| VAPID README + V1 plan refresh | #73 |
+| Notion CSV import — mgmt command | #74 |
+| Vybavení → Tvůrce + dashboard per list | #75 |
+| Gear block v event landing builderu | #76 |
+| Gear CSV upload via UI | #77 |
+| Lidé CRM rozšíření — tagy, poznámky, CSV export | #78 |
+| Lidé — tag filter + bulk select + bulk tag apply | #79 |
+| Fio bank reconciliation — `/admin/platby` aktivní | #80 |
 
 ---
 
@@ -61,12 +69,12 @@ Plus všechno mimo původní slice plán:
 
 ### V1.5 — krátkodobé
 
-- **Fio bank email reconciliation** — parsing notifikace → match na VS →
-  auto mark-as-paid. Nahradí manuální „Označit zaplaceno". ~3 h.
 - **iDoklad API integrace** — auto-vystavení faktur do účetnictví. User
   pitchoval 2026-05-18. ~4 h.
 - **Letní kemp 2026 event v produkci** — content task, dělat přes UI po
   loginu (memory: `project_olaf_shipping_path.md`).
+- **Fio webhook** (V1.5+) — replace manual CSV upload (#80) with token-API
+  poll or webhook for live reconciliation.
 
 ### V2 — později
 
