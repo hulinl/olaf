@@ -29,7 +29,7 @@ export function GearForm({ payload, onChange }: Props) {
     gear
       .listLists()
       .then(setLists)
-      .catch(() => setError("Nepodařilo se načíst tvoje gear listy."));
+      .catch(() => setError("Nepodařilo se načíst tvoje gear seznamy."));
   }, []);
 
   const selected = lists?.find((l) => l.slug === payload.list_slug);
@@ -59,11 +59,11 @@ export function GearForm({ payload, onChange }: Props) {
       </div>
 
       <Field
-        label="Gear list"
+        label="Gear seznam"
         hint={
           lists && lists.length === 0
-            ? "Zatím nemáš žádný gear list. Vytvoř si ho v Tvůrce → Vybavení."
-            : "Vyber list z tvého katalogu. Doporučujeme jeho viditelnost přepnout na Nelistované nebo Veřejné."
+            ? "Zatím nemáš žádný gear seznam. Vytvoř si ho v Tvůrce → Vybavení."
+            : "Vyber seznam z tvého katalogu. Doporučujeme jeho viditelnost přepnout na Nelistované nebo Veřejné."
         }
       >
         {lists === null ? (
@@ -78,7 +78,7 @@ export function GearForm({ payload, onChange }: Props) {
             }
             className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
           >
-            <option value="">— vyber list —</option>
+            <option value="">— vyber seznam —</option>
             {lists.map((l) => (
               <option key={l.slug} value={l.slug}>
                 {l.name}
@@ -93,7 +93,7 @@ export function GearForm({ payload, onChange }: Props) {
 
       {isPrivate && (
         <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          Vybraný list je <strong>soukromý</strong> — na public landing se
+          Vybraný seznam je <strong>soukromý</strong> — na public landing se
           nezobrazí, dokud ho nepřepneš na Nelistované nebo Veřejné v
           Tvůrce → Vybavení.
         </p>
