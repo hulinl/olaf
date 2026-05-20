@@ -205,6 +205,20 @@ class Event(TenantScopedModel):
         ),
     )
 
+    # Recommended gear — owner attaches one of their GearLists. The
+    # public landing renders a bare "Doporučené vybavení" section
+    # (just item names + category, no URLs/prices); a registered
+    # participant gets the same items as a checklist they tick off
+    # while packing. SET_NULL on list delete keeps the event intact.
+    recommended_gear_list = models.ForeignKey(
+        "gear.GearList",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recommended_for_events",
+        help_text="Optional GearList shown to participants as a packing checklist.",
+    )
+
     # Required documents (Slice 7). Owner declares a list of documents
     # the participant must upload (waiver, insurance card, parental
     # consent, ...). Each item is {key, label, required}. Files land in
@@ -345,6 +359,12 @@ class RSVP(models.Model):
         blank=True,
         help_text="Set by the Creator after the event.",
     )
+
+    # Packing-checklist state for Event.recommended_gear_list. Keys are
+    # stringified GearListItem ids (the through-table entry), values
+    # are ISO-8601 timestamps for when the participant ticked the box.
+    # Unchecked items are simply absent from the dict.
+    gear_checklist = models.JSONField(default=dict, blank=True)
 
     # Organizer flag — a person who's on the event in a help-the-event-
     # happen capacity, not as a paying attendee. Organizers:

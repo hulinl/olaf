@@ -11,6 +11,7 @@ import {
   type BillingProfile,
   type Event as OlafEvent,
   type EventWritePayload,
+  type GearList,
   QUESTIONNAIRE_SECTION_HINTS,
   QUESTIONNAIRE_SECTION_LABELS,
   QUESTIONNAIRE_SECTION_ORDER,
@@ -18,6 +19,7 @@ import {
   type RequiredDocumentSpec,
   type Workspace,
   auth,
+  gear,
   workspaces,
 } from "@/lib/api";
 
@@ -160,6 +162,14 @@ export function EventForm({
     initial?.required_documents ?? [],
   );
 
+  // Recommended gear — owner picks one of their GearLists. Loaded lazily
+  // when the form mounts so the picker dropdown has fresh data even if
+  // the owner created a list in another tab.
+  const [recommendedGearListId, setRecommendedGearListId] = useState<
+    number | null
+  >(initial?.recommended_gear_list?.id ?? null);
+  const [gearLists, setGearLists] = useState<GearList[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,6 +198,15 @@ export function EventForm({
       })
       .catch(() => {
         // Silently — no profiles means the section just says "vytvoř si profil".
+      });
+    gear
+      .listLists()
+      .then((list) => {
+        if (cancelled) return;
+        setGearLists(list);
+      })
+      .catch(() => {
+        if (!cancelled) setGearLists([]);
       });
     return () => {
       cancelled = true;
@@ -234,6 +253,7 @@ export function EventForm({
         required_documents: requiredDocs.filter(
           (d) => d.key.trim() && d.label.trim(),
         ),
+        recommended_gear_list: recommendedGearListId,
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -575,6 +595,61 @@ export function EventForm({
         </Card>
         );
       })()}
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">
+            Doporučené vybavení
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Přiřaď jeden ze svých gear listů jako doporučené vybavení.
+            Na public stránce eventu se ukáže jako bare seznam (jména +
+            kategorie); přihlášený účastník dostane interaktivní
+            checklist s odškrtáváním.
+          </p>
+
+          {gearLists.length === 0 ? (
+            <p className="mt-3 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+              Zatím nemáš žádný gear list. Vytvoř si ho v{" "}
+              <strong>Tvůrce → Vybavení</strong>.
+            </p>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select
+                value={recommendedGearListId ?? ""}
+                onChange={(e) =>
+                  setRecommendedGearListId(
+                    e.target.value ? Number(e.target.value) : null,
+                  )
+                }
+                className="flex-1 min-w-[220px] rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+              >
+                <option value="">— žádný gear list —</option>
+                {gearLists.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} ({l.item_count}{" "}
+                    {l.item_count === 1
+                      ? "položka"
+                      : l.item_count < 5
+                        ? "položky"
+                        : "položek"}
+                    )
+                  </option>
+                ))}
+              </select>
+              {recommendedGearListId != null && (
+                <button
+                  type="button"
+                  onClick={() => setRecommendedGearListId(null)}
+                  className="text-xs font-medium text-ink-500 hover:text-danger"
+                >
+                  Odebrat
+                </button>
+              )}
+            </div>
+          )}
+        </CardSection>
+      </Card>
 
       <Card>
         <CardSection>

@@ -207,6 +207,10 @@ export interface Event extends EventSummary {
   /** Inline payload for every `gear` block on this event's landing.
    *  Map of slug → PublicGearList. Private lists are omitted. */
   gear_lists_by_slug?: Record<string, PublicGearList>;
+  /** Slim payload for the event's recommended gear checklist — set
+   *  via Event.recommended_gear_list. Strips URLs/weights/notes; just
+   *  what a packing checklist needs. */
+  recommended_gear_list: RecommendedGearList | null;
   enabled_questionnaire_sections: QuestionnaireSection[];
   community_slugs: string[];
   shared_workspace_slugs: string[];
@@ -466,6 +470,10 @@ export interface MyRSVP {
   payment_currency: string;
   variable_symbol: string;
   paid_at: string | null;
+  /** Packing-checklist state: keys = stringified RecommendedGearListEntry
+   *  ids, values = ISO timestamp the box was ticked. Unchecked items are
+   *  simply absent from the dict. */
+  gear_checklist: Record<string, string>;
   created_at: string;
 }
 
@@ -1087,6 +1095,8 @@ export interface EventWritePayload {
   billing_profile?: number | null;
   shared_workspace_slugs?: string[];
   required_documents?: RequiredDocumentSpec[];
+  /** FK id of a GearList owned by the event creator; null clears it. */
+  recommended_gear_list?: number | null;
 }
 
 export const events = {
@@ -1257,6 +1267,19 @@ export const events = {
       {
         method: "POST",
         body: JSON.stringify({ is_organizer: isOrganizer }),
+      },
+    ),
+  toggleGearChecklistItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+    isChecked: boolean,
+  ) =>
+    apiFetch<{ gear_checklist: Record<string, string> }>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvp/gear-checklist/`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ item_id: itemId, is_checked: isChecked }),
       },
     ),
   myDocuments: (workspaceSlug: string, eventSlug: string) =>
@@ -1668,6 +1691,20 @@ export interface PublicGearList {
   owner_name: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface RecommendedGearListEntry {
+  id: number;
+  name: string;
+  category: string;
+  quantity: number;
+}
+
+export interface RecommendedGearList {
+  id: number;
+  name: string;
+  slug: string;
+  entries: RecommendedGearListEntry[];
 }
 
 export interface GearItemWritePayload {

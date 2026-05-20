@@ -182,6 +182,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     community_slugs = serializers.SerializerMethodField()
     shared_workspace_slugs = serializers.SerializerMethodField()
     gear_lists_by_slug = serializers.SerializerMethodField()
+    recommended_gear_list = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -205,6 +206,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "shared_workspace_slugs",
             "blocks",
             "gear_lists_by_slug",
+            "recommended_gear_list",
             "enabled_questionnaire_sections",
             "images",
             "workspace_slug",
@@ -242,6 +244,35 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     def get_shared_workspace_slugs(self, obj: Event) -> list[str]:
         return list(obj.shared_workspaces.values_list("slug", flat=True))
+
+    def get_recommended_gear_list(self, obj: Event) -> dict | None:
+        """Slim payload for the public "Doporučené vybavení" section
+        + the participant checklist. Just id, name, slug, and entries
+        with bare item name + category — no URLs, weights, or notes
+        (those leak the owner's specific picks; we want the generic
+        gear plan visible to everyone). Owner-side admin views still
+        get the full GearList via the normal gear endpoints."""
+        if obj.recommended_gear_list_id is None:
+            return None
+        gl = obj.recommended_gear_list
+        entries = []
+        for e in gl.entries.select_related("item").order_by(
+            "sort_order", "id"
+        ):
+            entries.append(
+                {
+                    "id": e.id,
+                    "name": e.item.name,
+                    "category": e.item.category,
+                    "quantity": e.quantity,
+                }
+            )
+        return {
+            "id": gl.id,
+            "name": gl.name,
+            "slug": gl.slug,
+            "entries": entries,
+        }
 
     def get_gear_lists_by_slug(self, obj: Event) -> dict:
         """Inline payload for every gear block on this event's landing.
@@ -402,6 +433,7 @@ class MyRSVPSerializer(serializers.ModelSerializer):
             "payment_currency",
             "variable_symbol",
             "paid_at",
+            "gear_checklist",
             "created_at",
         )
         read_only_fields = fields
@@ -454,7 +486,20 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "payment_in_cash",
             "billing_profile",
             "required_documents",
+            "recommended_gear_list",
         )
+
+    def validate_recommended_gear_list(self, value):
+        """Owner can only attach their own GearLists. Anything else is
+        a 400 rather than a silent ignore."""
+        if value is None:
+            return None
+        request = self.context.get("request")
+        if request and value.user_id != request.user.id:
+            raise serializers.ValidationError(
+                "Tenhle gear list ti nepatří."
+            )
+        return value
 
     def validate_required_documents(self, value):
         if not isinstance(value, list):
