@@ -63,6 +63,12 @@ export default function DashboardPage() {
   const upcomingRsvped = (myEvents ?? []).filter(
     (e) => new Date(e.ends_at).getTime() >= Date.now(),
   );
+  const pastRsvped = (myEvents ?? [])
+    .filter((e) => new Date(e.ends_at).getTime() < Date.now())
+    .sort(
+      (a, b) =>
+        new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime(),
+    );
 
   return (
     <main className="flex flex-1 flex-col">
@@ -125,10 +131,6 @@ export default function DashboardPage() {
               )}
             </Section>
 
-            {/* "Moje pořádané akce" — owner-side view. Earlier dashboard
-                only showed events the user had RSVPed to, so creators
-                couldn't see their own work without going to /admin.
-                Section auto-hides when the user manages nothing. */}
             {(() => {
               const upcomingOwned = (ownedEvents ?? []).filter(
                 (e) => new Date(e.ends_at).getTime() >= Date.now(),
@@ -142,6 +144,48 @@ export default function DashboardPage() {
                         key={`owner-${e.workspace_slug}/${e.slug}`}
                         event={e}
                         ownerView
+                      />
+                    ))}
+                  </div>
+                </Section>
+              );
+            })()}
+
+            {pastRsvped.length > 0 && (
+              <Section title="Co už máš za sebou" href="/events">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pastRsvped.slice(0, 4).map((e) => (
+                    <EventMini
+                      key={`past-${e.workspace_slug}/${e.slug}`}
+                      event={e}
+                      muted
+                    />
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {(() => {
+              const pastOwned = (ownedEvents ?? [])
+                .filter((e) => new Date(e.ends_at).getTime() < Date.now())
+                .sort(
+                  (a, b) =>
+                    new Date(b.starts_at).getTime() -
+                    new Date(a.starts_at).getTime(),
+                );
+              if (pastOwned.length === 0) return null;
+              return (
+                <Section
+                  title="Tvé minulé akce"
+                  href="/admin/eventy"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {pastOwned.slice(0, 4).map((e) => (
+                      <EventMini
+                        key={`past-owner-${e.workspace_slug}/${e.slug}`}
+                        event={e}
+                        ownerView
+                        muted
                       />
                     ))}
                   </div>
@@ -277,9 +321,11 @@ function WorkspaceMini({ workspace }: { workspace: Workspace }) {
 function EventMini({
   event,
   ownerView = false,
+  muted = false,
 }: {
   event: EventSummary;
   ownerView?: boolean;
+  muted?: boolean;
 }) {
   const starts = new Date(event.starts_at);
   const cover = assetUrl(event.cover_url);
@@ -296,7 +342,10 @@ function EventMini({
     return (
       <Link
         href={href}
-        className="group relative isolate flex aspect-[16/10] flex-col justify-end overflow-hidden rounded-xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-ring"
+        className={[
+          "group relative isolate flex aspect-[16/10] flex-col justify-end overflow-hidden rounded-xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-ring",
+          muted ? "opacity-75 saturate-75 hover:opacity-100 hover:saturate-100" : "",
+        ].join(" ")}
       >
         <div
           aria-hidden
@@ -359,7 +408,10 @@ function EventMini({
   return (
     <Link
       href={href}
-      className="block rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
+      className={[
+        "block rounded-md border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring",
+        muted ? "border-border-strong/40 bg-surface-muted/40" : "border-border",
+      ].join(" ")}
     >
       <p className="text-xs text-ink-500">
         {starts.toLocaleDateString("cs-CZ", {
