@@ -2,10 +2,8 @@ Ahoj {{ user.first_name }},
 
 vítej na olafu — kde začíná dobrodružství.
 
-Potvrď svoji e-mailovou adresu kliknutím na odkaz níže:
-
-  {{ link }}
+Potvrď svoji e-mailovou adresu kliknutím na odkaz: {{ link }}
 
 Odkaz vyprší za {{ expires_hours }} hodin. Pokud sis účet na olafu nezakládal/a, můžeš tenhle e-mail ignorovat.
 
-— Tým olaf
+— Aplikace olaf

@@ -1,13 +1,12 @@
 Ahoj {{ user.first_name }},
 
-bohužel — „{{ event.title }}" byla zrušena.
+bohužel — akce „{{ event.title }}" byla zrušena.
 
-{% if reason %}Důvod:
-  {{ reason }}
+{% if reason %}Důvod: {{ reason }}
 
-{% endif %}{% if event.starts_at %}Původní termín: {{ event.starts_at|date:"l j. F Y, H:i" }}{% endif %}{% if event.location_text %}
+{% endif %}{% if event_when %}Původní termín: {{ event_when }}{% endif %}{% if event.location_text %}
 Místo: {{ event.location_text }}{% endif %}
 
 Tvoje registrace je tímto zrušená. Pokud něco potřebuješ, ozvi se nám.
 
-— {{ workspace.name }} přes olaf
+— Aplikace olaf

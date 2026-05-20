@@ -1,29 +1,23 @@
 Ahoj {{ user.first_name }},
 
-{% if status == 'yes' %}máš potvrzenou registraci na „{{ event.title }}". Těšíme se na tebe.
-{% elif status == 'waitlist' %}jsi na waitlistu pro „{{ event.title }}". Ozveme se hned, jak se uvolní místo.
-{% elif status == 'pending_approval' %}tvoje registrace na „{{ event.title }}" čeká na schválení od {{ workspace.name }}. Brzy se ti ozveme.
-{% else %}tvoje registrace na „{{ event.title }}" je zaznamenaná.
-{% endif %}
-Stránka akce:
-  {{ event_url }}
+{% if status == 'yes' %}máš potvrzenou registraci na „{{ event.title }}". Těšíme se na tebe.{% elif status == 'waitlist' %}jsi na waitlistu pro „{{ event.title }}". Ozveme se hned, jak se uvolní místo.{% elif status == 'pending_approval' %}tvoje registrace na „{{ event.title }}" čeká na schválení od pořadatele. Brzy se ti ozveme.{% else %}tvoje registrace na „{{ event.title }}" je zaznamenaná.{% endif %}
 
-{% if event.starts_at %}Kdy: {{ event.starts_at|date:"l j. F Y, H:i" }}{% endif %}{% if event.location_text %}
+Stránka akce: {{ event_url }}
+{% if event_when %}
+Kdy: {{ event_when }}{% endif %}{% if event.location_text %}
 Kde: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
 Sraz: {{ event.meeting_point_text }}{% endif %}{% if rsvp.payment_status == 'pending' and rsvp.payment_due_amount %}
 
-—— POKYNY K PLATBĚ ——
+Pokyny k platbě
+Částka: {{ rsvp.payment_due_amount }} {{ rsvp.payment_currency }}
+Účet: {{ workspace.payment_iban|default:"(organizátor ještě nezadal IBAN)" }}{% if workspace.payment_bank_name %}
+Banka: {{ workspace.payment_bank_name }}{% endif %}
+Variabilní symbol: {{ rsvp.variable_symbol }}
+Zpráva: {{ workspace.name }} — {{ event.title }}
+Splatnost: {{ workspace.payment_due_days }} dní od registrace
 
-Částka:     {{ rsvp.payment_due_amount }} {{ rsvp.payment_currency }}
-Účet:       {{ workspace.payment_iban|default:"(organizátor ještě nezadal IBAN)" }}
-{% if workspace.payment_bank_name %}Banka:      {{ workspace.payment_bank_name }}
-{% endif %}Var. symbol: {{ rsvp.variable_symbol }}
-Zpráva:     {{ workspace.name }} — {{ event.title }}
-Splatnost:  {{ workspace.payment_due_days }} dní od registrace
-
-QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.
-{% endif %}
+QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.{% endif %}
 
 Registraci si můžeš kdykoli zkontrolovat na stránce akce výše. Pokud něco nevyjde nebo potřebuješ zrušit, otevři si stránku a uprav svou registraci.
 
-— {{ workspace.name }} přes olaf
+— Aplikace olaf
