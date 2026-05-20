@@ -675,6 +675,14 @@ function ListCard({
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-xs">
+                    {e.item.url && (e.click_count ?? 0) > 0 && (
+                      <span
+                        title="Počet prokliků na affiliate odkaz"
+                        className="rounded bg-brand/10 px-1.5 py-0.5 font-mono tabular-nums text-brand"
+                      >
+                        {e.click_count}↗
+                      </span>
+                    )}
                     {e.item.weight_g != null && (
                       <span className="font-mono tabular-nums text-ink-700">
                         {e.quantity}× {e.item.weight_g} g

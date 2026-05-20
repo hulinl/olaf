@@ -24,4 +24,9 @@ urlpatterns = [
         views.public_gear_list,
         name="list-by-slug",
     ),
+    path(
+        "g/<slug:slug>/<int:entry_id>/",
+        views.gear_link_click,
+        name="go",
+    ),
 ]

@@ -1373,6 +1373,8 @@ export interface GearListEntry {
   quantity: number;
   sort_order: number;
   note: string;
+  /** Outbound click count — owner-only, 0 on public payloads. */
+  click_count?: number;
 }
 
 export type GearListVisibility = "private" | "unlisted" | "public";

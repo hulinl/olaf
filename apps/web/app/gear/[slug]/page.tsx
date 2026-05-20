@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
-import { type PublicGearList } from "@/lib/api";
+import { assetUrl, type PublicGearList } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
 interface Props {
@@ -107,7 +107,14 @@ export default async function PublicGearListPage({ params }: Props) {
                   </h2>
                   <ul className="mt-2 divide-y divide-border rounded-md border border-border bg-surface">
                     {entries.map((e) => {
-                      const href = e.item.display_url || e.item.url;
+                      // Outbound through our redirect so we can count
+                      // clicks. The redirect re-applies the affiliate
+                      // params server-side, so we don't need display_url
+                      // here — only knowing whether *some* URL exists.
+                      const hasUrl = Boolean(e.item.url);
+                      const href = hasUrl
+                        ? assetUrl(`/api/gear/g/${list.slug}/${e.id}/`)
+                        : null;
                       const weightLabel =
                         e.item.weight_g != null
                           ? e.quantity > 1
