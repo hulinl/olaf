@@ -184,123 +184,166 @@ export default function WorkspaceDetailPage({ params }: Props) {
           <p className="mt-6 max-w-2xl text-ink-700">{workspace.bio}</p>
         )}
 
-        {/* Rozcestník — jump-to anchors for the page's sections. Small
-            viewports otherwise hide Nástěnka entirely; this gives the
-            visitor a one-tap path to it from the top. */}
-        <nav
-          aria-label="Sekce komunity"
-          className="mt-8 flex flex-wrap gap-2 text-sm"
-        >
-          <a
-            href="#nadchazejici-akce"
-            className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-          >
-            Nadcházející akce
-          </a>
-          {past.length > 0 && (
-            <a
-              href="#minule-akce"
-              className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-            >
-              Minulé akce
-            </a>
-          )}
-          {isOwner && (
-            <a
-              href="#nastenka"
-              className="rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-            >
-              Nástěnka
-            </a>
-          )}
-        </nav>
-
-        <section id="nadchazejici-akce" className="mt-12 scroll-mt-20">
-          <div className="mb-5">
-            <h2 className="text-xl font-semibold text-ink-900">
-              Nadcházející akce
-            </h2>
-          </div>
-          {upcoming.length === 0 ? (
-            <Card>
-              <CardSection>
-                <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
-                  <h3 className="text-base font-semibold text-ink-900">
-                    Žádné nadcházející akce
-                  </h3>
-                  <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                    {isOwner
-                      ? "Vytvoř první akci a uvidíš ji tady."
-                      : "Tato komunita zatím neplánuje žádnou veřejnou akci."}
-                  </p>
-                  {isOwner && (
-                    <LinkButton
-                      href="/admin/eventy/new"
-                      variant="primary"
-                      size="md"
-                      className="mt-5"
-                    >
-                      Vytvořit event
-                    </LinkButton>
-                  )}
-                </div>
-              </CardSection>
-            </Card>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {upcoming.map((e) => (
-                <EventCard
-                  key={e.slug}
-                  event={e}
-                  workspaceSlug={workspace.slug}
-                  showStatus={isOwner}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {past.length > 0 && (
-          <section id="minule-akce" className="mt-12 scroll-mt-20">
-            <h2 className="mb-5 text-xl font-semibold text-ink-900">
-              Minulé akce
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {past.map((e) => (
-                <EventCard
-                  key={e.slug}
-                  event={e}
-                  workspaceSlug={workspace.slug}
-                  showStatus={isOwner}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Sub-Community feature (smaller member rosters within a workspace)
-            is parked for V1.5 — the model + endpoints still exist, but the
-            UI surface is hidden so the V1 audience doesn't see two levels of
-            "komunita" with the same word. Re-enable here when the V1.5 slice
-            ships. */}
-
-        {/* Nástěnka komunity — V1 backend gates this to WorkspaceMember
-            (= currently only owners), so we render the section only when
-            the viewer has access. When sub-communities / general membership
-            ship the gate widens automatically. */}
-        {isOwner && (
-          <section id="nastenka" className="mt-12 scroll-mt-20">
-            <DiscussionWall
-              scope={{ kind: "workspace", slug, isModerator: isOwner }}
-              currentUserId={user.id}
-              topicHref={(topicId) =>
-                `/workspaces/${slug}/nastenka/${topicId}`
-              }
-            />
-          </section>
-        )}
+        <WorkspaceTabs
+          workspace={workspace}
+          upcoming={upcoming}
+          past={past}
+          isOwner={isOwner}
+          slug={slug}
+          userId={user.id}
+        />
       </section>
     </main>
+  );
+}
+
+/** Tab switcher between Akce (events) and Nástěnka (wall).
+ *  Replaces the old "all sections stacked + jump-to anchor strip" so
+ *  the page is shorter, doesn't scroll-jump on tab switch, and Nástěnka
+ *  is reachable on small viewports without scrolling past the empty
+ *  events grid. */
+function WorkspaceTabs({
+  workspace,
+  upcoming,
+  past,
+  isOwner,
+  slug,
+  userId,
+}: {
+  workspace: Workspace;
+  upcoming: EventSummary[];
+  past: EventSummary[];
+  isOwner: boolean;
+  slug: string;
+  userId: number;
+}) {
+  // Owner-only viewers get the wall tab; visitors w/o access only see
+  // Akce, so hiding the tab strip entirely would be confusing — keep
+  // a single visible tab so the page structure feels intentional.
+  type Tab = "akce" | "nastenka";
+  const [tab, setTab] = useState<Tab>("akce");
+
+  return (
+    <>
+      <div
+        role="tablist"
+        aria-label="Sekce komunity"
+        className="mt-8 flex flex-wrap gap-2 text-sm"
+      >
+        <TabButton active={tab === "akce"} onClick={() => setTab("akce")}>
+          Nadcházející akce
+        </TabButton>
+        {isOwner && (
+          <TabButton
+            active={tab === "nastenka"}
+            onClick={() => setTab("nastenka")}
+          >
+            Nástěnka
+          </TabButton>
+        )}
+      </div>
+
+      {tab === "akce" && (
+        <>
+          <section className="mt-8">
+            {upcoming.length === 0 ? (
+              <Card>
+                <CardSection>
+                  <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
+                    <h3 className="text-base font-semibold text-ink-900">
+                      Žádné nadcházející akce
+                    </h3>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                      {isOwner
+                        ? "Vytvoř první akci a uvidíš ji tady."
+                        : "Tato komunita zatím neplánuje žádnou veřejnou akci."}
+                    </p>
+                    {isOwner && (
+                      <LinkButton
+                        href="/admin/eventy/new"
+                        variant="primary"
+                        size="md"
+                        className="mt-5"
+                      >
+                        Vytvořit event
+                      </LinkButton>
+                    )}
+                  </div>
+                </CardSection>
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {upcoming.map((e) => (
+                  <EventCard
+                    key={e.slug}
+                    event={e}
+                    workspaceSlug={workspace.slug}
+                    showStatus={isOwner}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {past.length > 0 && (
+            <section className="mt-10">
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">
+                Minulé akce
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {past.map((e) => (
+                  <EventCard
+                    key={e.slug}
+                    event={e}
+                    workspaceSlug={workspace.slug}
+                    showStatus={isOwner}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {tab === "nastenka" && isOwner && (
+        <section className="mt-8">
+          <DiscussionWall
+            scope={{ kind: "workspace", slug, isModerator: isOwner }}
+            currentUserId={userId}
+            topicHref={(topicId) =>
+              `/workspaces/${slug}/nastenka/${topicId}`
+            }
+          />
+        </section>
+      )}
+    </>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={[
+        "rounded-md border px-3 py-1.5 font-medium focus-ring",
+        active
+          ? "border-brand bg-brand text-brand-ink"
+          : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+      ].join(" ")}
+    >
+      {children}
+    </button>
   );
 }
 
