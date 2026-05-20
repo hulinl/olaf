@@ -121,3 +121,68 @@ class WorkspaceMember(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} as {self.role} of {self.workspace}"
+
+
+class PersonTag(models.Model):
+    """A label the workspace owner attaches to people (Lidé CRM).
+
+    Tags are workspace-scoped (each komunita keeps its own vocabulary
+    — "stálice", "platí pozdě", "VIP"), short, and optional. Assigned
+    to a user via PersonTagAssignment; one tag can be on many people,
+    one person can carry many tags."""
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="person_tags"
+    )
+    name = models.CharField(max_length=40)
+    color = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Optional color token or hex; UI falls back to brand if blank.",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "workspaces_person_tag"
+        ordering = ["sort_order", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "name"], name="uniq_tag_name_per_workspace"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} (ws={self.workspace_id})"
+
+
+class PersonProfile(models.Model):
+    """Workspace-scoped CRM annotations on a person who has touched the
+    workspace (RSVP, role, etc.).
+
+    Holds the free-text note + the m2m to PersonTag. Created lazily —
+    a row only appears when the owner first writes a note or assigns
+    a tag, so we don't bloat the table with empty profiles."""
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="person_profiles"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="workspace_profiles",
+    )
+    note = models.TextField(blank=True, default="")
+    tags = models.ManyToManyField(
+        PersonTag, related_name="profiles", blank=True
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "workspaces_person_profile"
+        unique_together = [("workspace", "user")]
+
+    def __str__(self) -> str:
+        return f"profile(ws={self.workspace_id}, user={self.user_id})"

@@ -34,4 +34,25 @@ urlpatterns = [
         views.workspace_member_handover,
         name="member-handover",
     ),
+    path(
+        "<slug:slug>/members.csv",
+        views.workspace_members_csv,
+        name="members-csv",
+    ),
+    path("<slug:slug>/tags/", views.person_tags, name="tags"),
+    path(
+        "<slug:slug>/tags/<int:tag_id>/",
+        views.person_tag_detail,
+        name="tag-detail",
+    ),
+    path(
+        "<slug:slug>/members/<int:user_id>/note/",
+        views.person_note,
+        name="member-note",
+    ),
+    path(
+        "<slug:slug>/members/<int:user_id>/tags/<int:tag_id>/",
+        views.person_tag_assignment,
+        name="member-tag",
+    ),
 ]

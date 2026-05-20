@@ -1,3 +1,5 @@
+import contextlib
+
 from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import (
@@ -411,6 +413,16 @@ def workspace_members(request: Request, slug: str) -> Response:
         )
     )
 
+    # Pull profile (note + tag ids) per user in one query — keeps the
+    # roster response O(1) regardless of how many tags are attached.
+    from .models import PersonProfile
+    profiles_by_user: dict[int, PersonProfile] = {
+        p.user_id: p
+        for p in PersonProfile.objects.filter(
+            workspace=workspace
+        ).prefetch_related("tags")
+    }
+
     return Response(
         [
             {
@@ -425,6 +437,16 @@ def workspace_members(request: Request, slug: str) -> Response:
                 "past_rsvps": u.past_rsvps,
                 "last_rsvp_at": u.last_rsvp_at,
                 "role": member_roles.get(u.id),
+                "note": (
+                    profiles_by_user[u.id].note
+                    if u.id in profiles_by_user
+                    else ""
+                ),
+                "tag_ids": (
+                    [t.id for t in profiles_by_user[u.id].tags.all()]
+                    if u.id in profiles_by_user
+                    else []
+                ),
             }
             for u in users
         ]
@@ -655,3 +677,285 @@ def workspace_member_handover(
             "old_owner_role": me.role,
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Lidé CRM — workspace-scoped tags + per-person notes + CSV export
+# ---------------------------------------------------------------------------
+
+
+def _serialize_tag(t) -> dict:
+    return {
+        "id": t.id,
+        "name": t.name,
+        "color": t.color,
+        "sort_order": t.sort_order,
+    }
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def person_tags(request: Request, slug: str) -> Response:
+    """List + create tags for a workspace's Lidé CRM."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _can_view_workspace_people(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from .models import PersonTag
+
+    if request.method == "GET":
+        qs = PersonTag.objects.filter(workspace=workspace)
+        return Response([_serialize_tag(t) for t in qs])
+
+    # Create. Owner/admin only — co-creators are read-only on tags so
+    # they can't pollute the workspace vocabulary.
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    name = (request.data.get("name") or "").strip()
+    if not name:
+        return Response(
+            {"name": "Tag musí mít název."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    color = (request.data.get("color") or "").strip()[:20]
+    tag, created = PersonTag.objects.get_or_create(
+        workspace=workspace,
+        name=name[:40],
+        defaults={"color": color},
+    )
+    return Response(
+        _serialize_tag(tag),
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def person_tag_detail(request: Request, slug: str, tag_id: int) -> Response:
+    """Rename / recolor / delete a tag. Owner/admin only.
+
+    Deleting a tag drops it from everyone it was assigned to (cascade
+    via the m2m through table); profiles + people stay untouched."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from .models import PersonTag
+
+    try:
+        tag = PersonTag.objects.get(pk=tag_id, workspace=workspace)
+    except PersonTag.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        tag.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if "name" in request.data:
+        n = str(request.data["name"]).strip()
+        if n:
+            tag.name = n[:40]
+    if "color" in request.data:
+        tag.color = str(request.data["color"]).strip()[:20]
+    if "sort_order" in request.data:
+        with contextlib.suppress(TypeError, ValueError):
+            tag.sort_order = int(request.data["sort_order"])
+    tag.save()
+    return Response(_serialize_tag(tag))
+
+
+def _get_or_create_profile(workspace, user):
+    """Profiles are lazy — create on first write only."""
+    from .models import PersonProfile
+
+    profile, _ = PersonProfile.objects.get_or_create(
+        workspace=workspace, user=user
+    )
+    return profile
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def person_note(request: Request, slug: str, user_id: int) -> Response:
+    """Set the free-text CRM note on a person within this workspace."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _can_view_workspace_people(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from accounts.models import User
+
+    try:
+        person = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    profile = _get_or_create_profile(workspace, person)
+    profile.note = str(request.data.get("note") or "")[:5000]
+    profile.save(update_fields=["note", "updated_at"])
+    return Response({"note": profile.note})
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def person_tag_assignment(
+    request: Request, slug: str, user_id: int, tag_id: int
+) -> Response:
+    """Attach (POST) / detach (DELETE) one tag from one person."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _can_view_workspace_people(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from accounts.models import User
+
+    from .models import PersonTag
+
+    try:
+        person = User.objects.get(pk=user_id)
+        tag = PersonTag.objects.get(pk=tag_id, workspace=workspace)
+    except (User.DoesNotExist, PersonTag.DoesNotExist):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    profile = _get_or_create_profile(workspace, person)
+    if request.method == "POST":
+        profile.tags.add(tag)
+    else:
+        profile.tags.remove(tag)
+    return Response({"tag_ids": list(profile.tags.values_list("id", flat=True))})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_members_csv(request: Request, slug: str):
+    """CSV dump of the Lidé roster — owner-tooling for newsletter
+    handoff, accounting, retention review. Includes note + tag names
+    so the spreadsheet matches what the owner sees on screen."""
+    import csv as _csv
+    import io as _io
+
+    from django.db.models import Count, Max
+    from django.db.models import Q as DQ
+    from django.http import HttpResponse
+    from django.utils import timezone
+
+    from accounts.models import User
+    from events.models import RSVP, Event
+
+    from .models import PersonProfile
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _can_view_workspace_people(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    event_ids = list(
+        Event.objects.filter(
+            DQ(workspace=workspace) | DQ(shared_workspaces=workspace)
+        )
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    now = timezone.now()
+    role_user_ids = list(
+        WorkspaceMember.objects.filter(workspace=workspace).values_list(
+            "user_id", flat=True
+        )
+    )
+    users = (
+        User.objects.filter(
+            DQ(rsvps__event_id__in=event_ids) | DQ(id__in=role_user_ids)
+        )
+        .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
+        .annotate(
+            total_rsvps=Count("rsvps", filter=DQ(rsvps__event_id__in=event_ids)),
+            upcoming_rsvps=Count(
+                "rsvps",
+                filter=DQ(
+                    rsvps__event_id__in=event_ids,
+                    rsvps__event__ends_at__gte=now,
+                )
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+            ),
+            past_rsvps=Count(
+                "rsvps",
+                filter=DQ(
+                    rsvps__event_id__in=event_ids,
+                    rsvps__event__ends_at__lt=now,
+                )
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+            ),
+            last_rsvp_at=Max("rsvps__created_at"),
+        )
+        .distinct()
+        .order_by("-last_rsvp_at")
+    )
+    profiles = {
+        p.user_id: p
+        for p in PersonProfile.objects.filter(workspace=workspace).prefetch_related(
+            "tags"
+        )
+    }
+    role_by_user = dict(
+        WorkspaceMember.objects.filter(workspace=workspace).values_list(
+            "user_id", "role"
+        )
+    )
+
+    buf = _io.StringIO()
+    # Excel-friendly BOM so the UTF-8 column with diacritics renders
+    # right when the owner double-clicks the file on macOS / Windows.
+    buf.write("﻿")
+    w = _csv.writer(buf)
+    w.writerow(
+        [
+            "Jméno",
+            "E-mail",
+            "Telefon",
+            "Role",
+            "Akcí celkem",
+            "Nadcházejících",
+            "Minulých",
+            "Poslední registrace",
+            "Tagy",
+            "Poznámka",
+        ]
+    )
+    for u in users:
+        profile = profiles.get(u.id)
+        tag_names = (
+            ", ".join(t.name for t in profile.tags.all()) if profile else ""
+        )
+        note = profile.note if profile else ""
+        last = u.last_rsvp_at.strftime("%Y-%m-%d") if u.last_rsvp_at else ""
+        w.writerow(
+            [
+                u.get_full_name() or "",
+                u.email,
+                u.phone or "",
+                role_by_user.get(u.id, ""),
+                u.total_rsvps,
+                u.upcoming_rsvps,
+                u.past_rsvps,
+                last,
+                tag_names,
+                note.replace("\n", " ").strip(),
+            ]
+        )
+
+    filename = f"lide-{workspace.slug}-{timezone.now():%Y-%m-%d}.csv"
+    response = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
