@@ -19,7 +19,7 @@ from communities.models import Community
 from workspaces.models import Workspace
 
 from .models import RSVP, Event, EventImage
-from .permissions import is_workspace_owner
+from .permissions import can_manage_event, is_workspace_owner
 from .serializers import (
     EventImageSerializer,
     EventPublicSerializer,
@@ -61,8 +61,8 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     # before flipping to published, and seeing "not found" was confusing
     # enough that people kept asking "did you delete it?" Owners still
     # see the full landing in preview mode.
-    if event.status == Event.STATUS_DRAFT and not is_workspace_owner(
-        request.user, event.workspace
+    if event.status == Event.STATUS_DRAFT and not can_manage_event(
+        request.user, event
     ):
         return Response(
             {
@@ -90,9 +90,7 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
         payload["my_rsvp"] = (
             MyRSVPSerializer(my_rsvp).data if my_rsvp else None
         )
-        payload["i_am_owner"] = is_workspace_owner(
-            request.user, event.workspace
-        )
+        payload["i_am_owner"] = can_manage_event(request.user, event)
     else:
         payload["i_am_owner"] = False
 
@@ -239,18 +237,32 @@ def my_events(request: Request) -> Response:
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def owner_events(request: Request) -> Response:
-    """Events the current user owns (workspace-Owner-scoped)."""
-    workspaces = (
+    """Events the current user manages — workspace owner/admin scope,
+    plus events where they're an explicit EventCollaborator (co-creator)."""
+    from django.db.models import Q
+
+    from .models import EventCollaborator
+
+    managed_ws_ids = list(
         Workspace.objects.filter(
             members__user=request.user,
-            members__role="owner",
+            members__role__in=["owner", "admin"],
         )
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    collab_event_ids = list(
+        EventCollaborator.objects.filter(user=request.user)
+        .values_list("event_id", flat=True)
         .distinct()
     )
     events = (
-        Event.objects.filter(workspace__in=workspaces)
+        Event.objects.filter(
+            Q(workspace_id__in=managed_ws_ids) | Q(id__in=collab_event_ids)
+        )
         .select_related("workspace")
         .order_by("-starts_at")
+        .distinct()
     )
     serializer = EventSummarySerializer(events, many=True)
     return Response(serializer.data)
@@ -350,7 +362,7 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     serializer = EventWriteSerializer(event, data=request.data, partial=True)
@@ -412,7 +424,7 @@ def duplicate_event(
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     base = f"{event.slug}-kopie"
@@ -588,7 +600,7 @@ def event_image_detail(
     except EventImage.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, img.event.workspace):
+    if not can_manage_event(request.user, img.event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     img.image.delete(save=False)
@@ -617,7 +629,7 @@ def event_block_image_upload(
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     upload = request.FILES.get("image")
@@ -660,7 +672,7 @@ def event_images_reorder(
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     order = request.data.get("order")
@@ -698,7 +710,7 @@ def event_cover(
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "DELETE":
@@ -742,7 +754,7 @@ def cancel_event(
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if event.status == Event.STATUS_CANCELLED:
@@ -758,14 +770,18 @@ def cancel_event(
 
 
 def _owner_event_or_403(request, workspace_slug: str, event_slug: str):
-    """Resolve event + verify owner. Returns (event, None) on success or (None, Response)."""
+    """Resolve event + verify manager access. Workspace owner/admin OR
+    explicit event co-creator. Returns (event, None) on success or
+    (None, Response)."""
+    from .permissions import can_manage_event
+
     try:
         event = Event.objects.select_related("workspace").get(
             workspace__slug=workspace_slug, slug=event_slug
         )
     except Event.DoesNotExist:
         return None, Response(status=status.HTTP_404_NOT_FOUND)
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return None, Response(status=status.HTTP_403_FORBIDDEN)
     return event, None
 
@@ -893,7 +909,7 @@ def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Respo
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     rsvps = (
@@ -1014,7 +1030,7 @@ def mark_rsvp_paid(
     except RSVP.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, rsvp.event.workspace):
+    if not can_manage_event(request.user, rsvp.event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if rsvp.payment_status == RSVP.PAYMENT_PAID:
@@ -1148,7 +1164,7 @@ def event_invoices(
     except Event.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not is_workspace_owner(request.user, event.workspace):
+    if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     from .models import refresh_invoice_supplier
@@ -1523,3 +1539,99 @@ def checklist_from_preset(
         EventChecklistItemSerializer(item).data,
         status=status.HTTP_201_CREATED,
     )
+
+
+# ---------------------------------------------------------------------------
+# Event co-creators (Spolutvůrci)
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def event_collaborators(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """List current co-creators on this event (GET), or add a new one
+    by email (POST). Only callers with manage rights see / mutate."""
+    from .models import EventCollaborator
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+
+    if request.method == "GET":
+        rows = (
+            EventCollaborator.objects.filter(event=event)
+            .select_related("user")
+            .order_by("created_at")
+        )
+        return Response(
+            [
+                {
+                    "id": c.id,
+                    "user_id": c.user_id,
+                    "email": c.user.email,
+                    "full_name": c.user.get_full_name() or c.user.email,
+                    "created_at": c.created_at,
+                }
+                for c in rows
+            ]
+        )
+
+    email = (request.data.get("email") or "").strip().lower()
+    if not email:
+        return Response(
+            {"email": "Vyplň e-mail."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        target = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response(
+            {"email": "Uživatel s tímto e-mailem na olafu zatím není. Ať si nejdřív vytvoří účet."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if target == request.user:
+        return Response(
+            {"detail": "Spolutvůrcem nemůžeš být ty sám — už event spravuješ."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # Workspace owner/admin doesn't need an explicit collaborator row;
+    # they already manage this event through workspace role.
+    if is_workspace_owner(target, event.workspace):
+        return Response(
+            {"detail": "Tato osoba už event spravuje přes komunitu."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    collab, created = EventCollaborator.objects.get_or_create(
+        event=event,
+        user=target,
+        defaults={"added_by": request.user},
+    )
+    return Response(
+        {
+            "id": collab.id,
+            "user_id": collab.user_id,
+            "email": collab.user.email,
+            "full_name": collab.user.get_full_name() or collab.user.email,
+            "created_at": collab.created_at,
+        },
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def event_collaborator_detail(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    user_id: int,
+) -> Response:
+    from .models import EventCollaborator
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    EventCollaborator.objects.filter(event=event, user_id=user_id).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
