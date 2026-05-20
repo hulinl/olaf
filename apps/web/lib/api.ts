@@ -474,6 +474,10 @@ export interface RSVPRecord extends MyRSVP {
   uploaded_doc_keys: string[];
   verified_doc_keys: string[];
   invoice_id: number | null;
+  /** Marks this RSVP as an organizer — exempt from capacity / payment /
+   *  required-document expectations. Independent of EventCollaborator
+   *  (edit rights). */
+  is_organizer: boolean;
   updated_at: string;
 }
 
@@ -1225,6 +1229,19 @@ export const events = {
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/mark-paid/`,
       { method: "POST" },
+    ),
+  toggleRsvpOrganizer: (
+    workspaceSlug: string,
+    eventSlug: string,
+    rsvpId: number,
+    isOrganizer: boolean,
+  ) =>
+    apiFetch<RSVPRecord>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/organizer/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ is_organizer: isOrganizer }),
+      },
     ),
   myDocuments: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<RSVPDocumentsBundle>(

@@ -255,7 +255,15 @@ class Event(TenantScopedModel):
 
     @property
     def confirmed_rsvp_count(self) -> int:
-        return self.rsvps.filter(status=RSVP.STATUS_YES).count()
+        """Confirmed *participants* (excludes organizers). The capacity
+        + waitlist logic should both run off this number."""
+        return self.rsvps.filter(
+            status=RSVP.STATUS_YES, is_organizer=False
+        ).count()
+
+    @property
+    def organizer_count(self) -> int:
+        return self.rsvps.filter(is_organizer=True).count()
 
     @property
     def waitlist_count(self) -> int:
@@ -336,6 +344,20 @@ class RSVP(models.Model):
         null=True,
         blank=True,
         help_text="Set by the Creator after the event.",
+    )
+
+    # Organizer flag — a person who's on the event in a help-the-event-
+    # happen capacity, not as a paying attendee. Organizers:
+    #   * appear in the roster with an Organizátor badge
+    #   * are excluded from confirmed_rsvp_count / capacity / waitlist
+    #   * have payment_status forced to "waived" (no QR, no invoice)
+    #   * are skipped by required_documents checks at the roster level
+    # Independent of EventCollaborator (edit rights) — a person can be
+    # an organizer without being a co-creator, or both.
+    is_organizer = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Doesn't count toward capacity, exempt from payment + docs.",
     )
 
     # Payment (Slice 5). Wired only when event.price_amount is set;
@@ -698,6 +720,9 @@ def generate_invoice_for_rsvp(rsvp: RSVP) -> Invoice:
     event = rsvp.event
     workspace = event.workspace
     user = rsvp.user
+
+    if rsvp.is_organizer:
+        raise ValueError("Organizer RSVP — no invoice to issue.")
 
     if not event.price_amount:
         raise ValueError("Event has no price — no invoice to issue.")

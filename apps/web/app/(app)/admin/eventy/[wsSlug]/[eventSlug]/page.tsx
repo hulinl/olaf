@@ -372,7 +372,9 @@ function RsvpRow({
   onUpdate: (updated: RSVPRecord) => void;
   onOpenProfile: () => void;
 }) {
-  const [busy, setBusy] = useState<"paid" | "approve" | "reject" | null>(null);
+  const [busy, setBusy] = useState<
+    "paid" | "approve" | "reject" | "organizer" | null
+  >(null);
   const created = new Date(rsvp.created_at);
   const requiredKeys = new Set(requiredDocs.map((d) => d.key));
   const uploadedKeys = new Set(rsvp.uploaded_doc_keys);
@@ -387,6 +389,39 @@ function RsvpRow({
       onUpdate(updated);
     } catch {
       // Quietly fail; admin can retry.
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleToggleOrganizer() {
+    if (busy) return;
+    const next = !rsvp.is_organizer;
+    if (
+      next &&
+      !confirm(
+        `Označit ${rsvp.user_full_name || rsvp.user_email} jako organizátora?\n\nNebude se počítat do kapacity ani se po něm nebude chtít platba.`,
+      )
+    )
+      return;
+    if (
+      !next &&
+      !confirm(
+        "Odebrat organizátorovi tuhle roli? Bude opět účastník (s případnou platbou).",
+      )
+    )
+      return;
+    setBusy("organizer");
+    try {
+      const updated = await events.toggleRsvpOrganizer(
+        wsSlug,
+        eventSlug,
+        rsvp.id,
+        next,
+      );
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
     } finally {
       setBusy(null);
     }
@@ -438,18 +473,24 @@ function RsvpRow({
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <div className="flex flex-col gap-1.5">
-          <span
-            className={[
-              "inline-flex w-fit rounded px-2 py-0.5 text-xs font-medium",
-              RSVP_STATUS_TONE[rsvp.status],
-            ].join(" ")}
-          >
-            {RSVP_STATUS_LABEL[rsvp.status]}
-            {rsvp.waitlist_position != null && (
-              <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
-            )}
-          </span>
-          {rsvp.status === "pending_approval" && (
+          {rsvp.is_organizer ? (
+            <span className="inline-flex w-fit rounded bg-brand/15 px-2 py-0.5 text-xs font-medium text-brand">
+              Organizátor
+            </span>
+          ) : (
+            <span
+              className={[
+                "inline-flex w-fit rounded px-2 py-0.5 text-xs font-medium",
+                RSVP_STATUS_TONE[rsvp.status],
+              ].join(" ")}
+            >
+              {RSVP_STATUS_LABEL[rsvp.status]}
+              {rsvp.waitlist_position != null && (
+                <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+              )}
+            </span>
+          )}
+          {rsvp.status === "pending_approval" && !rsvp.is_organizer && (
             <div className="flex gap-1">
               <button
                 type="button"
@@ -469,29 +510,57 @@ function RsvpRow({
               </button>
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleToggleOrganizer}
+            disabled={busy !== null}
+            className="text-left text-[11px] font-medium text-ink-500 hover:text-brand disabled:opacity-50"
+          >
+            {busy === "organizer"
+              ? "..."
+              : rsvp.is_organizer
+                ? "Odebrat organizátora"
+                : "Označit organizátorem"}
+          </button>
         </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={busy === "paid"} />
+        {rsvp.is_organizer ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={busy === "paid"} />
+        )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        <InvoiceCell rsvp={rsvp} wsSlug={wsSlug} eventSlug={eventSlug} />
+        {rsvp.is_organizer ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <InvoiceCell rsvp={rsvp} wsSlug={wsSlug} eventSlug={eventSlug} />
+        )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        <DocCell
-          docKey="smlouva"
-          required={requiredKeys.has("smlouva")}
-          uploaded={uploadedKeys.has("smlouva")}
-          verified={verifiedKeys.has("smlouva")}
-        />
+        {rsvp.is_organizer ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <DocCell
+            docKey="smlouva"
+            required={requiredKeys.has("smlouva")}
+            uploaded={uploadedKeys.has("smlouva")}
+            verified={verifiedKeys.has("smlouva")}
+          />
+        )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        <DocCell
-          docKey="pojisteni"
-          required={requiredKeys.has("pojisteni")}
-          uploaded={uploadedKeys.has("pojisteni")}
-          verified={verifiedKeys.has("pojisteni")}
-        />
+        {rsvp.is_organizer ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <DocCell
+            docKey="pojisteni"
+            required={requiredKeys.has("pojisteni")}
+            uploaded={uploadedKeys.has("pojisteni")}
+            verified={verifiedKeys.has("pojisteni")}
+          />
+        )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-ink-500">
         {created.toLocaleDateString("cs-CZ", {
@@ -664,17 +733,23 @@ function RsvpCard({
             <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
           )}
         </button>
-        <span
-          className={[
-            "inline-flex shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-            RSVP_STATUS_TONE[rsvp.status],
-          ].join(" ")}
-        >
-          {RSVP_STATUS_LABEL[rsvp.status]}
-          {rsvp.waitlist_position != null && (
-            <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
-          )}
-        </span>
+        {rsvp.is_organizer ? (
+          <span className="inline-flex shrink-0 rounded bg-brand/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
+            Organizátor
+          </span>
+        ) : (
+          <span
+            className={[
+              "inline-flex shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+              RSVP_STATUS_TONE[rsvp.status],
+            ].join(" ")}
+          >
+            {RSVP_STATUS_LABEL[rsvp.status]}
+            {rsvp.waitlist_position != null && (
+              <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+            )}
+          </span>
+        )}
       </div>
 
       {rsvp.status === "pending_approval" && (
