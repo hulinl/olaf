@@ -277,7 +277,14 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
 
     if file_field:
         file_field.delete(save=False)
-    setattr(workspace, field, upload)
+    # Same downscale + JPEG pipeline as event uploads — phones produce
+    # multi-megabyte JPEGs that crush mobile pageload time otherwise.
+    # Logos are usually small (rare for someone to upload a 4000px
+    # logo), but the helper short-circuits when the source is already
+    # under max_dim so calling it costs nothing in the common case.
+    from events.image_utils import downscale_upload
+
+    setattr(workspace, field, downscale_upload(upload))
     workspace.save(update_fields=[field])
     return Response(
         WorkspacePublicSerializer(workspace, context={"request": request}).data

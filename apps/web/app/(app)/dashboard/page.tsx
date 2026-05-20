@@ -258,45 +258,101 @@ function EventMini({
   const href = ownerView
     ? `/admin/eventy/${event.workspace_slug}/${event.slug}`
     : `/events/${event.workspace_slug}/${event.slug}`;
-  return (
-    <Link
-      href={href}
-      className="flex overflow-hidden rounded-md border border-border bg-surface transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
-    >
-      {cover && (
+
+  // Cinematic variant when a cover photo exists — mirrors the public
+  // community grid (see /[slug]/page.tsx EventCard). Plain textual
+  // fallback when no cover so the dashboard never grows ugly blank
+  // tiles.
+  if (cover) {
+    return (
+      <Link
+        href={href}
+        className="group relative isolate flex aspect-[16/10] flex-col justify-end overflow-hidden rounded-xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-ring"
+      >
         <div
           aria-hidden
-          className="hidden h-auto w-28 shrink-0 bg-surface-muted sm:block"
+          className="absolute inset-0 -z-10 transition-transform duration-300 group-hover:scale-[1.02]"
           style={{
-            backgroundImage: `url(${cover})`,
+            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.82) 100%), url(${cover})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
         />
-      )}
-      <div className="flex flex-1 flex-col p-4">
-        <p className="text-xs text-ink-500">
-          {starts.toLocaleDateString("cs-CZ", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
-        </p>
-        <p className="mt-1 font-medium text-ink-900">{event.title}</p>
-        {event.location_text && (
-          <p className="mt-0.5 text-xs text-ink-500">{event.location_text}</p>
-        )}
-        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 text-xs text-ink-500">
-          <span>
-            <strong className="text-ink-900">{event.confirmed_count}</strong>
-            {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
-          </span>
-          {price && (
-            <span className="font-semibold tabular-nums text-ink-900">
-              {price}
-            </span>
+        <div className="flex flex-col gap-1 p-4 text-ink-inverse">
+          <p
+            className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/85"
+            style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}
+          >
+            {starts.toLocaleDateString("cs-CZ", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </p>
+          <p
+            className="text-base font-semibold sm:text-lg"
+            style={{
+              letterSpacing: "-0.015em",
+              lineHeight: 1.2,
+              textShadow: "0 2px 10px rgba(0,0,0,0.55)",
+            }}
+          >
+            {event.title}
+          </p>
+          {event.location_text && (
+            <p
+              className="text-xs text-white/85"
+              style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}
+            >
+              {event.location_text}
+            </p>
           )}
+          <div
+            className="mt-1 flex flex-wrap items-baseline gap-x-3 text-xs text-white/85"
+            style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}
+          >
+            <span>
+              <strong className="text-white">{event.confirmed_count}</strong>
+              {event.capacity != null ? ` / ${event.capacity}` : ""}{" "}
+              přihlášeno
+            </span>
+            {price && (
+              <span className="font-semibold tabular-nums text-white">
+                {price}
+              </span>
+            )}
+          </div>
         </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="block rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
+    >
+      <p className="text-xs text-ink-500">
+        {starts.toLocaleDateString("cs-CZ", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })}
+      </p>
+      <p className="mt-1 font-medium text-ink-900">{event.title}</p>
+      {event.location_text && (
+        <p className="mt-0.5 text-xs text-ink-500">{event.location_text}</p>
+      )}
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 text-xs text-ink-500">
+        <span>
+          <strong className="text-ink-900">{event.confirmed_count}</strong>
+          {event.capacity != null ? ` / ${event.capacity}` : ""} přihlášeno
+        </span>
+        {price && (
+          <span className="font-semibold tabular-nums text-ink-900">
+            {price}
+          </span>
+        )}
       </div>
     </Link>
   );
