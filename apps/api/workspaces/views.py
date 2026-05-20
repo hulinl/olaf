@@ -30,6 +30,21 @@ def _is_owner(user, workspace: Workspace) -> bool:
     ).exists()
 
 
+def _can_view_workspace_people(user, workspace: Workspace) -> bool:
+    """Anyone who can manage at least one event in this workspace can
+    see its Lidé list — owners/admins via WorkspaceMember and event
+    co-creators via EventCollaborator. The co-creator's edit screen
+    needs this so they can pick a fellow spolutvůrce from the list."""
+    if not user or not user.is_authenticated:
+        return False
+    if _is_owner(user, workspace):
+        return True
+    from events.models import EventCollaborator
+    return EventCollaborator.objects.filter(
+        user=user, event__workspace=workspace
+    ).exists()
+
+
 WORKSPACE_IMAGE_MAX_BYTES = 8 * 1024 * 1024
 
 
@@ -337,7 +352,7 @@ def workspace_members(request: Request, slug: str) -> Response:
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if not _is_owner(request.user, workspace):
+    if not _can_view_workspace_people(request.user, workspace):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     event_ids = list(
