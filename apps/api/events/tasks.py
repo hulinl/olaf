@@ -72,6 +72,23 @@ def dispatch_due_reminders_task() -> dict[str, int]:
     return {"items": dispatched, "recipients": recipients_total}
 
 
+@shared_task(name="events.complete_finished_events")
+def complete_finished_events_task() -> dict[str, int]:
+    """Flip published events to "completed" once their end-time passes.
+
+    The model has STATUS_COMPLETED documented as "auto-transition after
+    end" but until now nothing actually did the flip — events stayed
+    "published" forever, which confused the dashboard's "moje pořádané
+    akce" split and meant past camps showed up as upcoming.
+
+    Runs every 15 minutes from Celery beat.
+    """
+    now = timezone.now()
+    qs = Event.objects.filter(status=Event.STATUS_PUBLISHED, ends_at__lt=now)
+    flipped = qs.update(status=Event.STATUS_COMPLETED, updated_at=now)
+    return {"flipped": flipped}
+
+
 @shared_task(name="events.send_checklist_reminder_now")
 def send_checklist_reminder_now_task(item_id: int) -> int:
     """Force-send a reminder for a single item (owner override).
