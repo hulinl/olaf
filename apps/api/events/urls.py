@@ -113,6 +113,11 @@ urlpatterns = [
         name="rsvp-mark-paid",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/organizer/",
+        views.toggle_rsvp_organizer,
+        name="rsvp-toggle-organizer",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/documents/",
         views.my_rsvp_documents,
         name="rsvp-documents",

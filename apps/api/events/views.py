@@ -1052,6 +1052,57 @@ def mark_rsvp_paid(
     return Response(RSVPSerializer(rsvp).data)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def toggle_rsvp_organizer(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Flip the organizer flag on an RSVP. Body: {is_organizer: bool}.
+
+    On → waives any pending payment + clears payment_due_amount so no
+    QR / invoice is expected from this person.
+    Off → recomputes payment from event price (same path as a fresh
+    RSVP would take, minus changing status)."""
+    try:
+        rsvp = RSVP.objects.select_related("event", "event__workspace").get(
+            pk=rsvp_id,
+            event__workspace__slug=workspace_slug,
+            event__slug=event_slug,
+        )
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not can_manage_event(request.user, rsvp.event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    is_organizer = bool(request.data.get("is_organizer"))
+    rsvp.is_organizer = is_organizer
+
+    if is_organizer:
+        # No money, no paper trail.
+        rsvp.payment_status = RSVP.PAYMENT_WAIVED
+        rsvp.payment_due_amount = None
+        rsvp.paid_at = None
+    elif rsvp.event.price_amount and rsvp.payment_status == RSVP.PAYMENT_WAIVED:
+        # Was organizer, now isn't — recompute the bill so they're back
+        # in the normal payment flow.
+        rsvp.payment_status = RSVP.PAYMENT_PENDING
+        rsvp.payment_due_amount = rsvp.event.price_amount
+        rsvp.payment_currency = rsvp.event.price_currency or "CZK"
+
+    rsvp.save(
+        update_fields=[
+            "is_organizer",
+            "payment_status",
+            "payment_due_amount",
+            "payment_currency",
+            "paid_at",
+            "updated_at",
+        ]
+    )
+    return Response(RSVPSerializer(rsvp).data)
+
+
 # ---------------------------------------------------------------------------
 # Slice 7 — RSVP documents (uploads tied to required_documents)
 # ---------------------------------------------------------------------------

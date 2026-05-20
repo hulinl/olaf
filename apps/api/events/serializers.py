@@ -350,6 +350,7 @@ class RSVPSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "status",
+            "is_organizer",
             "user_email",
             "user_full_name",
             "user_phone",
