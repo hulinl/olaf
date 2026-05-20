@@ -1028,3 +1028,363 @@ def workspace_payments_reconcile(request: Request, slug: str) -> Response:
             "already_paid": [_tx_dict(t) for t in result.already_paid],
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Workspace invitations — three ways to add a person to a komunita
+# ---------------------------------------------------------------------------
+
+
+def _frontend_base() -> str:
+    from django.conf import settings as _s
+    return getattr(_s, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+
+def _send_workspace_invitation_email(invitation):
+    """Best-effort: send the e-mail, never let it crash the request."""
+    from django.conf import settings as _s
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+
+    accept_url = f"{_frontend_base()}/invitations/{invitation.token}"
+    body = render_to_string(
+        "emails/workspace_invitation.txt",
+        {
+            "invitation": invitation,
+            "workspace": invitation.workspace,
+            "accept_url": accept_url,
+            "invited_by_name": (
+                invitation.invited_by.get_full_name()
+                if invitation.invited_by
+                else ""
+            ),
+        },
+    )
+    with contextlib.suppress(Exception):
+        EmailMessage(
+            subject=f"Pozvánka do komunity {invitation.workspace.name} — olaf",
+            body=body,
+            from_email=getattr(_s, "DEFAULT_FROM_EMAIL", "olaf@olaf.events"),
+            to=[invitation.email],
+        ).send(fail_silently=True)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_add_existing_member(request: Request, slug: str) -> Response:
+    """Path 3 — owner picks an existing user (typically from Lidé) and
+    adds them as a regular member. Body: {user_id: int}."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from accounts.models import User
+
+    user_id = request.data.get("user_id")
+    if not user_id:
+        return Response(
+            {"user_id": "Vyber uživatele."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        target = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    membership, created = WorkspaceMember.objects.get_or_create(
+        workspace=workspace,
+        user=target,
+        defaults={"role": WorkspaceMember.ROLE_MEMBER},
+    )
+    return Response(
+        {
+            "user_id": target.id,
+            "role": membership.role,
+            "created": created,
+        },
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def workspace_invitations(request: Request, slug: str) -> Response:
+    """List pending invitations or create a new one for an e-mail.
+
+    If the e-mail already belongs to a registered user, we skip the
+    invitation flow entirely and add them as a member directly — the
+    owner doesn't need to wait for the recipient to click an e-mail
+    link they could've avoided."""
+    from .models import WorkspaceInvitation
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == "GET":
+        qs = WorkspaceInvitation.objects.filter(
+            workspace=workspace, status=WorkspaceInvitation.STATUS_PENDING
+        ).select_related("invited_by")
+        return Response(
+            [
+                {
+                    "id": inv.id,
+                    "email": inv.email,
+                    "status": inv.status,
+                    "invited_by_name": (
+                        inv.invited_by.get_full_name() if inv.invited_by else ""
+                    ),
+                    "created_at": inv.created_at,
+                }
+                for inv in qs
+            ]
+        )
+
+    email = (request.data.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return Response(
+            {"email": "Zadej platný e-mail."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Short-circuit: if a user with this e-mail already exists, just
+    # add them as a member. No invitation needed.
+    from accounts.models import User
+
+    existing = User.objects.filter(email__iexact=email).first()
+    if existing is not None:
+        membership, created = WorkspaceMember.objects.get_or_create(
+            workspace=workspace,
+            user=existing,
+            defaults={"role": WorkspaceMember.ROLE_MEMBER},
+        )
+        return Response(
+            {
+                "mode": "direct",
+                "user_id": existing.id,
+                "role": membership.role,
+                "created": created,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    # New e-mail → invitation flow.
+    invitation, created = WorkspaceInvitation.objects.get_or_create(
+        workspace=workspace,
+        email=email,
+        status=WorkspaceInvitation.STATUS_PENDING,
+        defaults={"invited_by": request.user},
+    )
+    if created:
+        _send_workspace_invitation_email(invitation)
+    return Response(
+        {
+            "mode": "invited",
+            "id": invitation.id,
+            "email": invitation.email,
+            "status": invitation.status,
+            "created_at": invitation.created_at,
+        },
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def workspace_invitation_detail(
+    request: Request, slug: str, invitation_id: int
+) -> Response:
+    """Cancel a pending invitation. Owner-only."""
+    from .models import WorkspaceInvitation
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+        invitation = WorkspaceInvitation.objects.get(
+            pk=invitation_id, workspace=workspace
+        )
+    except (Workspace.DoesNotExist, WorkspaceInvitation.DoesNotExist):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if invitation.status == WorkspaceInvitation.STATUS_PENDING:
+        invitation.status = WorkspaceInvitation.STATUS_CANCELLED
+        invitation.save(update_fields=["status"])
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET", "POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def workspace_invite_link(request: Request, slug: str) -> Response:
+    """Manage the workspace's public invite link.
+
+    GET → returns current token (empty when disabled).
+    POST → generates a fresh token (rotating any previous one).
+    DELETE → disables the link (clears the token)."""
+    import secrets
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    base = _frontend_base()
+
+    if request.method == "DELETE":
+        workspace.public_invite_token = ""
+        workspace.save(update_fields=["public_invite_token"])
+        return Response({"public_invite_token": "", "invite_url": ""})
+
+    if request.method == "POST":
+        # Generate a fresh url-safe token (rotating any previous).
+        workspace.public_invite_token = secrets.token_urlsafe(20)[:32]
+        workspace.save(update_fields=["public_invite_token"])
+
+    return Response(
+        {
+            "public_invite_token": workspace.public_invite_token,
+            "invite_url": (
+                f"{base}/join/{workspace.public_invite_token}"
+                if workspace.public_invite_token
+                else ""
+            ),
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public-facing invitation accept endpoints
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def invitation_lookup(request: Request, token: str) -> Response:
+    """Public lookup of an e-mail invitation by token.
+
+    Returns workspace info + invited e-mail so the accept page can
+    render branded copy + check whether the caller's session matches
+    the invited e-mail."""
+    from .models import WorkspaceInvitation
+
+    try:
+        invitation = WorkspaceInvitation.objects.select_related(
+            "workspace", "invited_by"
+        ).get(token=token)
+    except WorkspaceInvitation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    return Response(
+        {
+            "email": invitation.email,
+            "status": invitation.status,
+            "workspace": {
+                "slug": invitation.workspace.slug,
+                "name": invitation.workspace.name,
+                "bio": invitation.workspace.bio,
+            },
+            "invited_by_name": (
+                invitation.invited_by.get_full_name()
+                if invitation.invited_by
+                else ""
+            ),
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def invitation_accept(request: Request, token: str) -> Response:
+    """Accept an e-mail invitation. Auth required (sign up first if no
+    account). The invitation's e-mail must match the authenticated user
+    so an invite link can't be redirected to someone else."""
+    from .models import WorkspaceInvitation
+
+    try:
+        invitation = WorkspaceInvitation.objects.select_related(
+            "workspace"
+        ).get(token=token)
+    except WorkspaceInvitation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if invitation.status != WorkspaceInvitation.STATUS_PENDING:
+        return Response(
+            {"detail": "Pozvánka už není platná."},
+            status=status.HTTP_410_GONE,
+        )
+
+    if request.user.email.lower() != invitation.email.lower():
+        return Response(
+            {
+                "detail": (
+                    "Pozvánka byla zaslána na jiný e-mail. Přihlas se "
+                    f"jako {invitation.email}."
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    from django.utils import timezone as _tz
+
+    WorkspaceMember.objects.get_or_create(
+        workspace=invitation.workspace,
+        user=request.user,
+        defaults={"role": invitation.role},
+    )
+    invitation.status = WorkspaceInvitation.STATUS_ACCEPTED
+    invitation.accepted_at = _tz.now()
+    invitation.accepted_by = request.user
+    invitation.save(
+        update_fields=["status", "accepted_at", "accepted_by"]
+    )
+    return Response({"workspace_slug": invitation.workspace.slug})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_invite_lookup(request: Request, token: str) -> Response:
+    """Public lookup by workspace.public_invite_token — used by /join/<token>."""
+    try:
+        workspace = Workspace.objects.get(public_invite_token=token)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    return Response(
+        {
+            "workspace": {
+                "slug": workspace.slug,
+                "name": workspace.name,
+                "bio": workspace.bio,
+            }
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def public_invite_accept(request: Request, token: str) -> Response:
+    """Self-join via a public invite link. No approval step in V1."""
+    try:
+        workspace = Workspace.objects.get(public_invite_token=token)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    membership, created = WorkspaceMember.objects.get_or_create(
+        workspace=workspace,
+        user=request.user,
+        defaults={"role": WorkspaceMember.ROLE_MEMBER},
+    )
+    return Response(
+        {
+            "workspace_slug": workspace.slug,
+            "role": membership.role,
+            "created": created,
+        }
+    )

@@ -1,0 +1,12 @@
+Ahoj,
+
+{% if invited_by_name %}{{ invited_by_name }} tě{% else %}někdo tě{% endif %} pozval do komunity „{{ workspace.name }}" na olafu.
+
+{% if workspace.bio %}{{ workspace.bio }}
+
+{% endif %}Pozvánku přijmeš kliknutím na odkaz:
+{{ accept_url }}
+
+Pokud na olafu ještě nemáš účet, založíš si ho při přijetí pozvánky stejným e-mailem ({{ invitation.email }}).
+
+— Aplikace olaf
