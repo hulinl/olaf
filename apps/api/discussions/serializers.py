@@ -14,6 +14,7 @@ class CommentSerializer(serializers.ModelSerializer):
     )
     like_count = serializers.SerializerMethodField()
     i_liked = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -22,6 +23,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "topic",
             "parent",
             "body",
+            "image_url",
             "author_id",
             "author_name",
             "author_email",
@@ -33,6 +35,7 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "topic",
+            "image_url",
             "author_id",
             "author_name",
             "author_email",
@@ -41,6 +44,9 @@ class CommentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def get_image_url(self, obj: Comment) -> str | None:
+        return obj.image.url if obj.image else None
 
     def get_author_name(self, obj: Comment) -> str:
         if obj.author is None:

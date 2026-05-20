@@ -326,6 +326,9 @@ export interface DiscussionComment {
    *  the parent comment this one replies to. */
   parent: number | null;
   body: string;
+  /** URL to the attached photo (resolved through assetUrl for absolute
+   *  display); null when no image was uploaded. */
+  image_url: string | null;
   author_id: number | null;
   author_name: string;
   author_email: string;
@@ -1400,11 +1403,23 @@ export const discussions = {
     topicId: number,
     body: string,
     parent: number | null = null,
-  ) =>
-    apiFetch<DiscussionComment>(
+    image: File | null = null,
+  ) => {
+    if (image) {
+      const fd = new FormData();
+      fd.append("body", body);
+      if (parent != null) fd.append("parent", String(parent));
+      fd.append("image", image);
+      return apiFetch<DiscussionComment>(
+        `/api/discussions/workspace/${slug}/topics/${topicId}/comments/`,
+        { method: "POST", body: fd },
+      );
+    }
+    return apiFetch<DiscussionComment>(
       `/api/discussions/workspace/${slug}/topics/${topicId}/comments/`,
       { method: "POST", body: JSON.stringify({ body, parent }) },
-    ),
+    );
+  },
   deleteWorkspaceComment: (
     slug: string,
     topicId: number,
@@ -1460,11 +1475,23 @@ export const discussions = {
     topicId: number,
     body: string,
     parent: number | null = null,
-  ) =>
-    apiFetch<DiscussionComment>(
+    image: File | null = null,
+  ) => {
+    if (image) {
+      const fd = new FormData();
+      fd.append("body", body);
+      if (parent != null) fd.append("parent", String(parent));
+      fd.append("image", image);
+      return apiFetch<DiscussionComment>(
+        `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/`,
+        { method: "POST", body: fd },
+      );
+    }
+    return apiFetch<DiscussionComment>(
       `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/`,
       { method: "POST", body: JSON.stringify({ body, parent }) },
-    ),
+    );
+  },
   deleteEventComment: (
     workspaceSlug: string,
     eventSlug: string,
