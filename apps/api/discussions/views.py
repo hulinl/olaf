@@ -405,15 +405,16 @@ def event_topic_comments(
             status=status.HTTP_400_BAD_REQUEST,
         )
     body = (request.data.get("body") or "").strip()
-    image = request.FILES.get("image")
-    if not body and not image:
+    # Accept both legacy "image" and new "attachment" form field names.
+    attachment = request.FILES.get("attachment") or request.FILES.get("image")
+    if not body and not attachment:
         return Response(
-            {"body": "Napiš zprávu nebo přilož fotku."},
+            {"body": "Napiš zprávu nebo přilož soubor."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    if image is not None and image.size > _COMMENT_IMAGE_MAX_BYTES:
+    if attachment is not None and attachment.size > _COMMENT_IMAGE_MAX_BYTES:
         return Response(
-            {"image": "Fotka je moc velká (max 6 MB)."},
+            {"attachment": "Soubor je moc velký (max 6 MB)."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     parent = None

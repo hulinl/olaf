@@ -20,6 +20,17 @@ jobs:
         with:
           submodules: true
           lfs: false
+      - name: Stamp build version
+        # Write the current commit sha to apps/web/public/version.json so
+        # the PWA can poll a no-cache static file at runtime and detect
+        # when a newer deploy is live. Same sha is also injected as
+        # NEXT_PUBLIC_BUILD_SHA below, so the running client knows what
+        # build it is and can compare against the live version.json.
+        run: |
+          mkdir -p apps/web/public
+          printf '{"sha":"%s","built_at":"%s"}\n' \
+            "${GITHUB_SHA}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > apps/web/public/version.json
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -30,6 +41,11 @@ jobs:
           NEXT_PUBLIC_API_URL: https://api.olaf.events
           INTERNAL_API_URL: https://api.olaf.events
           NEXT_PUBLIC_VAPID_PUBLIC_KEY: BD0AvKIR8VsZjpnVf3uXdklCuTxUcQzRDUoqa0vGoSYhG-dj5YNSGbmYtdx1vibX35G86ejd7Duy6i8LsWPCTFA
+          # Build sha is read at runtime via process.env.NEXT_PUBLIC_BUILD_SHA
+          # and compared against /version.json so iOS PWA users get a
+          # banner when the deployed bundle no longer matches what they're
+          # running.
+          NEXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_GENTLE_GROUND_0C0BA5903 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
