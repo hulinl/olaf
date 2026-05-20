@@ -6,6 +6,7 @@ import { BlockRenderer } from "@/components/event-blocks/block-renderer";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
+import { ShareButton } from "@/components/ui/share-button";
 import { assetUrl, type Event, type EventDraftPreview } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -88,6 +89,12 @@ export default async function EventLandingPage({ params }: Props) {
             <Logo size={26} />
           </Link>
           <div className="flex items-center gap-3">
+            <ShareButton
+              url={`/${event.workspace_slug}/e/${event.slug}`}
+              title={event.title}
+              text={`${event.workspace_name} — ${event.title}`}
+              variant="soft"
+            />
             <OwnerCockpitLink
               workspaceSlug={event.workspace_slug}
               eventSlug={event.slug}

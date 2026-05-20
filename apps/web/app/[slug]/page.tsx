@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
+import { ShareButton } from "@/components/ui/share-button";
 import {
   assetUrl,
   type EventSummary,
@@ -112,7 +113,15 @@ export default async function WorkspaceProfilePage({ params }: Props) {
           >
             <Logo size={26} />
           </Link>
-          <PublicAuthIndicator />
+          <div className="flex items-center gap-3">
+            <ShareButton
+              url={`/${workspace.slug}`}
+              title={workspace.name}
+              text={workspace.bio || workspace.name}
+              variant="soft"
+            />
+            <PublicAuthIndicator />
+          </div>
         </div>
       </header>
 

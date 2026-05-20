@@ -7,6 +7,7 @@ import { type MouseEvent as ReactMouseEvent, use, useEffect, useState } from "re
 import { DiscussionWall } from "@/components/discussion-wall";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { ShareButton } from "@/components/ui/share-button";
 import { useUser } from "@/lib/user-context";
 import {
   ApiError,
@@ -147,6 +148,12 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
           >
             Veřejný profil ↗
           </a>
+          <ShareButton
+            url={`/${workspace.slug}`}
+            title={workspace.name}
+            text={workspace.bio || workspace.name}
+            label="Sdílet komunitu"
+          />
         </div>
       </header>
 

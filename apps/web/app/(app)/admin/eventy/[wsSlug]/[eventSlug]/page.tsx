@@ -8,6 +8,7 @@ import { EventChecklist } from "@/components/event-checklist";
 import { ParticipantProfileDialog } from "@/components/participant-profile-dialog";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { ShareButton } from "@/components/ui/share-button";
 import {
   ApiError,
   type Event as OlafEvent,
@@ -176,6 +177,12 @@ function AdminEventDetail({ params }: Props) {
           >
             Veřejný náhled ↗
           </a>
+          <ShareButton
+            url={`/${wsSlug}/e/${eventSlug}`}
+            title={event.title}
+            text={`${event.title} — ${dateLabel}`}
+            label="Sdílet akci"
+          />
         </div>
       </header>
 
