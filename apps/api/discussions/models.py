@@ -88,6 +88,12 @@ class Comment(models.Model):
         related_name="replies",
     )
     body = models.TextField()
+    image = models.ImageField(
+        upload_to="discussions/comments/",
+        blank=True,
+        null=True,
+        help_text="Optional photo attached to the comment.",
+    )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

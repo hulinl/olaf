@@ -9,6 +9,7 @@ import {
   ApiError,
   type DiscussionComment,
   type DiscussionTopicDetail,
+  assetUrl,
   discussions,
 } from "@/lib/api";
 
@@ -49,6 +50,10 @@ export function DiscussionThread({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [composerBody, setComposerBody] = useState("");
+  const [composerImage, setComposerImage] = useState<File | null>(null);
+  const [composerImagePreview, setComposerImagePreview] = useState<
+    string | null
+  >(null);
   const [posting, setPosting] = useState(false);
   const [notFound, setNotFound] = useState(false);
   /** When set, the composer at the bottom is "replying to" this comment. */
@@ -151,7 +156,7 @@ export function DiscussionThread({
 
   async function handlePostComment(e: FormEvent) {
     e.preventDefault();
-    if (!composerBody.trim()) return;
+    if (!composerBody.trim() && !composerImage) return;
     setPosting(true);
     try {
       const body = composerBody.trim();
@@ -162,6 +167,7 @@ export function DiscussionThread({
           topicId,
           body,
           parent,
+          composerImage,
         );
       } else {
         await discussions.addEventComment(
@@ -170,9 +176,13 @@ export function DiscussionThread({
           topicId,
           body,
           parent,
+          composerImage,
         );
       }
       setComposerBody("");
+      setComposerImage(null);
+      if (composerImagePreview) URL.revokeObjectURL(composerImagePreview);
+      setComposerImagePreview(null);
       setReplyTo(null);
       await loadDetail();
     } catch (err) {
@@ -184,6 +194,22 @@ export function DiscussionThread({
     } finally {
       setPosting(false);
     }
+  }
+
+  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (composerImagePreview) URL.revokeObjectURL(composerImagePreview);
+    setComposerImage(file);
+    setComposerImagePreview(URL.createObjectURL(file));
+    // Reset so re-picking the same file re-fires onChange.
+    e.target.value = "";
+  }
+
+  function clearComposerImage() {
+    if (composerImagePreview) URL.revokeObjectURL(composerImagePreview);
+    setComposerImage(null);
+    setComposerImagePreview(null);
   }
 
   async function handleDeleteComment(c: DiscussionComment) {
@@ -480,13 +506,33 @@ export function DiscussionThread({
             }
             className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
           />
-          <div className="flex items-center gap-2">
+          {composerImagePreview && (
+            <div className="relative w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={composerImagePreview}
+                alt="Náhled přílohy"
+                className="max-h-48 rounded-md border border-border"
+              />
+              <button
+                type="button"
+                onClick={clearComposerImage}
+                aria-label="Odebrat fotku"
+                className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-canvas text-ink-700 shadow-sm hover:text-danger focus-ring"
+              >
+                <span aria-hidden>×</span>
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="submit"
               variant="primary"
               size="md"
               loading={posting}
-              disabled={!composerBody.trim() || posting}
+              disabled={
+                (!composerBody.trim() && !composerImage) || posting
+              }
             >
               {posting
                 ? "Odesílám…"
@@ -494,6 +540,24 @@ export function DiscussionThread({
                   ? "Odeslat odpověď"
                   : "Odeslat komentář"}
             </Button>
+            <label
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-within:ring-2 focus-within:ring-brand/40"
+              title="Přidat fotku"
+            >
+              <span aria-hidden>📷</span>
+              <span>{composerImage ? "Změnit fotku" : "Fotka"}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={pickImage}
+                className="hidden"
+              />
+            </label>
+            {composerImage && (
+              <span className="text-xs text-ink-500">
+                {composerImage.name}
+              </span>
+            )}
           </div>
         </form>
       )}
@@ -536,9 +600,27 @@ function CommentCard({
           })}
         </p>
       </div>
-      <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">
-        {c.body}
-      </p>
+      {c.body && (
+        <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">
+          {c.body}
+        </p>
+      )}
+      {c.image_url && (
+        <a
+          href={assetUrl(c.image_url) ?? c.image_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 block w-fit overflow-hidden rounded-md border border-border bg-surface-muted focus-ring"
+          aria-label="Zvětšit fotku"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={assetUrl(c.image_url) ?? c.image_url}
+            alt=""
+            className="max-h-72 max-w-full object-contain"
+          />
+        </a>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"

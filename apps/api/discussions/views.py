@@ -13,7 +13,12 @@ from __future__ import annotations
 
 from django.db.models import Count, Exists, OuterRef
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    parser_classes,
+    permission_classes,
+)
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -30,6 +35,8 @@ from .serializers import (
     TopicDetailSerializer,
     TopicSerializer,
 )
+
+_COMMENT_IMAGE_MAX_BYTES = 6 * 1024 * 1024  # 6 MB
 
 
 def _annotate_likes(qs, user):
@@ -172,6 +179,7 @@ def workspace_topic_detail(
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@parser_classes([JSONParser, MultiPartParser, FormParser])
 def workspace_topic_comments(
     request: Request, slug: str, topic_id: int
 ) -> Response:
@@ -196,9 +204,17 @@ def workspace_topic_comments(
         )
 
     body = (request.data.get("body") or "").strip()
-    if not body:
+    image = request.FILES.get("image")
+    # Allow image-only comments (e.g. quick photo reply); require body
+    # only when there's no image to upload.
+    if not body and not image:
         return Response(
-            {"body": "Napiš zprávu."},
+            {"body": "Napiš zprávu nebo přilož fotku."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if image is not None and image.size > _COMMENT_IMAGE_MAX_BYTES:
+        return Response(
+            {"image": "Fotka je moc velká (max 6 MB)."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     # Reply-to handling: only one level deep. If the requested parent
@@ -212,7 +228,7 @@ def workspace_topic_comments(
         except Comment.DoesNotExist:
             pass
     comment = Comment.objects.create(
-        topic=topic, body=body, author=request.user, parent=parent
+        topic=topic, body=body, author=request.user, parent=parent, image=image
     )
     from .tasks import send_comment_notification_task
 
@@ -359,6 +375,7 @@ def event_topic_detail(
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@parser_classes([JSONParser, MultiPartParser, FormParser])
 def event_topic_comments(
     request: Request,
     workspace_slug: str,
@@ -385,9 +402,15 @@ def event_topic_comments(
             status=status.HTTP_400_BAD_REQUEST,
         )
     body = (request.data.get("body") or "").strip()
-    if not body:
+    image = request.FILES.get("image")
+    if not body and not image:
         return Response(
-            {"body": "Napiš zprávu."},
+            {"body": "Napiš zprávu nebo přilož fotku."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if image is not None and image.size > _COMMENT_IMAGE_MAX_BYTES:
+        return Response(
+            {"image": "Fotka je moc velká (max 6 MB)."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     parent = None
@@ -399,7 +422,7 @@ def event_topic_comments(
         except Comment.DoesNotExist:
             pass
     comment = Comment.objects.create(
-        topic=topic, body=body, author=request.user, parent=parent
+        topic=topic, body=body, author=request.user, parent=parent, image=image
     )
     from .tasks import send_comment_notification_task
 
