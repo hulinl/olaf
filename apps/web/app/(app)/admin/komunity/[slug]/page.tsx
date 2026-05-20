@@ -52,12 +52,18 @@ interface Props {
  * the owner can drill into the existing /workspaces/<slug>/edit cockpit
  * for profile edits, and links to the public profile in a new tab.
  */
+type Tab = "dashboard" | "nastenka" | "clenove";
+
 export default function AdminKomunitaDetailPage({ params }: Props) {
   const { slug } = use(params);
   const router = useRouter();
   const user = useUser();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [eventList, setEventList] = useState<EventSummary[] | null>(null);
+  const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(
+    null,
+  );
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,9 +71,10 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [ws, ev] = await Promise.all([
+        const [ws, ev, mem] = await Promise.all([
           workspaces.detail(slug),
           workspaces.eventsFor(slug),
+          workspaces.members(slug).catch(() => null),
         ]);
         if (cancelled) return;
         if (ws.my_role !== "owner") {
@@ -81,6 +88,7 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         }
         setWorkspace(ws);
         setEventList(ev);
+        setMembers(mem);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -166,105 +174,209 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         </div>
       </header>
 
-      {/* Rozcestník — small-screen users were missing whole sections
-          (Nástěnka especially) because everything was stacked vertically.
-          Top tab bar jumps to the section and stays sticky so the
-          context never leaves the viewport. */}
+      {/* Tabs swap content in place — no more in-page anchor jumping.
+          Dashboard = overview (stat tiles + events table). Nástěnka =
+          wall. Členové = members list + invite controls. Pozvat is no
+          longer a top-level tab; it lives inside Členové as a CTA. */}
       <nav
+        role="tablist"
         aria-label="Sekce komunity"
         className="sticky top-16 z-10 -mx-4 flex gap-1 overflow-x-auto border-y border-border bg-canvas/85 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-md sm:border"
       >
-        <TabLink href={`/admin/komunity/${slug}#akce`}>
-          Akce ({upcoming.length})
-        </TabLink>
-        <TabLink href={`/admin/komunity/${slug}/clenove`}>
+        <TabBtn active={tab === "dashboard"} onClick={() => setTab("dashboard")}>
+          Dashboard
+        </TabBtn>
+        <TabBtn active={tab === "nastenka"} onClick={() => setTab("nastenka")}>
+          Nástěnka
+        </TabBtn>
+        <TabBtn active={tab === "clenove"} onClick={() => setTab("clenove")}>
           Členové ({workspace.member_count ?? 1})
-        </TabLink>
-        <TabLink href={`/admin/komunity/${slug}#nastenka`}>Nástěnka</TabLink>
-        <TabLink href={`/admin/komunity/${slug}#pozvat`}>Pozvat</TabLink>
+        </TabBtn>
       </nav>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Link
-          href={`/admin/komunity/${slug}/clenove`}
-          className="rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-brand hover:bg-brand/10 focus-ring"
-        >
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-500">
-            Členů
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-ink-900">
-            {workspace.member_count ?? 1}
-          </p>
-        </Link>
-        <StatTile label="Nadcházející akce" value={String(upcoming.length)} />
-        <StatTile label="Minulé akce" value={String(past.length)} />
-      </div>
-
-      <section id="pozvat" className="scroll-mt-32">
-        <InviteSection wsSlug={slug} />
-      </section>
-
-      <section id="akce" className="flex scroll-mt-32 flex-col gap-3">
-        <h2 className="text-xl font-semibold text-ink-900">
-          Akce této komunity
-        </h2>
-        {eventList.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
-            <h3 className="text-base font-semibold text-ink-900">
-              Žádné akce
-            </h3>
-            <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-              Vytvoř první akci v této komunitě.
-            </p>
+      {tab === "dashboard" && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatTile label="Členů" value={String(workspace.member_count ?? 1)} />
+            <StatTile
+              label="Nadcházející akce"
+              value={String(upcoming.length)}
+            />
+            <StatTile label="Minulé akce" value={String(past.length)} />
           </div>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-muted/60">
-                <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                  <th className="px-4 py-3">Akce</th>
-                  <th className="px-4 py-3">Termín</th>
-                  <th className="px-4 py-3 text-right">Přihlášeno</th>
-                  <th className="px-4 py-3 text-right">Waitlist</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {eventList.map((e) => (
-                  <EventRow key={e.slug} event={e} wsSlug={workspace.slug} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
 
-      <section id="nastenka" className="scroll-mt-32">
-        <DiscussionWall
-          scope={{ kind: "workspace", slug, isModerator: true }}
-          currentUserId={user.id}
-          topicHref={(topicId) =>
-            `/admin/komunity/${slug}/nastenka/${topicId}`
-          }
+          <section className="flex flex-col gap-3">
+            <h2 className="text-xl font-semibold text-ink-900">
+              Akce této komunity
+            </h2>
+            {eventList.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
+                <h3 className="text-base font-semibold text-ink-900">
+                  Žádné akce
+                </h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                  Vytvoř první akci v této komunitě.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-muted/60">
+                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                      <th className="px-4 py-3">Akce</th>
+                      <th className="px-4 py-3">Termín</th>
+                      <th className="px-4 py-3 text-right">Přihlášeno</th>
+                      <th className="px-4 py-3 text-right">Waitlist</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {eventList.map((e) => (
+                      <EventRow
+                        key={e.slug}
+                        event={e}
+                        wsSlug={workspace.slug}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {tab === "nastenka" && (
+        <section>
+          <DiscussionWall
+            scope={{ kind: "workspace", slug, isModerator: true }}
+            currentUserId={user.id}
+            topicHref={(topicId) =>
+              `/admin/komunity/${slug}/nastenka/${topicId}`
+            }
+          />
+        </section>
+      )}
+
+      {tab === "clenove" && (
+        <MembersTab
+          slug={slug}
+          members={members}
+          onMembersChanged={async () => {
+            const fresh = await workspaces.members(slug).catch(() => null);
+            setMembers(fresh);
+          }}
         />
-      </section>
+      )}
     </div>
   );
 }
 
-function TabLink({
-  href,
+function TabBtn({
+  active,
+  onClick,
   children,
 }: {
-  href: string;
+  active: boolean;
+  onClick: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={[
+        "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium focus-ring",
+        active
+          ? "bg-brand text-brand-ink"
+          : "text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+      ].join(" ")}
     >
       {children}
-    </Link>
+    </button>
+  );
+}
+
+function MembersTab({
+  slug,
+  members,
+  onMembersChanged,
+}: {
+  slug: string;
+  members: WorkspaceMemberSummary[] | null;
+  onMembersChanged: () => Promise<void>;
+}) {
+  // Members list here is the lightweight preview — full Lidé CRM
+  // (tags, search, bulk e-mail) stays at /admin/komunity/[slug]/clenove
+  // and gets a clear "Otevřít plný CRM" link below.
+  const actualMembers = (members ?? []).filter((m) => Boolean(m.role));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <InviteSection wsSlug={slug} onInvited={onMembersChanged} />
+
+      <Card>
+        <CardSection>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold text-ink-900">
+              Členové ({actualMembers.length})
+            </h2>
+            <Link
+              href={`/admin/komunity/${slug}/clenove`}
+              className="text-sm font-medium text-brand hover:underline"
+            >
+              Otevřít plný CRM →
+            </Link>
+          </div>
+          {actualMembers.length === 0 ? (
+            <p className="mt-3 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
+              Zatím jsi tu sám. Pozvi někoho odkazem nebo e-mailem výš.
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-col divide-y divide-border">
+              {actualMembers.slice(0, 20).map((m) => (
+                <li
+                  key={m.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium text-ink-900">
+                      {m.full_name || m.email}
+                    </span>
+                    {m.full_name && (
+                      <span className="ml-2 text-xs text-ink-500">
+                        {m.email}
+                      </span>
+                    )}
+                  </div>
+                  {m.role && (
+                    <span
+                      className={[
+                        "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                        m.role === "owner"
+                          ? "bg-brand/15 text-brand"
+                          : m.role === "admin"
+                            ? "bg-surface-muted text-ink-700"
+                            : "bg-surface-muted/60 text-ink-500",
+                      ].join(" ")}
+                    >
+                      {m.role}
+                    </span>
+                  )}
+                </li>
+              ))}
+              {actualMembers.length > 20 && (
+                <li className="pt-2 text-xs text-ink-500">
+                  …a další ({actualMembers.length - 20}). Přejdi do plného
+                  CRM pro celý seznam.
+                </li>
+              )}
+            </ul>
+          )}
+        </CardSection>
+      </Card>
+    </div>
   );
 }
 
@@ -339,7 +451,15 @@ function EventRow({
   );
 }
 
-function InviteSection({ wsSlug }: { wsSlug: string }) {
+function InviteSection({
+  wsSlug,
+  onInvited,
+}: {
+  wsSlug: string;
+  /** Called whenever the invite section adds a member / sends an
+   *  invitation, so the parent can refresh its own members list. */
+  onInvited?: () => Promise<void>;
+}) {
   const [open, setOpen] = useState(false);
   const [invitations, setInvitations] = useState<
     WorkspaceInvitationSummary[] | null
@@ -369,6 +489,7 @@ function InviteSection({ wsSlug }: { wsSlug: string }) {
       } else {
         setLink(null);
       }
+      if (onInvited) await onInvited();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
     }
@@ -389,7 +510,7 @@ function InviteSection({ wsSlug }: { wsSlug: string }) {
         >
           <div>
             <h2 className="text-base font-semibold text-ink-900">
-              Pozvat lidi
+              Pozvat člena
             </h2>
             <p className="mt-1 text-sm text-ink-500">
               Tři způsoby — e-mailem, veřejným odkazem, nebo přidat někoho
