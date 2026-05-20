@@ -19,6 +19,7 @@ urlpatterns = [
     path("api/events/", include("events.urls", namespace="events")),
     path("api/communities/", include("communities.urls", namespace="communities")),
     path("api/discussions/", include("discussions.urls", namespace="discussions")),
+    path("api/gear/", include("gear.urls", namespace="gear")),
 ]
 
 if settings.DEBUG:
