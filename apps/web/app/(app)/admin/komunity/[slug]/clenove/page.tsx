@@ -40,6 +40,7 @@ export default function KomunityMembersPage({ params }: Props) {
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const [filterTagIds, setFilterTagIds] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
@@ -141,6 +142,22 @@ export default function KomunityMembersPage({ params }: Props) {
         </div>
       </header>
 
+      <div className="relative">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Hledat podle jména nebo e-mailu…"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 pl-9 text-sm text-ink-900 focus-ring sm:max-w-md"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500"
+        >
+          ⌕
+        </span>
+      </div>
+
       {tags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
@@ -190,15 +207,23 @@ export default function KomunityMembersPage({ params }: Props) {
       )}
 
       {(() => {
-        // OR-mode filter: a person stays if they carry ANY of the chosen
-        // tags. Most natural fit for "show me everyone tagged Stálice or
-        // Beskydy core" workflows.
-        const filtered =
-          filterTagIds.size === 0
-            ? members
-            : members.filter((m) =>
-                (m.tag_ids ?? []).some((id) => filterTagIds.has(id)),
-              );
+        // OR-mode tag filter combined with a substring search across
+        // full_name + email. Both narrowings run in series so the owner
+        // can search inside a tag-filtered subset (or vice versa).
+        const q = searchQuery.trim().toLowerCase();
+        const filtered = members
+          .filter((m) =>
+            filterTagIds.size === 0
+              ? true
+              : (m.tag_ids ?? []).some((id) => filterTagIds.has(id)),
+          )
+          .filter((m) => {
+            if (!q) return true;
+            return (
+              m.full_name.toLowerCase().includes(q) ||
+              m.email.toLowerCase().includes(q)
+            );
+          });
 
         async function bulkToggle(tagId: number) {
           // Snapshot current members so TS narrowing survives across
