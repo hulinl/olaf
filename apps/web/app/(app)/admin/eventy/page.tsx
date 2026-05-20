@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/card";
 import {
   ApiError,
   type EventSummary,
+  assetUrl,
   events,
 } from "@/lib/api";
 
@@ -162,6 +163,7 @@ export default function AdminEventyTablePage() {
 function EventCard({ event }: { event: EventSummary }) {
   const href = `/admin/eventy/${event.workspace_slug}/${event.slug}`;
   const starts = new Date(event.starts_at);
+  const cover = assetUrl(event.cover_url);
   const dateLabel = starts.toLocaleDateString("cs-CZ", {
     day: "numeric",
     month: "short",
@@ -174,39 +176,52 @@ function EventCard({ event }: { event: EventSummary }) {
   return (
     <Link
       href={href}
-      className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm transition-colors hover:border-brand hover:bg-brand/5 focus-ring"
+      className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand hover:shadow-md focus-ring"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <span
-          className={[
-            "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-            STATUS_TONE[event.status],
-          ].join(" ")}
-        >
-          {STATUS_LABELS[event.status]}
-        </span>
-        <span className="text-xs text-ink-500">{dateLabel}</span>
-      </div>
-      <p className="text-base font-semibold text-ink-900">{event.title}</p>
-      {event.pending_approval_count > 0 && (
-        <p className="rounded-md bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
-          ⚠ Čeká {event.pending_approval_count} na schválení
-        </p>
+      {cover && (
+        <div
+          aria-hidden
+          className="aspect-[16/9] w-full bg-surface-muted transition-transform duration-300 group-hover:scale-[1.02]"
+          style={{
+            backgroundImage: `url(${cover})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
       )}
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-ink-500">
-        <dt>Přihlášeno</dt>
-        <dd className="text-right font-medium text-ink-900 tabular-nums">
-          {capacity}
-        </dd>
-        {event.waitlist_count > 0 && (
-          <>
-            <dt>Waitlist</dt>
-            <dd className="text-right font-medium text-warning tabular-nums">
-              {event.waitlist_count}
-            </dd>
-          </>
+      <div className="flex flex-col gap-2 p-4">
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className={[
+              "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+              STATUS_TONE[event.status],
+            ].join(" ")}
+          >
+            {STATUS_LABELS[event.status]}
+          </span>
+          <span className="text-xs text-ink-500">{dateLabel}</span>
+        </div>
+        <p className="text-base font-semibold text-ink-900">{event.title}</p>
+        {event.pending_approval_count > 0 && (
+          <p className="rounded-md bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
+            ⚠ Čeká {event.pending_approval_count} na schválení
+          </p>
         )}
-      </dl>
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-ink-500">
+          <dt>Přihlášeno</dt>
+          <dd className="text-right font-medium text-ink-900 tabular-nums">
+            {capacity}
+          </dd>
+          {event.waitlist_count > 0 && (
+            <>
+              <dt>Waitlist</dt>
+              <dd className="text-right font-medium text-warning tabular-nums">
+                {event.waitlist_count}
+              </dd>
+            </>
+          )}
+        </dl>
+      </div>
     </Link>
   );
 }
