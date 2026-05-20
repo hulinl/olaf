@@ -2,13 +2,12 @@ Ahoj {{ user.first_name }},
 
 dobrá zpráva — uvolnilo se místo na „{{ event.title }}" a postoupil/a jsi z waitlistu. Tvoje registrace je potvrzená.
 
-Stránka akce:
-  {{ event_url }}
-
-{% if event.starts_at %}Kdy: {{ event.starts_at|date:"l j. F Y, H:i" }}{% endif %}{% if event.location_text %}
+Stránka akce: {{ event_url }}
+{% if event_when %}
+Kdy: {{ event_when }}{% endif %}{% if event.location_text %}
 Kde: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
 Sraz: {{ event.meeting_point_text }}{% endif %}
 
 Pokud to nakonec nevyjde, dej nám prosím vědět na stránce akce — místo se uvolní pro dalšího z waitlistu.
 
-— {{ workspace.name }} přes olaf
+— Aplikace olaf

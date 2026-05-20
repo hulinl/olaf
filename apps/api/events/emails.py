@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
+from notifications.formatters import format_event_dt
+
 from .models import RSVP, Event
 
 
@@ -23,6 +25,7 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
         "status": rsvp.status,
         "event_url": _frontend_event_url(event),
         "workspace": event.workspace,
+        "event_when": format_event_dt(event.starts_at),
     }
     body = render_to_string("emails/rsvp_confirmation.txt", context)
 
@@ -50,6 +53,7 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
         "event": event,
         "event_url": _frontend_event_url(event),
         "workspace": event.workspace,
+        "event_when": format_event_dt(event.starts_at),
     }
     body = render_to_string("emails/rsvp_promoted.txt", context)
     send_mail(
@@ -69,6 +73,7 @@ def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
         "event": event,
         "reason": reason,
         "workspace": event.workspace,
+        "event_when": format_event_dt(event.starts_at),
     }
     body = render_to_string("emails/event_cancelled.txt", context)
     send_mail(
