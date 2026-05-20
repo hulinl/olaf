@@ -36,13 +36,25 @@ from .tasks import (
 
 
 def _load_published_event(workspace_slug: str, event_slug: str):
-    """Return the event if it's visible publicly, else None."""
-    try:
-        return Event.objects.select_related("workspace").get(
-            workspace__slug=workspace_slug, slug=event_slug
+    """Return the event if it's reachable under this workspace slug.
+
+    Events live in one primary workspace but can be shared into many
+    others (Event.shared_workspaces m2m). The URL /<slug>/e/<event>/
+    must work for either path — otherwise clicking an event from a
+    community that shares it produces a confused 404. We match by
+    primary workspace OR shared, falling back to the event's primary
+    workspace URL when only the shared path was requested."""
+    from django.db.models import Q as DQ
+
+    return (
+        Event.objects.select_related("workspace")
+        .filter(slug=event_slug)
+        .filter(
+            DQ(workspace__slug=workspace_slug)
+            | DQ(shared_workspaces__slug=workspace_slug)
         )
-    except Event.DoesNotExist:
-        return None
+        .first()
+    )
 
 
 @api_view(["GET"])

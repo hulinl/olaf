@@ -166,6 +166,24 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         </div>
       </header>
 
+      {/* Rozcestník — small-screen users were missing whole sections
+          (Nástěnka especially) because everything was stacked vertically.
+          Top tab bar jumps to the section and stays sticky so the
+          context never leaves the viewport. */}
+      <nav
+        aria-label="Sekce komunity"
+        className="sticky top-16 z-10 -mx-4 flex gap-1 overflow-x-auto border-y border-border bg-canvas/85 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-md sm:border"
+      >
+        <TabLink href={`/admin/komunity/${slug}#akce`}>
+          Akce ({upcoming.length})
+        </TabLink>
+        <TabLink href={`/admin/komunity/${slug}/clenove`}>
+          Členové ({workspace.member_count ?? 1})
+        </TabLink>
+        <TabLink href={`/admin/komunity/${slug}#nastenka`}>Nástěnka</TabLink>
+        <TabLink href={`/admin/komunity/${slug}#pozvat`}>Pozvat</TabLink>
+      </nav>
+
       <div className="grid gap-3 sm:grid-cols-3">
         <Link
           href={`/admin/komunity/${slug}/clenove`}
@@ -182,9 +200,11 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         <StatTile label="Minulé akce" value={String(past.length)} />
       </div>
 
-      <InviteSection wsSlug={slug} />
+      <section id="pozvat" className="scroll-mt-32">
+        <InviteSection wsSlug={slug} />
+      </section>
 
-      <section className="flex flex-col gap-3">
+      <section id="akce" className="flex scroll-mt-32 flex-col gap-3">
         <h2 className="text-xl font-semibold text-ink-900">
           Akce této komunity
         </h2>
@@ -218,11 +238,30 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         )}
       </section>
 
-      <DiscussionWall
-        scope={{ kind: "workspace", slug, isModerator: true }}
-        currentUserId={user.id}
-      />
+      <section id="nastenka" className="scroll-mt-32">
+        <DiscussionWall
+          scope={{ kind: "workspace", slug, isModerator: true }}
+          currentUserId={user.id}
+        />
+      </section>
     </div>
+  );
+}
+
+function TabLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+    >
+      {children}
+    </Link>
   );
 }
 
