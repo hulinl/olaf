@@ -19,4 +19,14 @@ urlpatterns = [
         views.workspace_member_detail,
         name="member-detail",
     ),
+    path(
+        "<slug:slug>/members/<int:user_id>/promote/",
+        views.workspace_member_promote,
+        name="member-promote",
+    ),
+    path(
+        "<slug:slug>/members/<int:user_id>/demote/",
+        views.workspace_member_demote,
+        name="member-demote",
+    ),
 ]

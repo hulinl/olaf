@@ -19,10 +19,14 @@ from .serializers import (
 
 
 def _is_owner(user, workspace: Workspace) -> bool:
+    """Operational owner-or-admin check. Despite the name, admins pass
+    too — matches events.permissions.is_workspace_owner semantics."""
     if not user or not user.is_authenticated:
         return False
     return WorkspaceMember.objects.filter(
-        workspace=workspace, user=user, role=WorkspaceMember.ROLE_OWNER
+        workspace=workspace,
+        user=user,
+        role__in=[WorkspaceMember.ROLE_OWNER, WorkspaceMember.ROLE_ADMIN],
     ).exists()
 
 
@@ -345,8 +349,19 @@ def workspace_members(request: Request, slug: str) -> Response:
     )
 
     now = timezone.now()
+    # Roster = people who have RSVPed OR who hold an explicit role
+    # (owner / admin). The role-only case matters now that the owner
+    # can promote anyone to admin — their roster row needs to render
+    # even before they RSVP to anything.
+    role_user_ids = list(
+        WorkspaceMember.objects.filter(workspace=workspace).values_list(
+            "user_id", flat=True
+        )
+    )
     users = (
-        User.objects.filter(rsvps__event_id__in=event_ids)
+        User.objects.filter(
+            DQ(rsvps__event_id__in=event_ids) | DQ(id__in=role_user_ids)
+        )
         .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
         .annotate(
             total_rsvps=Count("rsvps", filter=DQ(rsvps__event_id__in=event_ids)),
@@ -372,6 +387,15 @@ def workspace_members(request: Request, slug: str) -> Response:
         .order_by("-last_rsvp_at")
     )
 
+    # Bolt the workspace role onto each row so the UI can render
+    # owner / admin badges + the right action buttons. None = plain
+    # RSVPing participant with no explicit membership.
+    member_roles = dict(
+        WorkspaceMember.objects.filter(workspace=workspace).values_list(
+            "user_id", "role"
+        )
+    )
+
     return Response(
         [
             {
@@ -385,6 +409,7 @@ def workspace_members(request: Request, slug: str) -> Response:
                 "upcoming_rsvps": u.upcoming_rsvps,
                 "past_rsvps": u.past_rsvps,
                 "last_rsvp_at": u.last_rsvp_at,
+                "role": member_roles.get(u.id),
             }
             for u in users
         ]
@@ -456,3 +481,98 @@ def workspace_member_detail(
             ],
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-admin — promote / demote (super-admin only)
+# ---------------------------------------------------------------------------
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_member_promote(
+    request: Request, slug: str, user_id: int
+) -> Response:
+    """Promote a member to admin (super-admin only). No-ops if already
+    admin or owner."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    from events.permissions import is_workspace_super_admin
+
+    if not is_workspace_super_admin(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from accounts.models import User
+    from events.models import RSVP
+
+    # Sanity-check that the target user has any presence in this
+    # workspace at all (RSVP or existing membership) — we don't want
+    # owners promoting strangers via id-guessing.
+    try:
+        target = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    has_presence = (
+        RSVP.objects.filter(
+            user=target, event__workspace=workspace
+        ).exists()
+        or WorkspaceMember.objects.filter(
+            workspace=workspace, user=target
+        ).exists()
+    )
+    if not has_presence:
+        return Response(
+            {"detail": "Tento uživatel není v komunitě (žádný RSVP ani členství)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    member, _ = WorkspaceMember.objects.get_or_create(
+        workspace=workspace,
+        user=target,
+        defaults={"role": WorkspaceMember.ROLE_MEMBER},
+    )
+    if member.role == WorkspaceMember.ROLE_OWNER:
+        return Response(
+            {"detail": "Owner už má všechna práva."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if member.role != WorkspaceMember.ROLE_ADMIN:
+        member.role = WorkspaceMember.ROLE_ADMIN
+        member.save(update_fields=["role"])
+    return Response({"user_id": member.user_id, "role": member.role})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_member_demote(
+    request: Request, slug: str, user_id: int
+) -> Response:
+    """Demote an admin back to member (super-admin only). Cannot demote
+    the owner — there must always be at least one owner."""
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    from events.permissions import is_workspace_super_admin
+
+    if not is_workspace_super_admin(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        member = WorkspaceMember.objects.get(workspace=workspace, user_id=user_id)
+    except WorkspaceMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if member.role == WorkspaceMember.ROLE_OWNER:
+        return Response(
+            {"detail": "Ownera nelze degradovat — předej nejdřív vlastnictví."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if member.role != WorkspaceMember.ROLE_MEMBER:
+        member.role = WorkspaceMember.ROLE_MEMBER
+        member.save(update_fields=["role"])
+    return Response({"user_id": member.user_id, "role": member.role})

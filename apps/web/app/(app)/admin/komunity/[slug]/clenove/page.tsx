@@ -7,7 +7,9 @@ import { type MouseEvent as ReactMouseEvent, use, useEffect, useState } from "re
 import { Alert } from "@/components/ui/card";
 import {
   ApiError,
+  type Workspace,
   type WorkspaceMemberSummary,
+  type WorkspaceRole,
   workspaces,
 } from "@/lib/api";
 
@@ -26,15 +28,17 @@ export default function KomunityMembersPage({ params }: Props) {
   const { slug } = use(params);
   const router = useRouter();
   const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    workspaces
-      .members(slug)
-      .then((list) => {
-        if (!cancelled) setMembers(list);
+    Promise.all([workspaces.members(slug), workspaces.detail(slug)])
+      .then(([list, ws]) => {
+        if (cancelled) return;
+        setMembers(list);
+        setWorkspace(ws);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -114,7 +118,21 @@ export default function KomunityMembersPage({ params }: Props) {
             </thead>
             <tbody className="divide-y divide-border">
               {members.map((m) => (
-                <MemberRow key={m.id} member={m} wsSlug={slug} />
+                <MemberRow
+                  key={m.id}
+                  member={m}
+                  wsSlug={slug}
+                  iAmSuperAdmin={workspace?.my_role === "owner"}
+                  onRoleChange={(role) =>
+                    setMembers((prev) =>
+                      prev
+                        ? prev.map((x) =>
+                            x.id === m.id ? { ...x, role } : x,
+                          )
+                        : prev,
+                    )
+                  }
+                />
               ))}
             </tbody>
           </table>
@@ -127,11 +145,16 @@ export default function KomunityMembersPage({ params }: Props) {
 function MemberRow({
   member,
   wsSlug,
+  iAmSuperAdmin,
+  onRoleChange,
 }: {
   member: WorkspaceMemberSummary;
   wsSlug: string;
+  iAmSuperAdmin: boolean;
+  onRoleChange: (role: WorkspaceRole) => void;
 }) {
   const router = useRouter();
+  const [busy, setBusy] = useState(false);
   const href = `/admin/komunity/${wsSlug}/clenove/${member.id}`;
   const lastAt = member.last_rsvp_at ? new Date(member.last_rsvp_at) : null;
 
@@ -141,6 +164,31 @@ function MemberRow({
     router.push(href);
   }
 
+  async function handlePromote() {
+    setBusy(true);
+    try {
+      const r = await workspaces.promoteMember(wsSlug, member.id);
+      onRoleChange(r.role);
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleDemote() {
+    if (!confirm(`Snížit ${member.full_name || member.email} na běžného člena?`))
+      return;
+    setBusy(true);
+    try {
+      const r = await workspaces.demoteMember(wsSlug, member.id);
+      onRoleChange(r.role);
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <tr
       onClick={handleRowClick}
@@ -148,10 +196,51 @@ function MemberRow({
     >
       <td className="px-4 py-3">
         <Link href={href} className="flex flex-col focus-ring">
-          <span className="font-medium text-ink-900">
-            {member.full_name || "—"}
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="font-medium text-ink-900">
+              {member.full_name || "—"}
+            </span>
+            {member.role === "owner" && (
+              <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                Owner
+              </span>
+            )}
+            {member.role === "admin" && (
+              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                Admin
+              </span>
+            )}
+          </div>
           <span className="text-xs text-ink-500">{member.email}</span>
+          {iAmSuperAdmin && member.role !== "owner" && (
+            <div className="mt-1 flex gap-1.5">
+              {member.role === "admin" ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDemote();
+                  }}
+                  disabled={busy}
+                  className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+                >
+                  {busy ? "..." : "Snížit"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handlePromote();
+                  }}
+                  disabled={busy}
+                  className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+                >
+                  {busy ? "..." : "Povýšit na admina"}
+                </button>
+              )}
+            </div>
+          )}
         </Link>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-ink-700">
