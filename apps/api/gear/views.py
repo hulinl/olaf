@@ -6,11 +6,13 @@ import hashlib
 
 from django.http import HttpResponseRedirect
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .imports import import_notion_gear_csv
 from .models import GearItem, GearLinkClick, GearList, GearListItem
 from .serializers import (
     GearItemSerializer,
@@ -264,3 +266,61 @@ def gear_list_entry_detail(
             entry.sort_order = int(request.data["sort_order"])
     entry.save()
     return Response(GearListEntrySerializer(entry).data)
+
+
+# ---------------------------------------------------------------------------
+# Import — Notion CSV upload
+# ---------------------------------------------------------------------------
+
+
+# Conservative cap. Notion exports are KBs, not MBs — anything bigger is
+# almost certainly the wrong file. Keeps the parser from chewing on huge
+# user-uploaded blobs.
+_MAX_CSV_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser])
+def gear_import_csv(request: Request) -> Response:
+    """Upload a Notion gear-database CSV and import into the caller's catalog.
+
+    Idempotent — re-uploading the same export updates nothing (items
+    upserted by name, list edges deduped). Field name: `file`. Returns
+    counts so the UI can confirm what landed."""
+    upload = request.FILES.get("file")
+    if upload is None:
+        return Response(
+            {"file": "Vyber CSV soubor exportovaný z Notion."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if upload.size > _MAX_CSV_BYTES:
+        return Response(
+            {"file": "Soubor je moc velký (max 2 MB)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = import_notion_gear_csv(
+            user=request.user, csv_content=upload.read()
+        )
+    except UnicodeDecodeError:
+        return Response(
+            {"file": "Soubor není v UTF-8. Otevři a ulož jako UTF-8 CSV."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+        return Response(
+            {"file": f"Soubor se nepodařilo zpracovat: {e}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(
+        {
+            "rows": result.rows,
+            "items_created": result.items_created,
+            "items_backfilled": result.items_backfilled,
+            "lists_total": result.lists_total,
+            "edges_created": result.edges_created,
+        }
+    )

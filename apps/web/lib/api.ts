@@ -1469,4 +1469,21 @@ export const gear = {
     apiFetch<void>(`/api/gear/lists/${listId}/items/${entryId}/`, {
       method: "DELETE",
     }),
+  importCsv: async (file: File): Promise<GearImportResult> => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiFetch<GearImportResult>("/api/gear/import_csv/", {
+      method: "POST",
+      // Let the browser set the multipart boundary header.
+      body: form,
+    });
+  },
 };
+
+export interface GearImportResult {
+  rows: number;
+  items_created: number;
+  items_backfilled: number;
+  lists_total: number;
+  edges_created: number;
+}
