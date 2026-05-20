@@ -10,6 +10,7 @@ import {
   assetUrl,
   type EventSummary,
   type Workspace,
+  formatEventPrice,
 } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -355,6 +356,20 @@ function EventCard({
         >
           {event.title}
         </h3>
+        {(() => {
+          const price = formatEventPrice(event.price_amount, event.price_currency);
+          if (!price) return null;
+          return (
+            <p className="mt-2 text-sm">
+              <span className="font-semibold text-ink-900 tabular-nums">
+                {price}
+              </span>
+              {event.price_note && (
+                <span className="ml-1 text-ink-500">· {event.price_note}</span>
+              )}
+            </p>
+          );
+        })()}
         <div className="mt-auto pt-5 text-sm text-ink-500">
           {cancelled ? (
             <span className="font-medium text-danger">Zrušeno</span>

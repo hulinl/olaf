@@ -6,47 +6,39 @@ import { useEffect, useState } from "react";
 import { EventForm } from "@/components/event-form";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Alert } from "@/components/ui/card";
-import {
-  ApiError,
-  type Workspace,
-  events,
-  workspaces,
-} from "@/lib/api";
+import { ApiError, type Workspace, events, workspaces } from "@/lib/api";
 
 /**
  * New-event flow. Event is first-class — the user doesn't need a community
- * to create one. Backend lazy-creates a personal workspace ("Můj prostor")
- * the first time the user lands here; the event drops into it by default.
- *
- * If the user also owns one or more communities (workspaces), we surface a
- * "Vytvořit pod" dropdown so they can pick a community as the event's home
- * — and the EventForm's "Sdílet do komunit" picker lets them publish into
- * additional communities afterwards.
+ * to create one. We pick the primary home automatically:
+ *   - 0 owned communities → personal workspace (lazy-created on demand)
+ *   - 1+ owned communities → the first one, alphabetically
+ * The "Sdílet do komunit" multi-select inside EventForm covers any extra
+ * communities the user wants to publish into. Removing the "Vytvořit pod"
+ * picker that used to live here — it was a confusing extra decision for
+ * the common case (single community owner).
  */
 export default function NewEventPage() {
   const router = useRouter();
-  const [personal, setPersonal] = useState<Workspace | null>(null);
-  const [communities, setCommunities] = useState<Workspace[]>([]);
-  const [chosenSlug, setChosenSlug] = useState<string | null>(null);
+  const [home, setHome] = useState<Workspace | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Personal workspace is lazy-created on first call — safe to
-        // fire unconditionally on every visit.
-        const [p, mine] = await Promise.all([
-          workspaces.personal(),
-          workspaces.mine(),
-        ]);
+        const mine = await workspaces.mine();
+        const owned = mine.filter((w) => w.my_role === "owner");
         if (cancelled) return;
-        setPersonal(p);
-        const ownedCommunities = mine.filter((w) => w.my_role === "owner");
-        setCommunities(ownedCommunities);
-        // Default: personal workspace. Owner can switch via dropdown if
-        // they want the event homed under a community instead.
-        setChosenSlug(p.slug);
+        if (owned.length > 0) {
+          // Sorted by name by the API; pick the first.
+          setHome(owned[0]);
+        } else {
+          // No community → fall back to the lazy personal workspace.
+          const p = await workspaces.personal();
+          if (cancelled) return;
+          setHome(p);
+        }
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
@@ -71,7 +63,7 @@ export default function NewEventPage() {
   ];
 
   if (error) return <Alert variant="danger">{error}</Alert>;
-  if (!personal || !chosenSlug) {
+  if (!home) {
     return (
       <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
@@ -89,77 +81,19 @@ export default function NewEventPage() {
           Vytvoř novou akci
         </h1>
         <p className="mt-2 text-ink-500">
-          Akce má vlastní stránku a registrace. Pokud chceš, můžeš ji
-          publikovat i do svých komunit níže ve formuláři.
+          Akce má vlastní stránku a registrace. Pokud chceš, ve formuláři
+          níže si vyber komunity, kam ji chceš taky publikovat.
         </p>
       </header>
 
-      {communities.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 shadow-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-            Vytvořit pod
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <HomeChip
-              label="Můj prostor"
-              hint="Akce mimo komunitu"
-              slug={personal.slug}
-              active={chosenSlug === personal.slug}
-              onSelect={setChosenSlug}
-            />
-            {communities.map((w) => (
-              <HomeChip
-                key={w.slug}
-                label={w.name}
-                hint="Akce komunity"
-                slug={w.slug}
-                active={chosenSlug === w.slug}
-                onSelect={setChosenSlug}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       <EventForm
-        workspaceSlug={chosenSlug}
-        onSubmit={(payload) => events.create(chosenSlug, payload)}
+        workspaceSlug={home.slug}
+        onSubmit={(payload) => events.create(home.slug, payload)}
         onSuccess={(event) =>
-          router.push(`/admin/eventy/${chosenSlug}/${event.slug}/edit`)
+          router.push(`/admin/eventy/${home.slug}/${event.slug}/edit`)
         }
         submitLabel="Vytvořit akci"
       />
     </div>
-  );
-}
-
-function HomeChip({
-  label,
-  hint,
-  slug,
-  active,
-  onSelect,
-}: {
-  label: string;
-  hint: string;
-  slug: string;
-  active: boolean;
-  onSelect: (slug: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(slug)}
-      aria-pressed={active}
-      className={[
-        "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors focus-ring",
-        active
-          ? "border-brand bg-brand/5 text-ink-900 ring-1 ring-brand/40"
-          : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
-      ].join(" ")}
-    >
-      <span className="text-sm font-semibold">{label}</span>
-      <span className="text-[11px] text-ink-500">{hint}</span>
-    </button>
   );
 }

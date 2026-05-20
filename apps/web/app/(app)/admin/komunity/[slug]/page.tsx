@@ -400,6 +400,7 @@ function InviteByEmail({
   onChange: () => Promise<void>;
 }) {
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"member" | "admin">("member");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -411,13 +412,22 @@ function InviteByEmail({
     setError(null);
     setMsg(null);
     try {
-      const r = await workspaces.createInvitation(wsSlug, email.trim());
+      const r = await workspaces.createInvitation(wsSlug, email.trim(), role);
       if (r.mode === "direct") {
-        setMsg("Účet existuje — uživatel byl rovnou přidán jako člen.");
+        setMsg(
+          `Účet existuje — uživatel byl rovnou přidán${
+            role === "admin" ? " jako admin" : ""
+          }.`,
+        );
       } else {
-        setMsg(`Pozvánka odeslána na ${r.email}.`);
+        setMsg(
+          `Pozvánka odeslána na ${r.email}${
+            role === "admin" ? " (po přijetí získá admin práva)" : ""
+          }.`,
+        );
       }
       setEmail("");
+      setRole("member");
       await onChange();
     } catch (err) {
       setError(
@@ -448,6 +458,19 @@ function InviteByEmail({
             />
           </Field>
         </div>
+        <Field label="Role" htmlFor="inv-role">
+          <select
+            id="inv-role"
+            value={role}
+            onChange={(e) =>
+              setRole(e.target.value as "member" | "admin")
+            }
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+          >
+            <option value="member">Člen</option>
+            <option value="admin">Admin</option>
+          </select>
+        </Field>
         <Button type="submit" variant="primary" size="md" loading={busy}>
           {busy ? "..." : "Pozvat"}
         </Button>
@@ -629,6 +652,7 @@ function AddFromLide({
   onChange: () => Promise<void>;
 }) {
   const [pickedId, setPickedId] = useState<number | null>(null);
+  const [role, setRole] = useState<"member" | "admin">("member");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -641,10 +665,15 @@ function AddFromLide({
     setBusy(true);
     setMsg(null);
     try {
-      await workspaces.addExistingMember(wsSlug, pickedId);
+      await workspaces.addExistingMember(wsSlug, pickedId, role);
       const person = members?.find((m) => m.id === pickedId);
-      setMsg(`Přidáno: ${person?.full_name || person?.email}`);
+      setMsg(
+        `Přidáno: ${person?.full_name || person?.email}${
+          role === "admin" ? " jako admin" : ""
+        }`,
+      );
       setPickedId(null);
+      setRole("member");
       await onChange();
     } finally {
       setBusy(false);
@@ -678,6 +707,15 @@ function AddFromLide({
                 {m.full_name ? ` (${m.email})` : ""}
               </option>
             ))}
+          </select>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as "member" | "admin")}
+            aria-label="Role"
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+          >
+            <option value="member">Člen</option>
+            <option value="admin">Admin</option>
           </select>
           <Button
             type="button"

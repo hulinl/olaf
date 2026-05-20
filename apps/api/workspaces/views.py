@@ -1094,11 +1094,22 @@ def workspace_add_existing_member(request: Request, slug: str) -> Response:
     except User.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    membership, created = WorkspaceMember.objects.get_or_create(
-        workspace=workspace,
-        user=target,
-        defaults={"role": WorkspaceMember.ROLE_MEMBER},
+    # Caller can choose admin or member. Owner role is never assignable
+    # via this path — that's the hand-over endpoint's job.
+    requested_role = (request.data.get("role") or "").strip().lower()
+    role = (
+        WorkspaceMember.ROLE_ADMIN
+        if requested_role == WorkspaceMember.ROLE_ADMIN
+        else WorkspaceMember.ROLE_MEMBER
     )
+    membership, created = WorkspaceMember.objects.get_or_create(
+        workspace=workspace, user=target, defaults={"role": role}
+    )
+    # If they already exist with a different role, allow upgrade from
+    # member → admin (but never touch owner).
+    if not created and membership.role == WorkspaceMember.ROLE_MEMBER and role == WorkspaceMember.ROLE_ADMIN:
+        membership.role = role
+        membership.save(update_fields=["role"])
     return Response(
         {
             "user_id": target.id,
@@ -1153,8 +1164,16 @@ def workspace_invitations(request: Request, slug: str) -> Response:
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Caller-chosen role — admin or member. Owner never assignable here.
+    requested_role = (request.data.get("role") or "").strip().lower()
+    role = (
+        WorkspaceMember.ROLE_ADMIN
+        if requested_role == WorkspaceMember.ROLE_ADMIN
+        else WorkspaceMember.ROLE_MEMBER
+    )
+
     # Short-circuit: if a user with this e-mail already exists, just
-    # add them as a member. No invitation needed.
+    # add them. No invitation needed.
     from accounts.models import User
 
     existing = User.objects.filter(email__iexact=email).first()
@@ -1162,8 +1181,11 @@ def workspace_invitations(request: Request, slug: str) -> Response:
         membership, created = WorkspaceMember.objects.get_or_create(
             workspace=workspace,
             user=existing,
-            defaults={"role": WorkspaceMember.ROLE_MEMBER},
+            defaults={"role": role},
         )
+        if not created and membership.role == WorkspaceMember.ROLE_MEMBER and role == WorkspaceMember.ROLE_ADMIN:
+            membership.role = role
+            membership.save(update_fields=["role"])
         return Response(
             {
                 "mode": "direct",
@@ -1174,12 +1196,13 @@ def workspace_invitations(request: Request, slug: str) -> Response:
             status=status.HTTP_201_CREATED,
         )
 
-    # New e-mail → invitation flow.
+    # New e-mail → invitation flow. Encode the requested role into the
+    # invitation so it sticks when the recipient accepts.
     invitation, created = WorkspaceInvitation.objects.get_or_create(
         workspace=workspace,
         email=email,
         status=WorkspaceInvitation.STATUS_PENDING,
-        defaults={"invited_by": request.user},
+        defaults={"invited_by": request.user, "role": role},
     )
     if created:
         _send_workspace_invitation_email(invitation)

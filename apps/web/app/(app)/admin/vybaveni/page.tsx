@@ -604,15 +604,28 @@ function ItemSection({
             Žádné položky. Začni přidáním prvního kusu vybavení.
           </p>
         ) : (
-          <div className="mt-4 flex flex-col gap-2">
-            {items.map((i) => (
-              <ItemRow
-                key={i.id}
-                item={i}
-                categories={categories}
-                onChange={onChange}
-              />
-            ))}
+          <div className="mt-4 overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted/60">
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                  <th className="px-3 py-2">Položka</th>
+                  <th className="hidden px-3 py-2 sm:table-cell">Kategorie</th>
+                  <th className="px-3 py-2 text-right">Váha</th>
+                  <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
+                  <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-surface">
+                {items.map((i) => (
+                  <ItemRow
+                    key={i.id}
+                    item={i}
+                    categories={categories}
+                    onChange={onChange}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </CardSection>
@@ -633,51 +646,83 @@ function ItemRow({
 
   if (editing) {
     return (
-      <div className="rounded-md border border-border bg-surface-muted/30 p-3">
-        <ItemEditor
-          initial={item}
-          categories={categories}
-          onCancel={() => setEditing(false)}
-          onSave={async (payload) => {
-            await gear.updateItem(item.id, payload);
-            setEditing(false);
-            await onChange();
-          }}
-          onDelete={async () => {
-            if (!confirm(`Smazat položku „${item.name}"?`)) return;
-            await gear.deleteItem(item.id);
-            setEditing(false);
-            await onChange();
-          }}
-          onCategoryAdded={onChange}
-        />
-      </div>
+      <tr className="bg-surface-muted/30">
+        <td colSpan={5} className="p-3">
+          <ItemEditor
+            initial={item}
+            categories={categories}
+            onCancel={() => setEditing(false)}
+            onSave={async (payload) => {
+              await gear.updateItem(item.id, payload);
+              setEditing(false);
+              await onChange();
+            }}
+            onDelete={async () => {
+              if (!confirm(`Smazat položku „${item.name}"?`)) return;
+              await gear.deleteItem(item.id);
+              setEditing(false);
+              await onChange();
+            }}
+            onCategoryAdded={onChange}
+          />
+        </td>
+      </tr>
     );
   }
 
+  const weightLabel =
+    item.weight_g == null
+      ? "—"
+      : item.weight_g >= 1000
+        ? `${(item.weight_g / 1000).toFixed(2)} kg`
+        : `${item.weight_g} g`;
+
   return (
-    <button
-      type="button"
+    <tr
       onClick={() => setEditing(true)}
-      className="flex flex-col items-start gap-1 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:border-brand hover:bg-brand/5 focus-ring sm:flex-row sm:items-center sm:gap-4"
+      className="cursor-pointer hover:bg-brand/5"
     >
-      <span className="flex-1 font-medium text-ink-900">{item.name}</span>
-      <span className="flex items-center gap-3 text-xs text-ink-500">
-        {item.category && (
+      <td className="px-3 py-2">
+        <span className="font-medium text-ink-900">{item.name}</span>
+        {/* On small screens collapse category + link hints under the
+            title since the columns are hidden. */}
+        <span className="ml-2 text-xs text-ink-500 sm:hidden">
+          {item.category && <>{item.category}</>}
+          {item.url && <span className="ml-2 text-brand">↗</span>}
+        </span>
+      </td>
+      <td className="hidden whitespace-nowrap px-3 py-2 text-ink-700 sm:table-cell">
+        {item.category ? (
           <span className="rounded bg-surface-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
             {item.category}
           </span>
+        ) : (
+          <span className="text-ink-300">—</span>
         )}
-        {item.weight_g != null && (
-          <span className="font-mono tabular-nums">
-            {item.weight_g >= 1000
-              ? `${(item.weight_g / 1000).toFixed(2)} kg`
-              : `${item.weight_g} g`}
-          </span>
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums text-ink-700">
+        {weightLabel}
+      </td>
+      <td className="hidden max-w-[1px] px-3 py-2 lg:table-cell">
+        {item.url ? (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="block truncate text-brand hover:underline"
+            title={item.url}
+          >
+            {new URL(item.url).hostname.replace(/^www\./, "")} ↗
+          </a>
+        ) : (
+          <span className="text-ink-300">—</span>
         )}
-        {item.url && <span className="text-brand">↗</span>}
-      </span>
-    </button>
+      </td>
+      <td className="hidden max-w-[1px] truncate px-3 py-2 text-xs text-ink-500 lg:table-cell">
+        {item.note || ""}
+      </td>
+    </tr>
   );
 }
 
