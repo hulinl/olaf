@@ -784,3 +784,59 @@ class ConfigurableQuestionnaireTests(TestCase):
             resp.json()["enabled_questionnaire_sections"],
             ["tshirt_size", "diet"],
         )
+
+
+class CompleteFinishedEventsTaskTests(TestCase):
+    def setUp(self) -> None:
+        self.workspace = Workspace.objects.create(
+            slug="olaf-adventures", name="Olaf Adventures"
+        )
+
+    def test_flips_published_event_whose_end_has_passed(self) -> None:
+        from .tasks import complete_finished_events_task
+
+        ended = _build_event(
+            self.workspace,
+            slug="past-camp",
+            starts_at=timezone.now() - timedelta(days=5),
+            ends_at=timezone.now() - timedelta(days=2),
+        )
+        upcoming = _build_event(
+            self.workspace,
+            slug="future-camp",
+            starts_at=timezone.now() + timedelta(days=10),
+            ends_at=timezone.now() + timedelta(days=12),
+        )
+
+        result = complete_finished_events_task()
+
+        ended.refresh_from_db()
+        upcoming.refresh_from_db()
+        self.assertEqual(result["flipped"], 1)
+        self.assertEqual(ended.status, Event.STATUS_COMPLETED)
+        self.assertEqual(upcoming.status, Event.STATUS_PUBLISHED)
+
+    def test_leaves_draft_and_cancelled_alone(self) -> None:
+        from .tasks import complete_finished_events_task
+
+        draft = _build_event(
+            self.workspace,
+            slug="draft-past",
+            status=Event.STATUS_DRAFT,
+            starts_at=timezone.now() - timedelta(days=5),
+            ends_at=timezone.now() - timedelta(days=2),
+        )
+        cancelled = _build_event(
+            self.workspace,
+            slug="cancelled-past",
+            status=Event.STATUS_CANCELLED,
+            starts_at=timezone.now() - timedelta(days=5),
+            ends_at=timezone.now() - timedelta(days=2),
+        )
+
+        complete_finished_events_task()
+
+        draft.refresh_from_db()
+        cancelled.refresh_from_db()
+        self.assertEqual(draft.status, Event.STATUS_DRAFT)
+        self.assertEqual(cancelled.status, Event.STATUS_CANCELLED)
