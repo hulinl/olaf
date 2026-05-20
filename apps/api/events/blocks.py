@@ -164,6 +164,22 @@ def _validate_practical(payload: dict) -> None:
         raise ValueError("'difficulty_level' must be an integer between 0 and 5")
 
 
+def _validate_gear(payload: dict) -> None:
+    """Gear-list reference block.
+
+    Carries just a slug — the public event endpoint embeds the
+    referenced list's data so the frontend renders without a second
+    fetch. Slug existence and visibility are checked at render time,
+    not save time, so an owner can attach a list before flipping it
+    public (or have it gracefully empty out if they later make it
+    private)."""
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
+    _expect_str(
+        payload.get("list_slug", ""), "list_slug", allow_blank=False
+    )
+
+
 BLOCK_SCHEMAS: dict[str, Any] = {
     "hero": _validate_hero,
     "prose": _validate_prose,
@@ -174,6 +190,7 @@ BLOCK_SCHEMAS: dict[str, Any] = {
     "map": _validate_map,
     "faq": _validate_faq,
     "practical": _validate_practical,
+    "gear": _validate_gear,
 }
 
 KNOWN_BLOCK_TYPES = tuple(BLOCK_SCHEMAS.keys())

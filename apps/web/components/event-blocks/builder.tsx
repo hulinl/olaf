@@ -11,6 +11,7 @@ import {
 import { DaysForm } from "./forms/days-form";
 import { FaqForm } from "./forms/faq-form";
 import { GalleryForm } from "./forms/gallery-form";
+import { GearForm } from "./forms/gear-form";
 import { HeroForm } from "./forms/hero-form";
 import { IncludedSplitForm } from "./forms/included-split-form";
 import { MapForm } from "./forms/map-form";
@@ -267,6 +268,8 @@ function BlockForm({
       return <FaqForm payload={block.payload} onChange={onChange} />;
     case "practical":
       return <PracticalForm payload={block.payload} onChange={onChange} />;
+    case "gear":
+      return <GearForm payload={block.payload} onChange={onChange} />;
     default:
       return null;
   }
@@ -297,5 +300,7 @@ function makeBlock(type: BlockType): EventBlock {
       return { id, type, payload: { items: [] } };
     case "practical":
       return { id, type, payload: {} };
+    case "gear":
+      return { id, type, payload: { list_slug: "" } };
   }
 }

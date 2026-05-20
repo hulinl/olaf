@@ -181,6 +181,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     enabled_questionnaire_sections = serializers.SerializerMethodField()
     community_slugs = serializers.SerializerMethodField()
     shared_workspace_slugs = serializers.SerializerMethodField()
+    gear_lists_by_slug = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -203,6 +204,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "community_slugs",
             "shared_workspace_slugs",
             "blocks",
+            "gear_lists_by_slug",
             "enabled_questionnaire_sections",
             "images",
             "workspace_slug",
@@ -240,6 +242,36 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     def get_shared_workspace_slugs(self, obj: Event) -> list[str]:
         return list(obj.shared_workspaces.values_list("slug", flat=True))
+
+    def get_gear_lists_by_slug(self, obj: Event) -> dict:
+        """Inline payload for every gear block on this event's landing.
+
+        Maps slug → PublicGearList payload (slim) when the list is
+        unlisted or public. Private lists are omitted, so the block
+        renders gracefully empty if the owner switches a list back to
+        private after attaching it."""
+        slugs: list[str] = []
+        for block in obj.blocks or []:
+            if not isinstance(block, dict) or block.get("type") != "gear":
+                continue
+            slug = ((block.get("payload") or {}).get("list_slug") or "").strip()
+            if slug:
+                slugs.append(slug)
+        if not slugs:
+            return {}
+
+        from gear.models import GearList
+        from gear.serializers import PublicGearListSerializer
+
+        qs = (
+            GearList.objects.select_related("user")
+            .prefetch_related("entries__item")
+            .filter(slug__in=slugs)
+            .exclude(visibility=GearList.VISIBILITY_PRIVATE)
+        )
+        return {
+            gl.slug: PublicGearListSerializer(gl).data for gl in qs
+        }
 
 
 class EventSummarySerializer(serializers.ModelSerializer):

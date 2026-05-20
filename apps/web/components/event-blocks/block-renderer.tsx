@@ -1,9 +1,10 @@
-import type { EventImage } from "@/lib/api";
+import type { EventImage, PublicGearList } from "@/lib/api";
 import type { BlockTone, EventBlock } from "@/lib/event-blocks";
 
 import { DaysBlock } from "./days-block";
 import { FaqBlock } from "./faq-block";
 import { GalleryBlock } from "./gallery-block";
+import { GearBlock } from "./gear-block";
 import { HeroBlock } from "./hero-block";
 import { IncludedSplitBlock } from "./included-split-block";
 import { MapBlock } from "./map-block";
@@ -29,6 +30,8 @@ interface Props {
     currency: string;
     note: string;
   };
+  /** Inline gear-list payloads keyed by slug; passed to gear blocks. */
+  gearListsBySlug?: Record<string, PublicGearList>;
 }
 
 export function BlockRenderer({
@@ -39,6 +42,7 @@ export function BlockRenderer({
   images = [],
   tone = "canvas",
   eventPrice,
+  gearListsBySlug,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -75,6 +79,14 @@ export function BlockRenderer({
       return <FaqBlock payload={block.payload} tone={tone} />;
     case "practical":
       return <PracticalBlock payload={block.payload} tone={tone} />;
+    case "gear":
+      return (
+        <GearBlock
+          payload={block.payload}
+          list={gearListsBySlug?.[block.payload.list_slug]}
+          tone={tone}
+        />
+      );
     default:
       return null;
   }
