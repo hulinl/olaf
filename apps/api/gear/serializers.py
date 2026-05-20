@@ -2,7 +2,14 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from rest_framework import serializers
 
-from .models import GearItem, GearList, GearListItem
+from .models import GearCategory, GearItem, GearList, GearListItem
+
+
+class GearCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GearCategory
+        fields = ("id", "name", "sort_order", "created_at")
+        read_only_fields = ("id", "created_at")
 
 
 def _apply_affiliate_partners(url: str, partners: list) -> str:
@@ -40,19 +47,98 @@ def _apply_affiliate_partners(url: str, partners: list) -> str:
 
 
 class GearItemSerializer(serializers.ModelSerializer):
+    """Item payload — write accepts either `category_id` (canonical) or a
+    free-text `category` string (auto-creates a GearCategory). Read
+    returns both: id for dropdown wiring + name for display."""
+
     display_url = serializers.SerializerMethodField()
+    category_id = serializers.IntegerField(
+        source="category_obj_id", required=False, allow_null=True
+    )
+    # Read-only name field (resolved from FK with fallback to legacy
+    # string); writes can still use the legacy plain `category` string
+    # which we accept in to_internal_value below.
+    category = serializers.SerializerMethodField()
 
     class Meta:
         model = GearItem
         fields = (
             "id", "name", "weight_g", "url", "display_url",
-            "category", "note", "created_at", "updated_at",
+            "category_id", "category", "note", "created_at", "updated_at",
         )
         read_only_fields = ("id", "display_url", "created_at", "updated_at")
 
     def get_display_url(self, obj: GearItem) -> str:
         partners = getattr(obj.user, "affiliate_partners", None) or []
         return _apply_affiliate_partners(obj.url, partners)
+
+    def get_category(self, obj: GearItem) -> str:
+        if obj.category_obj_id and getattr(obj, "category_obj", None):
+            return obj.category_obj.name
+        return obj.category or ""
+
+    def to_internal_value(self, data):
+        # Stash a string `category` (legacy write path) so we can
+        # auto-create the matching GearCategory below.
+        self._legacy_category_str = None
+        if (
+            "category_id" not in data
+            and isinstance(data.get("category"), str)
+        ):
+            self._legacy_category_str = data["category"].strip()
+        # The base serializer doesn't know about plain `category` —
+        # drop it so it doesn't 400 on "extra field".
+        cleaned = {k: v for k, v in data.items() if k != "category"}
+        # Guard cross-user category access: any category_id must be a
+        # row owned by the caller.
+        if cleaned.get("category_id"):
+            request = self.context.get("request")
+            if request and not GearCategory.objects.filter(
+                pk=cleaned["category_id"], user=request.user
+            ).exists():
+                raise serializers.ValidationError(
+                    {"category_id": "Neznámá kategorie."}
+                )
+        return super().to_internal_value(cleaned)
+
+    def _resolve_category(self, user):
+        """Returns a GearCategory or None based on what the request gave."""
+        if getattr(self, "_legacy_category_str", None):
+            name = self._legacy_category_str[:60]
+            if not name:
+                return None
+            cat, _ = GearCategory.objects.get_or_create(
+                user=user, name=name
+            )
+            return cat
+        return None  # category_obj_id already handled by ModelSerializer
+
+    def create(self, validated_data):
+        user = validated_data.get("user") or self.context["request"].user
+        item = super().create(validated_data)
+        cat = self._resolve_category(user)
+        if cat is not None:
+            item.category_obj = cat
+            item.category = cat.name
+            item.save(update_fields=["category_obj", "category"])
+        elif item.category_obj_id:
+            item.category = item.category_obj.name
+            item.save(update_fields=["category"])
+        return item
+
+    def update(self, instance, validated_data):
+        item = super().update(instance, validated_data)
+        cat = self._resolve_category(item.user)
+        if cat is not None:
+            item.category_obj = cat
+            item.category = cat.name
+            item.save(update_fields=["category_obj", "category"])
+        elif "category_obj_id" in self.initial_data:
+            # Explicit category_id was set (possibly to null) — keep the
+            # string column in sync.
+            item.category = item.category_obj.name if item.category_obj_id else ""
+            item.save(update_fields=["category"])
+        return item
 
 
 class GearListEntrySerializer(serializers.ModelSerializer):

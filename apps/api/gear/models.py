@@ -15,6 +15,37 @@ from django.db import models
 from django.utils import timezone
 
 
+class GearCategory(models.Model):
+    """User-scoped category for grouping gear items.
+
+    Promoted from free-text on GearItem to a first-class entity so the
+    owner can manage the vocabulary (rename in one place, see empty
+    categories, control sort order). GearItem still keeps the
+    denormalized name string as a fallback display + for legacy reads;
+    canonical truth is the FK."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="gear_categories",
+    )
+    name = models.CharField(max_length=60)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "gear_category"
+        ordering = ["sort_order", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "name"], name="uniq_category_per_user"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class GearItem(models.Model):
     """One gear thing the user owns or recommends."""
 
@@ -35,11 +66,19 @@ class GearItem(models.Model):
         default="",
         help_text="Optional product link (e-shop, manufacturer).",
     )
+    category_obj = models.ForeignKey(
+        GearCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="items",
+        help_text="Canonical category — kept in sync with the string below.",
+    )
     category = models.CharField(
         max_length=60,
         blank=True,
         default="",
-        help_text="Free-text grouping label (sleep / cooking / clothing / ...).",
+        help_text="Denormalised category name for legacy reads.",
     )
     note = models.TextField(
         blank=True,

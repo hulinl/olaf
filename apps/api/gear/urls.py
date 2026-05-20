@@ -7,6 +7,12 @@ app_name = "gear"
 urlpatterns = [
     path("items/", views.gear_items, name="items"),
     path("items/<int:item_id>/", views.gear_item_detail, name="item-detail"),
+    path("categories/", views.gear_categories, name="categories"),
+    path(
+        "categories/<int:category_id>/",
+        views.gear_category_detail,
+        name="category-detail",
+    ),
     path("lists/", views.gear_lists, name="lists"),
     path("lists/<int:list_id>/", views.gear_list_detail, name="list-detail"),
     path(

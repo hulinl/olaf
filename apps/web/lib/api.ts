@@ -1446,7 +1446,10 @@ export interface GearItem {
    *  Fall back to `url` when no partner matches. Always use this for
    *  outbound clicks. */
   display_url: string;
+  /** Category as a name (resolved from FK with legacy-string fallback). */
   category: string;
+  /** Canonical FK to GearCategory. Null when the item is uncategorised. */
+  category_id: number | null;
   note: string;
   created_at: string;
   updated_at: string;
@@ -1498,8 +1501,18 @@ export interface GearItemWritePayload {
   name?: string;
   weight_g?: number | null;
   url?: string;
+  /** Preferred: FK id of a GearCategory owned by the caller. */
+  category_id?: number | null;
+  /** Legacy free-text fallback; backend auto-creates the category. */
   category?: string;
   note?: string;
+}
+
+export interface GearCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export const gear = {
@@ -1556,6 +1569,23 @@ export const gear = {
     apiFetch<void>(`/api/gear/lists/${listId}/items/${entryId}/`, {
       method: "DELETE",
     }),
+  listCategories: () =>
+    apiFetch<GearCategory[]>("/api/gear/categories/"),
+  createCategory: (name: string) =>
+    apiFetch<GearCategory>("/api/gear/categories/", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  updateCategory: (
+    id: number,
+    payload: { name?: string; sort_order?: number },
+  ) =>
+    apiFetch<GearCategory>(`/api/gear/categories/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteCategory: (id: number) =>
+    apiFetch<void>(`/api/gear/categories/${id}/`, { method: "DELETE" }),
   importCsv: async (file: File): Promise<GearImportResult> => {
     const form = new FormData();
     form.append("file", file);

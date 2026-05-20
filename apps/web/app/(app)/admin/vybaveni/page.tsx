@@ -7,6 +7,7 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
+  type GearCategory,
   type GearImportResult,
   type GearItem,
   type GearList,
@@ -27,13 +28,19 @@ import {
 export default function GearSettingsPage() {
   const [items, setItems] = useState<GearItem[] | null>(null);
   const [lists, setLists] = useState<GearList[] | null>(null);
+  const [categories, setCategories] = useState<GearCategory[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function reload() {
     try {
-      const [is, ls] = await Promise.all([gear.listItems(), gear.listLists()]);
+      const [is, ls, cs] = await Promise.all([
+        gear.listItems(),
+        gear.listLists(),
+        gear.listCategories(),
+      ]);
       setItems(is);
       setLists(ls);
+      setCategories(cs);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
     }
@@ -43,7 +50,7 @@ export default function GearSettingsPage() {
     reload();
   }, []);
 
-  if (!items || !lists) {
+  if (!items || !lists || !categories) {
     return (
       <div className="flex justify-center py-12">
         <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
@@ -67,10 +74,181 @@ export default function GearSettingsPage() {
 
       {error && <Alert variant="danger">{error}</Alert>}
 
-      <ItemSection items={items} onChange={reload} />
+      <CategorySection categories={categories} items={items} onChange={reload} />
+      <ItemSection
+        items={items}
+        categories={categories}
+        onChange={reload}
+      />
       <ListSection lists={lists} items={items} onChange={reload} />
       <ImportSection onChange={reload} />
       <AffiliateSection />
+    </div>
+  );
+}
+
+function CategorySection({
+  categories,
+  items,
+  onChange,
+}: {
+  categories: GearCategory[];
+  items: GearItem[];
+  onChange: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Count items per category so the owner can see what's actually used.
+  const usageById = new Map<number, number>();
+  for (const i of items) {
+    if (i.category_id == null) continue;
+    usageById.set(i.category_id, (usageById.get(i.category_id) ?? 0) + 1);
+  }
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    const n = newName.trim();
+    if (!n) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await gear.createCategory(n);
+      setNewName("");
+      await onChange();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Vytvoření selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rename(c: GearCategory, name: string) {
+    if (name === c.name) return;
+    try {
+      await gear.updateCategory(c.id, { name });
+      await onChange();
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function remove(c: GearCategory) {
+    const usage = usageById.get(c.id) ?? 0;
+    const ok = confirm(
+      usage > 0
+        ? `Smazat kategorii „${c.name}"? Položky zůstanou, ale ztratí kategorii (${usage} ks).`
+        : `Smazat kategorii „${c.name}"?`,
+    );
+    if (!ok) return;
+    try {
+      await gear.deleteCategory(c.id);
+      await onChange();
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  return (
+    <Card>
+      <CardSection>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+        >
+          <div>
+            <h3 className="text-base font-semibold text-ink-900">
+              Kategorie ({categories.length})
+            </h3>
+            <p className="mt-1 text-sm text-ink-500">
+              Vlastní slovník pro tvůj gear — z těchto kategorií pak vybíráš
+              při zakládání položky. Přejmenování se propíše do všech věcí.
+            </p>
+          </div>
+          <span
+            aria-hidden
+            className={open ? "rotate-90 text-ink-500" : "text-ink-500"}
+          >
+            ›
+          </span>
+        </button>
+
+        {open && (
+          <div className="mt-4 flex flex-col gap-2">
+            {categories.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+                Zatím žádné kategorie. Přidej první níže nebo nech je založit
+                importem.
+              </p>
+            ) : (
+              categories.map((c) => (
+                <CategoryRow
+                  key={c.id}
+                  category={c}
+                  usage={usageById.get(c.id) ?? 0}
+                  onRename={(name) => rename(c, name)}
+                  onDelete={() => remove(c)}
+                />
+              ))
+            )}
+
+            <form onSubmit={create} className="mt-2 flex flex-wrap gap-2">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="např. Spaní"
+                maxLength={60}
+                className="flex-1 min-w-[200px]"
+              />
+              <Button type="submit" variant="primary" size="md" loading={busy}>
+                {busy ? "..." : "Přidat kategorii"}
+              </Button>
+            </form>
+            {error && <Alert variant="danger">{error}</Alert>}
+          </div>
+        )}
+      </CardSection>
+    </Card>
+  );
+}
+
+function CategoryRow({
+  category,
+  usage,
+  onRename,
+  onDelete,
+}: {
+  category: GearCategory;
+  usage: number;
+  onRename: (name: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [name, setName] = useState(category.name);
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => {
+          if (name.trim() && name !== category.name) onRename(name.trim());
+        }}
+        maxLength={60}
+        className="flex-1 min-w-[160px] rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
+      />
+      <span className="font-mono text-[11px] uppercase tracking-wide text-ink-500">
+        {usage} ks
+      </span>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="text-xs font-medium text-ink-500 hover:text-danger"
+      >
+        Smazat
+      </button>
     </div>
   );
 }
@@ -380,9 +558,11 @@ function PartnerRow({
 
 function ItemSection({
   items,
+  categories,
   onChange,
 }: {
   items: GearItem[];
+  categories: GearCategory[];
   onChange: () => Promise<void>;
 }) {
   const [composerOpen, setComposerOpen] = useState(false);
@@ -408,12 +588,14 @@ function ItemSection({
 
         {composerOpen && (
           <ItemEditor
+            categories={categories}
             onCancel={() => setComposerOpen(false)}
             onSave={async (payload) => {
               await gear.createItem(payload);
               setComposerOpen(false);
               await onChange();
             }}
+            onCategoryAdded={onChange}
           />
         )}
 
@@ -424,7 +606,12 @@ function ItemSection({
         ) : (
           <div className="mt-4 flex flex-col gap-2">
             {items.map((i) => (
-              <ItemRow key={i.id} item={i} onChange={onChange} />
+              <ItemRow
+                key={i.id}
+                item={i}
+                categories={categories}
+                onChange={onChange}
+              />
             ))}
           </div>
         )}
@@ -435,9 +622,11 @@ function ItemSection({
 
 function ItemRow({
   item,
+  categories,
   onChange,
 }: {
   item: GearItem;
+  categories: GearCategory[];
   onChange: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -447,6 +636,7 @@ function ItemRow({
       <div className="rounded-md border border-border bg-surface-muted/30 p-3">
         <ItemEditor
           initial={item}
+          categories={categories}
           onCancel={() => setEditing(false)}
           onSave={async (payload) => {
             await gear.updateItem(item.id, payload);
@@ -459,6 +649,7 @@ function ItemRow({
             setEditing(false);
             await onChange();
           }}
+          onCategoryAdded={onChange}
         />
       </div>
     );
@@ -492,29 +683,37 @@ function ItemRow({
 
 function ItemEditor({
   initial,
+  categories,
   onSave,
   onCancel,
   onDelete,
+  onCategoryAdded,
 }: {
   initial?: GearItem;
+  categories: GearCategory[];
   onSave: (payload: {
     name: string;
     weight_g: number | null;
     url: string;
-    category: string;
+    category_id: number | null;
     note: string;
   }) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
+  onCategoryAdded?: () => Promise<void>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [weight, setWeight] = useState(
     initial?.weight_g != null ? String(initial.weight_g) : "",
   );
   const [url, setUrl] = useState(initial?.url ?? "");
-  const [category, setCategory] = useState(initial?.category ?? "");
+  const [categoryId, setCategoryId] = useState<number | null>(
+    initial?.category_id ?? null,
+  );
   const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   async function handle(e: FormEvent) {
     e.preventDefault();
@@ -525,11 +724,26 @@ function ItemEditor({
         name: name.trim(),
         weight_g: w ? Math.max(0, parseInt(w, 10) || 0) : null,
         url: url.trim(),
-        category: category.trim(),
+        category_id: categoryId,
         note: note.trim(),
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function addCategory(e: FormEvent) {
+    e.preventDefault();
+    const n = newCategoryName.trim();
+    if (!n) return;
+    try {
+      const cat = await gear.createCategory(n);
+      setCategoryId(cat.id);
+      setNewCategoryName("");
+      setCreatingCategory(false);
+      if (onCategoryAdded) await onCategoryAdded();
+    } catch {
+      /* keep silent — owner can retry */
     }
   }
 
@@ -558,13 +772,69 @@ function ItemEditor({
             placeholder="900"
           />
         </Field>
-        <Field label="Kategorie" htmlFor="gi-cat" hint='např. „spaní", „vaření", „oblečení"'>
-          <Input
-            id="gi-cat"
-            maxLength={60}
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
+        <Field
+          label="Kategorie"
+          htmlFor="gi-cat"
+          hint={
+            categories.length === 0
+              ? "Žádné kategorie zatím nejsou — vytvoř jednu tlačítkem níže."
+              : 'Vyber ze seznamu, nebo přidej novou.'
+          }
+        >
+          {!creatingCategory ? (
+            <div className="flex flex-wrap gap-2">
+              <select
+                id="gi-cat"
+                value={categoryId ?? ""}
+                onChange={(e) =>
+                  setCategoryId(e.target.value ? Number(e.target.value) : null)
+                }
+                className="flex-1 min-w-[140px] rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+              >
+                <option value="">— bez kategorie —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setCreatingCategory(true)}
+                className="rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium text-ink-700 hover:bg-surface-muted"
+              >
+                + Nová
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="např. Spaní"
+                maxLength={60}
+                className="flex-1 min-w-[140px]"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={addCategory}
+                className="rounded-md bg-brand px-3 py-2 text-xs font-medium text-brand-ink hover:opacity-90"
+              >
+                Přidat
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatingCategory(false);
+                  setNewCategoryName("");
+                }}
+                className="rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium text-ink-700 hover:bg-surface-muted"
+              >
+                Zrušit
+              </button>
+            </div>
+          )}
         </Field>
       </div>
       <Field label="URL produktu (volitelné)" htmlFor="gi-url">
@@ -853,8 +1123,31 @@ function ItemPicker({
   onPick: (id: number) => Promise<void>;
   onClose: () => void;
 }) {
+  const [pickedId, setPickedId] = useState<number | null>(null);
+  // Sort by category then name so the dropdown groups items naturally.
+  // 79+ items in a grid was overwhelming; dropdown + group is calmer.
+  const sorted = [...items].sort((a, b) => {
+    const ca = a.category || "Bez kategorie";
+    const cb = b.category || "Bez kategorie";
+    if (ca !== cb) return ca.localeCompare(cb);
+    return a.name.localeCompare(b.name);
+  });
+  // Group by category for <optgroup>.
+  const byCategory = new Map<string, GearItem[]>();
+  for (const i of sorted) {
+    const c = i.category || "Bez kategorie";
+    const arr = byCategory.get(c) ?? [];
+    arr.push(i);
+    byCategory.set(c, arr);
+  }
+
+  async function confirm() {
+    if (pickedId == null) return;
+    await onPick(pickedId);
+  }
+
   return (
-    <div className="flex w-full flex-col gap-2 rounded-md border border-border bg-surface-muted/30 p-2">
+    <div className="flex w-full flex-col gap-2 rounded-md border border-border bg-surface-muted/30 p-3">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-xs font-medium text-ink-700">Vyber položku</p>
         <button
@@ -865,20 +1158,34 @@ function ItemPicker({
           Zavřít
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        {items.map((i) => (
-          <button
-            key={i.id}
-            type="button"
-            onClick={() => onPick(i.id)}
-            className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-left text-xs hover:border-brand hover:bg-brand/5"
-          >
-            <span className="font-medium text-ink-900">{i.name}</span>
-            {i.weight_g != null && (
-              <span className="font-mono text-ink-500">{i.weight_g} g</span>
-            )}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={pickedId ?? ""}
+          onChange={(e) =>
+            setPickedId(e.target.value ? Number(e.target.value) : null)
+          }
+          className="flex-1 min-w-[200px] rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+        >
+          <option value="">— vyber položku —</option>
+          {[...byCategory.entries()].map(([cat, list]) => (
+            <optgroup key={cat} label={cat}>
+              {list.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                  {i.weight_g != null ? ` · ${i.weight_g} g` : ""}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={confirm}
+          disabled={pickedId == null}
+          className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+        >
+          Přidat
+        </button>
       </div>
     </div>
   );
