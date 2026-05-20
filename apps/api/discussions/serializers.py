@@ -20,6 +20,7 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "topic",
+            "parent",
             "body",
             "author_id",
             "author_name",

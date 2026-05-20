@@ -322,6 +322,9 @@ export interface TopicLikeResponse {
 export interface DiscussionComment {
   id: number;
   topic: number;
+  /** Single-level threading: null for top-level, otherwise the id of
+   *  the parent comment this one replies to. */
+  parent: number | null;
   body: string;
   author_id: number | null;
   author_name: string;
@@ -1392,10 +1395,15 @@ export const discussions = {
       `/api/discussions/workspace/${slug}/topics/${topicId}/`,
       { method: "DELETE" },
     ),
-  addWorkspaceComment: (slug: string, topicId: number, body: string) =>
+  addWorkspaceComment: (
+    slug: string,
+    topicId: number,
+    body: string,
+    parent: number | null = null,
+  ) =>
     apiFetch<DiscussionComment>(
       `/api/discussions/workspace/${slug}/topics/${topicId}/comments/`,
-      { method: "POST", body: JSON.stringify({ body }) },
+      { method: "POST", body: JSON.stringify({ body, parent }) },
     ),
   deleteWorkspaceComment: (
     slug: string,
@@ -1451,10 +1459,11 @@ export const discussions = {
     eventSlug: string,
     topicId: number,
     body: string,
+    parent: number | null = null,
   ) =>
     apiFetch<DiscussionComment>(
       `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/`,
-      { method: "POST", body: JSON.stringify({ body }) },
+      { method: "POST", body: JSON.stringify({ body, parent }) },
     ),
   deleteEventComment: (
     workspaceSlug: string,
