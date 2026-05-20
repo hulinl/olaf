@@ -33,6 +33,12 @@ urlpatterns = [
         name="push-subscription-detail",
     ),
     path("me/push-test/", views.push_test, name="push-test"),
+    path("me/people/", views.creator_people, name="creator-people"),
+    path(
+        "me/people/<int:user_id>/",
+        views.creator_person_detail,
+        name="creator-person-detail",
+    ),
     path("password/reset/request/", views.password_reset_request, name="password-reset-request"),
     path("password/reset/confirm/", views.password_reset_confirm, name="password-reset-confirm"),
 ]

@@ -396,6 +396,13 @@ function MobileDrawer({
             >
               Komunity
             </DrawerSubLink>
+            <DrawerSubLink
+              href="/admin/lide"
+              pathname={pathname}
+              onClose={onClose}
+            >
+              Lidé
+            </DrawerSubLink>
             <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
               Platby
               <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
@@ -410,12 +417,6 @@ function MobileDrawer({
             </span>
             <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
               Smlouvy
-              <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
-                Brzy
-              </span>
-            </span>
-            <span className="flex items-center justify-between px-3 py-2 text-sm text-ink-300">
-              Členové
               <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-ink-500">
                 Brzy
               </span>

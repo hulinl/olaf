@@ -446,3 +446,119 @@ def push_test(request: Request) -> Response:
             and bool(dj_settings.VAPID_PRIVATE_KEY),
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Lidé — proto-CRM list of everyone who has RSVPed to creator's events
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def creator_people(request: Request) -> Response:
+    """Deduped list of users who've RSVPed (non-cancelled) to any event
+    in a workspace the caller owns. One row per user with aggregate
+    counts so the table reads at a glance.
+    """
+    from django.db.models import Count, Max, Q
+
+    from events.models import RSVP
+    from workspaces.models import WorkspaceMember
+
+    owned_ws_ids = list(
+        WorkspaceMember.objects.filter(
+            user=request.user, role=WorkspaceMember.ROLE_OWNER
+        ).values_list("workspace_id", flat=True)
+    )
+    if not owned_ws_ids:
+        return Response([])
+
+    scope = Q(rsvps__event__workspace_id__in=owned_ws_ids) & ~Q(
+        rsvps__status=RSVP.STATUS_CANCELLED
+    )
+    qs = (
+        User.objects.filter(scope)
+        .distinct()
+        .annotate(
+            event_count=Count("rsvps", distinct=True, filter=scope),
+            last_rsvp_at=Max("rsvps__created_at", filter=scope),
+        )
+        .order_by("-last_rsvp_at", "last_name", "first_name")
+    )
+
+    out = [
+        {
+            "user_id": u.id,
+            "full_name": u.get_full_name() or u.email,
+            "email": u.email,
+            "phone": u.phone,
+            "event_count": int(u.event_count or 0),
+            "last_rsvp_at": u.last_rsvp_at,
+        }
+        for u in qs
+    ]
+    return Response(out)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def creator_person_detail(request: Request, user_id: int) -> Response:
+    """Full profile of one person + their RSVP history on the caller's
+    events. Access-checked: must have at least one RSVP on an event
+    in a workspace the caller owns."""
+    from events.models import RSVP
+    from workspaces.models import WorkspaceMember
+
+    owned_ws_ids = list(
+        WorkspaceMember.objects.filter(
+            user=request.user, role=WorkspaceMember.ROLE_OWNER
+        ).values_list("workspace_id", flat=True)
+    )
+
+    try:
+        person = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    shared_rsvps = (
+        RSVP.objects.filter(user=person, event__workspace_id__in=owned_ws_ids)
+        .select_related("event", "event__workspace")
+        .order_by("-created_at")
+    )
+    if not shared_rsvps.exists():
+        # Not someone the caller has actually met.
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    return Response(
+        {
+            "user_id": person.id,
+            "first_name": person.first_name,
+            "last_name": person.last_name,
+            "full_name": person.get_full_name() or person.email,
+            "email": person.email,
+            "phone": person.phone,
+            "address": {
+                "street": person.address_street,
+                "city": person.address_city,
+                "zip": person.address_zip,
+                "country": person.address_country,
+                "legacy": person.address,
+            },
+            "emergency_contact": {
+                "name": person.emergency_contact_name,
+                "phone": person.emergency_contact_phone,
+                "relationship": person.emergency_contact_relationship,
+            },
+            "events": [
+                {
+                    "workspace_slug": r.event.workspace.slug,
+                    "event_slug": r.event.slug,
+                    "event_title": r.event.title,
+                    "event_starts_at": r.event.starts_at,
+                    "rsvp_status": r.status,
+                    "rsvp_created_at": r.created_at,
+                }
+                for r in shared_rsvps
+            ],
+        }
+    )
