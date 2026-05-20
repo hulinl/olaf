@@ -721,36 +721,154 @@ function ItemSection({
             Žádná položka neodpovídá filtru.
           </p>
         ) : (
-          // No outer border — the Card already provides one, doubling
-          // it up made it look like "table inside a table". Header gets
-          // a bottom border instead.
-          <div className="mt-4 -mx-3 overflow-x-auto sm:-mx-4">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border">
-                <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                  <th className="px-3 py-2">Položka</th>
-                  <th className="hidden px-3 py-2 sm:table-cell">Kategorie</th>
-                  <th className="px-3 py-2 text-right">Váha</th>
-                  <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
-                  <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((i) => (
-                  <ItemRow
-                    key={i.id}
-                    item={i}
-                    categories={categories}
-                    lists={lists}
-                    onChange={onChange}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ItemsByCategoryView
+            filtered={filtered}
+            categories={categories}
+            lists={lists}
+            onChange={onChange}
+          />
         )}
       </CardSection>
     </Card>
+  );
+}
+
+/** Items grouped by category — each category is its own collapsible
+ *  section. Default state: all groups collapsed so the page stays
+ *  scannable even with 79+ items; owner expands the ones they care
+ *  about. Empty groups (no items in this category that match the
+ *  current filter) are skipped entirely. */
+function ItemsByCategoryView({
+  filtered,
+  categories,
+  lists,
+  onChange,
+}: {
+  filtered: GearItem[];
+  categories: GearCategory[];
+  lists: GearList[];
+  onChange: () => Promise<void>;
+}) {
+  // Group filtered items by category id (using "uncategorised" key
+  // for items with no category_id).
+  const groups = new Map<string, GearItem[]>();
+  for (const i of filtered) {
+    const key =
+      i.category_id != null ? `c${i.category_id}` : "uncategorised";
+    const arr = groups.get(key) ?? [];
+    arr.push(i);
+    groups.set(key, arr);
+  }
+
+  // Ordered list of group descriptors so the render order matches the
+  // user's category sort_order, with "uncategorised" pushed to the end.
+  type Group = { key: string; name: string; items: GearItem[] };
+  const ordered: Group[] = [];
+  for (const c of categories) {
+    const items = groups.get(`c${c.id}`);
+    if (items && items.length > 0) {
+      ordered.push({ key: `c${c.id}`, name: c.name, items });
+    }
+  }
+  const uncategorised = groups.get("uncategorised");
+  if (uncategorised && uncategorised.length > 0) {
+    ordered.push({
+      key: "uncategorised",
+      name: "Bez kategorie",
+      items: uncategorised,
+    });
+  }
+
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+  const allOpen =
+    ordered.length > 0 && ordered.every((g) => openKeys.has(g.key));
+
+  function toggle(key: string) {
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allOpen) setOpenKeys(new Set());
+    else setOpenKeys(new Set(ordered.map((g) => g.key)));
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-2">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={toggleAll}
+          className="text-xs font-medium text-ink-500 hover:text-ink-900"
+        >
+          {allOpen ? "Sbalit vše" : "Rozbalit vše"}
+        </button>
+      </div>
+      {ordered.map((g) => {
+        const open = openKeys.has(g.key);
+        return (
+          <div key={g.key} className="rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => toggle(g.key)}
+              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left focus-ring hover:bg-brand/5"
+            >
+              <div className="flex items-baseline gap-2">
+                <span
+                  aria-hidden
+                  className={open ? "rotate-90 text-ink-500" : "text-ink-500"}
+                >
+                  ›
+                </span>
+                <span className="font-medium text-ink-900">{g.name}</span>
+                <span className="font-mono text-[11px] uppercase tracking-wide text-ink-500 tabular-nums">
+                  {g.items.length}{" "}
+                  {g.items.length === 1
+                    ? "položka"
+                    : g.items.length < 5
+                      ? "položky"
+                      : "položek"}
+                </span>
+              </div>
+            </button>
+            {open && (
+              <div className="overflow-x-auto border-t border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-muted/30">
+                    <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                      <th className="px-3 py-2">Položka</th>
+                      <th className="px-3 py-2 text-right">Váha</th>
+                      <th className="hidden px-3 py-2 lg:table-cell">
+                        Odkaz
+                      </th>
+                      <th className="hidden px-3 py-2 lg:table-cell">
+                        Poznámka
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {g.items.map((i) => (
+                      <ItemRow
+                        key={i.id}
+                        item={i}
+                        categories={categories}
+                        lists={lists}
+                        onChange={onChange}
+                        hideCategoryCell
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -759,18 +877,23 @@ function ItemRow({
   categories,
   lists,
   onChange,
+  hideCategoryCell = false,
 }: {
   item: GearItem;
   categories: GearCategory[];
   lists: GearList[];
   onChange: () => Promise<void>;
+  /** When the row is rendered inside a category group, the group
+   *  header already names the category — hide the Kategorie cell
+   *  to avoid repeating the same word on every row. */
+  hideCategoryCell?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
 
   if (editing) {
     return (
       <tr className="bg-surface-muted/30">
-        <td colSpan={5} className="p-3">
+        <td colSpan={hideCategoryCell ? 4 : 5} className="p-3">
           <ItemEditor
             initial={item}
             categories={categories}
@@ -816,15 +939,17 @@ function ItemRow({
           {item.url && <span className="ml-2 text-brand">↗</span>}
         </span>
       </td>
-      <td className="hidden whitespace-nowrap px-3 py-2 text-ink-700 sm:table-cell">
-        {item.category ? (
-          <span className="rounded bg-surface-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
-            {item.category}
-          </span>
-        ) : (
-          <span className="text-ink-300">—</span>
-        )}
-      </td>
+      {!hideCategoryCell && (
+        <td className="hidden whitespace-nowrap px-3 py-2 text-ink-700 sm:table-cell">
+          {item.category ? (
+            <span className="rounded bg-surface-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+              {item.category}
+            </span>
+          ) : (
+            <span className="text-ink-300">—</span>
+          )}
+        </td>
+      )}
       <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums text-ink-700">
         {weightLabel}
       </td>

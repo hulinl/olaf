@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PublicGearBody } from "@/components/public-gear-body";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
-import { assetUrl, type PublicGearList } from "@/lib/api";
+import { type PublicGearList } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
 interface Props {
@@ -38,15 +39,6 @@ export default async function PublicGearListPage({ params }: Props) {
   if (!list) notFound();
 
   const totalKg = list.total_weight_g / 1000;
-
-  // Group entries by category for clean visual grouping.
-  const byCategory = new Map<string, PublicGearList["entries"]>();
-  for (const e of list.entries) {
-    const cat = e.item.category || "Ostatní";
-    const arr = byCategory.get(cat) ?? [];
-    arr.push(e);
-    byCategory.set(cat, arr);
-  }
 
   return (
     <div data-theme="paper" className="flex min-h-screen flex-col bg-canvas text-ink-900">
@@ -102,81 +94,9 @@ export default async function PublicGearListPage({ params }: Props) {
             )}
           </div>
 
-          {/* By-category breakdown chart — same horizontal-bar treatment
-              as the owner's admin dashboard (PR #75), ported to public
-              so visitors see at a glance where the pack weight lives. */}
-          {list.entries.length > 0 && (
-            <PublicCategoryChart entries={list.entries} totalG={list.total_weight_g} />
-          )}
-        </section>
-
-        <section className="mx-auto w-full max-w-3xl px-4 pb-16">
-          {byCategory.size === 0 ? (
-            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-6 text-center text-sm text-ink-500">
-              Tento list je zatím prázdný.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-6">
-              {[...byCategory.entries()].map(([cat, entries]) => (
-                <div key={cat}>
-                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-                    {cat}
-                  </h2>
-                  <ul className="mt-2 divide-y divide-border rounded-md border border-border bg-surface">
-                    {entries.map((e) => {
-                      // Outbound through our redirect so we can count
-                      // clicks. The redirect re-applies the affiliate
-                      // params server-side, so we don't need display_url
-                      // here — only knowing whether *some* URL exists.
-                      const hasUrl = Boolean(e.item.url);
-                      const href = hasUrl
-                        ? assetUrl(`/api/gear/g/${list.slug}/${e.id}/`)
-                        : null;
-                      const weightLabel =
-                        e.item.weight_g != null
-                          ? e.quantity > 1
-                            ? `${e.quantity}× ${e.item.weight_g} g`
-                            : `${e.item.weight_g} g`
-                          : null;
-                      return (
-                        <li
-                          key={e.id}
-                          className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                        >
-                          <div className="flex flex-col">
-                            {href ? (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer sponsored"
-                                className="font-medium text-ink-900 hover:text-brand"
-                              >
-                                {e.item.name} ↗
-                              </a>
-                            ) : (
-                              <span className="font-medium text-ink-900">
-                                {e.item.name}
-                              </span>
-                            )}
-                            {e.item.note && (
-                              <span className="text-xs text-ink-500">
-                                {e.item.note}
-                              </span>
-                            )}
-                          </div>
-                          {weightLabel && (
-                            <span className="font-mono text-xs tabular-nums text-ink-700">
-                              {weightLabel}
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Chart + filterable items table (client component — chart
+              labels are buttons that filter the table below). */}
+          <PublicGearBody list={list} />
         </section>
 
         {/* Cross-sell CTA — when a friend opens a shared list, give
@@ -226,79 +146,6 @@ export default async function PublicGearListPage({ params }: Props) {
           </div>
         </footer>
       </main>
-    </div>
-  );
-}
-
-/** Horizontal-bar chart broken down by gear category. Reuses the
- *  shape of the owner-side ListDashboard so the public view feels
- *  like the same product the creator built the list in. Pure CSS — no
- *  chart library, sub-1kb on the wire. */
-function PublicCategoryChart({
-  entries,
-  totalG,
-}: {
-  entries: PublicGearList["entries"];
-  totalG: number;
-}) {
-  const byCategory = new Map<string, { weight: number; count: number }>();
-  let weightedItems = 0;
-  for (const e of entries) {
-    const cat = (e.item.category || "Bez kategorie").trim();
-    const w = (e.item.weight_g ?? 0) * e.quantity;
-    if (e.item.weight_g != null) weightedItems += e.quantity;
-    const prev = byCategory.get(cat) ?? { weight: 0, count: 0 };
-    byCategory.set(cat, {
-      weight: prev.weight + w,
-      count: prev.count + e.quantity,
-    });
-  }
-  const rows = [...byCategory.entries()].sort(
-    (a, b) => b[1].weight - a[1].weight,
-  );
-  const maxWeight = Math.max(1, ...rows.map(([, v]) => v.weight));
-  const missingWeight = entries.reduce((n, e) => n + e.quantity, 0) - weightedItems;
-
-  return (
-    <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink-900">
-          Váha podle kategorií
-        </h2>
-        {missingWeight > 0 && (
-          <span className="text-xs text-warning">
-            {missingWeight} {missingWeight === 1 ? "položka" : missingWeight < 5 ? "položky" : "položek"} bez váhy
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {rows.map(([cat, { weight, count }]) => {
-          const pct = (weight / maxWeight) * 100;
-          const sharePct = totalG ? (weight / totalG) * 100 : 0;
-          return (
-            <div key={cat} className="flex flex-col gap-0.5">
-              <div className="flex items-baseline justify-between gap-2 text-xs">
-                <span className="font-medium text-ink-900">{cat}</span>
-                <span className="font-mono tabular-nums text-ink-500">
-                  {count} ks ·{" "}
-                  {weight > 0 ? `${(weight / 1000).toFixed(2)} kg` : "—"}
-                  {weight > 0 && (
-                    <span className="ml-1 text-ink-300">
-                      ({sharePct.toFixed(0)} %)
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-sm bg-surface-muted">
-                <div
-                  className="h-full bg-brand"
-                  style={{ width: `${Math.max(pct, weight > 0 ? 3 : 0)}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
