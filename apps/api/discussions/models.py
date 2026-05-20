@@ -88,11 +88,15 @@ class Comment(models.Model):
         related_name="replies",
     )
     body = models.TextField()
-    image = models.ImageField(
+    # Renamed in spirit from "image" to "attachment" — keep the DB
+    # column name for migration simplicity, but the field accepts any
+    # file (photo from mobile gallery, file picker on desktop, etc.).
+    # The serializer adds detection so images still render inline.
+    image = models.FileField(
         upload_to="discussions/comments/",
         blank=True,
         null=True,
-        help_text="Optional photo attached to the comment.",
+        help_text="Optional file attached to the comment (image or other).",
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,

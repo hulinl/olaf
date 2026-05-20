@@ -50,7 +50,11 @@ export function DiscussionThread({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [composerBody, setComposerBody] = useState("");
-  const [composerImage, setComposerImage] = useState<File | null>(null);
+  const [composerAttachment, setComposerAttachment] = useState<File | null>(
+    null,
+  );
+  /** Object URL for image previews. Null for non-image files (we show
+   *  a file pill instead of a thumbnail). */
   const [composerImagePreview, setComposerImagePreview] = useState<
     string | null
   >(null);
@@ -156,7 +160,7 @@ export function DiscussionThread({
 
   async function handlePostComment(e: FormEvent) {
     e.preventDefault();
-    if (!composerBody.trim() && !composerImage) return;
+    if (!composerBody.trim() && !composerAttachment) return;
     setPosting(true);
     try {
       const body = composerBody.trim();
@@ -167,7 +171,7 @@ export function DiscussionThread({
           topicId,
           body,
           parent,
-          composerImage,
+          composerAttachment,
         );
       } else {
         await discussions.addEventComment(
@@ -176,11 +180,11 @@ export function DiscussionThread({
           topicId,
           body,
           parent,
-          composerImage,
+          composerAttachment,
         );
       }
       setComposerBody("");
-      setComposerImage(null);
+      setComposerAttachment(null);
       if (composerImagePreview) URL.revokeObjectURL(composerImagePreview);
       setComposerImagePreview(null);
       setReplyTo(null);
@@ -196,19 +200,23 @@ export function DiscussionThread({
     }
   }
 
-  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+  function pickAttachment(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (composerImagePreview) URL.revokeObjectURL(composerImagePreview);
-    setComposerImage(file);
-    setComposerImagePreview(URL.createObjectURL(file));
+    setComposerAttachment(file);
+    // Only generate an inline preview URL for image files; for arbitrary
+    // files we show a name pill.
+    setComposerImagePreview(
+      file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+    );
     // Reset so re-picking the same file re-fires onChange.
     e.target.value = "";
   }
 
-  function clearComposerImage() {
+  function clearComposerAttachment() {
     if (composerImagePreview) URL.revokeObjectURL(composerImagePreview);
-    setComposerImage(null);
+    setComposerAttachment(null);
     setComposerImagePreview(null);
   }
 
@@ -506,7 +514,7 @@ export function DiscussionThread({
             }
             className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
           />
-          {composerImagePreview && (
+          {composerImagePreview ? (
             <div className="relative w-fit">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -516,14 +524,30 @@ export function DiscussionThread({
               />
               <button
                 type="button"
-                onClick={clearComposerImage}
-                aria-label="Odebrat fotku"
+                onClick={clearComposerAttachment}
+                aria-label="Odebrat přílohu"
                 className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-canvas text-ink-700 shadow-sm hover:text-danger focus-ring"
               >
                 <span aria-hidden>×</span>
               </button>
             </div>
-          )}
+          ) : composerAttachment ? (
+            // Non-image attachment — show a file pill with the name.
+            <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-surface-muted/40 px-3 py-1.5 text-xs">
+              <span aria-hidden>📎</span>
+              <span className="font-medium text-ink-900">
+                {composerAttachment.name}
+              </span>
+              <button
+                type="button"
+                onClick={clearComposerAttachment}
+                aria-label="Odebrat přílohu"
+                className="text-ink-500 hover:text-danger"
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="submit"
@@ -531,7 +555,7 @@ export function DiscussionThread({
               size="md"
               loading={posting}
               disabled={
-                (!composerBody.trim() && !composerImage) || posting
+                (!composerBody.trim() && !composerAttachment) || posting
               }
             >
               {posting
@@ -542,22 +566,21 @@ export function DiscussionThread({
             </Button>
             <label
               className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted focus-within:ring-2 focus-within:ring-brand/40"
-              title="Přidat fotku"
+              title="Přidat přílohu"
             >
-              <span aria-hidden>📷</span>
-              <span>{composerImage ? "Změnit fotku" : "Fotka"}</span>
+              <span aria-hidden>📎</span>
+              <span>
+                {composerAttachment ? "Změnit přílohu" : "Přidat přílohu"}
+              </span>
+              {/* No `accept` filter — mobile native picker still shows
+                  Photo Library / Take Photo / Choose File, so the user
+                  gets the right options without us locking it down. */}
               <input
                 type="file"
-                accept="image/*"
-                onChange={pickImage}
+                onChange={pickAttachment}
                 className="hidden"
               />
             </label>
-            {composerImage && (
-              <span className="text-xs text-ink-500">
-                {composerImage.name}
-              </span>
-            )}
           </div>
         </form>
       )}
@@ -605,21 +628,11 @@ function CommentCard({
           {c.body}
         </p>
       )}
-      {c.image_url && (
-        <a
-          href={assetUrl(c.image_url) ?? c.image_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 block w-fit overflow-hidden rounded-md border border-border bg-surface-muted focus-ring"
-          aria-label="Zvětšit fotku"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={assetUrl(c.image_url) ?? c.image_url}
-            alt=""
-            className="max-h-72 max-w-full object-contain"
-          />
-        </a>
+      {c.attachment_url && (
+        <CommentAttachment
+          url={c.attachment_url}
+          name={c.attachment_name}
+        />
       )}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
@@ -656,5 +669,46 @@ function CommentCard({
         )}
       </div>
     </div>
+  );
+}
+
+/** Inline render for the file attached to a comment. Decides between
+ *  "embed as image" and "show as downloadable file pill" by extension
+ *  — keeps the markup simple and avoids loading large non-image files
+ *  inline. */
+function CommentAttachment({ url, name }: { url: string; name: string }) {
+  const absolute = assetUrl(url) ?? url;
+  const isImage = /\.(png|jpe?g|gif|webp|avif|svg|heic|heif)$/i.test(
+    url.split("?")[0] ?? "",
+  );
+  if (isImage) {
+    return (
+      <a
+        href={absolute}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 block w-fit overflow-hidden rounded-md border border-border bg-surface-muted focus-ring"
+        aria-label="Zvětšit fotku"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={absolute}
+          alt={name || ""}
+          className="max-h-72 max-w-full object-contain"
+        />
+      </a>
+    );
+  }
+  return (
+    <a
+      href={absolute}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2 inline-flex items-center gap-2 rounded-md border border-border bg-surface-muted/40 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
+    >
+      <span aria-hidden>📎</span>
+      <span>{name || "soubor"}</span>
+      <span aria-hidden className="text-ink-500">↓</span>
+    </a>
   );
 }

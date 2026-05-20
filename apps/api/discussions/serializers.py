@@ -14,7 +14,8 @@ class CommentSerializer(serializers.ModelSerializer):
     )
     like_count = serializers.SerializerMethodField()
     i_liked = serializers.SerializerMethodField()
-    image_url = serializers.SerializerMethodField()
+    attachment_url = serializers.SerializerMethodField()
+    attachment_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -23,7 +24,8 @@ class CommentSerializer(serializers.ModelSerializer):
             "topic",
             "parent",
             "body",
-            "image_url",
+            "attachment_url",
+            "attachment_name",
             "author_id",
             "author_name",
             "author_email",
@@ -35,7 +37,8 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "topic",
-            "image_url",
+            "attachment_url",
+            "attachment_name",
             "author_id",
             "author_name",
             "author_email",
@@ -45,8 +48,17 @@ class CommentSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
-    def get_image_url(self, obj: Comment) -> str | None:
+    def get_attachment_url(self, obj: Comment) -> str | None:
         return obj.image.url if obj.image else None
+
+    def get_attachment_name(self, obj: Comment) -> str:
+        """Basename of the uploaded file — UI uses it as the download
+        link label for non-image attachments."""
+        if not obj.image:
+            return ""
+        import os
+
+        return os.path.basename(obj.image.name)
 
     def get_author_name(self, obj: Comment) -> str:
         if obj.author is None:

@@ -312,8 +312,10 @@ function TopicCard({
             </span>
           )}
         </div>
+        {/* pr-16 reserves space for the hover icons in the top-right
+            corner so the title's last words never slide under them. */}
         <h4
-          className="line-clamp-2 text-base font-semibold text-ink-900"
+          className="line-clamp-2 pr-16 text-base font-semibold text-ink-900"
           style={{ letterSpacing: "-0.015em" }}
         >
           {topic.title}

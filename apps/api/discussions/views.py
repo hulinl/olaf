@@ -204,17 +204,20 @@ def workspace_topic_comments(
         )
 
     body = (request.data.get("body") or "").strip()
-    image = request.FILES.get("image")
-    # Allow image-only comments (e.g. quick photo reply); require body
-    # only when there's no image to upload.
-    if not body and not image:
+    # Accept both legacy "image" and new "attachment" form field names —
+    # the renamed UI sends `attachment` but a stale client could still
+    # send `image`.
+    attachment = request.FILES.get("attachment") or request.FILES.get("image")
+    # Allow attachment-only comments (e.g. quick photo reply); require
+    # body only when there's no file to upload.
+    if not body and not attachment:
         return Response(
-            {"body": "Napiš zprávu nebo přilož fotku."},
+            {"body": "Napiš zprávu nebo přilož soubor."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    if image is not None and image.size > _COMMENT_IMAGE_MAX_BYTES:
+    if attachment is not None and attachment.size > _COMMENT_IMAGE_MAX_BYTES:
         return Response(
-            {"image": "Fotka je moc velká (max 6 MB)."},
+            {"attachment": "Soubor je moc velký (max 6 MB)."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     # Reply-to handling: only one level deep. If the requested parent
@@ -228,7 +231,7 @@ def workspace_topic_comments(
         except Comment.DoesNotExist:
             pass
     comment = Comment.objects.create(
-        topic=topic, body=body, author=request.user, parent=parent, image=image
+        topic=topic, body=body, author=request.user, parent=parent, image=attachment
     )
     from .tasks import send_comment_notification_task
 
@@ -422,7 +425,7 @@ def event_topic_comments(
         except Comment.DoesNotExist:
             pass
     comment = Comment.objects.create(
-        topic=topic, body=body, author=request.user, parent=parent, image=image
+        topic=topic, body=body, author=request.user, parent=parent, image=attachment
     )
     from .tasks import send_comment_notification_task
 

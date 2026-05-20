@@ -326,9 +326,11 @@ export interface DiscussionComment {
    *  the parent comment this one replies to. */
   parent: number | null;
   body: string;
-  /** URL to the attached photo (resolved through assetUrl for absolute
-   *  display); null when no image was uploaded. */
-  image_url: string | null;
+  /** URL to the attached file (image or arbitrary file). null when no
+   *  attachment is present. Use attachment_name for the human-friendly
+   *  filename label on non-image downloads. */
+  attachment_url: string | null;
+  attachment_name: string;
   author_id: number | null;
   author_name: string;
   author_email: string;
@@ -1403,13 +1405,13 @@ export const discussions = {
     topicId: number,
     body: string,
     parent: number | null = null,
-    image: File | null = null,
+    attachment: File | null = null,
   ) => {
-    if (image) {
+    if (attachment) {
       const fd = new FormData();
       fd.append("body", body);
       if (parent != null) fd.append("parent", String(parent));
-      fd.append("image", image);
+      fd.append("attachment", attachment);
       return apiFetch<DiscussionComment>(
         `/api/discussions/workspace/${slug}/topics/${topicId}/comments/`,
         { method: "POST", body: fd },
@@ -1475,13 +1477,13 @@ export const discussions = {
     topicId: number,
     body: string,
     parent: number | null = null,
-    image: File | null = null,
+    attachment: File | null = null,
   ) => {
-    if (image) {
+    if (attachment) {
       const fd = new FormData();
       fd.append("body", body);
       if (parent != null) fd.append("parent", String(parent));
-      fd.append("image", image);
+      fd.append("attachment", attachment);
       return apiFetch<DiscussionComment>(
         `/api/discussions/event/${workspaceSlug}/${eventSlug}/topics/${topicId}/comments/`,
         { method: "POST", body: fd },
