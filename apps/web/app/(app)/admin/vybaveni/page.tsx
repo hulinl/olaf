@@ -811,10 +811,16 @@ function ItemsByCategoryView({
         </thead>
         {ordered.map((g) => (
           <tbody key={g.key} className="divide-y divide-border">
-            <tr className="bg-surface-muted/20">
+            {/* Category-header row needs to read clearly as a section
+                anchor, not as a continuation of the column header. The
+                previous bg-surface-muted/20 sat right next to the
+                column header's /30 and the first group blurred into
+                the header band. Brand-tinted background + brand text +
+                left accent stripe make the boundary unmistakable. */}
+            <tr className="border-y-2 border-brand/30 bg-brand/10">
               <td
                 colSpan={4}
-                className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-700"
+                className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand"
               >
                 {g.name}
                 <span className="ml-2 font-mono text-[10px] tracking-wide text-ink-500 tabular-nums">
@@ -1531,10 +1537,10 @@ function ListEntriesByCategoryView({
         </thead>
         {ordered.map((g) => (
           <tbody key={g.key} className="divide-y divide-border">
-            <tr className="bg-surface-muted/20">
+            <tr className="border-y-2 border-brand/30 bg-brand/10">
               <td
                 colSpan={4}
-                className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-700"
+                className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand"
               >
                 {g.name}
                 <span className="ml-2 font-mono text-[10px] tracking-wide text-ink-500 tabular-nums">
