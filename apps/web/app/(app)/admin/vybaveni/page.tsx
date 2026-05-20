@@ -652,63 +652,70 @@ function ItemSection({
         )}
 
         {open && items.length > 0 && (categories.length > 0 || lists.length > 0) && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-              Filtr
-            </span>
-            {categories.length > 0 && (
-              <select
-                value={categoryFilter ?? ""}
-                onChange={(e) =>
-                  setCategoryFilter(
-                    e.target.value ? Number(e.target.value) : null,
-                  )
-                }
-                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-700 focus-ring"
-              >
-                <option value="">Všechny kategorie</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {lists.length > 0 && (
-              <select
-                value={listFilter ?? ""}
-                onChange={(e) =>
-                  setListFilter(
-                    e.target.value ? Number(e.target.value) : null,
-                  )
-                }
-                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-700 focus-ring"
-              >
-                <option value="">Všechny listy</option>
-                {lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {(categoryFilter != null || listFilter != null) && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCategoryFilter(null);
-                    setListFilter(null);
-                  }}
-                  className="text-xs font-medium text-ink-500 hover:text-ink-900"
+          // Mobile-friendly filter block: header on its own line, then
+          // each dropdown full-width below. On sm+ the two dropdowns
+          // can sit side-by-side to save vertical space.
+          <div className="mt-3 flex flex-col gap-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                Filtr
+              </p>
+              {(categoryFilter != null || listFilter != null) && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs text-ink-500">
+                    {filtered.length} z {items.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryFilter(null);
+                      setListFilter(null);
+                    }}
+                    className="text-xs font-medium text-ink-500 hover:text-ink-900"
+                  >
+                    Vymazat
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {categories.length > 0 && (
+                <select
+                  value={categoryFilter ?? ""}
+                  onChange={(e) =>
+                    setCategoryFilter(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
+                  }
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-700 focus-ring sm:flex-1"
                 >
-                  Vymazat filtr
-                </button>
-                <span className="text-xs text-ink-500">
-                  ({filtered.length} z {items.length})
-                </span>
-              </>
-            )}
+                  <option value="">Všechny kategorie</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {lists.length > 0 && (
+                <select
+                  value={listFilter ?? ""}
+                  onChange={(e) =>
+                    setListFilter(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
+                  }
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-700 focus-ring sm:flex-1"
+                >
+                  <option value="">Všechny listy</option>
+                  {lists.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
         )}
 
@@ -779,95 +786,54 @@ function ItemsByCategoryView({
     });
   }
 
-  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
-  const allOpen =
-    ordered.length > 0 && ordered.every((g) => openKeys.has(g.key));
-
-  function toggle(key: string) {
-    setOpenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    if (allOpen) setOpenKeys(new Set());
-    else setOpenKeys(new Set(ordered.map((g) => g.key)));
-  }
-
+  // Render all groups expanded — flat scrollable list with each
+  // category as an inline header row + its items table beneath. The
+  // previous click-to-expand was extra friction on mobile where the
+  // owner just wanted to scan everything; scrolling is cheaper than
+  // tapping 12 chevrons.
   return (
-    <div className="mt-4 flex flex-col gap-2">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={toggleAll}
-          className="text-xs font-medium text-ink-500 hover:text-ink-900"
-        >
-          {allOpen ? "Sbalit vše" : "Rozbalit vše"}
-        </button>
-      </div>
-      {ordered.map((g) => {
-        const open = openKeys.has(g.key);
-        return (
-          <div key={g.key} className="rounded-md border border-border">
-            <button
-              type="button"
-              onClick={() => toggle(g.key)}
-              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left focus-ring hover:bg-brand/5"
-            >
-              <div className="flex items-baseline gap-2">
-                <span
-                  aria-hidden
-                  className={open ? "rotate-90 text-ink-500" : "text-ink-500"}
-                >
-                  ›
-                </span>
-                <span className="font-medium text-ink-900">{g.name}</span>
-                <span className="font-mono text-[11px] uppercase tracking-wide text-ink-500 tabular-nums">
-                  {g.items.length}{" "}
-                  {g.items.length === 1
-                    ? "položka"
-                    : g.items.length < 5
-                      ? "položky"
-                      : "položek"}
-                </span>
-              </div>
-            </button>
-            {open && (
-              <div className="overflow-x-auto border-t border-border">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-muted/30">
-                    <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                      <th className="px-3 py-2">Položka</th>
-                      <th className="px-3 py-2 text-right">Váha</th>
-                      <th className="hidden px-3 py-2 lg:table-cell">
-                        Odkaz
-                      </th>
-                      <th className="hidden px-3 py-2 lg:table-cell">
-                        Poznámka
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {g.items.map((i) => (
-                      <ItemRow
-                        key={i.id}
-                        item={i}
-                        categories={categories}
-                        lists={lists}
-                        onChange={onChange}
-                        hideCategoryCell
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+    <div className="mt-4 flex flex-col gap-5">
+      {ordered.map((g) => (
+        <div key={g.key}>
+          <div className="flex items-baseline gap-2 px-1 pb-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-700">
+              {g.name}
+            </h4>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-500 tabular-nums">
+              {g.items.length}{" "}
+              {g.items.length === 1
+                ? "položka"
+                : g.items.length < 5
+                  ? "položky"
+                  : "položek"}
+            </span>
           </div>
-        );
-      })}
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted/30">
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                  <th className="px-3 py-2">Položka</th>
+                  <th className="px-3 py-2 text-right">Váha</th>
+                  <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
+                  <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {g.items.map((i) => (
+                  <ItemRow
+                    key={i.id}
+                    item={i}
+                    categories={categories}
+                    lists={lists}
+                    onChange={onChange}
+                    hideCategoryCell
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
