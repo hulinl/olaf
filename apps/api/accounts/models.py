@@ -66,6 +66,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     emergency_contact_phone = models.CharField(max_length=30, blank=True)
     emergency_contact_relationship = models.CharField(max_length=100, blank=True)
 
+    # Affiliate partner configuration for gear lists. Stored as a list
+    # of {"domain": "alza.cz", "params": {"ref": "MY_ID"}} entries.
+    # When the gear-item serializer renders a URL, it checks the
+    # outbound domain against this list and appends matching params,
+    # giving the user a per-shop affiliate handle without per-item
+    # URL editing.
+    affiliate_partners = models.JSONField(default=list, blank=True)
+
     # Activity & experience
     fitness_level = models.CharField(max_length=20, choices=FITNESS_LEVEL_CHOICES, blank=True)
     sport_tags = models.JSONField(default=list, blank=True)

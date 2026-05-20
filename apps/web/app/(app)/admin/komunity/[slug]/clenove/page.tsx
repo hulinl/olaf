@@ -188,6 +188,23 @@ function MemberRow({
       setBusy(false);
     }
   }
+  async function handleHandover() {
+    const ok = confirm(
+      `Předat vlastnictví komunity uživateli ${member.full_name || member.email}?\n\n` +
+        "Ty se staneš adminem a ztratíš právo mazat komunitu nebo měnit role. " +
+        "Nový vlastník ti to může vrátit, ale nemusí.",
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await workspaces.handoverOwnership(wsSlug, member.id);
+      // Reload the page — my_role just flipped, so the whole UI
+      // (sidebar gates, action buttons) needs to re-evaluate.
+      window.location.reload();
+    } catch {
+      setBusy(false);
+    }
+  }
 
   return (
     <tr
@@ -213,19 +230,32 @@ function MemberRow({
           </div>
           <span className="text-xs text-ink-500">{member.email}</span>
           {iAmSuperAdmin && member.role !== "owner" && (
-            <div className="mt-1 flex gap-1.5">
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
               {member.role === "admin" ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDemote();
-                  }}
-                  disabled={busy}
-                  className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
-                >
-                  {busy ? "..." : "Snížit"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleHandover();
+                    }}
+                    disabled={busy}
+                    className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+                  >
+                    {busy ? "..." : "Předat vlastnictví"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDemote();
+                    }}
+                    disabled={busy}
+                    className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+                  >
+                    {busy ? "..." : "Snížit"}
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"

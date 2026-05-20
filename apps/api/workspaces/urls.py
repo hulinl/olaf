@@ -29,4 +29,9 @@ urlpatterns = [
         views.workspace_member_demote,
         name="member-demote",
     ),
+    path(
+        "<slug:slug>/members/<int:user_id>/handover/",
+        views.workspace_member_handover,
+        name="member-handover",
+    ),
 ]

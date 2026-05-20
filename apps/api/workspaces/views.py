@@ -576,3 +576,67 @@ def workspace_member_demote(
         member.role = WorkspaceMember.ROLE_MEMBER
         member.save(update_fields=["role"])
     return Response({"user_id": member.user_id, "role": member.role})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_member_handover(
+    request: Request, slug: str, user_id: int
+) -> Response:
+    """Hand over ownership to another admin (super-admin only).
+
+    Atomically swaps roles: caller (current owner) becomes admin;
+    target (must be admin) becomes owner. The new owner can then
+    demote / remove the old one if they choose. This is the only
+    way to change the workspace owner — single-owner invariant is
+    preserved by the swap.
+    """
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    from django.db import transaction
+
+    from events.permissions import is_workspace_super_admin
+
+    if not is_workspace_super_admin(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if request.user.id == user_id:
+        return Response(
+            {"detail": "Vlastnictví nemůžeš předat sám sobě."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        target = WorkspaceMember.objects.get(
+            workspace=workspace, user_id=user_id
+        )
+    except WorkspaceMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if target.role != WorkspaceMember.ROLE_ADMIN:
+        return Response(
+            {
+                "detail": (
+                    "Vlastnictví můžeš předat jen někomu, kdo už je adminem. "
+                    "Nejdřív ho povyš na admina."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    me = WorkspaceMember.objects.get(workspace=workspace, user=request.user)
+    with transaction.atomic():
+        me.role = WorkspaceMember.ROLE_ADMIN
+        me.save(update_fields=["role"])
+        target.role = WorkspaceMember.ROLE_OWNER
+        target.save(update_fields=["role"])
+
+    return Response(
+        {
+            "new_owner_id": target.user_id,
+            "old_owner_id": me.user_id,
+            "old_owner_role": me.role,
+        }
+    )
