@@ -22,12 +22,29 @@ export function GearBlock({ payload, list, tone = "canvas" }: Props) {
   const dark = tone === "ink";
   const eyebrow = payload.eyebrow || "Vybavení";
   const title = payload.title || list.name;
-  const totalKg = list.total_weight_g / 1000;
+  // Apply the owner's curated subset (`featured_entry_ids`) before
+  // anything else — empty / missing = show all (back-compat with
+  // pre-feature blocks).
+  const featured = payload.featured_entry_ids ?? [];
+  const featuredEntries =
+    featured.length > 0
+      ? list.entries.filter((e) => featured.includes(e.id))
+      : list.entries;
+  if (featuredEntries.length === 0) return null;
+
+  // Recompute summary numbers off the visible subset so the header
+  // doesn't lie when the owner only featured a few items.
+  const visibleCount = featuredEntries.reduce((n, e) => n + e.quantity, 0);
+  const visibleWeightG = featuredEntries.reduce(
+    (n, e) => n + (e.item.weight_g ?? 0) * e.quantity,
+    0,
+  );
+  const totalKg = visibleWeightG / 1000;
 
   // Group entries by category for visual grouping (same shape as the
   // public /gear/[slug] landing for consistency).
   const byCategory = new Map<string, PublicGearList["entries"]>();
-  for (const e of list.entries) {
+  for (const e of featuredEntries) {
     const cat = e.item.category || "Ostatní";
     const arr = byCategory.get(cat) ?? [];
     arr.push(e);
@@ -55,15 +72,15 @@ export function GearBlock({ payload, list, tone = "canvas" }: Props) {
                 dark ? "text-ink-inverse tabular-nums" : "text-ink-900 tabular-nums"
               }
             >
-              {list.item_count}
+              {visibleCount}
             </strong>{" "}
-            {list.item_count === 1
+            {visibleCount === 1
               ? "položka"
-              : list.item_count < 5
+              : visibleCount < 5
                 ? "položky"
                 : "položek"}
           </span>
-          {list.total_weight_g > 0 && (
+          {visibleWeightG > 0 && (
             <span>
               ·{" "}
               <strong

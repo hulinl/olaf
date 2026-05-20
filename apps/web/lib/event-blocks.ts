@@ -93,6 +93,12 @@ export interface GearBlockPayload {
   title?: string;
   /** Slug of a GearList owned by the event creator (must be unlisted or public). */
   list_slug: string;
+  /** Optional curated subset of GearListItem ids (the entry ids, not
+   *  raw GearItem ids). Empty / missing means "render everything"
+   *  for back-compat with existing gear blocks. Owner uses checkboxes
+   *  in the editor to pick which items appear on the public landing
+   *  — typically a TOP-N selection rather than the full packing list. */
+  featured_entry_ids?: number[];
 }
 
 export interface PracticalBlockPayload {

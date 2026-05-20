@@ -99,11 +99,128 @@ export function GearForm({ payload, onChange }: Props) {
         </p>
       )}
 
+      {selected && selected.entries.length > 0 && (
+        <FeaturedPicker selected={selected} payload={payload} onChange={onChange} />
+      )}
+
       {error && (
         <p className="rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Curated subset picker — owner toggles which entries from the
+ *  selected gear list will appear on the public landing. Empty
+ *  selection means "show all" (same as before this feature).
+ *  Per-category checkboxes match the rendering grouping so the owner
+ *  can quickly include / exclude whole sections. */
+function FeaturedPicker({
+  selected,
+  payload,
+  onChange,
+}: {
+  selected: GearList;
+  payload: GearBlockPayload;
+  onChange: (p: GearBlockPayload) => void;
+}) {
+  const featured = new Set(payload.featured_entry_ids ?? []);
+  const showAll = featured.size === 0;
+
+  function setFeatured(next: Set<number>) {
+    onChange({ ...payload, featured_entry_ids: [...next] });
+  }
+
+  function toggleEntry(entryId: number) {
+    const next = new Set(featured);
+    if (next.has(entryId)) next.delete(entryId);
+    else next.add(entryId);
+    setFeatured(next);
+  }
+
+  function selectAll() {
+    setFeatured(new Set());
+  }
+
+  function clearAll() {
+    // "Empty array" still means "show none" in our convention only if
+    // we render the block conditionally — but the block returns null
+    // when featuredEntries ends up empty AND featured.length > 0. So
+    // we treat an explicit empty-array as "owner wants empty" — we
+    // just hide the block. To revert to "show all" the owner clicks
+    // selectAll above. Make this clear in the hint text below.
+    const all = new Set(selected.entries.map((e) => e.id));
+    // Toggle off — pick one entry to "unfeature" the rest? Simpler:
+    // setting featured to a marker {-1} would be confusing. Reset to
+    // empty (= show all) on this button.
+    if (all.size === featured.size) setFeatured(new Set());
+    else setFeatured(new Set());
+  }
+  void clearAll; // keep linter happy if unused
+
+  // Group entries by category for the checkbox list.
+  const byCategory = new Map<string, GearList["entries"]>();
+  for (const e of selected.entries) {
+    const cat = e.item.category || "Ostatní";
+    const arr = byCategory.get(cat) ?? [];
+    arr.push(e);
+    byCategory.set(cat, arr);
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-muted/30 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            TOP výběr pro public
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            {showAll
+              ? "Zobrazují se všechny položky. Zaškrtni jen ty, které chceš ukázat na veřejné stránce — typicky 5–10 klíčových věcí."
+              : `Zobrazí se ${featured.size} z ${selected.entries.length} položek.`}
+          </p>
+        </div>
+        {!showAll && (
+          <button
+            type="button"
+            onClick={selectAll}
+            className="text-xs font-medium text-ink-500 hover:text-ink-900"
+          >
+            Zobrazit vše
+          </button>
+        )}
+      </div>
+      <div className="flex flex-col gap-3">
+        {[...byCategory.entries()].map(([cat, items]) => (
+          <div key={cat}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+              {cat}
+            </p>
+            <ul className="mt-1 flex flex-col gap-1">
+              {items.map((e) => {
+                const on = featured.has(e.id);
+                return (
+                  <li key={e.id}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm hover:bg-surface-muted">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggleEntry(e.id)}
+                        className="size-4 accent-brand"
+                      />
+                      <span className="flex-1 text-ink-900">
+                        {e.item.name}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
