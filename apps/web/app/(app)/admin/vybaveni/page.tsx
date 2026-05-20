@@ -74,7 +74,9 @@ export default function GearSettingsPage() {
 
       {error && <Alert variant="danger">{error}</Alert>}
 
-      <CategorySection categories={categories} items={items} onChange={reload} />
+      {/* Order: Položky (main workflow) → Listy (assemble) → Kategorie
+          (taxonomy management). User reaches for items most often,
+          lists next, categories rarely — match that priority. */}
       <ItemSection
         items={items}
         categories={categories}
@@ -82,6 +84,7 @@ export default function GearSettingsPage() {
         onChange={reload}
       />
       <ListSection lists={lists} items={items} onChange={reload} />
+      <CategorySection categories={categories} items={items} onChange={reload} />
       <ImportSection onChange={reload} />
       <AffiliateSection />
     </div>
@@ -185,7 +188,7 @@ function CategorySection({
                 importem.
               </p>
             ) : (
-              <div className="divide-y divide-border">
+              <div className="flex flex-col gap-2">
                 {categories.map((c) => (
                   <CategoryRow
                     key={c.id}
@@ -229,12 +232,13 @@ function CategoryRow({
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
-  // Flat row — no outer border (the Card already provides one). The
-  // input is the only bordered element; rest sits on the card bg with
-  // divide-y between rows handling visual separation.
+  // Each category is its own bordered tile (just the row, not the
+  // input nested inside — that's a single border, not the triple-nest
+  // we had before). Between tiles we use gap-2 instead of a horizontal
+  // divider line so the list reads as a stack of independent cards.
   const [name, setName] = useState(category.name);
   return (
-    <div className="flex flex-wrap items-center gap-3 py-1.5">
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-3 py-2">
       <input
         type="text"
         value={name}
@@ -243,7 +247,7 @@ function CategoryRow({
           if (name.trim() && name !== category.name) onRename(name.trim());
         }}
         maxLength={60}
-        className="flex-1 min-w-[160px] rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
+        className="flex-1 min-w-[160px] rounded-md bg-transparent px-1 py-0.5 text-sm font-medium text-ink-900 focus-ring focus:bg-surface focus:ring-2"
       />
       <span className="font-mono text-[11px] uppercase tracking-wide text-ink-500 tabular-nums">
         {usage} {usage === 1 ? "položka" : usage < 5 ? "položky" : "položek"}
@@ -635,6 +639,7 @@ function ItemSection({
         {open && composerOpen && (
           <ItemEditor
             categories={categories}
+            lists={lists}
             onCancel={() => setComposerOpen(false)}
             onSave={async (payload) => {
               await gear.createItem(payload);
@@ -642,6 +647,7 @@ function ItemSection({
               await onChange();
             }}
             onCategoryAdded={onChange}
+            onListsChanged={onChange}
           />
         )}
 
@@ -735,6 +741,7 @@ function ItemSection({
                     key={i.id}
                     item={i}
                     categories={categories}
+                    lists={lists}
                     onChange={onChange}
                   />
                 ))}
@@ -750,10 +757,12 @@ function ItemSection({
 function ItemRow({
   item,
   categories,
+  lists,
   onChange,
 }: {
   item: GearItem;
   categories: GearCategory[];
+  lists: GearList[];
   onChange: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -765,6 +774,7 @@ function ItemRow({
           <ItemEditor
             initial={item}
             categories={categories}
+            lists={lists}
             onCancel={() => setEditing(false)}
             onSave={async (payload) => {
               await gear.updateItem(item.id, payload);
@@ -778,6 +788,7 @@ function ItemRow({
               await onChange();
             }}
             onCategoryAdded={onChange}
+            onListsChanged={onChange}
           />
         </td>
       </tr>
@@ -843,13 +854,16 @@ function ItemRow({
 function ItemEditor({
   initial,
   categories,
+  lists,
   onSave,
   onCancel,
   onDelete,
   onCategoryAdded,
+  onListsChanged,
 }: {
   initial?: GearItem;
   categories: GearCategory[];
+  lists: GearList[];
   onSave: (payload: {
     name: string;
     weight_g: number | null;
@@ -860,6 +874,9 @@ function ItemEditor({
   onCancel: () => void;
   onDelete?: () => Promise<void>;
   onCategoryAdded?: () => Promise<void>;
+  /** Called after an item↔list membership toggle so the parent can
+   *  refresh its view (counts, filters, etc). */
+  onListsChanged?: () => Promise<void>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [weight, setWeight] = useState(
@@ -873,6 +890,53 @@ function ItemEditor({
   const [busy, setBusy] = useState(false);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+
+  // Track which lists this item belongs to via local state so toggling
+  // checkboxes feels instant. Resolved from the GearList payload (each
+  // list has its entries; we look for one matching this item).
+  const initialListIds = new Set<number>();
+  if (initial) {
+    for (const l of lists) {
+      if (l.entries.some((e) => e.item.id === initial.id))
+        initialListIds.add(l.id);
+    }
+  }
+  const [listIds, setListIds] = useState<Set<number>>(initialListIds);
+
+  async function toggleList(list: GearList) {
+    if (!initial) {
+      // Creating a brand-new item — we can't write list-membership
+      // until the item exists. Just track intent locally so the parent
+      // can pick it up later (V2: write after onSave returns the new
+      // item id). For V1, hide checkboxes during create.
+      return;
+    }
+    const isMember = listIds.has(list.id);
+    // Optimistic toggle.
+    setListIds((prev) => {
+      const next = new Set(prev);
+      if (isMember) next.delete(list.id);
+      else next.add(list.id);
+      return next;
+    });
+    try {
+      if (isMember) {
+        const entry = list.entries.find((e) => e.item.id === initial.id);
+        if (entry) await gear.removeListEntry(list.id, entry.id);
+      } else {
+        await gear.addItemToList(list.id, initial.id);
+      }
+      if (onListsChanged) await onListsChanged();
+    } catch {
+      // Rollback on failure.
+      setListIds((prev) => {
+        const next = new Set(prev);
+        if (isMember) next.add(list.id);
+        else next.delete(list.id);
+        return next;
+      });
+    }
+  }
 
   async function handle(e: FormEvent) {
     e.preventDefault();
@@ -1014,6 +1078,41 @@ function ItemEditor({
           placeholder="velikost L, modrá"
         />
       </Field>
+
+      {/* List membership checkboxes — only shown for existing items
+          since toggling persists immediately and needs an item id.
+          New items can be added to lists via the list's "Přidat
+          položku" picker after they're created. */}
+      {initial && lists.length > 0 && (
+        <Field
+          label="Listy"
+          htmlFor="gi-lists"
+          hint="Položka může být ve více listech zároveň. Klikni — uloží se rovnou."
+        >
+          <div id="gi-lists" className="flex flex-wrap gap-2">
+            {lists.map((l) => {
+              const on = listIds.has(l.id);
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => toggleList(l)}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-ring",
+                    on
+                      ? "border-brand bg-brand/15 text-brand"
+                      : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
+                  ].join(" ")}
+                >
+                  <span aria-hidden>{on ? "✓" : "+"}</span>
+                  {l.name}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" size="md" loading={busy}>
           {busy ? "Ukládám…" : "Uložit"}
@@ -1150,6 +1249,10 @@ function ListCard({
   const usedItemIds = new Set(list.entries.map((e) => e.item.id));
   const availableItems = items.filter((i) => !usedItemIds.has(i.id));
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** Collapse just the items table (the dashboard + share + add-item
+   *  controls stay so the owner can keep tweaking metadata even when
+   *  the long list is folded). */
+  const [itemsOpen, setItemsOpen] = useState(true);
 
   async function handleDelete() {
     if (!confirm(`Smazat list „${list.name}"?`)) return;
@@ -1182,56 +1285,138 @@ function ListCard({
         <div className="border-t border-border px-4 py-4">
           {list.entries.length > 0 && <ListDashboard list={list} />}
           <SharePanel list={list} onChange={onChange} />
-          {list.entries.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
-              List je prázdný. Přidej položky z katalogu.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {list.entries.map((e) => (
-                <li
-                  key={e.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium text-ink-900">
-                      {e.item.name}
-                    </span>
-                    {e.item.category && (
-                      <span className="text-[11px] text-ink-500">
-                        {e.item.category}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    {e.item.url && (e.click_count ?? 0) > 0 && (
-                      <span
-                        title="Počet prokliků na affiliate odkaz"
-                        className="rounded bg-brand/10 px-1.5 py-0.5 font-mono tabular-nums text-brand"
-                      >
-                        {e.click_count}↗
-                      </span>
-                    )}
-                    {e.item.weight_g != null && (
-                      <span className="font-mono tabular-nums text-ink-700">
-                        {e.quantity}× {e.item.weight_g} g
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await gear.removeListEntry(list.id, e.id);
-                        await onChange();
-                      }}
-                      className="text-ink-500 hover:text-danger"
-                    >
-                      Odebrat
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+
+          {/* Items as a tabulka (matches the main Položky table layout
+              so the formatting is consistent). Collapsible so a long
+              list doesn't push everything below it off the screen. */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setItemsOpen((v) => !v)}
+              className="flex items-baseline gap-2 text-left focus-ring"
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                Položky ({list.entries.length})
+              </span>
+              <span
+                aria-hidden
+                className={
+                  itemsOpen ? "rotate-90 text-ink-500" : "text-ink-500"
+                }
+              >
+                ›
+              </span>
+            </button>
+          </div>
+
+          {itemsOpen &&
+            (list.entries.length === 0 ? (
+              <p className="mt-2 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+                List je prázdný. Přidej položky z katalogu.
+              </p>
+            ) : (
+              <div className="mt-2 -mx-4 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border">
+                    <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                      <th className="px-4 py-2">Položka</th>
+                      <th className="hidden px-3 py-2 sm:table-cell">
+                        Kategorie
+                      </th>
+                      <th className="px-3 py-2 text-right">Váha</th>
+                      <th className="hidden px-3 py-2 lg:table-cell">
+                        Odkaz
+                      </th>
+                      <th className="px-3 py-2 text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {list.entries.map((e) => {
+                      const weightLabel =
+                        e.item.weight_g == null
+                          ? "—"
+                          : e.quantity > 1
+                            ? `${e.quantity}× ${e.item.weight_g} g`
+                            : e.item.weight_g >= 1000
+                              ? `${(e.item.weight_g / 1000).toFixed(2)} kg`
+                              : `${e.item.weight_g} g`;
+                      return (
+                        <tr key={e.id} className="align-top">
+                          <td className="px-4 py-2">
+                            <span className="font-medium text-ink-900">
+                              {e.item.name}
+                            </span>
+                            {/* Mobile fallback: collapse category +
+                                link hints under the name when their
+                                columns are hidden. */}
+                            <span className="ml-2 text-xs text-ink-500 sm:hidden">
+                              {e.item.category && <>{e.item.category}</>}
+                              {e.item.url && (
+                                <span className="ml-2 text-brand">↗</span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="hidden whitespace-nowrap px-3 py-2 text-ink-700 sm:table-cell">
+                            {e.item.category ? (
+                              <span className="rounded bg-surface-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                                {e.item.category}
+                              </span>
+                            ) : (
+                              <span className="text-ink-300">—</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums text-ink-700">
+                            {weightLabel}
+                          </td>
+                          <td className="hidden max-w-[1px] px-3 py-2 lg:table-cell">
+                            {e.item.url ? (
+                              <a
+                                href={e.item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(ev) => ev.stopPropagation()}
+                                className="block truncate text-brand hover:underline"
+                                title={e.item.url}
+                              >
+                                {new URL(e.item.url).hostname.replace(
+                                  /^www\./,
+                                  "",
+                                )}{" "}
+                                ↗
+                              </a>
+                            ) : (
+                              <span className="text-ink-300">—</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right">
+                            <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+                              {e.item.url && (e.click_count ?? 0) > 0 && (
+                                <span
+                                  title="Počet prokliků na affiliate odkaz"
+                                  className="rounded bg-brand/10 px-1.5 py-0.5 font-mono tabular-nums text-brand"
+                                >
+                                  {e.click_count}↗
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await gear.removeListEntry(list.id, e.id);
+                                  await onChange();
+                                }}
+                                className="text-ink-500 hover:text-danger"
+                              >
+                                Odebrat
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ))}
 
           <div className="mt-3 flex flex-wrap gap-2">
             {availableItems.length > 0 ? (
