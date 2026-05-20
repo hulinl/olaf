@@ -425,7 +425,9 @@ def duplicate_event(
     - cancellation_reason = "" (start clean)
     - cover file is duplicated, not referenced
     - dates, location, content blocks, questionnaire sections — all copied
-    - RSVPs are NOT copied
+    - operational config (price, gear, risks, required docs, owner
+      checklist) — copied so the new draft is workable, not empty
+    - RSVPs, gallery images, co-creators — NOT copied
     """
     from django.core.files.base import ContentFile
 
@@ -467,7 +469,44 @@ def duplicate_event(
         enabled_questionnaire_sections=list(
             event.enabled_questionnaire_sections or []
         ),
+        price_amount=event.price_amount,
+        price_currency=event.price_currency,
+        price_note=event.price_note,
+        payment_in_cash=event.payment_in_cash,
+        billing_profile=event.billing_profile,
+        recommended_gear_list=event.recommended_gear_list,
+        # JSONFields — copy the value, not the reference, so editing
+        # one event's list can't mutate the other's.
+        risk_checklist=[dict(r) for r in (event.risk_checklist or [])],
+        required_documents=[dict(d) for d in (event.required_documents or [])],
     )
+
+    # Owner's checklist items copy too — that's the bulk of the
+    # setup work, and the whole point of duplication is to skip it.
+    from .models import EventChecklistItem
+
+    bulk: list[EventChecklistItem] = []
+    for item in event.checklist_items.all():
+        bulk.append(
+            EventChecklistItem(
+                event=copy,
+                title=item.title,
+                description=item.description,
+                category=item.category,
+                done=False,
+                sort_order=item.sort_order,
+                remind_audience=item.remind_audience,
+            )
+        )
+    if bulk:
+        EventChecklistItem.objects.bulk_create(bulk)
+
+    # Reset risk checklist statuses — the new event hasn't been
+    # prepped yet, but the labels/categories/notes are still useful.
+    if copy.risk_checklist:
+        for item in copy.risk_checklist:
+            item["status"] = "open"
+        copy.save(update_fields=["risk_checklist"])
 
     # Duplicate the cover so deleting one doesn't strip the other.
     if event.cover:
