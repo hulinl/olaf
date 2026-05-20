@@ -1,15 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { type FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
-  type DiscussionComment,
   type DiscussionTopic,
-  type DiscussionTopicDetail,
   type TopicWritePayload,
   discussions,
 } from "@/lib/api";
@@ -25,23 +24,26 @@ type Scope =
 
 interface Props {
   scope: Scope;
-  /** Current user id — used to gate "smazat můj komentář" / "smazat mé téma". */
+  /** Current user id — used to gate "smazat mé téma". */
   currentUserId: number;
+  /** Builds the dedicated-thread URL for a given topic id. The wall is
+   *  card-only now (Trello-style); clicking a card navigates here. */
+  topicHref: (topicId: number) => string;
 }
 
 /**
- * Reusable wall: list of topics + expand to comments + add comment.
- * Owner (isModerator) can pin / lock / delete any post; authors can
- * delete their own. Locked topics gray out the comment composer.
+ * The wall is now strictly a list of topic cards. Each card links to a
+ * dedicated thread page (DiscussionThread) where the full body +
+ * comments + composer live. The wall stops being a giant nested
+ * accordion — easier to scan, makes room for V2 replies / photo uploads
+ * on the thread page without crushing the layout.
  *
- * Same component is mounted on:
- *   - /admin/komunity/[slug]/nastenka (workspace scope)
- *   - /events/[ws]/[event]            (event scope, participant zone)
+ * Composer at the top stays inline so creating a new topic is one
+ * click + write + publish, no extra navigation.
  */
-export function DiscussionWall({ scope, currentUserId }: Props) {
+export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
   const [topics, setTopics] = useState<DiscussionTopic[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [openTopicId, setOpenTopicId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
 
   async function listTopics() {
@@ -100,7 +102,6 @@ export function DiscussionWall({ scope, currentUserId }: Props) {
           topicId,
         );
       }
-      if (openTopicId === topicId) setOpenTopicId(null);
       await listTopics();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Smazání selhalo.");
@@ -156,38 +157,32 @@ export function DiscussionWall({ scope, currentUserId }: Props) {
         />
       )}
 
-      <TopicList
+      <TopicGrid
         topics={topics}
-        openTopicId={openTopicId}
-        setOpenTopicId={setOpenTopicId}
-        scope={scope}
+        topicHref={topicHref}
+        canModerate={scope.isModerator}
         currentUserId={currentUserId}
-        handleDeleteTopic={handleDeleteTopic}
-        handleTogglePin={handleTogglePin}
-        listTopics={listTopics}
+        onTogglePin={handleTogglePin}
+        onDeleteTopic={handleDeleteTopic}
       />
     </section>
   );
 }
 
-function TopicList({
+function TopicGrid({
   topics,
-  openTopicId,
-  setOpenTopicId,
-  scope,
+  topicHref,
+  canModerate,
   currentUserId,
-  handleDeleteTopic,
-  handleTogglePin,
-  listTopics,
+  onTogglePin,
+  onDeleteTopic,
 }: {
   topics: DiscussionTopic[] | null;
-  openTopicId: number | null;
-  setOpenTopicId: (id: number | null) => void;
-  scope: Scope;
+  topicHref: (topicId: number) => string;
+  canModerate: boolean;
   currentUserId: number;
-  handleDeleteTopic: (id: number) => Promise<void>;
-  handleTogglePin: (t: DiscussionTopic) => Promise<void>;
-  listTopics: () => Promise<void>;
+  onTogglePin: (t: DiscussionTopic) => Promise<void>;
+  onDeleteTopic: (id: number) => Promise<void>;
 }) {
   if (topics === null) {
     return (
@@ -211,15 +206,11 @@ function TopicList({
     <TopicCard
       key={t.id}
       topic={t}
-      open={openTopicId === t.id}
-      onToggle={() => setOpenTopicId(openTopicId === t.id ? null : t.id)}
-      canDelete={scope.isModerator || t.author_id === currentUserId}
-      canModerate={scope.isModerator}
-      onDelete={() => handleDeleteTopic(t.id)}
-      onTogglePin={() => handleTogglePin(t)}
-      scope={scope}
-      currentUserId={currentUserId}
-      onCommentChange={listTopics}
+      href={topicHref(t.id)}
+      canDelete={canModerate || t.author_id === currentUserId}
+      canModerate={canModerate}
+      onTogglePin={() => onTogglePin(t)}
+      onDelete={() => onDeleteTopic(t.id)}
     />
   );
 
@@ -230,7 +221,7 @@ function TopicList({
           <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
             <span aria-hidden>📌</span> Připnuté
           </p>
-          <div className="flex flex-col gap-3 rounded-xl border border-brand/30 bg-brand/5 p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {pinned.map(renderCard)}
           </div>
         </div>
@@ -242,10 +233,133 @@ function TopicList({
               Ostatní příspěvky
             </p>
           )}
-          <div className="flex flex-col gap-3">{rest.map(renderCard)}</div>
+          <div className="grid gap-3 sm:grid-cols-2">{rest.map(renderCard)}</div>
         </div>
       )}
     </div>
+  );
+}
+
+function TopicCard({
+  topic,
+  href,
+  canDelete,
+  canModerate,
+  onTogglePin,
+  onDelete,
+}: {
+  topic: DiscussionTopic;
+  href: string;
+  canDelete: boolean;
+  canModerate: boolean;
+  onTogglePin: () => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  return (
+    <article
+      className={[
+        "group relative flex flex-col gap-2 rounded-xl border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/40",
+        topic.pinned ? "border-brand/40" : "border-border",
+      ].join(" ")}
+    >
+      {/* Action icons in the top-right corner, only visible on hover so
+          they don't compete with the title for attention. */}
+      {(canModerate || canDelete) && (
+        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {canModerate && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onTogglePin();
+              }}
+              title={topic.pinned ? "Odepnout" : "Připnout"}
+              aria-label={topic.pinned ? "Odepnout" : "Připnout"}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              <span aria-hidden>{topic.pinned ? "📌" : "📍"}</span>
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete();
+              }}
+              title="Smazat téma"
+              aria-label="Smazat téma"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:text-danger focus-ring"
+            >
+              <span aria-hidden>×</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      <Link href={href} className="flex flex-col gap-2 focus-ring">
+        <div className="flex flex-wrap items-center gap-2">
+          {topic.pinned && (
+            <span className="inline-flex rounded bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-brand">
+              Připnuto
+            </span>
+          )}
+          {topic.locked && (
+            <span className="inline-flex rounded bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-ink-500">
+              Zamčeno
+            </span>
+          )}
+        </div>
+        <h4
+          className="line-clamp-2 text-base font-semibold text-ink-900"
+          style={{ letterSpacing: "-0.015em" }}
+        >
+          {topic.title}
+        </h4>
+        {topic.body && (
+          <p className="line-clamp-2 text-sm text-ink-500">{topic.body}</p>
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+          <span>{topic.author_name}</span>
+          <span aria-hidden>·</span>
+          <span>
+            {new Date(topic.last_activity_at).toLocaleDateString("cs-CZ", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            <strong className="text-ink-900 tabular-nums">
+              {topic.comment_count}
+            </strong>{" "}
+            {topic.comment_count === 1
+              ? "komentář"
+              : topic.comment_count < 5
+                ? "komentáře"
+                : "komentářů"}
+          </span>
+          {topic.like_count > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span
+                className={
+                  topic.i_liked
+                    ? "font-medium text-brand"
+                    : "text-ink-500"
+                }
+              >
+                <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>{" "}
+                <span className="tabular-nums">{topic.like_count}</span>
+              </span>
+            </>
+          )}
+        </div>
+      </Link>
+    </article>
   );
 }
 
@@ -329,379 +443,5 @@ function TopicComposer({
         </button>
       </div>
     </form>
-  );
-}
-
-function TopicCard({
-  topic,
-  open,
-  onToggle,
-  canDelete,
-  canModerate,
-  onDelete,
-  onTogglePin,
-  scope,
-  currentUserId,
-  onCommentChange,
-}: {
-  topic: DiscussionTopic;
-  open: boolean;
-  onToggle: () => void;
-  canDelete: boolean;
-  canModerate: boolean;
-  onDelete: () => void;
-  onTogglePin: () => void;
-  scope: Scope;
-  currentUserId: number;
-  onCommentChange: () => Promise<void>;
-}) {
-  const [detail, setDetail] = useState<DiscussionTopicDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [composerBody, setComposerBody] = useState("");
-  const [posting, setPosting] = useState(false);
-  // Optimistic like state — seeded from the prop, owned locally so a
-  // toggle doesn't need a full list re-fetch. Reset when the topic id
-  // changes (e.g. after a delete + insert in the parent list).
-  const [liked, setLiked] = useState<boolean>(topic.i_liked);
-  const [likeCount, setLikeCount] = useState<number>(topic.like_count);
-  useEffect(() => {
-    setLiked(topic.i_liked);
-    setLikeCount(topic.like_count);
-  }, [topic.id, topic.i_liked, topic.like_count]);
-
-  async function handleToggleLike(e: React.MouseEvent) {
-    e.stopPropagation();
-    const nextLiked = !liked;
-    setLiked(nextLiked);
-    setLikeCount((n) => Math.max(0, n + (nextLiked ? 1 : -1)));
-    try {
-      const resp =
-        scope.kind === "workspace"
-          ? await discussions.toggleWorkspaceLike(
-              scope.slug,
-              topic.id,
-              nextLiked,
-            )
-          : await discussions.toggleEventLike(
-              scope.workspaceSlug,
-              scope.eventSlug,
-              topic.id,
-              nextLiked,
-            );
-      // Sync to server-truth in case of races (someone else liked too).
-      setLiked(resp.i_liked);
-      setLikeCount(resp.like_count);
-    } catch {
-      // Rollback on failure.
-      setLiked(!nextLiked);
-      setLikeCount((n) => Math.max(0, n + (nextLiked ? -1 : 1)));
-    }
-  }
-
-  async function loadDetail() {
-    setLoading(true);
-    try {
-      const d =
-        scope.kind === "workspace"
-          ? await discussions.workspaceTopic(scope.slug, topic.id)
-          : await discussions.eventTopic(
-              scope.workspaceSlug,
-              scope.eventSlug,
-              topic.id,
-            );
-      setDetail(d);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (open && !detail) loadDetail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  async function handlePostComment(e: FormEvent) {
-    e.preventDefault();
-    const body = composerBody.trim();
-    if (!body) return;
-    setPosting(true);
-    try {
-      if (scope.kind === "workspace") {
-        await discussions.addWorkspaceComment(scope.slug, topic.id, body);
-      } else {
-        await discussions.addEventComment(
-          scope.workspaceSlug,
-          scope.eventSlug,
-          topic.id,
-          body,
-        );
-      }
-      setComposerBody("");
-      await loadDetail();
-      await onCommentChange();
-    } finally {
-      setPosting(false);
-    }
-  }
-
-  async function handleDeleteComment(c: DiscussionComment) {
-    if (!confirm("Smazat komentář?")) return;
-    if (scope.kind === "workspace") {
-      await discussions.deleteWorkspaceComment(scope.slug, topic.id, c.id);
-    } else {
-      await discussions.deleteEventComment(
-        scope.workspaceSlug,
-        scope.eventSlug,
-        topic.id,
-        c.id,
-      );
-    }
-    await loadDetail();
-    await onCommentChange();
-  }
-
-  async function handleToggleCommentLike(c: DiscussionComment) {
-    const nextLiked = !c.i_liked;
-    // Optimistic update on the local detail snapshot.
-    setDetail((prev) =>
-      prev
-        ? {
-            ...prev,
-            comments: prev.comments.map((x) =>
-              x.id === c.id
-                ? {
-                    ...x,
-                    i_liked: nextLiked,
-                    like_count: Math.max(
-                      0,
-                      x.like_count + (nextLiked ? 1 : -1),
-                    ),
-                  }
-                : x,
-            ),
-          }
-        : prev,
-    );
-    try {
-      const resp =
-        scope.kind === "workspace"
-          ? await discussions.toggleWorkspaceCommentLike(
-              scope.slug,
-              topic.id,
-              c.id,
-              nextLiked,
-            )
-          : await discussions.toggleEventCommentLike(
-              scope.workspaceSlug,
-              scope.eventSlug,
-              topic.id,
-              c.id,
-              nextLiked,
-            );
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              comments: prev.comments.map((x) =>
-                x.id === c.id
-                  ? { ...x, i_liked: resp.i_liked, like_count: resp.like_count }
-                  : x,
-              ),
-            }
-          : prev,
-      );
-    } catch {
-      // Roll back to server-truth on failure.
-      await loadDetail();
-    }
-  }
-
-  return (
-    <article className="rounded-md border border-border bg-surface">
-      <header
-        onClick={onToggle}
-        className="flex cursor-pointer flex-wrap items-baseline justify-between gap-3 px-4 py-3 hover:bg-brand/5"
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-2">
-            {topic.pinned && (
-              <span className="inline-flex rounded bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-brand">
-                Připnuto
-              </span>
-            )}
-            {topic.locked && (
-              <span className="inline-flex rounded bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-ink-500">
-                Zamčeno
-              </span>
-            )}
-            <p className="text-sm font-semibold text-ink-900">
-              {topic.title}
-            </p>
-          </div>
-          <p className="mt-1 text-xs text-ink-500">
-            {topic.author_name} ·{" "}
-            {new Date(topic.last_activity_at).toLocaleString("cs-CZ", {
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}{" "}
-            · {topic.comment_count}{" "}
-            {topic.comment_count === 1
-              ? "komentář"
-              : topic.comment_count < 5
-                ? "komentáře"
-                : "komentářů"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleToggleLike}
-            aria-pressed={liked}
-            aria-label={liked ? "Zrušit lajk" : "Lajknout"}
-            className={[
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-ring",
-              liked
-                ? "border-brand/40 bg-brand/10 text-brand"
-                : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
-            ].join(" ")}
-          >
-            <span aria-hidden>{liked ? "♥" : "♡"}</span>
-            <span className="tabular-nums">{likeCount}</span>
-          </button>
-          {open && canModerate && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePin();
-              }}
-              title={topic.pinned ? "Odepnout" : "Připnout"}
-              aria-label={topic.pinned ? "Odepnout" : "Připnout"}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-            >
-              <span aria-hidden>{topic.pinned ? "📌" : "📍"}</span>
-            </button>
-          )}
-          {open && canDelete && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              title="Smazat téma"
-              aria-label="Smazat téma"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 hover:text-danger focus-ring"
-            >
-              <span aria-hidden>×</span>
-            </button>
-          )}
-          <span className="text-xs text-ink-500">
-            {open ? "Skrýt" : "Otevřít"}
-          </span>
-        </div>
-      </header>
-
-      {open && (
-        <div className="border-t border-border px-4 py-4">
-          {topic.body && (
-            <p className="whitespace-pre-wrap text-sm text-ink-700">
-              {topic.body}
-            </p>
-          )}
-
-          <div className="mt-5 flex flex-col gap-3">
-            {loading && !detail && (
-              <div className="flex justify-center py-3">
-                <span className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
-              </div>
-            )}
-            {detail?.comments.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-md border border-border bg-surface-muted/30 px-3 py-2"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-xs font-medium text-ink-900">
-                    {c.author_name}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[11px] text-ink-500">
-                      {new Date(c.created_at).toLocaleString("cs-CZ", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                    {(canModerate || c.author_id === currentUserId) && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteComment(c)}
-                        className="text-[11px] text-ink-500 hover:text-danger"
-                      >
-                        Smazat
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">
-                  {c.body}
-                </p>
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleCommentLike(c)}
-                    aria-pressed={c.i_liked}
-                    aria-label={c.i_liked ? "Zrušit lajk" : "Lajknout"}
-                    className={[
-                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus-ring",
-                      c.i_liked
-                        ? "border-brand/40 bg-brand/10 text-brand"
-                        : "border-border bg-surface text-ink-500 hover:bg-surface-muted hover:text-ink-900",
-                    ].join(" ")}
-                  >
-                    <span aria-hidden>{c.i_liked ? "♥" : "♡"}</span>
-                    {c.like_count > 0 && (
-                      <span className="tabular-nums">{c.like_count}</span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-            {detail?.comments.length === 0 && (
-              <p className="text-xs text-ink-500">
-                Zatím žádný komentář.
-              </p>
-            )}
-          </div>
-
-          {!topic.locked && (
-            <form onSubmit={handlePostComment} className="mt-4 flex flex-col gap-2">
-              <textarea
-                rows={2}
-                value={composerBody}
-                onChange={(e) => setComposerBody(e.target.value)}
-                placeholder="Napiš komentář…"
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm focus-ring"
-              />
-              <div>
-                <Button
-                  type="submit"
-                  variant="secondary"
-                  size="md"
-                  loading={posting}
-                  disabled={!composerBody.trim()}
-                >
-                  {posting ? "Posílám…" : "Odeslat"}
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-    </article>
   );
 }

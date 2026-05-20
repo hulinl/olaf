@@ -207,6 +207,9 @@ export default function MyEventPage({ params }: Props) {
                     isModerator: !!event.i_am_owner,
                   }}
                   currentUserId={user.id}
+                  topicHref={(topicId) =>
+                    `/events/${wsSlug}/${eventSlug}/nastenka/${topicId}`
+                  }
                 />
               ) : my?.status === "pending_approval" ? (
                 <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">

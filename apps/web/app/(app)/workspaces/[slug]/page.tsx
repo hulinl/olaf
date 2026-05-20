@@ -262,6 +262,9 @@ export default function WorkspaceDetailPage({ params }: Props) {
             <DiscussionWall
               scope={{ kind: "workspace", slug, isModerator: isOwner }}
               currentUserId={user.id}
+              topicHref={(topicId) =>
+                `/workspaces/${slug}/nastenka/${topicId}`
+              }
             />
           </section>
         )}
