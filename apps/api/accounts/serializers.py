@@ -102,6 +102,8 @@ class UserSerializer(serializers.ModelSerializer):
             # Notifications
             "notify_on_discussion_reply",
             "notify_on_discussion_announce",
+            # Gear affiliate partners
+            "affiliate_partners",
             # System
             "email_verified",
             "date_joined",

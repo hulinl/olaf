@@ -9,6 +9,8 @@ import {
   ApiError,
   type GearItem,
   type GearList,
+  type User,
+  auth,
   gear,
 } from "@/lib/api";
 
@@ -63,6 +65,215 @@ export default function GearSettingsPage() {
 
       <ItemSection items={items} onChange={reload} />
       <ListSection lists={lists} items={items} onChange={reload} />
+      <AffiliateSection />
+    </div>
+  );
+}
+
+function AffiliateSection() {
+  const [partners, setPartners] = useState<
+    { domain: string; params: Record<string, string> }[] | null
+  >(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    auth.me().then((u: User) => setPartners(u.affiliate_partners ?? []));
+  }, []);
+
+  function update(
+    next: { domain: string; params: Record<string, string> }[],
+  ) {
+    setPartners(next);
+  }
+
+  async function save() {
+    if (partners == null) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await auth.updateMe({ affiliate_partners: partners });
+      setMsg("Uloženo.");
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : "Uložení selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardSection>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+        >
+          <div>
+            <h3 className="text-base font-semibold text-ink-900">
+              Affiliate partneři
+            </h3>
+            <p className="mt-1 text-sm text-ink-500">
+              Když si někdo klikne přes tvůj gear na e-shop, můžeme k URL
+              automaticky přidat tvůj affiliate identifikátor. Stačí
+              přidat e-shop a páry klíč/hodnota.
+            </p>
+          </div>
+          <span aria-hidden className={open ? "rotate-90 text-ink-500" : "text-ink-500"}>
+            ›
+          </span>
+        </button>
+
+        {open && partners && (
+          <div className="mt-4 flex flex-col gap-3">
+            {partners.length === 0 && (
+              <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+                Zatím nemáš žádného partnera. Příklad: doména „alza.cz",
+                klíč „ref", hodnota tvůj affiliate ID.
+              </p>
+            )}
+            {partners.map((p, i) => (
+              <PartnerRow
+                key={i}
+                partner={p}
+                onChange={(next) => {
+                  const copy = [...partners];
+                  copy[i] = next;
+                  update(copy);
+                }}
+                onDelete={() =>
+                  update(partners.filter((_, j) => j !== i))
+                }
+              />
+            ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  update([...partners, { domain: "", params: {} }])
+                }
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+              >
+                + Přidat partnera
+              </button>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                loading={busy}
+                onClick={save}
+              >
+                {busy ? "Ukládám…" : "Uložit"}
+              </Button>
+              {msg && <span className="text-xs text-ink-500">{msg}</span>}
+            </div>
+          </div>
+        )}
+      </CardSection>
+    </Card>
+  );
+}
+
+function PartnerRow({
+  partner,
+  onChange,
+  onDelete,
+}: {
+  partner: { domain: string; params: Record<string, string> };
+  onChange: (next: { domain: string; params: Record<string, string> }) => void;
+  onDelete: () => void;
+}) {
+  // Render params as a list of {key, value} pairs.
+  const entries = Object.entries(partner.params);
+
+  function setDomain(v: string) {
+    onChange({ ...partner, domain: v });
+  }
+  function setParam(idx: number, key: string, value: string) {
+    const copy = entries.slice();
+    copy[idx] = [key, value];
+    onChange({
+      ...partner,
+      params: Object.fromEntries(copy.filter(([k]) => k)),
+    });
+  }
+  function addParam() {
+    onChange({
+      ...partner,
+      params: { ...partner.params, "": "" },
+    });
+  }
+  function removeParam(idx: number) {
+    onChange({
+      ...partner,
+      params: Object.fromEntries(entries.filter((_, j) => j !== idx)),
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-[180px]">
+          <Field label="Doména e-shopu" htmlFor={`dom-${partner.domain}`}>
+            <Input
+              id={`dom-${partner.domain}`}
+              value={partner.domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="alza.cz"
+            />
+          </Field>
+        </div>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="text-xs text-ink-500 hover:text-danger"
+        >
+          Smazat partnera
+        </button>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Query parametry
+        </p>
+        {entries.length === 0 && (
+          <p className="text-xs text-ink-500">
+            Bez parametrů — žádný affiliate identifikátor se nepřidá.
+          </p>
+        )}
+        {entries.map(([k, v], i) => (
+          <div key={i} className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[120px]">
+              <Input
+                value={k}
+                onChange={(e) => setParam(i, e.target.value, v)}
+                placeholder="ref"
+              />
+            </div>
+            <div className="flex-1 min-w-[120px]">
+              <Input
+                value={v}
+                onChange={(e) => setParam(i, k, e.target.value)}
+                placeholder="moje-affiliate-id"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => removeParam(i)}
+              className="text-xs text-ink-500 hover:text-danger"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addParam}
+          className="self-start text-xs font-medium text-brand hover:underline"
+        >
+          + Přidat parametr
+        </button>
+      </div>
     </div>
   );
 }

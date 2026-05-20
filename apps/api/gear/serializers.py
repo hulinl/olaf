@@ -1,16 +1,58 @@
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
 from rest_framework import serializers
 
 from .models import GearItem, GearList, GearListItem
 
 
+def _apply_affiliate_partners(url: str, partners: list) -> str:
+    """Append affiliate query params to a URL when its domain matches
+    one of the user's configured partners.
+
+    Partners shape: [{"domain": "alza.cz", "params": {"ref": "MY_ID"}}].
+    Domain match is suffix-based so "alza.cz" covers "www.alza.cz".
+    Existing query params on the source URL are never overwritten.
+    """
+    if not url or not partners:
+        return url
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return url
+    merged = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    matched = False
+    for partner in partners:
+        domain = (partner.get("domain") or "").strip().lower()
+        params = partner.get("params") or {}
+        if not domain or not isinstance(params, dict):
+            continue
+        if host == domain or host.endswith("." + domain):
+            for k, v in params.items():
+                if k not in merged:
+                    merged[k] = str(v)
+                    matched = True
+    if not matched:
+        return url
+    return urlunparse(parsed._replace(query=urlencode(merged)))
+
+
 class GearItemSerializer(serializers.ModelSerializer):
+    display_url = serializers.SerializerMethodField()
+
     class Meta:
         model = GearItem
         fields = (
-            "id", "name", "weight_g", "url", "category", "note",
-            "created_at", "updated_at",
+            "id", "name", "weight_g", "url", "display_url",
+            "category", "note", "created_at", "updated_at",
         )
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "display_url", "created_at", "updated_at")
+
+    def get_display_url(self, obj: GearItem) -> str:
+        partners = getattr(obj.user, "affiliate_partners", None) or []
+        return _apply_affiliate_partners(obj.url, partners)
 
 
 class GearListEntrySerializer(serializers.ModelSerializer):

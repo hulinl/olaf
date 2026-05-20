@@ -71,6 +71,8 @@ export interface User {
   // Notification preferences
   notify_on_discussion_reply: boolean;
   notify_on_discussion_announce: boolean;
+  // Gear affiliate partners
+  affiliate_partners: { domain: string; params: Record<string, string> }[];
   // System
   email_verified: boolean;
   date_joined: string;
@@ -735,6 +737,14 @@ export const workspaces = {
       `/api/workspaces/${slug}/members/${userId}/demote/`,
       { method: "POST" },
     ),
+  handoverOwnership: (slug: string, userId: number) =>
+    apiFetch<{
+      new_owner_id: number;
+      old_owner_id: number;
+      old_owner_role: WorkspaceRole;
+    }>(`/api/workspaces/${slug}/members/${userId}/handover/`, {
+      method: "POST",
+    }),
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
   personal: () => apiFetch<Workspace>("/api/workspaces/personal/"),
   create: (payload: WorkspaceCreatePayload) =>
@@ -1342,10 +1352,19 @@ export interface GearItem {
   name: string;
   weight_g: number | null;
   url: string;
+  /** URL with the user's affiliate params applied for matching domains.
+   *  Fall back to `url` when no partner matches. Always use this for
+   *  outbound clicks. */
+  display_url: string;
   category: string;
   note: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface AffiliatePartner {
+  domain: string;
+  params: Record<string, string>;
 }
 
 export interface GearListEntry {
