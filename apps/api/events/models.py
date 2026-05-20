@@ -205,6 +205,14 @@ class Event(TenantScopedModel):
         ),
     )
 
+    # Risk-checklist for the event (V2 feature). Owner ticks through
+    # weather / route / equipment / medical / etc. items before the
+    # event runs. JSONField mirrors required_documents — list of
+    # {key, label, category, status, notes}. Empty list = owner hasn't
+    # set anything up yet; FE offers a "Načíst šablonu" button that
+    # pre-populates a sensible default they can then trim.
+    risk_checklist = models.JSONField(default=list, blank=True)
+
     # Recommended gear — owner attaches one of their GearLists. The
     # public landing renders a bare "Doporučené vybavení" section
     # (just item names + category, no URLs/prices); a registered

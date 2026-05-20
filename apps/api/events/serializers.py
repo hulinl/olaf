@@ -183,6 +183,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     shared_workspace_slugs = serializers.SerializerMethodField()
     gear_lists_by_slug = serializers.SerializerMethodField()
     recommended_gear_list = serializers.SerializerMethodField()
+    risk_checklist = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -207,6 +208,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "blocks",
             "gear_lists_by_slug",
             "recommended_gear_list",
+            "risk_checklist",
             "enabled_questionnaire_sections",
             "images",
             "workspace_slug",
@@ -244,6 +246,18 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     def get_shared_workspace_slugs(self, obj: Event) -> list[str]:
         return list(obj.shared_workspaces.values_list("slug", flat=True))
+
+    def get_risk_checklist(self, obj: Event) -> list:
+        """Owner-only: risk checklist is internal prep, not for the
+        public landing. Return an empty list to non-managers so the
+        field's shape stays stable (FE always reads as array)."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            from .permissions import can_manage_event
+
+            if can_manage_event(request.user, obj):
+                return list(obj.risk_checklist or [])
+        return []
 
     def get_recommended_gear_list(self, obj: Event) -> dict | None:
         """Slim payload for the public "Doporučené vybavení" section
@@ -487,7 +501,46 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "billing_profile",
             "required_documents",
             "recommended_gear_list",
+            "risk_checklist",
         )
+
+    def validate_risk_checklist(self, value):
+        """Owner-managed list. Each item must be a dict with key,
+        label, category (string), status (open|done|na), notes."""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Musí být seznam.")
+        valid_status = {"open", "done", "na"}
+        cleaned = []
+        seen_keys: set[str] = set()
+        for i, item in enumerate(value):
+            if not isinstance(item, dict):
+                raise serializers.ValidationError(
+                    f"Položka #{i} musí být objekt."
+                )
+            key = (item.get("key") or "").strip()
+            label = (item.get("label") or "").strip()
+            if not key or not label:
+                raise serializers.ValidationError(
+                    f"Položka #{i}: vyplň 'key' i 'label'."
+                )
+            if key in seen_keys:
+                raise serializers.ValidationError(
+                    f"Položka #{i}: duplicitní key '{key}'."
+                )
+            seen_keys.add(key)
+            status = (item.get("status") or "open").strip().lower()
+            if status not in valid_status:
+                status = "open"
+            cleaned.append(
+                {
+                    "key": key,
+                    "label": label[:200],
+                    "category": (item.get("category") or "").strip()[:40],
+                    "status": status,
+                    "notes": (item.get("notes") or "").strip()[:1000],
+                }
+            )
+        return cleaned
 
     def validate_recommended_gear_list(self, value):
         """Owner can only attach their own GearLists. Anything else is

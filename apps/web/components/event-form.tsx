@@ -17,11 +17,26 @@ import {
   QUESTIONNAIRE_SECTION_ORDER,
   type QuestionnaireSection,
   type RequiredDocumentSpec,
+  type RiskChecklistItem,
   type Workspace,
   auth,
   gear,
   workspaces,
 } from "@/lib/api";
+
+const RISK_TEMPLATE: RiskChecklistItem[] = [
+  { key: "weather-forecast", label: "Zkontrolovat předpověď počasí 3 dny předem", category: "Počasí", status: "open", notes: "" },
+  { key: "weather-plan-b", label: "Mít plán B pro špatné počasí", category: "Počasí", status: "open", notes: "" },
+  { key: "route-mapped", label: "Trasa zmapovaná a stažená offline", category: "Trasa", status: "open", notes: "" },
+  { key: "route-escape", label: "Záchytné body a možnost zkrácení trasy", category: "Trasa", status: "open", notes: "" },
+  { key: "equip-firstaid", label: "Lékárna doplněná", category: "Vybavení", status: "open", notes: "" },
+  { key: "equip-comms", label: "Powerbank, signál v lokalitě", category: "Vybavení", status: "open", notes: "" },
+  { key: "medical-allergies", label: "Účastníci nahlásili alergie + medikamenty", category: "Zdraví", status: "open", notes: "" },
+  { key: "medical-insurance", label: "Pojištění platné na danou aktivitu", category: "Zdraví", status: "open", notes: "" },
+  { key: "comm-contacts", label: "Účastníci mají kontakt na organizátora", category: "Komunikace", status: "open", notes: "" },
+  { key: "comm-emergency", label: "Náhradní kontakt na pořadatele", category: "Komunikace", status: "open", notes: "" },
+  { key: "transport-plan", label: "Doprava domluvená (sraz, řidiči)", category: "Doprava", status: "open", notes: "" },
+];
 
 interface Props {
   /** When provided, the form is in edit mode and pre-populates from the event. */
@@ -170,6 +185,13 @@ export function EventForm({
   >(initial?.recommended_gear_list?.id ?? null);
   const [gearLists, setGearLists] = useState<GearList[]>([]);
 
+  // Risk checklist — owner's internal prep list (V2). Loaded from
+  // initial.risk_checklist; FE provides a "Load template" affordance
+  // for new events so the owner doesn't start from scratch.
+  const [risks, setRisks] = useState<RiskChecklistItem[]>(
+    initial?.risk_checklist ?? [],
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -254,6 +276,9 @@ export function EventForm({
           (d) => d.key.trim() && d.label.trim(),
         ),
         recommended_gear_list: recommendedGearListId,
+        risk_checklist: risks.filter(
+          (r) => r.key.trim() && r.label.trim(),
+        ),
       };
       const event = await onSubmit(payload);
       onSuccess(event);
@@ -646,6 +671,179 @@ export function EventForm({
                   Odebrat
                 </button>
               )}
+            </div>
+          )}
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">
+            Rizika a příprava
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Interní checklist před akcí — počasí, trasa, vybavení,
+            zdraví, komunikace, doprava. Účastníci to nevidí, jen ty
+            a spolutvůrci.
+          </p>
+
+          {risks.length === 0 ? (
+            <div className="mt-4 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-center">
+              <p className="text-sm text-ink-500">
+                Zatím prázdné. Začni se šablonou, nebo přidej vlastní
+                položku.
+              </p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRisks(RISK_TEMPLATE)}
+                  className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-ink hover:opacity-90"
+                >
+                  Načíst šablonu
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRisks([
+                      {
+                        key: `custom-${Date.now()}`,
+                        label: "",
+                        category: "",
+                        status: "open",
+                        notes: "",
+                      },
+                    ])
+                  }
+                  className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted"
+                >
+                  + Vlastní položka
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-2">
+              {(() => {
+                const done = risks.filter((r) => r.status === "done").length;
+                return (
+                  <div className="flex items-center justify-between text-xs text-ink-500">
+                    <span>
+                      <strong className="text-ink-900 tabular-nums">
+                        {done}
+                      </strong>{" "}
+                      / {risks.length} hotovo
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRisks((prev) => [
+                            ...prev,
+                            {
+                              key: `custom-${Date.now()}`,
+                              label: "",
+                              category: "",
+                              status: "open",
+                              notes: "",
+                            },
+                          ])
+                        }
+                        className="font-medium text-brand hover:underline"
+                      >
+                        + Přidat položku
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+              <div className="flex flex-col gap-2">
+                {risks.map((r, idx) => (
+                  <div
+                    key={`${r.key}-${idx}`}
+                    className={[
+                      "flex flex-col gap-2 rounded-md border bg-surface p-3 text-sm",
+                      r.status === "done"
+                        ? "border-success/40 bg-success/5"
+                        : "border-border",
+                    ].join(" ")}
+                  >
+                    <div className="flex flex-wrap items-start gap-2">
+                      <select
+                        value={r.status}
+                        onChange={(e) =>
+                          setRisks((prev) =>
+                            prev.map((x, i) =>
+                              i === idx
+                                ? {
+                                    ...x,
+                                    status: e.target
+                                      .value as RiskChecklistItem["status"],
+                                  }
+                                : x,
+                            ),
+                          )
+                        }
+                        className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink-700 focus-ring"
+                      >
+                        <option value="open">Otevřené</option>
+                        <option value="done">Hotovo</option>
+                        <option value="na">Nepoužije se</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={r.label}
+                        onChange={(e) =>
+                          setRisks((prev) =>
+                            prev.map((x, i) =>
+                              i === idx ? { ...x, label: e.target.value } : x,
+                            ),
+                          )
+                        }
+                        placeholder="Co zkontrolovat?"
+                        className="flex-1 min-w-[200px] rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-ink-900 focus-ring"
+                      />
+                      <input
+                        type="text"
+                        value={r.category}
+                        onChange={(e) =>
+                          setRisks((prev) =>
+                            prev.map((x, i) =>
+                              i === idx
+                                ? { ...x, category: e.target.value }
+                                : x,
+                            ),
+                          )
+                        }
+                        placeholder="Kategorie"
+                        className="w-32 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-ink-700 focus-ring"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRisks((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
+                        }
+                        className="text-xs font-medium text-ink-500 hover:text-danger"
+                      >
+                        Smazat
+                      </button>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={r.notes}
+                      onChange={(e) =>
+                        setRisks((prev) =>
+                          prev.map((x, i) =>
+                            i === idx ? { ...x, notes: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      placeholder="Poznámka (volitelná)…"
+                      className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-700 focus-ring"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardSection>

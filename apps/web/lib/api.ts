@@ -228,8 +228,19 @@ export interface Event extends EventSummary {
   payment_in_cash: boolean;
   billing_profile: number | null;
   required_documents: RequiredDocumentSpec[];
+  /** Owner-internal risk checklist (weather / route / equipment / etc).
+   *  Backend returns [] to non-managers; full list to owners. */
+  risk_checklist: RiskChecklistItem[];
   my_rsvp?: MyRSVP | null;
   i_am_owner?: boolean;
+}
+
+export interface RiskChecklistItem {
+  key: string;
+  label: string;
+  category: string;
+  status: "open" | "done" | "na";
+  notes: string;
 }
 
 export interface EventDraftPreview {
@@ -1105,6 +1116,7 @@ export interface EventWritePayload {
   required_documents?: RequiredDocumentSpec[];
   /** FK id of a GearList owned by the event creator; null clears it. */
   recommended_gear_list?: number | null;
+  risk_checklist?: RiskChecklistItem[];
 }
 
 export const events = {

@@ -91,7 +91,7 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
             status=status.HTTP_200_OK,
         )
 
-    serializer = EventPublicSerializer(event)
+    serializer = EventPublicSerializer(event, context={"request": request})
     payload = serializer.data
 
     # If the requester is authenticated and has an RSVP, include it.
@@ -318,7 +318,7 @@ def create_event(request: Request, workspace_slug: str) -> Response:
             event, shared_workspace_slugs, requesting_user=request.user
         )
     return Response(
-        EventPublicSerializer(event).data,
+        EventPublicSerializer(event, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -406,7 +406,7 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
         _set_event_shared_workspaces(
             event, shared_workspace_slugs or [], requesting_user=request.user
         )
-    return Response(EventPublicSerializer(event).data)
+    return Response(EventPublicSerializer(event, context={"request": request}).data)
 
 
 @api_view(["POST"])
@@ -697,7 +697,7 @@ def event_cover(
             event.cover.delete(save=False)
         event.cover = None
         event.save(update_fields=["cover", "updated_at"])
-        return Response(EventPublicSerializer(event).data)
+        return Response(EventPublicSerializer(event, context={"request": request}).data)
 
     upload = request.FILES.get("cover")
     if not upload:
@@ -722,7 +722,7 @@ def event_cover(
 
     event.cover = downscale_upload(upload)
     event.save(update_fields=["cover", "updated_at"])
-    return Response(EventPublicSerializer(event).data)
+    return Response(EventPublicSerializer(event, context={"request": request}).data)
 
 
 @api_view(["POST"])
@@ -742,7 +742,7 @@ def cancel_event(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if event.status == Event.STATUS_CANCELLED:
-        return Response(EventPublicSerializer(event).data)
+        return Response(EventPublicSerializer(event, context={"request": request}).data)
 
     reason = (request.data.get("reason") or "").strip()
     event.status = Event.STATUS_CANCELLED
@@ -750,7 +750,7 @@ def cancel_event(
     event.save(update_fields=["status", "cancellation_reason", "updated_at"])
 
     fan_out_event_cancellation_task.delay(event.pk, reason)
-    return Response(EventPublicSerializer(event).data)
+    return Response(EventPublicSerializer(event, context={"request": request}).data)
 
 
 def _owner_event_or_403(request, workspace_slug: str, event_slug: str):
