@@ -78,6 +78,7 @@ export default function GearSettingsPage() {
       <ItemSection
         items={items}
         categories={categories}
+        lists={lists}
         onChange={reload}
       />
       <ListSection lists={lists} items={items} onChange={reload} />
@@ -184,15 +185,17 @@ function CategorySection({
                 importem.
               </p>
             ) : (
-              categories.map((c) => (
-                <CategoryRow
-                  key={c.id}
-                  category={c}
-                  usage={usageById.get(c.id) ?? 0}
-                  onRename={(name) => rename(c, name)}
-                  onDelete={() => remove(c)}
-                />
-              ))
+              <div className="divide-y divide-border">
+                {categories.map((c) => (
+                  <CategoryRow
+                    key={c.id}
+                    category={c}
+                    usage={usageById.get(c.id) ?? 0}
+                    onRename={(name) => rename(c, name)}
+                    onDelete={() => remove(c)}
+                  />
+                ))}
+              </div>
             )}
 
             <form onSubmit={create} className="mt-2 flex flex-wrap gap-2">
@@ -226,9 +229,12 @@ function CategoryRow({
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
+  // Flat row — no outer border (the Card already provides one). The
+  // input is the only bordered element; rest sits on the card bg with
+  // divide-y between rows handling visual separation.
   const [name, setName] = useState(category.name);
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+    <div className="flex flex-wrap items-center gap-3 py-1.5">
       <input
         type="text"
         value={name}
@@ -239,8 +245,8 @@ function CategoryRow({
         maxLength={60}
         className="flex-1 min-w-[160px] rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
       />
-      <span className="font-mono text-[11px] uppercase tracking-wide text-ink-500">
-        {usage} ks
+      <span className="font-mono text-[11px] uppercase tracking-wide text-ink-500 tabular-nums">
+        {usage} {usage === 1 ? "položka" : usage < 5 ? "položky" : "položek"}
       </span>
       <button
         type="button"
@@ -559,22 +565,62 @@ function PartnerRow({
 function ItemSection({
   items,
   categories,
+  lists,
   onChange,
 }: {
   items: GearItem[];
   categories: GearCategory[];
+  lists: GearList[];
   onChange: () => Promise<void>;
 }) {
+  const [open, setOpen] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
+  const [listFilter, setListFilter] = useState<number | null>(null);
+
+  // Build a per-item list of which GearLists contain it so the list
+  // filter can run without re-fetching. Map id -> Set<listId>.
+  const listIdsByItemId = new Map<number, Set<number>>();
+  for (const l of lists) {
+    for (const e of l.entries) {
+      const set = listIdsByItemId.get(e.item.id) ?? new Set<number>();
+      set.add(l.id);
+      listIdsByItemId.set(e.item.id, set);
+    }
+  }
+
+  const filtered = items.filter((i) => {
+    if (categoryFilter != null && i.category_id !== categoryFilter)
+      return false;
+    if (listFilter != null) {
+      const set = listIdsByItemId.get(i.id);
+      if (!set || !set.has(listFilter)) return false;
+    }
+    return true;
+  });
 
   return (
     <Card>
       <CardSection>
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h3 className="text-base font-semibold text-ink-900">
-            Položky ({items.length})
-          </h3>
-          {!composerOpen && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-baseline gap-3 text-left focus-ring"
+          >
+            <h3 className="text-base font-semibold text-ink-900">
+              Položky ({items.length})
+            </h3>
+            <span
+              aria-hidden
+              className={
+                open ? "rotate-90 text-ink-500" : "text-ink-500"
+              }
+            >
+              ›
+            </span>
+          </button>
+          {!composerOpen && open && (
             <Button
               type="button"
               variant="secondary"
@@ -586,7 +632,7 @@ function ItemSection({
           )}
         </div>
 
-        {composerOpen && (
+        {open && composerOpen && (
           <ItemEditor
             categories={categories}
             onCancel={() => setComposerOpen(false)}
@@ -599,9 +645,74 @@ function ItemSection({
           />
         )}
 
-        {items.length === 0 ? (
+        {open && items.length > 0 && (categories.length > 0 || lists.length > 0) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              Filtr
+            </span>
+            {categories.length > 0 && (
+              <select
+                value={categoryFilter ?? ""}
+                onChange={(e) =>
+                  setCategoryFilter(
+                    e.target.value ? Number(e.target.value) : null,
+                  )
+                }
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-700 focus-ring"
+              >
+                <option value="">Všechny kategorie</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {lists.length > 0 && (
+              <select
+                value={listFilter ?? ""}
+                onChange={(e) =>
+                  setListFilter(
+                    e.target.value ? Number(e.target.value) : null,
+                  )
+                }
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-700 focus-ring"
+              >
+                <option value="">Všechny listy</option>
+                {lists.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {(categoryFilter != null || listFilter != null) && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryFilter(null);
+                    setListFilter(null);
+                  }}
+                  className="text-xs font-medium text-ink-500 hover:text-ink-900"
+                >
+                  Vymazat filtr
+                </button>
+                <span className="text-xs text-ink-500">
+                  ({filtered.length} z {items.length})
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {!open ? null : items.length === 0 ? (
           <p className="mt-4 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
             Žádné položky. Začni přidáním prvního kusu vybavení.
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="mt-4 rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-4 text-sm text-ink-500">
+            Žádná položka neodpovídá filtru.
           </p>
         ) : (
           // No outer border — the Card already provides one, doubling
@@ -619,7 +730,7 @@ function ItemSection({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {items.map((i) => (
+                {filtered.map((i) => (
                   <ItemRow
                     key={i.id}
                     item={i}
