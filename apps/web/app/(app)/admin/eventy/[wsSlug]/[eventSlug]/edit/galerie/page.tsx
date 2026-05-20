@@ -46,7 +46,7 @@ export default function EventGalleryPage({ params }: Props) {
           events.listImages(wsSlug, eventSlug),
         ]);
         if (cancelled) return;
-        if (ws.my_role !== "owner") {
+        if (!ev.i_am_owner) {
           try {
             await auth.me();
             router.replace(`/${wsSlug}/e/${eventSlug}`);

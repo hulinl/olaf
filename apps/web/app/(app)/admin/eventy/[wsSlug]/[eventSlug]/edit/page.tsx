@@ -6,14 +6,18 @@ import { use, useEffect, useState } from "react";
 
 import { EventDangerZone } from "@/components/event-danger-zone";
 import { Alert } from "@/components/ui/card";
+import { Field, Input } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 import {
   ApiError,
   type Event as OlafEvent,
+  type EventCollaborator,
   type Workspace,
   auth,
   events,
   workspaces,
 } from "@/lib/api";
+import { FormEvent } from "react";
 
 interface Props {
   params: Promise<{ wsSlug: string; eventSlug: string }>;
@@ -58,10 +62,9 @@ export default function EventEditCockpitPage({ params }: Props) {
           events.publicEvent(wsSlug, eventSlug),
         ]);
         if (cancelled) return;
-        if (ws.my_role !== "owner") {
-          // ws.detail is AllowAny — anon users get my_role=null too. Don't
-          // assume "not owner" without re-checking auth, or a transient session
-          // hiccup would silently kick a real owner to the public landing.
+        // Gate: workspace admin (owner/admin) OR explicit event co-creator
+        // can edit. Event.i_am_owner already encodes this on the backend.
+        if (!ev.i_am_owner) {
           try {
             await auth.me();
             router.replace(`/${wsSlug}/e/${eventSlug}`);
@@ -229,6 +232,8 @@ export default function EventEditCockpitPage({ params }: Props) {
         </div>
       </section>
 
+      <CollaboratorsSection wsSlug={wsSlug} eventSlug={eventSlug} />
+
       <section>
         <h2 className="text-lg font-semibold text-ink-900">Šablona</h2>
         <p className="mt-1 text-sm text-ink-500">
@@ -346,5 +351,152 @@ function PrimaryActionTile({
         <p className="mt-2 text-sm text-ink-700">{description}</p>
       </div>
     </Link>
+  );
+}
+
+function CollaboratorsSection({
+  wsSlug,
+  eventSlug,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const [list, setList] = useState<EventCollaborator[] | null>(null);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  async function reload() {
+    try {
+      const l = await events.listCollaborators(wsSlug, eventSlug);
+      setList(l);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
+    }
+  }
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsSlug, eventSlug]);
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    const v = email.trim().toLowerCase();
+    if (!v) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await events.addCollaborator(wsSlug, eventSlug, v);
+      setEmail("");
+      setAdding(false);
+      await reload();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Přidání selhalo.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(c: EventCollaborator) {
+    if (!confirm(`Odebrat ${c.full_name} ze spolutvůrců?`)) return;
+    try {
+      await events.removeCollaborator(wsSlug, eventSlug, c.user_id);
+      await reload();
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-ink-900">Spolutvůrci</h2>
+      <p className="mt-1 text-sm text-ink-500">
+        Pozvi další lidi, kteří budou tuhle akci řídit s tebou. Uvidí ji
+        u sebe v Tvůrci a budou ji moct upravovat, schvalovat registrace,
+        vystavovat faktury. Musí mít účet na olafu.
+      </p>
+
+      <div className="mt-3 flex flex-col gap-2">
+        {list === null ? (
+          <p className="text-sm text-ink-500">Načítám…</p>
+        ) : list.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+            Zatím jen ty. Přidej e-mail spolutvůrce níže.
+          </p>
+        ) : (
+          list.map((c) => (
+            <div
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            >
+              <div className="flex flex-col">
+                <span className="font-medium text-ink-900">{c.full_name}</span>
+                <span className="text-xs text-ink-500">{c.email}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemove(c)}
+                className="text-xs font-medium text-ink-500 hover:text-danger"
+              >
+                Odebrat
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {error && (
+        <div className="mt-3">
+          <Alert variant="danger">{error}</Alert>
+        </div>
+      )}
+
+      {!adding ? (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="mt-3 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+        >
+          + Přidat spolutvůrce
+        </button>
+      ) : (
+        <form onSubmit={handleAdd} className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[220px]">
+            <Field label="E-mail spolutvůrce" htmlFor="collab-email">
+              <Input
+                id="collab-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="kamarad@email.cz"
+              />
+            </Field>
+          </div>
+          <div className="flex items-end gap-2">
+            <Button type="submit" variant="primary" size="md" loading={busy}>
+              {busy ? "Přidávám…" : "Přidat"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setEmail("");
+                setError(null);
+              }}
+              className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+            >
+              Zrušit
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }

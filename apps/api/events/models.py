@@ -845,3 +845,41 @@ class EventChecklistItem(models.Model):
         elif not self.done:
             self.done_at = None
         super().save(*args, **kwargs)
+
+
+class EventCollaborator(models.Model):
+    """User who can manage one specific event without being a workspace
+    admin. Use case: 3-person trip team — all three see + edit the
+    event from their own Tvůrce surface; only one of them owns the
+    workspace.
+
+    V1 is binary — collaborators have full operational parity with
+    the workspace owner *on that event* (edit content, approve RSVPs,
+    issue invoices, send reminders). Scope-flag rollout (sekretářka
+    edits faktury only) is V2.
+    """
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="collaborators"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="event_collaborations",
+    )
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="added_event_collaborators",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "events_event_collaborator"
+        unique_together = [("event", "user")]
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.user} on {self.event}"

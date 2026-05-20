@@ -509,6 +509,14 @@ export interface PersonDetail {
   events: PersonEventEntry[];
 }
 
+export interface EventCollaborator {
+  id: number;
+  user_id: number;
+  email: string;
+  full_name: string;
+  created_at: string;
+}
+
 export interface ParticipantProfile {
   rsvp_id: number;
   user_id: number;
@@ -993,6 +1001,28 @@ export const events = {
   people: () => apiFetch<PersonSummary[]>("/api/auth/me/people/"),
   person: (userId: number) =>
     apiFetch<PersonDetail>(`/api/auth/me/people/${userId}/`),
+  listCollaborators: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<EventCollaborator[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/collaborators/`,
+    ),
+  addCollaborator: (
+    workspaceSlug: string,
+    eventSlug: string,
+    email: string,
+  ) =>
+    apiFetch<EventCollaborator>(
+      `/api/events/${workspaceSlug}/${eventSlug}/collaborators/`,
+      { method: "POST", body: JSON.stringify({ email }) },
+    ),
+  removeCollaborator: (
+    workspaceSlug: string,
+    eventSlug: string,
+    userId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/events/${workspaceSlug}/${eventSlug}/collaborators/${userId}/`,
+      { method: "DELETE" },
+    ),
   rejectRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<RSVPRecord>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,

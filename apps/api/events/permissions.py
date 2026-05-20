@@ -44,3 +44,20 @@ def is_workspace_super_admin(user, workspace: Workspace) -> bool:
         user=user,
         role=WorkspaceMember.ROLE_OWNER,
     ).exists()
+
+
+def can_manage_event(user, event) -> bool:
+    """Workspace owner/admin OR explicit EventCollaborator on this event.
+
+    Co-creators get operational parity with the workspace admin —
+    they can edit content, approve RSVPs, issue invoices, send
+    reminders. Scope-flag carve-outs (sekretářka edits faktury only)
+    are V2.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if is_workspace_owner(user, event.workspace):
+        return True
+    from .models import EventCollaborator
+
+    return EventCollaborator.objects.filter(event=event, user=user).exists()
