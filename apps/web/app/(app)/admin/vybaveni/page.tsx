@@ -7,6 +7,7 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
+  type GearImportResult,
   type GearItem,
   type GearList,
   type GearListVisibility,
@@ -68,8 +69,104 @@ export default function GearSettingsPage() {
 
       <ItemSection items={items} onChange={reload} />
       <ListSection lists={lists} items={items} onChange={reload} />
+      <ImportSection onChange={reload} />
       <AffiliateSection />
     </div>
+  );
+}
+
+function ImportSection({ onChange }: { onChange: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<GearImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await gear.importCsv(file);
+      setResult(r);
+      await onChange();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Import selhal.",
+      );
+    } finally {
+      setBusy(false);
+      // Reset the input so re-uploading the same file fires onChange again.
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <Card>
+      <CardSection>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+        >
+          <div>
+            <h3 className="text-base font-semibold text-ink-900">
+              Import z Notion CSV
+            </h3>
+            <p className="mt-1 text-sm text-ink-500">
+              Máš svůj gear v Notion databázi? Exportuj ji jako CSV (View
+              → ⋯ → Export → Format: CSV) a nahraj sem. Položky se
+              upsertují podle názvu, listy podle Notion UUID — re-import
+              je bezpečný.
+            </p>
+          </div>
+          <span aria-hidden className={open ? "rotate-90 text-ink-500" : "text-ink-500"}>
+            ›
+          </span>
+        </button>
+
+        {open && (
+          <div className="mt-4 flex flex-col gap-3">
+            <label
+              className={[
+                "flex flex-col items-start gap-2 rounded-md border border-dashed bg-surface-muted/30 p-4 text-sm",
+                busy ? "opacity-60" : "cursor-pointer hover:border-brand",
+                "border-border-strong",
+              ].join(" ")}
+            >
+              <span className="font-medium text-ink-900">
+                {busy ? "Importuju…" : "Vyber CSV soubor"}
+              </span>
+              <span className="text-xs text-ink-500">
+                Očekávané sloupce: name, category, link, gear list, unit
+                weight [grams], qty, type, specific type, price.
+              </span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                disabled={busy}
+                onChange={handleFile}
+                className="hidden"
+              />
+            </label>
+
+            {result && (
+              <Alert variant="success">
+                Import dokončen — {result.rows} řádků zpracováno.
+                Vytvořeno {result.items_created} položek,{" "}
+                {result.items_backfilled} doplněno o chybějící pole.
+                Listů: {result.lists_total}. Vazeb položka↔list:{" "}
+                {result.edges_created}.
+              </Alert>
+            )}
+            {error && <Alert variant="danger">{error}</Alert>}
+          </div>
+        )}
+      </CardSection>
+    </Card>
   );
 }
 

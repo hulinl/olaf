@@ -29,4 +29,5 @@ urlpatterns = [
         views.gear_link_click,
         name="go",
     ),
+    path("import_csv/", views.gear_import_csv, name="import-csv"),
 ]
