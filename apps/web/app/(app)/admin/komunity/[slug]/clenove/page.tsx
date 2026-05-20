@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type MouseEvent as ReactMouseEvent, use, useEffect, useState } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  use,
+  useEffect,
+  useState,
+} from "react";
 
 import { Alert } from "@/components/ui/card";
 import {
   ApiError,
+  type PersonTag,
   type Workspace,
   type WorkspaceMemberSummary,
   type WorkspaceRole,
@@ -19,26 +25,33 @@ interface Props {
 
 /**
  * Members of a komunita — V1 definition: anyone who's registered for at
- * least one event in this workspace (owned or shared). Useful for the
- * owner to see who's engaged and click through to a profile.
- *
- * Owner-only — the endpoint returns email + phone.
+ * least one event in this workspace (owned or shared) OR carries an
+ * explicit role. The owner uses this page as a CRM: poznámky, tagy,
+ * CSV export.
  */
 export default function KomunityMembersPage({ params }: Props) {
   const { slug } = use(params);
   const router = useRouter();
   const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [tags, setTags] = useState<PersonTag[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([workspaces.members(slug), workspaces.detail(slug)])
-      .then(([list, ws]) => {
+    Promise.all([
+      workspaces.members(slug),
+      workspaces.detail(slug),
+      workspaces.listTags(slug).catch(() => []),
+    ])
+      .then(([list, ws, t]) => {
         if (cancelled) return;
         setMembers(list);
         setWorkspace(ws);
+        setTags(t);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -64,6 +77,12 @@ export default function KomunityMembersPage({ params }: Props) {
     };
   }, [slug, router]);
 
+  function patchMember(memberId: number, patch: Partial<WorkspaceMemberSummary>) {
+    setMembers((prev) =>
+      prev ? prev.map((m) => (m.id === memberId ? { ...m, ...patch } : m)) : prev,
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -72,7 +91,11 @@ export default function KomunityMembersPage({ params }: Props) {
     );
   }
   if (error) return <Alert variant="danger">{error}</Alert>;
-  if (!members) return null;
+  if (!members || !tags) return null;
+
+  const isOwner = workspace?.my_role === "owner";
+  const isOwnerOrAdmin =
+    workspace?.my_role === "owner" || workspace?.my_role === "admin";
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,15 +106,35 @@ export default function KomunityMembersPage({ params }: Props) {
         ← Zpět na komunitu
       </Link>
 
-      <header>
-        <p className="text-sm font-medium text-brand">Členové</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-          Členové komunity
-        </h1>
-        <p className="mt-2 max-w-2xl text-ink-500">
-          Lidi, kteří se přihlásili na alespoň jednu akci této komunity.
-          Klikni na řádek pro profil + historii registrací.
-        </p>
+      <header className="flex flex-col gap-4">
+        <div>
+          <p className="text-sm font-medium text-brand">Členové</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+            Členové komunity
+          </h1>
+          <p className="mt-2 max-w-2xl text-ink-500">
+            Lidi, kteří se přihlásili na alespoň jednu akci této komunity.
+            Klikni na řádek pro profil + historii registrací; pravým
+            sloupcem můžeš přiřadit tagy a napsat si poznámku.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              onClick={() => setTagManagerOpen(true)}
+              className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              Spravovat tagy ({tags.length})
+            </button>
+          )}
+          <a
+            href={workspaces.membersCsvUrl(slug)}
+            className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            Export CSV ↓
+          </a>
+        </div>
       </header>
 
       {members.length === 0 ? (
@@ -110,10 +153,12 @@ export default function KomunityMembersPage({ params }: Props) {
               <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
                 <th className="px-4 py-3">Člen</th>
                 <th className="px-4 py-3">Kontakt</th>
-                <th className="px-4 py-3 text-right">Celkem akcí</th>
-                <th className="px-4 py-3 text-right">Nadcházejících</th>
-                <th className="px-4 py-3 text-right">Minulých</th>
-                <th className="px-4 py-3">Poslední přihláška</th>
+                <th className="px-4 py-3">Tagy</th>
+                <th className="px-4 py-3 text-right">Celkem</th>
+                <th className="px-4 py-3 text-right">Nadch.</th>
+                <th className="px-4 py-3 text-right">Min.</th>
+                <th className="px-4 py-3">Poslední</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -122,53 +167,74 @@ export default function KomunityMembersPage({ params }: Props) {
                   key={m.id}
                   member={m}
                   wsSlug={slug}
-                  iAmSuperAdmin={workspace?.my_role === "owner"}
-                  onRoleChange={(role) =>
-                    setMembers((prev) =>
-                      prev
-                        ? prev.map((x) =>
-                            x.id === m.id ? { ...x, role } : x,
-                          )
-                        : prev,
-                    )
+                  tags={tags}
+                  iAmSuperAdmin={isOwner}
+                  expanded={expandedRowId === m.id}
+                  onToggleExpand={() =>
+                    setExpandedRowId(expandedRowId === m.id ? null : m.id)
                   }
+                  onPatch={(patch) => patchMember(m.id, patch)}
                 />
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {tagManagerOpen && (
+        <TagManageDialog
+          wsSlug={slug}
+          tags={tags}
+          onChange={(next) => setTags(next)}
+          onClose={() => setTagManagerOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Row
+// ---------------------------------------------------------------------------
+
 function MemberRow({
   member,
   wsSlug,
+  tags,
   iAmSuperAdmin,
-  onRoleChange,
+  expanded,
+  onToggleExpand,
+  onPatch,
 }: {
   member: WorkspaceMemberSummary;
   wsSlug: string;
+  tags: PersonTag[];
   iAmSuperAdmin: boolean;
-  onRoleChange: (role: WorkspaceRole) => void;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const href = `/admin/komunity/${wsSlug}/clenove/${member.id}`;
+  const profileHref = `/admin/komunity/${wsSlug}/clenove/${member.id}`;
   const lastAt = member.last_rsvp_at ? new Date(member.last_rsvp_at) : null;
+  const memberTagIds = new Set(member.tag_ids ?? []);
+  const memberTags = tags.filter((t) => memberTagIds.has(t.id));
+  const hasNote = Boolean((member.note ?? "").trim());
 
-  function handleRowClick(e: ReactMouseEvent<HTMLTableRowElement>) {
+  function openProfileFromRowClick(e: ReactMouseEvent<HTMLTableRowElement>) {
     const target = e.target as HTMLElement;
-    if (target.closest("a, button, input, label")) return;
-    router.push(href);
+    // Keep row-click → profile, but don't hijack clicks inside the CRM
+    // controls (tag chips, expand toggle, role buttons).
+    if (target.closest("a, button, input, label, select, textarea")) return;
+    router.push(profileHref);
   }
 
   async function handlePromote() {
     setBusy(true);
     try {
       const r = await workspaces.promoteMember(wsSlug, member.id);
-      onRoleChange(r.role);
+      onPatch({ role: r.role });
     } catch {
       /* keep silent */
     } finally {
@@ -181,7 +247,7 @@ function MemberRow({
     setBusy(true);
     try {
       const r = await workspaces.demoteMember(wsSlug, member.id);
-      onRoleChange(r.role);
+      onPatch({ role: r.role });
     } catch {
       /* keep silent */
     } finally {
@@ -198,8 +264,6 @@ function MemberRow({
     setBusy(true);
     try {
       await workspaces.handoverOwnership(wsSlug, member.id);
-      // Reload the page — my_role just flipped, so the whole UI
-      // (sidebar gates, action buttons) needs to re-evaluate.
       window.location.reload();
     } catch {
       setBusy(false);
@@ -207,93 +271,470 @@ function MemberRow({
   }
 
   return (
-    <tr
-      onClick={handleRowClick}
-      className="group cursor-pointer hover:bg-brand/10"
-    >
-      <td className="px-4 py-3">
-        <Link href={href} className="flex flex-col focus-ring">
-          <div className="flex items-baseline gap-2">
-            <span className="font-medium text-ink-900">
-              {member.full_name || "—"}
-            </span>
-            {member.role === "owner" && (
-              <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
-                Owner
+    <>
+      <tr
+        onClick={openProfileFromRowClick}
+        className="group cursor-pointer hover:bg-brand/10"
+      >
+        <td className="px-4 py-3">
+          <Link href={profileHref} className="flex flex-col focus-ring">
+            <div className="flex items-baseline gap-2">
+              <span className="font-medium text-ink-900">
+                {member.full_name || "—"}
               </span>
-            )}
-            {member.role === "admin" && (
-              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
-                Admin
-              </span>
-            )}
-          </div>
-          <span className="text-xs text-ink-500">{member.email}</span>
-          {iAmSuperAdmin && member.role !== "owner" && (
-            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
-              {member.role === "admin" ? (
-                <>
+              {member.role === "owner" && (
+                <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                  Owner
+                </span>
+              )}
+              {member.role === "admin" && (
+                <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                  Admin
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-ink-500">{member.email}</span>
+            {iAmSuperAdmin && member.role !== "owner" && (
+              <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
+                {member.role === "admin" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleHandover();
+                      }}
+                      disabled={busy}
+                      className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+                    >
+                      {busy ? "..." : "Předat vlastnictví"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleDemote();
+                      }}
+                      disabled={busy}
+                      className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+                    >
+                      {busy ? "..." : "Snížit"}
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
-                      handleHandover();
+                      handlePromote();
                     }}
                     disabled={busy}
                     className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
                   >
-                    {busy ? "..." : "Předat vlastnictví"}
+                    {busy ? "..." : "Povýšit na admina"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDemote();
-                    }}
-                    disabled={busy}
-                    className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
-                  >
-                    {busy ? "..." : "Snížit"}
-                  </button>
-                </>
-              ) : (
+                )}
+              </div>
+            )}
+          </Link>
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+          {member.phone || "—"}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex max-w-[260px] flex-wrap gap-1">
+            {memberTags.length === 0 ? (
+              <span className="text-xs text-ink-300">—</span>
+            ) : (
+              memberTags.map((t) => <TagChip key={t.id} tag={t} />)
+            )}
+          </div>
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-ink-900">
+          {member.total_rsvps}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+          {member.upcoming_rsvps > 0 ? member.upcoming_rsvps : "—"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+          {member.past_rsvps > 0 ? member.past_rsvps : "—"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-ink-500">
+          {lastAt
+            ? lastAt.toLocaleDateString("cs-CZ", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })
+            : "—"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right">
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className={[
+              "inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring",
+              hasNote ? "ring-1 ring-brand/40" : "",
+            ].join(" ")}
+            title={
+              expanded
+                ? "Skrýt editor tagů + poznámky"
+                : hasNote
+                  ? "Upravit tagy / poznámku (poznámka uložená)"
+                  : "Upravit tagy / poznámku"
+            }
+            aria-label="Tagy a poznámka"
+          >
+            {hasNote ? "●" : "+"}
+          </button>
+        </td>
+      </tr>
+
+      {expanded && (
+        <tr className="bg-surface-muted/40">
+          <td colSpan={8} className="px-4 py-3">
+            <MemberCrmEditor
+              member={member}
+              wsSlug={wsSlug}
+              tags={tags}
+              onPatch={onPatch}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline CRM editor (tags + note)
+// ---------------------------------------------------------------------------
+
+function MemberCrmEditor({
+  member,
+  wsSlug,
+  tags,
+  onPatch,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  tags: PersonTag[];
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+}) {
+  const [note, setNote] = useState(member.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const memberTagIds = new Set(member.tag_ids ?? []);
+
+  async function toggleTag(tagId: number) {
+    const already = memberTagIds.has(tagId);
+    try {
+      const r = already
+        ? await workspaces.detachMemberTag(wsSlug, member.id, tagId)
+        : await workspaces.attachMemberTag(wsSlug, member.id, tagId);
+      onPatch({ tag_ids: r.tag_ids });
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function saveNote() {
+    setBusy(true);
+    try {
+      const r = await workspaces.setMemberNote(wsSlug, member.id, note);
+      onPatch({ note: r.note });
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+      <div className="flex flex-1 flex-col gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Tagy
+        </p>
+        {tags.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            Žádné tagy zatím nejsou — vytvoř je tlačítkem „Spravovat tagy"
+            nahoře.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((t) => {
+              const on = memberTagIds.has(t.id);
+              return (
                 <button
+                  key={t.id}
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handlePromote();
-                  }}
-                  disabled={busy}
-                  className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+                  onClick={() => toggleTag(t.id)}
+                  className={[
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    on
+                      ? "border-brand bg-brand/15 text-brand"
+                      : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
+                  ].join(" ")}
+                  style={
+                    on && t.color
+                      ? { borderColor: t.color, color: t.color }
+                      : undefined
+                  }
                 >
-                  {busy ? "..." : "Povýšit na admina"}
+                  <span aria-hidden>{on ? "✓" : "+"}</span>
+                  {t.name}
                 </button>
-              )}
-            </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Poznámka
+        </p>
+        <textarea
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Cokoli užitečného — co řešili, kdo doporučil, alergie, atd."
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={saveNote}
+            disabled={busy || note === (member.note ?? "")}
+            className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+          >
+            {busy ? "Ukládám…" : "Uložit poznámku"}
+          </button>
+          {note !== (member.note ?? "") && (
+            <span className="text-xs text-ink-500">Neuložené změny</span>
           )}
-        </Link>
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-ink-700">
-        {member.phone || "—"}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-ink-900">
-        {member.total_rsvps}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
-        {member.upcoming_rsvps > 0 ? member.upcoming_rsvps : "—"}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
-        {member.past_rsvps > 0 ? member.past_rsvps : "—"}
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-ink-500">
-        {lastAt
-          ? lastAt.toLocaleDateString("cs-CZ", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })
-          : "—"}
-      </td>
-    </tr>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tag CRUD dialog
+// ---------------------------------------------------------------------------
+
+function TagManageDialog({
+  wsSlug,
+  tags,
+  onChange,
+  onClose,
+}: {
+  wsSlug: string;
+  tags: PersonTag[];
+  onChange: (next: PersonTag[]) => void;
+  onClose: () => void;
+}) {
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function create() {
+    const n = newName.trim();
+    if (!n) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const t = await workspaces.createTag(wsSlug, {
+        name: n,
+        color: newColor.trim(),
+      });
+      onChange([...tags.filter((x) => x.id !== t.id), t].sort(
+        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
+      ));
+      setNewName("");
+      setNewColor("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Vytvoření selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rename(t: PersonTag, name: string) {
+    try {
+      const updated = await workspaces.updateTag(wsSlug, t.id, { name });
+      onChange(tags.map((x) => (x.id === t.id ? updated : x)));
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function recolor(t: PersonTag, color: string) {
+    try {
+      const updated = await workspaces.updateTag(wsSlug, t.id, { color });
+      onChange(tags.map((x) => (x.id === t.id ? updated : x)));
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function remove(t: PersonTag) {
+    if (
+      !confirm(
+        `Smazat tag „${t.name}"? Odebere se ze všech lidí, ale samotní lidi zůstanou.`,
+      )
+    )
+      return;
+    try {
+      await workspaces.deleteTag(wsSlug, t.id);
+      onChange(tags.filter((x) => x.id !== t.id));
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink-900">Spravovat tagy</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-ink-500 hover:text-ink-900"
+          >
+            Zavřít ×
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {tags.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+              Žádné tagy. Vytvoř první níže.
+            </p>
+          ) : (
+            tags.map((t) => (
+              <TagEditorRow
+                key={t.id}
+                tag={t}
+                onRename={(name) => rename(t, name)}
+                onRecolor={(color) => recolor(t, color)}
+                onDelete={() => remove(t)}
+              />
+            ))
+          )}
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Nový tag
+          </p>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="např. Stálice"
+              maxLength={40}
+              className="flex-1 min-w-[150px] rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+            <input
+              type="text"
+              value={newColor}
+              onChange={(e) => setNewColor(e.target.value)}
+              placeholder="#22c55e"
+              maxLength={20}
+              className="w-28 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+            <button
+              type="button"
+              onClick={create}
+              disabled={busy || !newName.trim()}
+              className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+            >
+              {busy ? "..." : "Přidat"}
+            </button>
+          </div>
+          {error && <Alert variant="danger">{error}</Alert>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TagEditorRow({
+  tag,
+  onRename,
+  onRecolor,
+  onDelete,
+}: {
+  tag: PersonTag;
+  onRename: (name: string) => Promise<void>;
+  onRecolor: (color: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [name, setName] = useState(tag.name);
+  const [color, setColor] = useState(tag.color);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+      <TagChip tag={{ ...tag, name, color }} />
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => {
+          if (name !== tag.name && name.trim()) onRename(name.trim());
+        }}
+        maxLength={40}
+        className="flex-1 min-w-[120px] rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
+      />
+      <input
+        type="text"
+        value={color}
+        onChange={(e) => setColor(e.target.value)}
+        onBlur={() => {
+          if (color !== tag.color) onRecolor(color);
+        }}
+        placeholder="#22c55e"
+        maxLength={20}
+        className="w-24 rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
+      />
+      <button
+        type="button"
+        onClick={onDelete}
+        className="text-xs font-medium text-ink-500 hover:text-danger"
+      >
+        Smazat
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tag chip — used in both the row + the editor preview
+// ---------------------------------------------------------------------------
+
+function TagChip({ tag }: { tag: Pick<PersonTag, "name" | "color"> }) {
+  const accent = tag.color || undefined;
+  return (
+    <span
+      className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand"
+      style={
+        accent
+          ? { borderColor: `${accent}55`, color: accent, background: `${accent}1a` }
+          : undefined
+      }
+    >
+      {tag.name}
+    </span>
   );
 }

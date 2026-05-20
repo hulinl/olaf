@@ -690,6 +690,17 @@ export interface WorkspaceMemberSummary {
   past_rsvps: number;
   last_rsvp_at: string | null;
   role: WorkspaceRole;
+  /** CRM annotations — empty when no profile row exists yet. */
+  note?: string;
+  tag_ids?: number[];
+}
+
+export interface PersonTag {
+  id: number;
+  name: string;
+  /** Optional hex/token; empty falls back to brand color. */
+  color: string;
+  sort_order: number;
 }
 
 export interface WorkspaceMemberRSVP {
@@ -748,6 +759,43 @@ export const workspaces = {
     }>(`/api/workspaces/${slug}/members/${userId}/handover/`, {
       method: "POST",
     }),
+  listTags: (slug: string) =>
+    apiFetch<PersonTag[]>(`/api/workspaces/${slug}/tags/`),
+  createTag: (slug: string, payload: { name: string; color?: string }) =>
+    apiFetch<PersonTag>(`/api/workspaces/${slug}/tags/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateTag: (
+    slug: string,
+    tagId: number,
+    payload: { name?: string; color?: string; sort_order?: number },
+  ) =>
+    apiFetch<PersonTag>(`/api/workspaces/${slug}/tags/${tagId}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteTag: (slug: string, tagId: number) =>
+    apiFetch<void>(`/api/workspaces/${slug}/tags/${tagId}/`, {
+      method: "DELETE",
+    }),
+  setMemberNote: (slug: string, userId: number, note: string) =>
+    apiFetch<{ note: string }>(
+      `/api/workspaces/${slug}/members/${userId}/note/`,
+      { method: "PATCH", body: JSON.stringify({ note }) },
+    ),
+  attachMemberTag: (slug: string, userId: number, tagId: number) =>
+    apiFetch<{ tag_ids: number[] }>(
+      `/api/workspaces/${slug}/members/${userId}/tags/${tagId}/`,
+      { method: "POST" },
+    ),
+  detachMemberTag: (slug: string, userId: number, tagId: number) =>
+    apiFetch<{ tag_ids: number[] }>(
+      `/api/workspaces/${slug}/members/${userId}/tags/${tagId}/`,
+      { method: "DELETE" },
+    ),
+  membersCsvUrl: (slug: string) =>
+    `${API_URL}/api/workspaces/${slug}/members.csv`,
   mine: () => apiFetch<Workspace[]>("/api/workspaces/mine/"),
   personal: () => apiFetch<Workspace>("/api/workspaces/personal/"),
   create: (payload: WorkspaceCreatePayload) =>
