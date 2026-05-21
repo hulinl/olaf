@@ -138,7 +138,7 @@ class NotifyMentionsTests(TestCase):
         )
 
     def test_opted_out_user_gets_nothing(self) -> None:
-        self.marta.notify_on_discussion_reply = False
+        self.marta.notify_on_discussion_mention = False
         self.marta.save()
         c = self._comment("@Marta tady jsi?")
         notify_mentions(c)

@@ -78,10 +78,19 @@ def notify_event_updated(event: Event, changed_fields: list[str], *, actor=None)
     body = f"Pořadatel upravil: {', '.join(labels)}."
     link = _event_link(event)
 
+    # Pull RSVPed user IDs, then filter by per-user opt-out
+    # (notify_on_event_update). Joining at the SQL layer keeps this
+    # cheap even with hundreds of participants.
+    from accounts.models import User
+
     recipient_ids = list(
-        RSVP.objects.filter(event=event)
-        .exclude(status=RSVP.STATUS_CANCELLED)
-        .values_list("user_id", flat=True)
+        User.objects.filter(
+            id__in=RSVP.objects.filter(event=event)
+            .exclude(status=RSVP.STATUS_CANCELLED)
+            .values_list("user_id", flat=True),
+            notify_on_event_update=True,
+        )
+        .values_list("id", flat=True)
         .distinct()
     )
     if actor is not None:
@@ -112,8 +121,11 @@ def notify_event_updated(event: Event, changed_fields: list[str], *, actor=None)
 def notify_rsvp_approved(rsvp: RSVP) -> Notification | None:
     """Owner approved a pending registration — let the participant
     know directly in the bell. Returns the created row or None when
-    the RSVP has no user (light account / placeholder)."""
+    the RSVP has no user (light account / placeholder) or the user
+    opted out of RSVP-status notifications."""
     if rsvp.user_id is None:
+        return None
+    if rsvp.user and not rsvp.user.notify_on_rsvp_status:
         return None
     event = rsvp.event
     return Notification.objects.create(
@@ -134,6 +146,8 @@ def notify_rsvp_rejected(rsvp: RSVP, *, reason: str = "") -> Notification | None
     """Owner rejected a pending registration. Notification mirrors
     the e-mail the participant also receives."""
     if rsvp.user_id is None:
+        return None
+    if rsvp.user and not rsvp.user.notify_on_rsvp_status:
         return None
     event = rsvp.event
     body = (
