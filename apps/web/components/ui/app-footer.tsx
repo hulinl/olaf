@@ -1,40 +1,54 @@
+import Link from "next/link";
+
 /**
- * Shared footer for every olaf surface — public landings, in-app
- * pages, owner cockpit. The "Powered by BI Factory" attribution is
- * the same pattern the user has on their other product (Slotly);
- * keep it small, monospace, low-volume.
+ * Global footer — same structure as Slotly's so both apps share the
+ * brand pattern; only the app name + its color change. Two
+ * attributions on a single centered line:
  *
- * Wrap once at the layout level so we don't duplicate the markup on
- * every page. Use the `variant="bare"` mode for the in-app layout
- * where the surrounding chrome (sidebar, content padding) already
- * defines bounds; "framed" adds a top border line for standalone
- * public pages.
+ *   [app] · Powered by [BIfactory logo]
+ *
+ * The app name links home in the OLAF brand-amber; the BIfactory
+ * link points to bifactory.cz with the company logo (light variant
+ * for now — dark logo lives in public/ for future dark-mode pages).
  */
 export function AppFooter({
   variant = "framed",
 }: {
+  /** "framed" adds a top divider line + light bg (standalone public
+   *  pages). "bare" drops both for use inside the in-app shell. */
   variant?: "framed" | "bare";
 }) {
   const wrapperClass =
     variant === "framed"
-      ? "border-t border-border bg-canvas"
-      : "bg-canvas";
+      ? "mt-auto border-t border-border bg-canvas py-5 px-4 sm:px-6"
+      : "mt-auto bg-canvas py-5 px-4 sm:px-6";
 
   return (
     <footer className={wrapperClass}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
-        <span>© {new Date().getFullYear()} olaf</span>
-        <span>
-          Powered by{" "}
-          <a
-            href="https://bifactory.cz"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-ink-700 transition-colors hover:text-ink-900"
-          >
-            BI Factory
-          </a>
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-ink-500">
+        <Link
+          href="/"
+          className="font-semibold text-brand hover:underline"
+        >
+          olaf
+        </Link>
+        <span aria-hidden className="text-ink-300">
+          ·
         </span>
+        <a
+          href="https://bifactory.cz"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 font-medium text-ink-700 transition-colors hover:text-ink-900"
+        >
+          <span>Powered by</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/bifactory-logo.png"
+            alt="BIfactory s.r.o."
+            className="h-6 w-6"
+          />
+        </a>
       </div>
     </footer>
   );
