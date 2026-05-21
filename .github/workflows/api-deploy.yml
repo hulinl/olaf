@@ -1,0 +1,100 @@
+name: Deploy API to Container App
+
+# Auto-deploy the Django backend image to Azure Container Apps on
+# push to main. Mirrors what `./infra/deploy.sh build && release`
+# does manually — the deploy script stays around for one-off
+# operations (logs, smoke) but routine merges don't need a terminal.
+#
+# Triggers only when the API code itself or the Bicep template
+# changes. Pure web / docs PRs don't re-build the container.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/api/**"
+      - "infra/main.bicep"
+      - ".github/workflows/api-deploy.yml"
+  workflow_dispatch:  # allow manual trigger from the Actions UI
+
+# Container Apps can only swap one revision at a time. Same pattern
+# as the SWA workflow — queue rapid-fire merges instead of letting
+# them race.
+concurrency:
+  group: api-prod-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # OIDC token for azure/login
+  contents: read
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+    env:
+      RG: olaf-prod
+      ACR_NAME: olafacrftj67d
+      ACR_LOGIN_SERVER: olafacrftj67d.azurecr.io
+      CONTAINER_APP: olaf-api
+      IMAGE_NAME: olaf-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Set image tags
+        id: tags
+        run: |
+          SHA_SHORT=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "sha=${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "ref=${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "latest=${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          file: apps/api/Dockerfile
+          # Container Apps run linux/amd64. No need for multi-arch.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.ref }}
+            ${{ steps.tags.outputs.latest }}
+          cache-from: type=registry,ref=${{ steps.tags.outputs.latest }}
+          cache-to: type=inline
+
+      - name: Update Container App to new revision
+        run: |
+          az containerapp update \
+            --resource-group "$RG" \
+            --name "$CONTAINER_APP" \
+            --image "${{ steps.tags.outputs.ref }}" \
+            --query "properties.latestRevisionName" -o tsv
+
+      - name: Smoke test
+        run: |
+          # Container Apps roll revisions over a few seconds. Try a
+          # handful of times before giving up — covers the transition
+          # window without hiding a real outage.
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sf -m 5 https://api.olaf.events/healthz > /dev/null; then
+              echo "✓ healthz OK on attempt $i"
+              exit 0
+            fi
+            echo "attempt $i: not yet, sleeping 5s"
+            sleep 5
+          done
+          echo "✗ /healthz never became healthy"
+          exit 1
