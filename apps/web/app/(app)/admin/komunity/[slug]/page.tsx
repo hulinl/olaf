@@ -212,27 +212,42 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-muted/60">
-                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                      <th className="px-4 py-3">Akce</th>
-                      <th className="px-4 py-3">Termín</th>
-                      <th className="px-4 py-3 text-right">Přihlášeno</th>
-                      <th className="px-4 py-3 text-right">Waitlist</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {eventList.map((e) => (
-                      <EventRow
-                        key={e.slug}
-                        event={e}
-                        wsSlug={workspace.slug}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {/* Mobile: card list — mirror the /admin/eventy
+                    pattern so a 4-column event table doesn't force
+                    horizontal scroll on small screens. */}
+                <div className="flex flex-col gap-2 sm:hidden">
+                  {eventList.map((e) => (
+                    <EventMobileCard
+                      key={e.slug}
+                      event={e}
+                      wsSlug={workspace.slug}
+                    />
+                  ))}
+                </div>
+                {/* sm+: full table. */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-surface-muted/60">
+                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                        <th className="px-4 py-3">Akce</th>
+                        <th className="px-4 py-3">Termín</th>
+                        <th className="px-4 py-3 text-right">Přihlášeno</th>
+                        <th className="px-4 py-3 text-right">Waitlist</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {eventList.map((e) => (
+                        <EventRow
+                          key={e.slug}
+                          event={e}
+                          wsSlug={workspace.slug}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </section>
         </>
@@ -290,6 +305,62 @@ function StatTile({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
     </div>
+  );
+}
+
+function EventMobileCard({
+  event,
+  wsSlug,
+}: {
+  event: EventSummary;
+  wsSlug: string;
+}) {
+  const href = `/admin/eventy/${wsSlug}/${event.slug}`;
+  const starts = new Date(event.starts_at);
+  const dateLabel = starts.toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const capacity =
+    event.capacity != null
+      ? `${event.confirmed_count} / ${event.capacity}`
+      : String(event.confirmed_count);
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand hover:shadow-md focus-ring"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className={[
+            "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+            STATUS_TONE[event.status],
+          ].join(" ")}
+        >
+          {STATUS_LABELS[event.status]}
+        </span>
+        <span className="text-xs text-ink-500">{dateLabel}</span>
+      </div>
+      <p className="text-base font-semibold text-ink-900">{event.title}</p>
+      {event.location_text && (
+        <p className="text-xs text-ink-500">{event.location_text}</p>
+      )}
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-ink-500">
+        <dt>Přihlášeno</dt>
+        <dd className="text-right font-medium text-ink-900 tabular-nums">
+          {capacity}
+        </dd>
+        {event.waitlist_count > 0 && (
+          <>
+            <dt>Waitlist</dt>
+            <dd className="text-right font-medium text-warning tabular-nums">
+              {event.waitlist_count}
+            </dd>
+          </>
+        )}
+      </dl>
+    </Link>
   );
 }
 

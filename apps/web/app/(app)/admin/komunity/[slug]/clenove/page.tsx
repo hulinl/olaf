@@ -361,70 +361,102 @@ export function MembersCrmView({ slug }: { slug: string }) {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-muted/60">
-                    <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                      <th className="w-8 px-3 py-3">
-                        <input
-                          type="checkbox"
-                          aria-label="Vybrat vše"
-                          checked={
-                            filtered.length > 0 &&
-                            filtered.every((m) => selectedIds.has(m.id))
+              <>
+                {/* Mobile: card list. The 9-column CRM table is way
+                    too wide for a phone and horizontal-scroll hides
+                    half the columns. Cards keep all info visible. */}
+                <div className="flex flex-col gap-2 sm:hidden">
+                  {filtered.map((m) => (
+                    <MemberMobileCard
+                      key={m.id}
+                      member={m}
+                      wsSlug={slug}
+                      tags={tags}
+                      expanded={expandedRowId === m.id}
+                      onToggleExpand={() =>
+                        setExpandedRowId(
+                          expandedRowId === m.id ? null : m.id,
+                        )
+                      }
+                      onPatch={(patch) => patchMember(m.id, patch)}
+                      selected={selectedIds.has(m.id)}
+                      onToggleSelected={() =>
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(m.id)) next.delete(m.id);
+                          else next.add(m.id);
+                          return next;
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+                {/* sm+: full table. */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-surface-muted/60">
+                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                        <th className="w-8 px-3 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label="Vybrat vše"
+                            checked={
+                              filtered.length > 0 &&
+                              filtered.every((m) => selectedIds.has(m.id))
+                            }
+                            onChange={(e) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) {
+                                  filtered.forEach((m) => next.add(m.id));
+                                } else {
+                                  filtered.forEach((m) => next.delete(m.id));
+                                }
+                                return next;
+                              });
+                            }}
+                          />
+                        </th>
+                        <th className="px-4 py-3">Člen</th>
+                        <th className="px-4 py-3">Kontakt</th>
+                        <th className="px-4 py-3">Tagy</th>
+                        <th className="px-4 py-3 text-right">Celkem</th>
+                        <th className="px-4 py-3 text-right">Nadch.</th>
+                        <th className="px-4 py-3 text-right">Min.</th>
+                        <th className="px-4 py-3">Poslední</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filtered.map((m) => (
+                        <MemberRow
+                          key={m.id}
+                          member={m}
+                          wsSlug={slug}
+                          tags={tags}
+                          iAmSuperAdmin={isOwner}
+                          expanded={expandedRowId === m.id}
+                          onToggleExpand={() =>
+                            setExpandedRowId(
+                              expandedRowId === m.id ? null : m.id,
+                            )
                           }
-                          onChange={(e) => {
+                          onPatch={(patch) => patchMember(m.id, patch)}
+                          selected={selectedIds.has(m.id)}
+                          onToggleSelected={() =>
                             setSelectedIds((prev) => {
                               const next = new Set(prev);
-                              if (e.target.checked) {
-                                filtered.forEach((m) => next.add(m.id));
-                              } else {
-                                filtered.forEach((m) => next.delete(m.id));
-                              }
+                              if (next.has(m.id)) next.delete(m.id);
+                              else next.add(m.id);
                               return next;
-                            });
-                          }}
+                            })
+                          }
                         />
-                      </th>
-                      <th className="px-4 py-3">Člen</th>
-                      <th className="px-4 py-3">Kontakt</th>
-                      <th className="px-4 py-3">Tagy</th>
-                      <th className="px-4 py-3 text-right">Celkem</th>
-                      <th className="px-4 py-3 text-right">Nadch.</th>
-                      <th className="px-4 py-3 text-right">Min.</th>
-                      <th className="px-4 py-3">Poslední</th>
-                      <th className="px-4 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filtered.map((m) => (
-                      <MemberRow
-                        key={m.id}
-                        member={m}
-                        wsSlug={slug}
-                        tags={tags}
-                        iAmSuperAdmin={isOwner}
-                        expanded={expandedRowId === m.id}
-                        onToggleExpand={() =>
-                          setExpandedRowId(
-                            expandedRowId === m.id ? null : m.id,
-                          )
-                        }
-                        onPatch={(patch) => patchMember(m.id, patch)}
-                        selected={selectedIds.has(m.id)}
-                        onToggleSelected={() =>
-                          setSelectedIds((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(m.id)) next.delete(m.id);
-                            else next.add(m.id);
-                            return next;
-                          })
-                        }
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </>
         );
@@ -459,6 +491,133 @@ export function MembersCrmView({ slug }: { slug: string }) {
 // ---------------------------------------------------------------------------
 // Row
 // ---------------------------------------------------------------------------
+
+function MemberMobileCard({
+  member,
+  wsSlug,
+  tags,
+  expanded,
+  onToggleExpand,
+  onPatch,
+  selected,
+  onToggleSelected,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  tags: PersonTag[];
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  selected: boolean;
+  onToggleSelected: () => void;
+}) {
+  const profileHref = `/admin/komunity/${wsSlug}/clenove/${member.id}`;
+  const lastAt = member.last_rsvp_at ? new Date(member.last_rsvp_at) : null;
+  const memberTagIds = new Set(member.tag_ids ?? []);
+  const memberTags = tags.filter((t) => memberTagIds.has(t.id));
+  const hasNote = Boolean((member.note ?? "").trim());
+
+  return (
+    <div
+      className={[
+        "rounded-xl border bg-surface shadow-sm transition-colors",
+        selected ? "border-brand/60 bg-brand/5" : "border-border",
+      ].join(" ")}
+    >
+      <div className="flex gap-3 p-4">
+        <input
+          type="checkbox"
+          aria-label={`Vybrat ${member.full_name || member.email}`}
+          checked={selected}
+          onChange={onToggleSelected}
+          className="mt-1 h-4 w-4 shrink-0 accent-brand"
+        />
+        <Link
+          href={profileHref}
+          className="flex min-w-0 flex-1 flex-col gap-1.5 focus-ring"
+        >
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="font-medium text-ink-900">
+              {member.full_name || member.email}
+            </span>
+            {member.role === "owner" && (
+              <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                Owner
+              </span>
+            )}
+            {member.role === "admin" && (
+              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                Admin
+              </span>
+            )}
+          </div>
+          {member.full_name && (
+            <span className="text-xs text-ink-500">{member.email}</span>
+          )}
+          {member.phone && (
+            <span className="text-xs text-ink-500">{member.phone}</span>
+          )}
+          {memberTags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {memberTags.map((t) => (
+                <TagChip key={t.id} tag={t} />
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-baseline gap-x-3 text-xs text-ink-500">
+            <span>
+              <strong className="text-ink-900 tabular-nums">
+                {member.total_rsvps}
+              </strong>{" "}
+              {member.total_rsvps === 1
+                ? "akce"
+                : member.total_rsvps < 5
+                  ? "akce"
+                  : "akcí"}
+            </span>
+            {member.upcoming_rsvps > 0 && (
+              <span>
+                <strong className="tabular-nums">{member.upcoming_rsvps}</strong>{" "}
+                nadcházejících
+              </span>
+            )}
+            {lastAt && (
+              <span>
+                poslední{" "}
+                {lastAt.toLocaleDateString("cs-CZ", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            )}
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className={[
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring",
+            hasNote ? "ring-1 ring-brand/40" : "",
+          ].join(" ")}
+          aria-label="Tagy a poznámka"
+        >
+          {hasNote ? "●" : "+"}
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-border bg-surface-muted/40 p-4">
+          <MemberCrmEditor
+            member={member}
+            wsSlug={wsSlug}
+            tags={tags}
+            onPatch={onPatch}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MemberRow({
   member,
