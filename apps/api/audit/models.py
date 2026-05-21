@@ -33,6 +33,8 @@ class AuditLog(models.Model):
     ACTION_RSVP_APPROVE = "rsvp.approve"
     ACTION_RSVP_REJECT = "rsvp.reject"
     ACTION_MEMBER_ROLE_CHANGE = "workspace_member.role_change"
+    ACTION_TOPIC_DELETE = "discussion.topic.delete"
+    ACTION_COMMENT_DELETE = "discussion.comment.delete"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

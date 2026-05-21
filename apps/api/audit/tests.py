@@ -497,3 +497,164 @@ class AuditFromMemberRoleTests(TestCase):
         self.assertEqual(rows[0].payload["new_role"], "owner")
         # Second row: original owner demoted to admin.
         self.assertEqual(rows[1].payload["new_role"], "admin")
+
+
+class AuditFromDiscussionTests(TestCase):
+    """Topic / comment deletes from both workspace and event walls
+    should write `discussion.topic.delete` / `discussion.comment.delete`
+    rows with a `by_moderator` flag distinguishing author-deletes-own
+    from mod-cleans-up-others."""
+
+    def setUp(self) -> None:
+        self.owner = _make_user("discowner@a.com")
+        self.member = _make_user("discmember@a.com")
+        self.ws = _make_workspace(self.owner, slug="discws")
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=self.member,
+            role=WorkspaceMember.ROLE_MEMBER,
+        )
+        self.event = _make_event(self.ws, slug="disc-ev")
+        self.client = APIClient()
+
+    def test_owner_deletes_own_workspace_topic(self) -> None:
+        from discussions.models import Topic
+
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="Sraz v 9?",
+            author=self.owner,
+        )
+        self.client.force_authenticate(self.owner)
+        r = self.client.delete(
+            reverse(
+                "discussions:workspace-topic-detail",
+                kwargs={"slug": self.ws.slug, "topic_id": topic.pk},
+            )
+        )
+        self.assertEqual(r.status_code, 204)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_TOPIC_DELETE)
+        self.assertEqual(row.workspace, self.ws)
+        # Owner deleting their OWN topic → by_moderator False (the rule
+        # is "did a mod delete someone else's content?", not "is the
+        # actor a mod?").
+        self.assertEqual(row.payload["by_moderator"], False)
+
+    def test_moderator_deletes_other_users_comment(self) -> None:
+        from discussions.models import Comment, Topic
+
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="T",
+            author=self.member,
+        )
+        comment = Comment.objects.create(
+            topic=topic, body="špatný komentář", author=self.member
+        )
+        self.client.force_authenticate(self.owner)
+        r = self.client.delete(
+            reverse(
+                "discussions:workspace-comment-detail",
+                kwargs={
+                    "slug": self.ws.slug,
+                    "topic_id": topic.pk,
+                    "comment_id": comment.pk,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, 204)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_COMMENT_DELETE)
+        self.assertEqual(row.payload["by_moderator"], True)
+        self.assertIn("špatný", row.payload["excerpt"])
+
+    def test_author_deletes_own_comment_not_flagged_as_mod(self) -> None:
+        from discussions.models import Comment, Topic
+
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="T",
+            author=self.member,
+        )
+        comment = Comment.objects.create(
+            topic=topic, body="vlastní", author=self.member
+        )
+        self.client.force_authenticate(self.member)
+        r = self.client.delete(
+            reverse(
+                "discussions:workspace-comment-detail",
+                kwargs={
+                    "slug": self.ws.slug,
+                    "topic_id": topic.pk,
+                    "comment_id": comment.pk,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, 204)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_COMMENT_DELETE)
+        self.assertEqual(row.payload["by_moderator"], False)
+
+    def test_event_topic_delete_logs_with_event_workspace(self) -> None:
+        from discussions.models import Topic
+        from events.models import RSVP
+
+        # Member needs an RSVP to access the event wall in the first
+        # place — owner already has access via workspace membership.
+        RSVP.objects.create(
+            event=self.event,
+            user=self.member,
+            status=RSVP.STATUS_YES,
+        )
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_EVENT,
+            parent_id=self.event.id,
+            title="Event topic",
+            author=self.member,
+        )
+        self.client.force_authenticate(self.owner)
+        r = self.client.delete(
+            reverse(
+                "discussions:event-topic-detail",
+                kwargs={
+                    "workspace_slug": self.ws.slug,
+                    "event_slug": self.event.slug,
+                    "topic_id": topic.pk,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, 204)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_TOPIC_DELETE)
+        # Workspace on the audit row resolves through the event, not
+        # the topic — the row is queryable from the workspace's audit
+        # page regardless of where in the workspace the topic lived.
+        self.assertEqual(row.workspace, self.ws)
+        self.assertEqual(row.payload["parent_type"], Topic.PARENT_EVENT)
+        self.assertEqual(row.payload["by_moderator"], True)
+
+    def test_403_does_not_write_row(self) -> None:
+        from discussions.models import Topic
+
+        # Outsider with no relationship to the workspace can't even
+        # access the wall — endpoint returns 403, audit MUST not log.
+        outsider = _make_user("outdisc@a.com")
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="T",
+            author=self.owner,
+        )
+        self.client.force_authenticate(outsider)
+        r = self.client.delete(
+            reverse(
+                "discussions:workspace-topic-detail",
+                kwargs={"slug": self.ws.slug, "topic_id": topic.pk},
+            )
+        )
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(
+            AuditLog.objects.filter(
+                action=AuditLog.ACTION_TOPIC_DELETE
+            ).exists()
+        )

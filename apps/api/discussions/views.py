@@ -39,6 +39,51 @@ from .serializers import (
 _COMMENT_IMAGE_MAX_BYTES = 6 * 1024 * 1024  # 6 MB
 
 
+def _log_topic_delete(actor, workspace, topic: Topic, *, by_mod: bool) -> None:
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=actor,
+        action=AuditLog.ACTION_TOPIC_DELETE,
+        workspace=workspace,
+        target_type="topic",
+        target_id=topic.pk,
+        summary=f'Smazal téma „{topic.title}"',
+        payload={
+            "title": topic.title,
+            "parent_type": topic.parent_type,
+            "parent_id": topic.parent_id,
+            "by_moderator": by_mod and topic.author_id != actor.id,
+        },
+    )
+
+
+def _log_comment_delete(actor, workspace, comment: Comment, *, by_mod: bool) -> None:
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    excerpt = (comment.body or "")[:120]
+    audit_log(
+        actor=actor,
+        action=AuditLog.ACTION_COMMENT_DELETE,
+        workspace=workspace,
+        target_type="comment",
+        target_id=comment.pk,
+        summary=(
+            f'Smazal komentář v „{comment.topic.title}"'
+            if comment.topic_id
+            else "Smazal komentář"
+        ),
+        payload={
+            "topic_id": comment.topic_id,
+            "topic_title": comment.topic.title if comment.topic_id else "",
+            "excerpt": excerpt,
+            "by_moderator": by_mod and comment.author_id != actor.id,
+        },
+    )
+
+
 def _annotate_likes(qs, user):
     """Annotate topics with _like_count + _i_liked for serializer use.
     Cuts the N+1 the SerializerMethodField would otherwise produce."""
@@ -157,6 +202,7 @@ def workspace_topic_detail(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "DELETE":
+        _log_topic_delete(request.user, workspace, topic, by_mod=is_mod)
         topic.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -257,11 +303,10 @@ def workspace_comment_detail(
         )
     except Comment.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    if (
-        comment.author_id != request.user.id
-        and not can_moderate_workspace(request.user, workspace)
-    ):
+    is_mod = can_moderate_workspace(request.user, workspace)
+    if comment.author_id != request.user.id and not is_mod:
         return Response(status=status.HTTP_403_FORBIDDEN)
+    _log_comment_delete(request.user, workspace, comment, by_mod=is_mod)
     comment.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -356,6 +401,9 @@ def event_topic_detail(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "DELETE":
+        _log_topic_delete(
+            request.user, event.workspace, topic, by_mod=is_mod
+        )
         topic.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -456,11 +504,12 @@ def event_comment_detail(
         )
     except Comment.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    if (
-        comment.author_id != request.user.id
-        and not can_moderate_event(request.user, event)
-    ):
+    is_mod = can_moderate_event(request.user, event)
+    if comment.author_id != request.user.id and not is_mod:
         return Response(status=status.HTTP_403_FORBIDDEN)
+    _log_comment_delete(
+        request.user, event.workspace, comment, by_mod=is_mod
+    )
     comment.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
