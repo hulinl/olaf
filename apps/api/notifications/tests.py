@@ -168,3 +168,112 @@ class NotificationMarkReadTests(TestCase):
         n.mark_read()
         resp = self.client.post("/api/notifications/read-all/")
         self.assertEqual(resp.json()["flipped"], 0)
+
+
+class DiscussionFanOutTests(TestCase):
+    """Verify the discussion-side fan-out creates Notification rows
+    alongside the e-mail + push it already sends. Same opt-out gates
+    (notify_on_discussion_reply / notify_on_discussion_announce)
+    govern all three channels."""
+
+    def setUp(self) -> None:
+        from discussions.models import Topic
+        from workspaces.models import Workspace, WorkspaceMember
+
+        self.author = _make_user("author@fan.com")
+        self.replier = _make_user("replier@fan.com")
+        self.member = _make_user("member@fan.com")
+        self.ws = Workspace.objects.create(slug="fanws", name="Fanws")
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=self.author,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=self.member,
+            role=WorkspaceMember.ROLE_MEMBER,
+        )
+        self.topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="Sraz v 9?",
+            body="Kdy se sejdeme?",
+            author=self.author,
+        )
+
+    def test_reply_creates_notification_for_topic_author(self) -> None:
+        from discussions.emails import send_comment_notification
+        from discussions.models import Comment
+
+        comment = Comment.objects.create(
+            topic=self.topic,
+            author=self.replier,
+            body="V 9 jo!",
+        )
+        send_comment_notification(comment)
+
+        notifs = Notification.objects.filter(recipient=self.author)
+        self.assertEqual(notifs.count(), 1)
+        n = notifs.first()
+        self.assertEqual(n.kind, Notification.KIND_DISCUSSION_REPLY)
+        self.assertIn("odpověděl", n.title)
+        self.assertEqual(n.payload["topic_id"], self.topic.pk)
+        self.assertEqual(n.payload["comment_id"], comment.pk)
+        self.assertFalse(n.is_read)
+
+    def test_self_reply_does_not_create_notification(self) -> None:
+        from discussions.emails import send_comment_notification
+        from discussions.models import Comment
+
+        comment = Comment.objects.create(
+            topic=self.topic,
+            author=self.author,
+            body="self note",
+        )
+        send_comment_notification(comment)
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.author).count(),
+            0,
+        )
+
+    def test_opted_out_user_gets_no_notification(self) -> None:
+        from discussions.emails import send_comment_notification
+        from discussions.models import Comment
+
+        self.author.notify_on_discussion_reply = False
+        self.author.save()
+        comment = Comment.objects.create(
+            topic=self.topic,
+            author=self.replier,
+            body="reply",
+        )
+        send_comment_notification(comment)
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.author).count(),
+            0,
+        )
+
+    def test_announce_creates_notification_for_each_member(self) -> None:
+        from discussions.emails import send_topic_announce
+        from discussions.models import Topic
+
+        new_topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="Důležité!",
+            body="Sraz se mění",
+            author=self.author,
+        )
+        send_topic_announce(new_topic)
+        # Author excluded from own announce.
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.author).count(),
+            0,
+        )
+        # Member receives one.
+        notifs = Notification.objects.filter(recipient=self.member)
+        self.assertEqual(notifs.count(), 1)
+        n = notifs.first()
+        self.assertEqual(n.kind, Notification.KIND_DISCUSSION_ANNOUNCE)
+        self.assertIn("Důležité!", n.title)
