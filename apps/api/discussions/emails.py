@@ -91,6 +91,25 @@ def send_comment_notification(comment: Comment) -> None:
         tag=f"comment-{comment.pk}",
     )
 
+    # In-app bell feed entry. Created alongside e-mail + push so the
+    # three channels stay in sync (one opt-out gate, one trigger
+    # site).
+    from notifications.models import Notification
+
+    Notification.objects.create(
+        recipient=topic.author,
+        kind=Notification.KIND_DISCUSSION_REPLY,
+        title=f'{author_name} odpověděl na „{topic.title}"',
+        body=(comment.body or "")[:280],
+        link=_topic_url(topic),
+        payload={
+            "topic_id": topic.pk,
+            "comment_id": comment.pk,
+            "parent_type": topic.parent_type,
+            "parent_id": topic.parent_id,
+        },
+    )
+
 
 def _audience_for_topic(topic: Topic) -> list[User]:
     """Who should get an announce email for this topic.
@@ -174,4 +193,21 @@ def send_topic_announce(topic: Topic) -> None:
             body=f"{author_name}: {topic.title}",
             url=topic_url,
             tag=f"topic-{topic.pk}",
+        )
+
+        # In-app bell feed entry — fires per recipient so each user's
+        # bell lights up independently.
+        from notifications.models import Notification
+
+        Notification.objects.create(
+            recipient=user,
+            kind=Notification.KIND_DISCUSSION_ANNOUNCE,
+            title=f"Nové téma v {parent_label}: {topic.title}",
+            body=(topic.body or "")[:280],
+            link=topic_url,
+            payload={
+                "topic_id": topic.pk,
+                "parent_type": topic.parent_type,
+                "parent_id": topic.parent_id,
+            },
         )
