@@ -168,6 +168,41 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_short_name(self) -> str:
         return self.first_name
 
+    @property
+    def profile_completion(self) -> dict:
+        """Which of the V1 "minimal profile" fields are still empty.
+
+        Surfaced to the frontend so we can nudge the user with a ! on
+        their avatar / profile until they fill the basics in. We don't
+        block anything on incomplete profiles — invoicing + emergency
+        contact + receipt prefills just degrade gracefully without
+        them.
+
+        Address counts as complete if EITHER the structured triple
+        (street + city + zip) is filled OR the legacy single-line
+        `address` has content. We accept either so older accounts that
+        only filled the legacy field don't get re-prompted.
+        """
+        missing: list[dict] = []
+        if not (self.first_name and self.first_name.strip()):
+            missing.append({"key": "first_name", "label": "Jméno"})
+        if not (self.last_name and self.last_name.strip()):
+            missing.append({"key": "last_name", "label": "Příjmení"})
+        if not (self.phone and self.phone.strip()):
+            missing.append({"key": "phone", "label": "Telefon"})
+        has_structured_address = bool(
+            (self.address_street or "").strip()
+            and (self.address_city or "").strip()
+            and (self.address_zip or "").strip()
+        )
+        has_legacy_address = bool((self.address or "").strip())
+        if not (has_structured_address or has_legacy_address):
+            missing.append({"key": "address", "label": "Adresa"})
+        return {
+            "is_complete": len(missing) == 0,
+            "missing": missing,
+        }
+
 
 class EmailVerificationToken(models.Model):
     """24-hour token to verify a user's email address."""
