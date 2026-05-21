@@ -64,39 +64,37 @@ export function ShareButton({
     }
   }
 
+  // Icon-only everywhere — the share glyph is universally recognised
+  // and the text label ate a chunk of horizontal real estate on the
+  // Tvůrce header row next to "Upravit akci →" / "Veřejný náhled ↗".
+  // Label still lives in aria-label + title for screen readers and
+  // tooltips. Ghost variant = 36 × 36 square (matches button-md
+  // height); soft variant = 32 × 32 (cramped public header).
   const isGhost = variant === "ghost";
   const className = isGhost
-    ? "inline-flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
-    : "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring";
+    ? "inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
+    : "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring";
+  const stateLabel =
+    state === "copied"
+      ? "Zkopírováno"
+      : state === "shared"
+        ? "Sdíleno"
+        : label;
 
   return (
     <button
       type="button"
       onClick={handle}
       className={className}
-      aria-label={label}
+      aria-label={stateLabel}
+      title={stateLabel}
     >
-      {state === "copied" ? (
-        <>
-          <span aria-hidden>✓</span>
-          <span className={isGhost ? "" : "hidden sm:inline"}>
-            Zkopírováno
-          </span>
-        </>
-      ) : state === "shared" ? (
-        <>
-          <span aria-hidden>✓</span>
-          <span className={isGhost ? "" : "hidden sm:inline"}>Sdíleno</span>
-        </>
+      {state === "copied" || state === "shared" ? (
+        <span aria-hidden className="text-success">
+          ✓
+        </span>
       ) : (
-        <>
-          <ShareIcon />
-          {/* Ghost variant (Tvůrce header) keeps the label always
-              visible — there's room. Soft variant lives in the cramped
-              public header next to OwnerCockpitLink + auth indicator,
-              so on mobile we render only the icon. */}
-          <span className={isGhost ? "" : "hidden sm:inline"}>{label}</span>
-        </>
+        <ShareIcon />
       )}
     </button>
   );
