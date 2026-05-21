@@ -64,6 +64,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "workspaces.middleware.TenantResolverMiddleware",
     "olaf.session_debug.SessionDebugMiddleware",
+    "olaf.no_store_middleware.NoStoreApiMiddleware",
 ]
 
 ROOT_URLCONF = "olaf.urls"
