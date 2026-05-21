@@ -24,6 +24,7 @@ class AuditLog(models.Model):
     # Common action codes. Free-text — we don't lock this to a choices
     # list because new modules add new codes constantly and the audit
     # viewer is fine with showing whatever string we wrote.
+    ACTION_EVENT_CREATE = "event.create"
     ACTION_EVENT_SOFT_DELETE = "event.soft_delete"
     ACTION_EVENT_RESTORE = "event.restore"
     ACTION_EVENT_PURGE = "event.purge"
