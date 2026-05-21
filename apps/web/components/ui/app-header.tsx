@@ -8,6 +8,7 @@ import { ADMIN_NAV } from "@/app/(app)/admin/layout";
 import { type Workspace, workspaces as workspacesApi } from "@/lib/api";
 
 import { Logo } from "./logo";
+import { NotificationBell } from "./notification-bell";
 import { UserMenu } from "./user-menu";
 
 interface AppHeaderProps {
@@ -144,6 +145,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
               </span>
               Tvůrce
             </Link>
+            <NotificationBell />
             <UserMenu
               user={user}
               onSignOut={onSignOut}
