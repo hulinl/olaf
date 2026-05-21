@@ -24,7 +24,11 @@ interface CardSectionProps {
 }
 
 export function CardSection({ children, className = "" }: CardSectionProps) {
-  return <div className={`p-6 ${className}`}>{children}</div>;
+  // Default to slightly tighter padding on mobile. 24 px all around
+  // ate ~48 px of a 360 px viewport, which forced item-row titles to
+  // wrap into 4 lines. 16 px on phone / 24 px on sm+ keeps cards
+  // breathing without crushing content.
+  return <div className={`p-4 sm:p-6 ${className}`}>{children}</div>;
 }
 
 interface AlertProps {
