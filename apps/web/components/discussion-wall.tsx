@@ -128,7 +128,11 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
+    // Borderless wrapper — each topic card already has its own outer
+    // border, so wrapping the whole wall in another card border just
+    // doubled up. The page section (workspace landing / event detail /
+    // Tvůrce komunita tab) is the container.
+    <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-ink-900">Nástěnka</h3>
         {!composerOpen && (
