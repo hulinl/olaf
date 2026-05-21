@@ -457,6 +457,112 @@ class AnthropicIntegrationTests(TestCase):
         self.assertEqual(self.user.anthropic_api_key_encrypted, "")
 
 
+class ProfileSaveRoundTripTests(TestCase):
+    """Locks in the contract that EVERY profile field the frontend
+    knows about can be PATCH'd through /api/auth/me/ and round-trips
+    on the next GET.
+
+    Born from a real bug 2026-05-21 where the form payload silently
+    omitted half the fields (address + billing missing). Local state
+    showed the changes; refresh showed empty. The class of bug —
+    "we forgot to add a field" — is easy to re-introduce. Hitting
+    every field at once catches the serializer, the model, and the
+    GET response in a single check.
+
+    Also locks in that choice fields (diet, fitness_level) accept
+    empty string, since the dropdowns show "Nevyplněno" as a valid
+    selection.
+    """
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            email="roundtrip@example.com",
+            password="alpine-hike-2026",
+            email_verified=True,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.url = reverse("accounts:me")
+
+    def _full_payload(self) -> dict:
+        return {
+            "first_name": "Adventurer",
+            "last_name": "Olafsson",
+            "display_name": "Olaf the Bold",
+            "phone": "+420 777 123 456",
+            "address_street": "Beskydská 7",
+            "address_city": "Frýdek-Místek",
+            "address_zip": "73801",
+            "address_country": "CZ",
+            "has_billing_address": True,
+            "billing_name": "Olaf Adventures s.r.o.",
+            "billing_ico": "12345678",
+            "billing_dic": "CZ12345678",
+            "billing_street": "Nádražní 1",
+            "billing_city": "Ostrava",
+            "billing_zip": "70200",
+            "billing_country": "CZ",
+            "fitness_level": "advanced",
+            "fitness_note": "10+ years",
+            "pace_10k": "0:45:00",
+            "weekly_km": 60,
+            "longest_run": "80 km",
+            "diet": "vegetarian",
+            "diet_note": "no nuts",
+            "tshirt_size": "L",
+            "emergency_contact_name": "Marta",
+            "emergency_contact_phone": "+420 777 999 888",
+            "emergency_contact_relationship": "Spouse",
+        }
+
+    def test_every_field_persists_and_round_trips(self) -> None:
+        payload = self._full_payload()
+        patch_resp = self.client.patch(self.url, payload, format="json")
+        self.assertEqual(patch_resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        for key, value in payload.items():
+            self.assertEqual(
+                getattr(self.user, key),
+                value,
+                msg=f"Field {key!r} did not persist to the DB",
+            )
+        get_resp = self.client.get(self.url)
+        body = get_resp.json()
+        for key, value in payload.items():
+            self.assertEqual(
+                body[key],
+                value,
+                msg=f"Field {key!r} did not come back on GET",
+            )
+
+    def test_empty_diet_accepted(self) -> None:
+        resp = self.client.patch(self.url, {"diet": ""}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.diet, "")
+
+    def test_empty_fitness_level_accepted(self) -> None:
+        resp = self.client.patch(
+            self.url, {"fitness_level": ""}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.fitness_level, "")
+
+    def test_country_codes_round_trip(self) -> None:
+        for code in ["CZ", "SK", "AT", "DE", "GB", ""]:
+            with self.subTest(code=code):
+                resp = self.client.patch(
+                    self.url,
+                    {"address_country": code, "billing_country": code},
+                    format="json",
+                )
+                self.assertEqual(resp.status_code, status.HTTP_200_OK)
+                self.user.refresh_from_db()
+                self.assertEqual(self.user.address_country, code)
+                self.assertEqual(self.user.billing_country, code)
+
+
 class NoStoreApiHeaderTests(TestCase):
     """The user-reported "saved on web but mobile shows old data"
     bug came from iOS Safari heuristically caching authenticated
