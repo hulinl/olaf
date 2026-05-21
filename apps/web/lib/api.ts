@@ -687,6 +687,14 @@ export async function apiFetch<T>(
       ...init,
       headers,
       credentials: "include",
+      // Bypass the browser's HTTP cache for every API call. The
+      // backend also sends `Cache-Control: no-store` on /api/*, but
+      // that header only governs FUTURE caching — existing cache
+      // entries (e.g. iOS Safari served a /me/ response yesterday
+      // before the no-store header was deployed) stay valid for
+      // their heuristic TTL. `cache: "no-store"` here is the
+      // belt-and-braces fix that ignores those stale entries.
+      cache: "no-store",
     });
   };
 
