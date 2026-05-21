@@ -1276,13 +1276,22 @@ def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Respo
     if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-    rsvps = (
+    rsvps = list(
         RSVP.objects.filter(event=event)
         .exclude(status=RSVP.STATUS_CANCELLED)
         .select_related("user")
         .order_by("status", "waitlist_position", "created_at")
     )
-    return Response(RSVPSerializer(rsvps, many=True).data)
+    from .duplicates import detect_duplicates
+
+    duplicate_hints_map = detect_duplicates(rsvps)
+    return Response(
+        RSVPSerializer(
+            rsvps,
+            many=True,
+            context={"duplicate_hints_map": duplicate_hints_map},
+        ).data
+    )
 
 
 # ---------------------------------------------------------------------------

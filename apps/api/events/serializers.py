@@ -390,6 +390,7 @@ class RSVPSerializer(serializers.ModelSerializer):
     uploaded_doc_keys = serializers.SerializerMethodField()
     verified_doc_keys = serializers.SerializerMethodField()
     invoice_id = serializers.SerializerMethodField()
+    duplicate_hints = serializers.SerializerMethodField()
 
     class Meta:
         model = RSVP
@@ -411,6 +412,7 @@ class RSVPSerializer(serializers.ModelSerializer):
             "uploaded_doc_keys",
             "verified_doc_keys",
             "invoice_id",
+            "duplicate_hints",
             "created_at",
             "updated_at",
         )
@@ -431,6 +433,15 @@ class RSVPSerializer(serializers.ModelSerializer):
             return obj.invoice.id
         except Exception:
             return None
+
+    def get_duplicate_hints(self, obj: RSVP) -> list[str]:
+        """Surfaces precomputed hints from the view layer (it builds
+        one map per request rather than per-row to avoid n+1). When
+        the context doesn't carry the precomputed map — e.g. the
+        single-RSVP detail flow — we silently fall back to an empty
+        list."""
+        hints_map = (self.context or {}).get("duplicate_hints_map") or {}
+        return hints_map.get(obj.id, [])
 
 
 class MyRSVPSerializer(serializers.ModelSerializer):

@@ -462,8 +462,11 @@ function RsvpRow({
           onClick={onOpenProfile}
           className="flex flex-col items-start gap-0.5 rounded text-left transition-colors focus-ring hover:text-brand"
         >
-          <span className="font-medium text-ink-900 group-hover:underline">
+          <span className="flex items-center gap-2 font-medium text-ink-900 group-hover:underline">
             {rsvp.user_full_name || "—"}
+            {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
+              <DuplicateBadge hints={rsvp.duplicate_hints} />
+            )}
           </span>
           <span className="text-xs text-ink-500">{rsvp.user_email}</span>
           {rsvp.user_phone && (
@@ -570,6 +573,28 @@ function RsvpRow({
         })}
       </td>
     </tr>
+  );
+}
+
+function DuplicateBadge({
+  hints,
+}: {
+  hints: ("same_phone" | "same_name")[];
+}) {
+  const tooltipParts: string[] = [];
+  if (hints.includes("same_phone")) {
+    tooltipParts.push("stejný telefon jako jiná přihláška");
+  }
+  if (hints.includes("same_name")) {
+    tooltipParts.push("stejné jméno jako jiná přihláška");
+  }
+  return (
+    <span
+      title={`Možný duplikát: ${tooltipParts.join(" + ")}`}
+      className="inline-flex items-center rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"
+    >
+      ⚠ Duplikát?
+    </span>
   );
 }
 
@@ -725,8 +750,11 @@ function RsvpCard({
           onClick={onOpenProfile}
           className="flex flex-col items-start gap-0.5 text-left focus-ring"
         >
-          <span className="text-sm font-semibold text-ink-900">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
             {rsvp.user_full_name || "—"}
+            {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
+              <DuplicateBadge hints={rsvp.duplicate_hints} />
+            )}
           </span>
           <span className="text-xs text-ink-500">{rsvp.user_email}</span>
           {rsvp.user_phone && (
