@@ -255,9 +255,11 @@ function CategoryRow({
       <button
         type="button"
         onClick={onDelete}
-        className="text-xs font-medium text-ink-500 hover:text-danger"
+        title="Smazat kategorii"
+        aria-label="Smazat kategorii"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-lg leading-none text-ink-500 hover:bg-danger-soft hover:text-danger"
       >
-        Smazat
+        ×
       </button>
     </div>
   );
@@ -789,22 +791,20 @@ function ItemsByCategoryView({
 
   // Single <table> with one <tbody> per category. Splitting into
   // multiple sibling tables loses column alignment across groups
-  // because each table sizes its own columns; one table with
-  // table-fixed + a shared <colgroup> guarantees identical column
-  // widths down the page.
+  // because each table sizes its own columns; one table with one
+  // shared <thead> guarantees identical column widths down the page.
+  // Auto layout (not table-fixed) lets the Položka column actually
+  // breathe on mobile — fixed layout combined with the colgroup
+  // widths was crushing names to four-line wraps. Outer border is
+  // collapsed on mobile because the Card around us already provides
+  // it; inside the card it just doubled up.
   return (
-    <div className="mt-4 overflow-x-auto rounded-md border border-border">
-      <table className="w-full table-fixed text-sm">
-        <colgroup>
-          <col />
-          <col className="w-[110px]" />
-          <col className="hidden lg:table-column lg:w-[28%]" />
-          <col className="hidden lg:table-column" />
-        </colgroup>
+    <div className="mt-4 overflow-x-auto sm:rounded-md sm:border sm:border-border">
+      <table className="w-full text-sm">
         <thead className="bg-surface-muted/30">
           <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
             <th className="px-3 py-2">Položka</th>
-            <th className="px-3 py-2 text-right">Váha</th>
+            <th className="whitespace-nowrap px-3 py-2 text-right">Váha</th>
             <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
             <th className="hidden px-3 py-2 lg:table-cell">Poznámka</th>
           </tr>
@@ -1519,18 +1519,12 @@ function ListEntriesByCategoryView({
   }
 
   return (
-    <div className="mt-2 overflow-x-auto rounded-md border border-border">
-      <table className="w-full table-fixed text-sm">
-        <colgroup>
-          <col />
-          <col className="w-[120px]" />
-          <col className="hidden lg:table-column lg:w-[26%]" />
-          <col className="w-[100px]" />
-        </colgroup>
+    <div className="mt-2 overflow-x-auto sm:rounded-md sm:border sm:border-border">
+      <table className="w-full text-sm">
         <thead className="bg-surface-muted/30">
           <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
             <th className="px-3 py-2">Položka</th>
-            <th className="px-3 py-2 text-right">Váha</th>
+            <th className="whitespace-nowrap px-3 py-2 text-right">Váha</th>
             <th className="hidden px-3 py-2 lg:table-cell">Odkaz</th>
             <th className="px-3 py-2 text-right"></th>
           </tr>
@@ -1609,9 +1603,11 @@ function ListEntriesByCategoryView({
                           await gear.removeListEntry(listId, e.id);
                           await onChange();
                         }}
-                        className="text-ink-500 hover:text-danger"
+                        title="Odebrat ze seznamu"
+                        aria-label="Odebrat ze seznamu"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-lg leading-none text-ink-500 hover:bg-danger-soft hover:text-danger"
                       >
-                        Odebrat
+                        ×
                       </button>
                     </div>
                   </td>
