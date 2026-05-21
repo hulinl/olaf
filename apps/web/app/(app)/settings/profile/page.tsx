@@ -4,8 +4,10 @@ import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { CountryPicker } from "@/components/ui/country-picker";
 import { Field, Input } from "@/components/ui/field";
 import { ApiError, type User, auth } from "@/lib/api";
+import { applyDialPrefix } from "@/lib/countries";
 import { useUser } from "@/lib/user-context";
 
 const TSHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -48,6 +50,24 @@ export default function ProfileSettingsPage() {
         last_name: user.last_name,
         display_name: user.display_name,
         phone: user.phone,
+        // Address fields used to be missing here — typing them in
+        // and hitting Save looked like it worked because the local
+        // state updated, but a refresh re-fetched the empty server
+        // value. Send all four.
+        address_street: user.address_street,
+        address_city: user.address_city,
+        address_zip: user.address_zip,
+        address_country: user.address_country,
+        // Billing fields too — gated by has_billing_address but
+        // always sent so the toggle round-trips correctly.
+        has_billing_address: user.has_billing_address,
+        billing_name: user.billing_name,
+        billing_ico: user.billing_ico,
+        billing_dic: user.billing_dic,
+        billing_street: user.billing_street,
+        billing_city: user.billing_city,
+        billing_zip: user.billing_zip,
+        billing_country: user.billing_country,
         fitness_level: user.fitness_level,
         fitness_note: user.fitness_note,
         pace_10k: user.pace_10k,
@@ -156,17 +176,24 @@ export default function ProfileSettingsPage() {
                 onChange={(e) => update("address_zip", e.target.value)}
               />
             </Field>
-            <Field label="Země" htmlFor="address_country" hint="Kód (CZ, SK, ...).">
-              <Input
+            <Field
+              label="Země"
+              htmlFor="address_country"
+              hint="Mění předvolbu telefonu, pokud telefon ještě nemá svojí."
+            >
+              <CountryPicker
                 id="address_country"
                 value={user.address_country}
-                onChange={(e) =>
-                  update(
-                    "address_country",
-                    e.target.value.toUpperCase().slice(0, 2),
-                  )
-                }
-                maxLength={2}
+                onChange={(code) => {
+                  setUser((u) => ({
+                    ...u,
+                    address_country: code,
+                    // Auto-prefix the phone unless the user already
+                    // entered a "+…" prefix themselves.
+                    phone: applyDialPrefix(u.phone, code),
+                  }));
+                  setSaved(false);
+                }}
               />
             </Field>
           </div>
@@ -234,16 +261,10 @@ export default function ProfileSettingsPage() {
                 />
               </Field>
               <Field label="Země" htmlFor="billing_country">
-                <Input
+                <CountryPicker
                   id="billing_country"
                   value={user.billing_country}
-                  onChange={(e) =>
-                    update(
-                      "billing_country",
-                      e.target.value.toUpperCase().slice(0, 2),
-                    )
-                  }
-                  maxLength={2}
+                  onChange={(code) => update("billing_country", code)}
                 />
               </Field>
             </div>
