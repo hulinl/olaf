@@ -194,3 +194,83 @@ class MeTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.json()["email"], "marta@example.com")
         self.assertTrue(resp.json()["email_verified"])
+
+
+class ProfileCompletionTests(TestCase):
+    """The User.profile_completion property + its serialized form
+    drive the "doplň profil" nudge in the UI. Keep this honest so the
+    badge doesn't disappear (or stick around) on the wrong accounts."""
+
+    def setUp(self) -> None:
+        # Default test user has name + email but no phone, no address.
+        self.user = User.objects.create_user(
+            email="incomplete@example.com",
+            password="alpine-hike-2026",
+            first_name="In",
+            last_name="Complete",
+        )
+
+    def test_brand_new_user_missing_phone_and_address(self) -> None:
+        pc = self.user.profile_completion
+        self.assertFalse(pc["is_complete"])
+        keys = [m["key"] for m in pc["missing"]]
+        self.assertIn("phone", keys)
+        self.assertIn("address", keys)
+        self.assertNotIn("first_name", keys)
+        self.assertNotIn("last_name", keys)
+
+    def test_blank_first_name_flagged(self) -> None:
+        u = User.objects.create_user(
+            email="noname@example.com",
+            password="alpine-hike-2026",
+            first_name="",
+            last_name="",
+        )
+        pc = u.profile_completion
+        keys = [m["key"] for m in pc["missing"]]
+        self.assertIn("first_name", keys)
+        self.assertIn("last_name", keys)
+
+    def test_legacy_single_line_address_satisfies(self) -> None:
+        self.user.phone = "+420 123 456 789"
+        self.user.address = "Beskydská 7, Frýdek"
+        self.user.save()
+        pc = self.user.profile_completion
+        self.assertTrue(pc["is_complete"])
+
+    def test_structured_address_satisfies(self) -> None:
+        self.user.phone = "+420 123 456 789"
+        self.user.address_street = "Beskydská 7"
+        self.user.address_city = "Frýdek"
+        self.user.address_zip = "73801"
+        self.user.save()
+        pc = self.user.profile_completion
+        self.assertTrue(pc["is_complete"])
+
+    def test_partial_structured_address_does_not_satisfy(self) -> None:
+        # Street + city but no ZIP — still considered incomplete.
+        self.user.phone = "+420 123"
+        self.user.address_street = "Beskydská 7"
+        self.user.address_city = "Frýdek"
+        self.user.save()
+        pc = self.user.profile_completion
+        keys = [m["key"] for m in pc["missing"]]
+        self.assertIn("address", keys)
+
+    def test_me_endpoint_returns_completion(self) -> None:
+        """Frontend reads `profile_completion` off the /me payload."""
+        from rest_framework.test import APIClient
+
+        c = APIClient()
+        c.force_authenticate(self.user)
+        resp = c.get("/api/auth/me/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn("profile_completion", resp.json())
+        self.assertFalse(resp.json()["profile_completion"]["is_complete"])
+
+    def test_whitespace_only_phone_does_not_count(self) -> None:
+        self.user.phone = "   "
+        self.user.address = "Real address"
+        self.user.save()
+        keys = [m["key"] for m in self.user.profile_completion["missing"]]
+        self.assertIn("phone", keys)

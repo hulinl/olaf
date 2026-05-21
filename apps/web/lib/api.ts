@@ -76,6 +76,13 @@ export interface User {
   // System
   email_verified: boolean;
   date_joined: string;
+  /** Server-computed: whether the user has filled the V1 minimum
+   *  (name + phone + address). Drives the "!" badge on the avatar
+   *  and the warning row inside the user menu. */
+  profile_completion: {
+    is_complete: boolean;
+    missing: { key: string; label: string }[];
+  };
 }
 
 export interface BillingProfile {

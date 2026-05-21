@@ -5,13 +5,29 @@ import { useEffect, useRef, useState } from "react";
 
 import { Avatar } from "./avatar";
 
+interface ProfileCompletion {
+  is_complete: boolean;
+  missing: { key: string; label: string }[];
+}
+
 interface UserMenuProps {
-  user: { first_name: string; last_name: string; email: string };
+  user: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    profile_completion?: ProfileCompletion;
+  };
   onSignOut: () => void;
   signingOut?: boolean;
 }
 
-/** Top-right dropdown — Profile settings / Notifications / Account / Sign out. */
+/** Top-right dropdown — Profile settings / Notifications / Account / Sign out.
+ *
+ *  Renders a small amber "!" dot on the avatar when the user's profile
+ *  is missing the V1 required fields (name / phone / address). The
+ *  dot is decorative — actually fixing the profile means opening the
+ *  menu and tapping "Profile settings", where the same shortfall is
+ *  surfaced as a banner. */
 export function UserMenu({ user, onSignOut, signingOut }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -44,14 +60,28 @@ export function UserMenu({ user, onSignOut, signingOut }: UserMenuProps) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Open user menu"
-        className="rounded-full focus-ring transition-opacity hover:opacity-80"
+        aria-label={
+          user.profile_completion && !user.profile_completion.is_complete
+            ? "Open user menu (profile incomplete)"
+            : "Open user menu"
+        }
+        className="relative rounded-full focus-ring transition-opacity hover:opacity-80"
       >
         <Avatar
           firstName={user.first_name}
           lastName={user.last_name}
           size={36}
         />
+        {user.profile_completion &&
+          !user.profile_completion.is_complete && (
+            <span
+              aria-hidden
+              title="Doplň profil"
+              className="absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-canvas bg-warning text-[9px] font-bold text-ink-900"
+            >
+              !
+            </span>
+          )}
       </button>
 
       {open && (
@@ -65,6 +95,26 @@ export function UserMenu({ user, onSignOut, signingOut }: UserMenuProps) {
             </p>
             <p className="truncate text-xs text-ink-500">{user.email}</p>
           </div>
+          {user.profile_completion &&
+            !user.profile_completion.is_complete && (
+              <Link
+                href="/settings/profile"
+                role="menuitem"
+                onClick={close}
+                className="flex items-baseline gap-2 border-b border-border bg-warning/10 px-4 py-2.5 text-xs font-medium text-ink-900 transition-colors hover:bg-warning/15"
+              >
+                <span aria-hidden className="text-warning">
+                  !
+                </span>
+                <span>
+                  Doplň profil — chybí{" "}
+                  {user.profile_completion.missing
+                    .map((m) => m.label.toLowerCase())
+                    .join(", ")}
+                  .
+                </span>
+              </Link>
+            )}
           <MenuLink href="/settings/profile" onClick={close}>
             Profile settings
           </MenuLink>

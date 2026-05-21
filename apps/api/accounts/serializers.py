@@ -55,6 +55,7 @@ class VerifyEmailSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="get_full_name", read_only=True)
+    profile_completion = serializers.ReadOnlyField()
 
     class Meta:
         model = User
@@ -66,6 +67,7 @@ class UserSerializer(serializers.ModelSerializer):
             "display_name",
             "full_name",
             "phone",
+            "profile_completion",
             "dob",
             "avatar_blob_id",
             "address",
