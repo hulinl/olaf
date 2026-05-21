@@ -24,6 +24,7 @@ urlpatterns = [
         "api/notifications/",
         include("notifications.urls", namespace="notifications"),
     ),
+    path("api/audit/", include("audit.urls", namespace="audit")),
 ]
 
 if settings.DEBUG:
