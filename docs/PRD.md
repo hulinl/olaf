@@ -1,12 +1,14 @@
 # OLAF — Product Requirements Document
 
-**Version**: v1.1 — Implementation Edition
+**Version**: v1.2 — Post-launch refinement
 **Owner**: Lubomir "Olaf" Hulin
-**Status**: Source of truth for V1 build. Supersedes the original Notion draft (v1.0).
+**Status**: Source of truth. Production live on olaf.events since 2026-05-19; this document tracks what shipped and what's still backlog.
 
 A community-and-event platform for adventure organizers, sports communities, and corporate event hosts. Built on the conviction that great events happen when a tight-knit crew shares both the planning *and* the journey.
 
 > **What changed from v1.0**: V1 scope was tightened against fifteen explicit decisions (recorded in `docs/decisions.md` once written, summarised inline below). The wall feed, personal gear catalogue, sensitive-health data on user profiles, password-step-up signatures, web push, billing fields, the audit-log viewer UI, and the onboarding wizard are all deferred to V1.5+. The launch milestone is now "Olaf Adventures runs a real event end-to-end on OLAF", with no calendar deadline.
+
+> **What changed from v1.1**: V1 shipped 2026-05-19 (Spring Camp Beskydy, Olaf Adventures). Post-launch session 2026-05-20 promoted several V1.5/V2 items into V1: Risk-checklist V1 baby step, full-config event duplication, auto-event-completion, Workspace + Tvůrce-komunity tab layouts, Gear block in landing builder. See §11 "Post-launch shipping log" for the running list. Personal gear catalogue + lists shipped earlier in May (was V1.5 backlog).
 
 ---
 
@@ -587,10 +589,10 @@ Each slice ships as one PR with model + API + UI + tests. Nothing starts until t
 ## 11. Roadmap beyond V1
 
 **V1.5 — Polish & loved features**
-- Community wall feed (posts, comments, reactions, pinning, GPX attachments).
+- ~~Community wall feed (posts, comments, reactions, pinning, GPX attachments).~~ **Shipped V1** — workspace + event walls, pin/like/reply, attachment uploads, e-mail + Web Push notifications.
 - OAuth logins (Google, Microsoft, Apple).
-- Personal gear catalogue + suggestions from past events.
-- Web push notifications (VAPID + service worker push handler).
+- ~~Personal gear catalogue + suggestions from past events.~~ **Shipped V1** — `/admin/vybaveni` items + seznamy + sharing (public/unlisted/private), Notion CSV import, recommended-gear FK on Event, participant checklist, Gear block in landing builder.
+- ~~Web push notifications (VAPID + service worker push handler).~~ **Shipped V1**.
 - Onboarding wizard for first-time Creators.
 - CSV invite bulk upload.
 - GPX preview rendering (Leaflet) + Mapy.cz integration.
@@ -599,8 +601,26 @@ Each slice ships as one PR with model + API + UI + tests. Nothing starts until t
 - 30-day soft-delete buffer for workspaces and events.
 - Newsletter integration (Mailchimp / Brevo connectors).
 - Multi-Owner promotion UI; workspace-create flow for new tenants.
-- **Named event templates** — "Save as template" + template picker on `/events/new`. Builds on the V1 duplication primitive.
-- **Event gallery block** — multi-image upload with sort + lightbox; matches `3_Dev/Pitztal` reference.
+- **Named event templates** — "Save as template" + template picker on `/events/new`. **Substantially covered V1** by full-config event duplication (copies risks/docs/gear/billing/checklist). Named-template UI on top would still be useful.
+- ~~**Event gallery block** — multi-image upload with sort + lightbox; matches `3_Dev/Pitztal` reference.~~ **Shipped V1**.
+- **Fio Banka webhook** + **iDoklad invoicing API** — automated payment reconciliation. Pitched 2026-05-18.
+- **CZ localization at platform level** — current build is Czech-first hardcoded; i18n framework adoption is the V1.5 cleanup. Deferred per user direction until after other V1 features ship.
+
+### Post-launch shipping log
+
+Items promoted into V1 after the 2026-05-19 production launch:
+
+| Date | Slice | Notes |
+|---|---|---|
+| 2026-05-20 | Risk-checklist V1 baby step | `Event.risk_checklist` JSONField + template (Počasí / Trasa / Vybavení / Zdraví / Komunikace / Doprava); owner-only via `can_manage_event`. Full Risk engine in §13 still V2. |
+| 2026-05-20 | Full-config event duplication | `POST /api/events/<ws>/<event>/duplicate/` now copies price, billing, gear list FK, required docs, risk checklist (statuses reset), owner checklist rows. Operationally meaningful clone, not just template+sections. |
+| 2026-05-20 | Auto-event-completion | Celery beat task `events.complete_finished_events` (15 min interval) flips `published → completed` when `ends_at` passes. |
+| 2026-05-20 | Workspace landing tabs | `/workspaces/[slug]` — Akce + Nástěnka as tab switcher instead of anchor-stacked sections. |
+| 2026-05-20 | Tvůrce komunity tabs | `/admin/komunity/[slug]` — Dashboard / Nástěnka / Členové; "Pozvat" no longer top-level. |
+| 2026-05-20 | Členové tab = full CRM | Extracted `WorkspaceInviteSection` + `MembersCrmView` as shared components; "+ Pozvat člena" CTA inline in CRM header. Single source of truth (no preview-vs-full duplication). |
+| 2026-05-20 | Gear block in landing builder | Added `"gear"` to `ADD_OPTIONS` — block was implemented but unreachable. |
+| 2026-05-20 | Dashboard cleanup | `/dashboard` shows only Čeká na tebe / Moje nadcházející akce / Moje komunity. Creator-side events live exclusively in Tvůrce. |
+| 2026-05-20 | SWA deploy concurrency | `concurrency: { group: swa-prod-deploy }` on the Azure SWA workflow — five-PR-in-three-seconds bursts no longer race for the single env slot. |
 
 **V2 — Commercial features**
 - Stripe-based payments for paid events (one-time + deposits).
@@ -638,9 +658,14 @@ Each slice ships as one PR with model + API + UI + tests. Nothing starts until t
 
 ---
 
-## 13. Risk Management Checklist (V2 feature)
+## 13. Risk Management Checklist
 
-Added 2026-05-14 per user direction. **Not in V1 scope** — documented here so it's not lost. Implementation lands in V2 alongside the Paid Events + Owner Event Editor work.
+Added 2026-05-14 per user direction. **V1 baby step shipped 2026-05-20** — `Event.risk_checklist` JSONField + an 11-item template (Počasí / Trasa / Vybavení / Zdraví / Komunikace / Doprava) with owner-only visibility via `can_manage_event`. Per-item shape: `{key, label, category, status (open/done/na), notes}`. Validated in `EventWriteSerializer.validate_risk_checklist`. The full rule-driven engine described below is still **V2 work** — what's live now is the manual checklist UX, no engine, no per-event rule firing, no PDF export.
+
+What still needs V2:
+- The `Event` extension fields (`is_outdoor`, `environment`, `has_water_crossing`, …) that drive the rule engine.
+- `RiskCategory` + `Risk` + `EventRisk` tables (the live JSONField is freeform, not normalised).
+- Rule firing / scoring / PDF export / dashboard widget.
 
 ### Purpose
 
