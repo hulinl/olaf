@@ -889,6 +889,22 @@ export const workspaces = {
     apiFetch<void>(`/api/workspaces/${slug}/invitations/${invitationId}/`, {
       method: "DELETE",
     }),
+  bulkInvite: (
+    slug: string,
+    emails: string,
+    role: "member" | "admin" = "member",
+  ) =>
+    apiFetch<{
+      added: { email: string; role: WorkspaceRole }[];
+      invited: { email: string; id: number }[];
+      already_member: string[];
+      already_invited: string[];
+      invalid: { email: string; reason: string }[];
+      total_processed: number;
+    }>(`/api/workspaces/${slug}/invitations/bulk/`, {
+      method: "POST",
+      body: JSON.stringify({ emails, role }),
+    }),
   getInviteLink: (slug: string) =>
     apiFetch<{ public_invite_token: string; invite_url: string }>(
       `/api/workspaces/${slug}/invite-link/`,

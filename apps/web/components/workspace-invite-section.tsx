@@ -113,6 +113,8 @@ export function WorkspaceInviteSection({
               onChange={reload}
             />
 
+            <BulkInvitePanel wsSlug={wsSlug} onChange={reload} />
+
             <PendingInvitations
               wsSlug={wsSlug}
               invitations={invitations}
@@ -330,6 +332,157 @@ function PublicLinkPanel({
             tomu, komu odkaz sám pošleš.
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+function BulkInvitePanel({
+  wsSlug,
+  onChange,
+}: {
+  wsSlug: string;
+  onChange: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [role, setRole] = useState<"member" | "admin">("member");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<
+    Awaited<ReturnType<typeof workspaces.bulkInvite>> | null
+  >(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!text.trim()) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await workspaces.bulkInvite(wsSlug, text, role);
+      setResult(r);
+      // Clear the input only if we actually processed something — keep
+      // it on the screen when everything came back invalid so the user
+      // can fix typos.
+      if (r.invited.length + r.added.length > 0) {
+        setText("");
+      }
+      await onChange();
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Hromadný import selhal.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-baseline justify-between gap-2 text-left focus-ring"
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Hromadný import (CSV)
+        </p>
+        <span
+          aria-hidden
+          className={[
+            "text-xs",
+            open ? "rotate-90 text-ink-500" : "text-ink-500",
+          ].join(" ")}
+        >
+          ›
+        </span>
+      </button>
+      {open && (
+        <>
+          <p className="text-xs text-ink-500">
+            Vlož e-maily — jeden na řádek nebo oddělené čárkou /
+            středníkem. Když má někdo už účet, přidá se rovnou; jinak
+            mu pošleme pozvánku.
+          </p>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={"alice@example.com\nbob@example.com\ncarol@example.com"}
+            rows={5}
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-ink-900 focus-ring"
+          />
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Role pro všechny" htmlFor="bulk-role">
+              <select
+                id="bulk-role"
+                value={role}
+                onChange={(e) =>
+                  setRole(e.target.value as "member" | "admin")
+                }
+                className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+              >
+                <option value="member">Člen</option>
+                <option value="admin">Admin</option>
+              </select>
+            </Field>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              loading={busy}
+              onClick={submit}
+              disabled={!text.trim()}
+            >
+              {busy ? "..." : "Importovat"}
+            </Button>
+          </div>
+          {error && (
+            <p className="rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-xs text-danger">
+              {error}
+            </p>
+          )}
+          {result && (
+            <div className="rounded-md border border-border bg-surface-muted/40 p-3 text-xs text-ink-700">
+              <p className="font-semibold text-ink-900">
+                Zpracováno {result.total_processed}{" "}
+                {result.total_processed === 1
+                  ? "řádek"
+                  : result.total_processed < 5
+                    ? "řádky"
+                    : "řádků"}
+              </p>
+              <ul className="mt-2 flex flex-col gap-0.5">
+                {result.added.length > 0 && (
+                  <li>
+                    ✓ {result.added.length} přidáno přímo (mají už účet)
+                  </li>
+                )}
+                {result.invited.length > 0 && (
+                  <li>
+                    ↗ {result.invited.length} pozvánka odeslána
+                  </li>
+                )}
+                {result.already_member.length > 0 && (
+                  <li>· {result.already_member.length} už je členem</li>
+                )}
+                {result.already_invited.length > 0 && (
+                  <li>
+                    · {result.already_invited.length} už má čekající
+                    pozvánku
+                  </li>
+                )}
+                {result.invalid.length > 0 && (
+                  <li className="text-danger">
+                    ✗ {result.invalid.length} špatný formát:{" "}
+                    {result.invalid
+                      .map((x) => x.email || "(prázdné)")
+                      .join(", ")}
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
