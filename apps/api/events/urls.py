@@ -8,6 +8,11 @@ urlpatterns = [
     path("mine/", views.my_events, name="mine"),
     path("owner/", views.owner_events, name="owner"),
     path(
+        "from-source/",
+        views.ingest_event_from_source,
+        name="from-source",
+    ),
+    path(
         "<slug:workspace_slug>/create/",
         views.create_event,
         name="create",

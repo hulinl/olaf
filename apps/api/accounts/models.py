@@ -150,6 +150,31 @@ class User(AbstractBaseUser, PermissionsMixin):
         ),
     )
 
+    # Third-party integrations (V2.1+). Stored encrypted at rest via
+    # accounts.integrations.encrypt_token; raw value never crosses the
+    # API boundary back to the client — frontend only ever sees
+    # "connected: bool".
+    notion_integration_token_encrypted = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "Fernet-encrypted Notion internal integration token. "
+            "Used to fetch Notion pages when ingesting an event from "
+            "a URL. User generates the token at notion.so/profile/"
+            "integrations and pastes it into settings → integrace."
+        ),
+    )
+    anthropic_api_key_encrypted = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "Fernet-encrypted Anthropic API key. Per-user so each "
+            "creator's LLM calls go on their own bill — no shared "
+            "platform key, no admin gating. User generates the key at "
+            "console.anthropic.com and pastes into settings → integrace."
+        ),
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"

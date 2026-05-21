@@ -274,3 +274,184 @@ class ProfileCompletionTests(TestCase):
         self.user.save()
         keys = [m["key"] for m in self.user.profile_completion["missing"]]
         self.assertIn("phone", keys)
+
+
+class NotionIntegrationTests(TestCase):
+    """Covers the user-scoped Notion token storage endpoint.
+
+    Token confidentiality is the load-bearing property here:
+    - never echoed back to the client
+    - encrypted at rest (test by inspecting the DB column)
+    - decryptable via the helper so the backend can actually use it
+    """
+
+    def setUp(self) -> None:
+        from rest_framework.test import APIClient
+
+        self.user = User.objects.create_user(
+            email="alice@notion.example.com",
+            password="alpine-hike-2026",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.url = "/api/auth/me/integrations/notion/"
+
+    def test_anonymous_blocked(self) -> None:
+        from rest_framework.test import APIClient
+
+        resp = APIClient().get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_initially_disconnected(self) -> None:
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(resp.json()["connected"])
+
+    def test_put_stores_encrypted_and_connected_flag_flips(self) -> None:
+        from .integrations import decrypt_token
+
+        raw = "secret_" + "a" * 50
+        resp = self.client.put(self.url, {"token": raw}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.json()["connected"])
+
+        self.user.refresh_from_db()
+        ciphertext = self.user.notion_integration_token_encrypted
+        # Must NOT be plaintext.
+        self.assertNotIn(raw, ciphertext)
+        self.assertTrue(ciphertext)
+        # Must decrypt back to the original.
+        self.assertEqual(decrypt_token(ciphertext), raw)
+
+    def test_put_response_never_contains_token(self) -> None:
+        raw = "secret_" + "b" * 50
+        resp = self.client.put(self.url, {"token": raw}, format="json")
+        body = resp.json()
+        self.assertNotIn("token", body)
+        self.assertNotIn(raw, str(body))
+
+    def test_get_never_returns_token(self) -> None:
+        from .integrations import encrypt_token
+
+        self.user.notion_integration_token_encrypted = encrypt_token(
+            "secret_" + "c" * 50
+        )
+        self.user.save()
+        resp = self.client.get(self.url)
+        body = resp.json()
+        self.assertEqual(set(body.keys()), {"connected"})
+        self.assertTrue(body["connected"])
+
+    def test_put_rejects_empty(self) -> None:
+        resp = self.client.put(self.url, {"token": ""}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_put_rejects_wrong_prefix(self) -> None:
+        resp = self.client.put(
+            self.url, {"token": "bearer_xxx_not_notion"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_put_rejects_too_short(self) -> None:
+        resp = self.client.put(
+            self.url, {"token": "secret_short"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_accepts_ntn_prefix(self) -> None:
+        # Notion issues `ntn_…` tokens for new integrations alongside
+        # the older `secret_…` form. Both should be accepted.
+        raw = "ntn_" + "x" * 50
+        resp = self.client.put(self.url, {"token": raw}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_delete_clears_token(self) -> None:
+        from .integrations import encrypt_token
+
+        self.user.notion_integration_token_encrypted = encrypt_token(
+            "secret_" + "d" * 50
+        )
+        self.user.save()
+        resp = self.client.delete(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(resp.json()["connected"])
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.notion_integration_token_encrypted, "")
+
+    def test_safe_decrypt_returns_none_on_corruption(self) -> None:
+        from .integrations import safe_decrypt_token
+
+        # Garbage in DB (e.g. previous key was rotated) shouldn't crash
+        # — caller should treat it as 'not connected'.
+        self.assertIsNone(safe_decrypt_token("not-real-ciphertext"))
+        self.assertIsNone(safe_decrypt_token(""))
+
+
+class AnthropicIntegrationTests(TestCase):
+    """Same contract as the Notion endpoint — token is per-user,
+    encrypted at rest, never echoed back. Shape check enforces the
+    `sk-ant-` prefix so an obvious typo doesn't show up as a 401
+    mid-ingest."""
+
+    def setUp(self) -> None:
+        from rest_framework.test import APIClient
+
+        self.user = User.objects.create_user(
+            email="alice@anthropic.example.com",
+            password="alpine-hike-2026",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.url = "/api/auth/me/integrations/anthropic/"
+
+    def test_initially_disconnected(self) -> None:
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(resp.json()["connected"])
+
+    def test_put_stores_encrypted(self) -> None:
+        from .integrations import decrypt_token
+
+        raw = "sk-ant-" + "a" * 50
+        resp = self.client.put(self.url, {"token": raw}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.json()["connected"])
+        self.user.refresh_from_db()
+        ciphertext = self.user.anthropic_api_key_encrypted
+        self.assertNotIn(raw, ciphertext)
+        self.assertTrue(ciphertext)
+        self.assertEqual(decrypt_token(ciphertext), raw)
+
+    def test_get_only_returns_connected_flag(self) -> None:
+        from .integrations import encrypt_token
+
+        self.user.anthropic_api_key_encrypted = encrypt_token(
+            "sk-ant-" + "b" * 50
+        )
+        self.user.save()
+        resp = self.client.get(self.url)
+        self.assertEqual(set(resp.json().keys()), {"connected"})
+
+    def test_put_rejects_wrong_prefix(self) -> None:
+        resp = self.client.put(
+            self.url, {"token": "bearer_xxx_not_anthropic"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_put_rejects_too_short(self) -> None:
+        resp = self.client.put(
+            self.url, {"token": "sk-ant-short"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delete_clears_key(self) -> None:
+        from .integrations import encrypt_token
+
+        self.user.anthropic_api_key_encrypted = encrypt_token(
+            "sk-ant-" + "c" * 50
+        )
+        self.user.save()
+        resp = self.client.delete(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.anthropic_api_key_encrypted, "")

@@ -23,3 +23,10 @@ pywebpush==2.0.3
 ruff==0.8.4
 pytest==8.3.4
 pytest-django==4.9.0
+# Fernet symmetric encryption for user-scoped integration tokens
+# (Notion, future OAuth, etc.). Already transitively available via
+# pywebpush + azure SDKs, but make it explicit so a dep upgrade
+# doesn't silently drop it.
+cryptography==44.0.0
+# Notion API client — V2.1 event-from-source ingest.
+notion-client==2.2.1

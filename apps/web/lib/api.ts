@@ -258,6 +258,26 @@ export interface EventDraftPreview {
   workspace_logo_url: string | null;
 }
 
+/** Output of the Notion+Claude ingest pipeline. Slim subset of Event
+ *  fields — unknown values come back null. Frontend maps this into an
+ *  EventForm `initial` after fixing up null → "" / undefined as
+ *  EventForm expects. */
+export interface EventDraftFromSource {
+  title: string | null;
+  description: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  location_text: string | null;
+  meeting_point_text: string | null;
+  location_url: string | null;
+  capacity: number | null;
+  price_amount: string | null;
+  price_currency: string | null;
+  price_note: string | null;
+  notes: string[] | null;
+  source_url: string;
+}
+
 export interface RequiredDocumentSpec {
   key: string;
   label: string;
@@ -1182,6 +1202,14 @@ export const events = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  /** V2.1 — extract a draft Event payload from a Notion URL.
+   *  Returns a slim object (subset of Event fields) the create form
+   *  can mount as `initial`. Does NOT persist. */
+  ingestFromSource: (url: string) =>
+    apiFetch<EventDraftFromSource>("/api/events/from-source/", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
   update: (
     workspaceSlug: string,
     eventSlug: string,
@@ -1636,6 +1664,34 @@ export const auth = {
     }),
   me: () => apiFetch<User>("/api/auth/me/"),
   todo: () => apiFetch<TodoItem[]>("/api/auth/me/todo/"),
+  getNotionIntegration: () =>
+    apiFetch<{ connected: boolean }>(
+      "/api/auth/me/integrations/notion/",
+    ),
+  setNotionIntegration: (token: string) =>
+    apiFetch<{ connected: boolean }>(
+      "/api/auth/me/integrations/notion/",
+      { method: "PUT", body: JSON.stringify({ token }) },
+    ),
+  removeNotionIntegration: () =>
+    apiFetch<{ connected: boolean }>(
+      "/api/auth/me/integrations/notion/",
+      { method: "DELETE" },
+    ),
+  getAnthropicIntegration: () =>
+    apiFetch<{ connected: boolean }>(
+      "/api/auth/me/integrations/anthropic/",
+    ),
+  setAnthropicIntegration: (token: string) =>
+    apiFetch<{ connected: boolean }>(
+      "/api/auth/me/integrations/anthropic/",
+      { method: "PUT", body: JSON.stringify({ token }) },
+    ),
+  removeAnthropicIntegration: () =>
+    apiFetch<{ connected: boolean }>(
+      "/api/auth/me/integrations/anthropic/",
+      { method: "DELETE" },
+    ),
   billingProfiles: () =>
     apiFetch<BillingProfile[]>("/api/auth/me/billing-profiles/"),
   createBillingProfile: (payload: BillingProfileWritePayload) =>

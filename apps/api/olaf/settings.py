@@ -210,3 +210,11 @@ LOGGING = {
 VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
 VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="")
 VAPID_SUBJECT = env("VAPID_SUBJECT", default="mailto:no-reply@olaf.events")
+
+# Integration tokens (Notion, Anthropic) are stored encrypted per-user
+# via accounts.integrations.encrypt_token. The Fernet key is derived
+# from DJANGO_SECRET_KEY (see that module) — no separate env var to
+# manage. Consequence: rotating SECRET_KEY invalidates every stored
+# integration token; users just re-enter them in /settings/integrace.
+# That's acceptable since rotation should be rare and the affected
+# users see a clear "připoj znovu" state.

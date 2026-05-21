@@ -33,6 +33,16 @@ urlpatterns = [
         name="push-subscription-detail",
     ),
     path("me/push-test/", views.push_test, name="push-test"),
+    path(
+        "me/integrations/notion/",
+        views.notion_integration,
+        name="notion-integration",
+    ),
+    path(
+        "me/integrations/anthropic/",
+        views.anthropic_integration,
+        name="anthropic-integration",
+    ),
     path("me/people/", views.creator_people, name="creator-people"),
     path(
         "me/people/<int:user_id>/",

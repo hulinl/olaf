@@ -7,6 +7,7 @@ const NAV = [
   { href: "/settings/profile", label: "Profil" },
   { href: "/settings/fakturace", label: "Fakturace" },
   { href: "/settings/notifications", label: "Notifikace" },
+  { href: "/settings/integrace", label: "Integrace" },
   { href: "/settings/account", label: "Účet" },
 ];
 
