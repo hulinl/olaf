@@ -1347,6 +1347,153 @@ def workspace_invitations(request: Request, slug: str) -> Response:
     )
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_invitations_bulk(request: Request, slug: str) -> Response:
+    """Bulk-invite many e-mails in one call.
+
+    Body: { "entries": [{ "email": "...", "role"?: "member|admin" }, ...] }
+       or { "emails": "one per line, comma-separated also ok" }
+       with optional top-level "role" applied to every row that
+       doesn't have its own.
+
+    Each row runs the same logic as the single-invite endpoint:
+    existing user → added as member directly; new e-mail →
+    invitation row + e-mail. Idempotent — re-uploading the same
+    list is a no-op (pending invitation already exists).
+
+    Returns per-row results so the UI can render:
+      added: existing users added directly
+      invited: new pending invitations
+      already_member: noop (already in workspace)
+      already_invited: noop (pending invitation already exists)
+      invalid: rejected (bad format)
+    """
+    from accounts.models import User
+
+    from .models import WorkspaceInvitation
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    default_role_raw = (request.data.get("role") or "").strip().lower()
+    default_role = (
+        WorkspaceMember.ROLE_ADMIN
+        if default_role_raw == WorkspaceMember.ROLE_ADMIN
+        else WorkspaceMember.ROLE_MEMBER
+    )
+
+    raw_entries: list[dict] = []
+    if isinstance(request.data.get("entries"), list):
+        for row in request.data["entries"]:
+            if isinstance(row, dict):
+                raw_entries.append(row)
+            elif isinstance(row, str):
+                raw_entries.append({"email": row})
+    elif isinstance(request.data.get("emails"), str):
+        # Free-form textarea blob — split on newlines, commas, semicolons.
+        import re
+
+        for chunk in re.split(r"[\n,;]+", request.data["emails"]):
+            chunk = chunk.strip()
+            if chunk:
+                raw_entries.append({"email": chunk})
+
+    if not raw_entries:
+        return Response(
+            {
+                "detail": "Body needs 'entries' (list) or 'emails' (string).",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    added: list[dict] = []
+    invited: list[dict] = []
+    already_member: list[str] = []
+    already_invited: list[str] = []
+    invalid: list[dict] = []
+    seen: set[str] = set()
+
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    for entry in raw_entries:
+        email = (entry.get("email") or "").strip().lower()
+        try:
+            validate_email(email)
+        except ValidationError:
+            invalid.append({"email": email, "reason": "bad-format"})
+            continue
+        if email in seen:
+            # Same e-mail typed twice in one upload — treat the second
+            # occurrence as a no-op so counts don't double up.
+            continue
+        seen.add(email)
+
+        row_role_raw = (entry.get("role") or "").strip().lower()
+        role = (
+            WorkspaceMember.ROLE_ADMIN
+            if row_role_raw == WorkspaceMember.ROLE_ADMIN
+            else default_role
+        )
+
+        existing = User.objects.filter(email__iexact=email).first()
+        if existing is not None:
+            membership, created = WorkspaceMember.objects.get_or_create(
+                workspace=workspace,
+                user=existing,
+                defaults={"role": role},
+            )
+            if created:
+                added.append({"email": email, "role": membership.role})
+            elif (
+                membership.role == WorkspaceMember.ROLE_MEMBER
+                and role == WorkspaceMember.ROLE_ADMIN
+            ):
+                # Bump existing member to admin — useful on re-upload
+                # when the role column changed.
+                membership.role = role
+                membership.save(update_fields=["role"])
+                added.append({"email": email, "role": membership.role})
+            else:
+                already_member.append(email)
+            continue
+
+        invitation, created = WorkspaceInvitation.objects.get_or_create(
+            workspace=workspace,
+            email=email,
+            status=WorkspaceInvitation.STATUS_PENDING,
+            defaults={"invited_by": request.user, "role": role},
+        )
+        if created:
+            _send_workspace_invitation_email(invitation)
+            invited.append({"email": email, "id": invitation.id})
+        else:
+            already_invited.append(email)
+
+    return Response(
+        {
+            "added": added,
+            "invited": invited,
+            "already_member": already_member,
+            "already_invited": already_invited,
+            "invalid": invalid,
+            "total_processed": (
+                len(added)
+                + len(invited)
+                + len(already_member)
+                + len(already_invited)
+                + len(invalid)
+            ),
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def workspace_invitation_detail(

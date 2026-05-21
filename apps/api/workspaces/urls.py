@@ -99,6 +99,11 @@ urlpatterns = [
         name="invitation-detail",
     ),
     path(
+        "<slug:slug>/invitations/bulk/",
+        views.workspace_invitations_bulk,
+        name="invitations-bulk",
+    ),
+    path(
         "<slug:slug>/invite-link/",
         views.workspace_invite_link,
         name="invite-link",
