@@ -23,6 +23,8 @@ const ACTION_LABELS: Record<string, string> = {
   "rsvp.approve": "Schválení přihlášky",
   "rsvp.reject": "Zamítnutí přihlášky",
   "workspace_member.role_change": "Změna role člena",
+  "discussion.topic.delete": "Smazání tématu",
+  "discussion.comment.delete": "Smazání komentáře",
 };
 
 const PAGE_SIZE = 50;
