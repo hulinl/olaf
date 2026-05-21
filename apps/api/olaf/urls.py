@@ -20,6 +20,10 @@ urlpatterns = [
     path("api/communities/", include("communities.urls", namespace="communities")),
     path("api/discussions/", include("discussions.urls", namespace="discussions")),
     path("api/gear/", include("gear.urls", namespace="gear")),
+    path(
+        "api/notifications/",
+        include("notifications.urls", namespace="notifications"),
+    ),
 ]
 
 if settings.DEBUG:

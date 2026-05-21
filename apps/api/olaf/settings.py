@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "communities",
     "discussions",
     "gear",
+    "notifications",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
