@@ -350,6 +350,7 @@ class EventSummarySerializer(serializers.ModelSerializer):
             "price_amount",
             "price_currency",
             "price_note",
+            "deleted_at",
         )
         read_only_fields = fields
 

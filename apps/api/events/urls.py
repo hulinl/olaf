@@ -7,6 +7,7 @@ app_name = "events"
 urlpatterns = [
     path("mine/", views.my_events, name="mine"),
     path("owner/", views.owner_events, name="owner"),
+    path("trash/", views.deleted_events_list, name="trash"),
     path(
         "from-source/",
         views.ingest_event_from_source,
@@ -61,6 +62,21 @@ urlpatterns = [
         "<slug:workspace_slug>/<slug:event_slug>/cancel/",
         views.cancel_event,
         name="cancel",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/delete/",
+        views.soft_delete_event,
+        name="soft-delete",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/restore/",
+        views.restore_event,
+        name="restore",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/purge/",
+        views.purge_event,
+        name="purge",
     ),
     path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/",
