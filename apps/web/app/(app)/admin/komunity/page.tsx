@@ -92,26 +92,69 @@ export default function AdminKomunityTablePage() {
       )}
 
       {!loading && (myWorkspaces?.length ?? 0) > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-muted/60">
-              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                <th className="px-4 py-3">Komunita</th>
-                <th className="px-4 py-3">Lokalita</th>
-                <th className="px-4 py-3">Viditelnost</th>
-                <th className="px-4 py-3 text-right">Členů</th>
-                <th className="px-4 py-3 text-right">Akce</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {myWorkspaces!.map((w) => (
-                <KomunityRow key={w.slug} workspace={w} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Mobile: card list. The 5-column table is too wide for a
+              360 px viewport and horizontal scroll defeats the
+              "scan my komunity" use case. */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {myWorkspaces!.map((w) => (
+              <KomunityCard key={w.slug} workspace={w} />
+            ))}
+          </div>
+          {/* sm+: full table. */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted/60">
+                <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                  <th className="px-4 py-3">Komunita</th>
+                  <th className="px-4 py-3">Lokalita</th>
+                  <th className="px-4 py-3">Viditelnost</th>
+                  <th className="px-4 py-3 text-right">Členů</th>
+                  <th className="px-4 py-3 text-right">Akce</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {myWorkspaces!.map((w) => (
+                  <KomunityRow key={w.slug} workspace={w} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+function KomunityCard({ workspace: w }: { workspace: Workspace }) {
+  const href = `/admin/komunity/${w.slug}`;
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand hover:shadow-md focus-ring"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-base font-semibold text-ink-900">{w.name}</p>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500">
+          {VISIBILITY_LABEL[w.visibility]}
+        </span>
+      </div>
+      {w.bio && (
+        <p className="line-clamp-2 text-xs text-ink-500">{w.bio}</p>
+      )}
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-ink-500">
+        {w.location && (
+          <>
+            <dt>Lokalita</dt>
+            <dd className="truncate text-right text-ink-700">{w.location}</dd>
+          </>
+        )}
+        <dt>Členů</dt>
+        <dd className="text-right font-medium text-ink-900 tabular-nums">
+          {w.member_count ?? "—"}
+        </dd>
+      </dl>
+    </Link>
   );
 }
 
