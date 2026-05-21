@@ -41,6 +41,13 @@ const RSVP_STATUS_TONE: Record<string, string> = {
 };
 
 type TabKey = "nastenka" | "registrace" | "vybaveni";
+type RegSubTab = "platba" | "dokumenty" | "faktura";
+
+const REG_SUBTABS_FROM_HASH: Record<string, RegSubTab> = {
+  platba: "platba",
+  dokumenty: "dokumenty",
+  faktura: "faktura",
+};
 
 /**
  * Participant's event hub.
@@ -112,20 +119,13 @@ export default function MyEventPage({ params }: Props) {
     };
   }, [wsSlug, eventSlug, router, searchParams]);
 
-  // After the page mounts and the right tab is active, honor any
-  // #section hash from the deep-link (dashboard → ?tab=registrace#dokumenty).
-  // We delay one frame so the panel anchors are in the DOM.
-  useEffect(() => {
-    if (loading || tab !== "registrace") return;
-    if (typeof window === "undefined") return;
-    const hash = window.location.hash.replace("#", "");
-    if (!hash) return;
-    const id = window.requestAnimationFrame(() => {
-      const el = document.getElementById(hash);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [loading, tab]);
+  // Deep-link hash (#platba / #dokumenty / #faktura) selects the
+  // matching sub-tab inside Registrace. Done as state read once on
+  // mount — the panel owns the sub-tab state from there.
+  const initialRegSubTab: RegSubTab | undefined =
+    typeof window !== "undefined"
+      ? REG_SUBTABS_FROM_HASH[window.location.hash.replace("#", "")]
+      : undefined;
 
   if (loading) {
     return (
@@ -277,6 +277,7 @@ export default function MyEventPage({ params }: Props) {
                 invoice={invoice}
                 wsSlug={wsSlug}
                 eventSlug={eventSlug}
+                initialSubTab={initialRegSubTab}
               />
             )}
           </div>
@@ -476,18 +477,73 @@ function TabButton({
   );
 }
 
+function RegSubTabs({
+  active,
+  onChange,
+  fakturaAvailable,
+}: {
+  active: RegSubTab;
+  onChange: (next: RegSubTab) => void;
+  fakturaAvailable: boolean;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Sekce registrace"
+      className="flex flex-wrap gap-2 text-sm"
+    >
+      <TabButton
+        active={active === "platba"}
+        onClick={() => onChange("platba")}
+        label="Platba"
+      />
+      <TabButton
+        active={active === "dokumenty"}
+        onClick={() => onChange("dokumenty")}
+        label="Dokumenty"
+      />
+      {fakturaAvailable && (
+        <TabButton
+          active={active === "faktura"}
+          onClick={() => onChange("faktura")}
+          label="Faktura"
+        />
+      )}
+    </div>
+  );
+}
+
 function MyReservationPanel({
   event,
   invoice,
   wsSlug,
   eventSlug,
+  initialSubTab,
 }: {
   event: OlafEvent;
   invoice: Invoice | null;
   wsSlug: string;
   eventSlug: string;
+  initialSubTab?: RegSubTab;
 }) {
   const my = event.my_rsvp;
+  // Sub-tabs replace the previous platba/dokumenty/faktura
+  // scroll-anchor stack — the user explicitly prefers swap-in-place
+  // tabs over anchor jumps (back button gets confused, the URL
+  // doesn't tell you which section is active).
+  //
+  // Default tab pick: honor a deep-link hash if it points at a real
+  // section (faktura collapses to platba when no invoice yet), else
+  // start on platba. The user lands here from the dashboard either
+  // because they owe money (anchor=platba) or need to upload docs
+  // (anchor=dokumenty) — platba is the safer default when no anchor.
+  const fakturaAvailable = invoice != null;
+  const subTabResolved: RegSubTab =
+    initialSubTab === "faktura" && !fakturaAvailable
+      ? "platba"
+      : initialSubTab ?? "platba";
+  const [subTab, setSubTab] = useState<RegSubTab>(subTabResolved);
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1 border-b border-border pb-4">
@@ -500,7 +556,9 @@ function MyReservationPanel({
         </p>
       </header>
 
-      {/* RSVP status summary */}
+      {/* RSVP status summary — tab-independent so it stays above the
+          sub-tab strip; status is small + useful regardless of which
+          sub-section the user clicked into. */}
       {my && (
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -539,21 +597,26 @@ function MyReservationPanel({
         </div>
       )}
 
-      <div id="platba" className="scroll-mt-24">
+      <RegSubTabs
+        active={subTab}
+        onChange={setSubTab}
+        fakturaAvailable={fakturaAvailable}
+      />
+
+      {subTab === "platba" && (
         <PaymentInstructionsPanel
           workspaceSlug={wsSlug}
           eventSlug={eventSlug}
         />
-      </div>
+      )}
 
-      <div id="dokumenty" className="scroll-mt-24">
+      {subTab === "dokumenty" && (
         <RequiredDocsPanel workspaceSlug={wsSlug} eventSlug={eventSlug} />
-      </div>
+      )}
 
-      {invoice && (
+      {subTab === "faktura" && invoice && (
         <section
-          id="faktura"
-          className="scroll-mt-24 rounded-2xl border border-border bg-surface p-6 shadow-sm"
+          className="rounded-2xl border border-border bg-surface p-6 shadow-sm"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div>
