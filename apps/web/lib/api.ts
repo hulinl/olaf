@@ -1921,3 +1921,39 @@ export interface GearImportResult {
   lists_total: number;
   edges_created: number;
 }
+
+// ---------------------------------------------------------------------------
+// Notifications (bell feed)
+// ---------------------------------------------------------------------------
+
+export interface NotificationItem {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  link: string;
+  payload: Record<string, unknown>;
+  read_at: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const notifications = {
+  list: (params: { unreadOnly?: boolean; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.unreadOnly) qs.set("unread_only", "1");
+    if (params.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return apiFetch<NotificationItem[]>(`/api/notifications/${suffix}`);
+  },
+  count: () =>
+    apiFetch<{ unread: number }>("/api/notifications/count/"),
+  markRead: (id: number) =>
+    apiFetch<NotificationItem>(`/api/notifications/${id}/read/`, {
+      method: "POST",
+    }),
+  markAllRead: () =>
+    apiFetch<{ flipped: number }>("/api/notifications/read-all/", {
+      method: "POST",
+    }),
+};
