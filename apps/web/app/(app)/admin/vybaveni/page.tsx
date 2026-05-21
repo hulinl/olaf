@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Alert, Card, CardSection } from "@/components/ui/card";
+import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -156,68 +156,66 @@ function CategorySection({
   }
 
   return (
-    <Card>
-      <CardSection>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+      >
+        <div>
+          <h3 className="text-base font-semibold text-ink-900">
+            Kategorie ({categories.length})
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Vlastní slovník pro tvůj gear — z těchto kategorií pak vybíráš
+            při zakládání položky. Přejmenování se propíše do všech věcí.
+          </p>
+        </div>
+        <span
+          aria-hidden
+          className={open ? "rotate-90 text-ink-500" : "text-ink-500"}
         >
-          <div>
-            <h3 className="text-base font-semibold text-ink-900">
-              Kategorie ({categories.length})
-            </h3>
-            <p className="mt-1 text-sm text-ink-500">
-              Vlastní slovník pro tvůj gear — z těchto kategorií pak vybíráš
-              při zakládání položky. Přejmenování se propíše do všech věcí.
+          ›
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-4 flex flex-col gap-2">
+          {categories.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+              Zatím žádné kategorie. Přidej první níže nebo nech je založit
+              importem.
             </p>
-          </div>
-          <span
-            aria-hidden
-            className={open ? "rotate-90 text-ink-500" : "text-ink-500"}
-          >
-            ›
-          </span>
-        </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {categories.map((c) => (
+                <CategoryRow
+                  key={c.id}
+                  category={c}
+                  usage={usageById.get(c.id) ?? 0}
+                  onRename={(name) => rename(c, name)}
+                  onDelete={() => remove(c)}
+                />
+              ))}
+            </div>
+          )}
 
-        {open && (
-          <div className="mt-4 flex flex-col gap-2">
-            {categories.length === 0 ? (
-              <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
-                Zatím žádné kategorie. Přidej první níže nebo nech je založit
-                importem.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {categories.map((c) => (
-                  <CategoryRow
-                    key={c.id}
-                    category={c}
-                    usage={usageById.get(c.id) ?? 0}
-                    onRename={(name) => rename(c, name)}
-                    onDelete={() => remove(c)}
-                  />
-                ))}
-              </div>
-            )}
-
-            <form onSubmit={create} className="mt-2 flex flex-wrap gap-2">
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="např. Spaní"
-                maxLength={60}
-                className="flex-1 min-w-[200px]"
-              />
-              <Button type="submit" variant="primary" size="md" loading={busy}>
-                {busy ? "..." : "Přidat kategorii"}
-              </Button>
-            </form>
-            {error && <Alert variant="danger">{error}</Alert>}
-          </div>
-        )}
-      </CardSection>
-    </Card>
+          <form onSubmit={create} className="mt-2 flex flex-wrap gap-2">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="např. Spaní"
+              maxLength={60}
+              className="flex-1 min-w-[200px]"
+            />
+            <Button type="submit" variant="primary" size="md" loading={busy}>
+              {busy ? "..." : "Přidat kategorii"}
+            </Button>
+          </form>
+          {error && <Alert variant="danger">{error}</Alert>}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -295,69 +293,67 @@ function ImportSection({ onChange }: { onChange: () => Promise<void> }) {
   }
 
   return (
-    <Card>
-      <CardSection>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 text-left focus-ring"
-        >
-          <div>
-            <h3 className="text-base font-semibold text-ink-900">
-              Import z Notion CSV
-            </h3>
-            <p className="mt-1 text-sm text-ink-500">
-              Máš svůj gear v Notion databázi? Exportuj ji jako CSV (View
-              → ⋯ → Export → Format: CSV) a nahraj sem. Položky se
-              upsertují podle názvu, seznamy podle Notion UUID — re-import
-              je bezpečný.
-            </p>
-          </div>
-          <span aria-hidden className={open ? "rotate-90 text-ink-500" : "text-ink-500"}>
-            ›
-          </span>
-        </button>
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+      >
+        <div>
+          <h3 className="text-base font-semibold text-ink-900">
+            Import z Notion CSV
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Máš svůj gear v Notion databázi? Exportuj ji jako CSV (View
+            → ⋯ → Export → Format: CSV) a nahraj sem. Položky se
+            upsertují podle názvu, seznamy podle Notion UUID — re-import
+            je bezpečný.
+          </p>
+        </div>
+        <span aria-hidden className={open ? "rotate-90 text-ink-500" : "text-ink-500"}>
+          ›
+        </span>
+      </button>
 
-        {open && (
-          <div className="mt-4 flex flex-col gap-3">
-            <label
-              className={[
-                "flex flex-col items-start gap-2 rounded-md border border-dashed bg-surface-muted/30 p-4 text-sm",
-                busy ? "opacity-60" : "cursor-pointer hover:border-brand",
-                "border-border-strong",
-              ].join(" ")}
-            >
-              <span className="font-medium text-ink-900">
-                {busy ? "Importuju…" : "Vyber CSV soubor"}
-              </span>
-              <span className="text-xs text-ink-500">
-                Očekávané sloupce: name, category, link, gear list (název
-                seznamu), unit weight [grams], qty, type, specific type,
-                price.
-              </span>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                disabled={busy}
-                onChange={handleFile}
-                className="hidden"
-              />
-            </label>
+      {open && (
+        <div className="mt-4 flex flex-col gap-3">
+          <label
+            className={[
+              "flex flex-col items-start gap-2 rounded-md border border-dashed bg-surface-muted/30 p-4 text-sm",
+              busy ? "opacity-60" : "cursor-pointer hover:border-brand",
+              "border-border-strong",
+            ].join(" ")}
+          >
+            <span className="font-medium text-ink-900">
+              {busy ? "Importuju…" : "Vyber CSV soubor"}
+            </span>
+            <span className="text-xs text-ink-500">
+              Očekávané sloupce: name, category, link, gear list (název
+              seznamu), unit weight [grams], qty, type, specific type,
+              price.
+            </span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              disabled={busy}
+              onChange={handleFile}
+              className="hidden"
+            />
+          </label>
 
-            {result && (
-              <Alert variant="success">
-                Import dokončen — {result.rows} řádků zpracováno.
-                Vytvořeno {result.items_created} položek,{" "}
-                {result.items_backfilled} doplněno o chybějící pole.
-                Seznamů: {result.lists_total}. Vazeb položka↔seznam:{" "}
-                {result.edges_created}.
-              </Alert>
-            )}
-            {error && <Alert variant="danger">{error}</Alert>}
-          </div>
-        )}
-      </CardSection>
-    </Card>
+          {result && (
+            <Alert variant="success">
+              Import dokončen — {result.rows} řádků zpracováno.
+              Vytvořeno {result.items_created} položek,{" "}
+              {result.items_backfilled} doplněno o chybějící pole.
+              Seznamů: {result.lists_total}. Vazeb položka↔seznam:{" "}
+              {result.edges_created}.
+            </Alert>
+          )}
+          {error && <Alert variant="danger">{error}</Alert>}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -394,75 +390,73 @@ function AffiliateSection() {
   }
 
   return (
-    <Card>
-      <CardSection>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 text-left focus-ring"
-        >
-          <div>
-            <h3 className="text-base font-semibold text-ink-900">
-              Affiliate partneři
-            </h3>
-            <p className="mt-1 text-sm text-ink-500">
-              Když si někdo klikne přes tvůj gear na e-shop, můžeme k URL
-              automaticky přidat tvůj affiliate identifikátor. Stačí
-              přidat e-shop a páry klíč/hodnota.
-            </p>
-          </div>
-          <span aria-hidden className={open ? "rotate-90 text-ink-500" : "text-ink-500"}>
-            ›
-          </span>
-        </button>
+    <section>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left focus-ring"
+      >
+        <div>
+          <h3 className="text-base font-semibold text-ink-900">
+            Affiliate partneři
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Když si někdo klikne přes tvůj gear na e-shop, můžeme k URL
+            automaticky přidat tvůj affiliate identifikátor. Stačí
+            přidat e-shop a páry klíč/hodnota.
+          </p>
+        </div>
+        <span aria-hidden className={open ? "rotate-90 text-ink-500" : "text-ink-500"}>
+          ›
+        </span>
+      </button>
 
-        {open && partners && (
-          <div className="mt-4 flex flex-col gap-3">
-            {partners.length === 0 && (
-              <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
-                Zatím nemáš žádného partnera. Příklad: doména „alza.cz",
-                klíč „ref", hodnota tvůj affiliate ID.
-              </p>
-            )}
-            {partners.map((p, i) => (
-              <PartnerRow
-                key={i}
-                partner={p}
-                onChange={(next) => {
-                  const copy = [...partners];
-                  copy[i] = next;
-                  update(copy);
-                }}
-                onDelete={() =>
-                  update(partners.filter((_, j) => j !== i))
-                }
-              />
-            ))}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  update([...partners, { domain: "", params: {} }])
-                }
-                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
-              >
-                + Přidat partnera
-              </button>
-              <Button
-                type="button"
-                variant="primary"
-                size="md"
-                loading={busy}
-                onClick={save}
-              >
-                {busy ? "Ukládám…" : "Uložit"}
-              </Button>
-              {msg && <span className="text-xs text-ink-500">{msg}</span>}
-            </div>
+      {open && partners && (
+        <div className="mt-4 flex flex-col gap-3">
+          {partners.length === 0 && (
+            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+              Zatím nemáš žádného partnera. Příklad: doména „alza.cz",
+              klíč „ref", hodnota tvůj affiliate ID.
+            </p>
+          )}
+          {partners.map((p, i) => (
+            <PartnerRow
+              key={i}
+              partner={p}
+              onChange={(next) => {
+                const copy = [...partners];
+                copy[i] = next;
+                update(copy);
+              }}
+              onDelete={() =>
+                update(partners.filter((_, j) => j !== i))
+              }
+            />
+          ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                update([...partners, { domain: "", params: {} }])
+              }
+              className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+            >
+              + Přidat partnera
+            </button>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              loading={busy}
+              onClick={save}
+            >
+              {busy ? "Ukládám…" : "Uložit"}
+            </Button>
+            {msg && <span className="text-xs text-ink-500">{msg}</span>}
           </div>
-        )}
-      </CardSection>
-    </Card>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -607,8 +601,7 @@ function ItemSection({
   });
 
   return (
-    <Card>
-      <CardSection>
+    <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -738,8 +731,7 @@ function ItemSection({
             onChange={onChange}
           />
         )}
-      </CardSection>
-    </Card>
+    </section>
   );
 }
 
@@ -793,13 +785,11 @@ function ItemsByCategoryView({
   // multiple sibling tables loses column alignment across groups
   // because each table sizes its own columns; one table with one
   // shared <thead> guarantees identical column widths down the page.
-  // Auto layout (not table-fixed) lets the Položka column actually
-  // breathe on mobile — fixed layout combined with the colgroup
-  // widths was crushing names to four-line wraps. Outer border is
-  // collapsed on mobile because the Card around us already provides
-  // it; inside the card it just doubled up.
+  // Auto layout (not table-fixed) lets the Položka column breathe on
+  // mobile. Border is always-on now — the parent ItemSection no
+  // longer wraps us in a Card, so we need to provide our own outline.
   return (
-    <div className="mt-4 overflow-x-auto sm:rounded-md sm:border sm:border-border">
+    <div className="mt-4 overflow-x-auto rounded-md border border-border">
       <table className="w-full text-sm">
         <thead className="bg-surface-muted/30">
           <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
@@ -1266,8 +1256,7 @@ function ListSection({
   }
 
   return (
-    <Card>
-      <CardSection>
+    <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -1345,8 +1334,7 @@ function ListSection({
             ))}
           </div>
         ))}
-      </CardSection>
-    </Card>
+    </section>
   );
 }
 
@@ -1519,7 +1507,7 @@ function ListEntriesByCategoryView({
   }
 
   return (
-    <div className="mt-2 overflow-x-auto sm:rounded-md sm:border sm:border-border">
+    <div className="mt-2 overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-surface-muted/30">
           <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500">
