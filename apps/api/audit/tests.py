@@ -100,6 +100,44 @@ class AuditServiceTests(TestCase):
         assert row is not None
         self.assertIsNone(row.actor)
 
+    def test_purge_old_removes_past_retention_only(self) -> None:
+        from datetime import timedelta
+
+        from .services import DEFAULT_RETENTION_DAYS, purge_old
+
+        old = audit_log(action="x", summary="old")
+        recent = audit_log(action="x", summary="recent")
+        assert old is not None and recent is not None
+        # Backdate `old` past the retention window.
+        AuditLog.objects.filter(pk=old.pk).update(
+            created_at=timezone.now()
+            - timedelta(days=DEFAULT_RETENTION_DAYS + 5)
+        )
+        purged = purge_old()
+        self.assertEqual(purged, 1)
+        self.assertFalse(AuditLog.objects.filter(pk=old.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(pk=recent.pk).exists())
+
+    def test_purge_old_is_a_no_op_when_nothing_to_remove(self) -> None:
+        from .services import purge_old
+
+        audit_log(action="x", summary="recent")
+        self.assertEqual(purge_old(), 0)
+
+    def test_purge_task_returns_purged_count(self) -> None:
+        from datetime import timedelta
+
+        from .tasks import purge_old_audit_rows_task
+
+        old = audit_log(action="x", summary="old")
+        assert old is not None
+        AuditLog.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        # Custom retention_days=1 so we don't have to fudge by 540+ days.
+        result = purge_old_audit_rows_task(retention_days=1)
+        self.assertEqual(result, {"purged": 1})
+
     def test_swallows_failure_returns_none(self) -> None:
         # If AuditLog.objects.create blows up (e.g. migration drift),
         # the helper must return None without raising. The originating

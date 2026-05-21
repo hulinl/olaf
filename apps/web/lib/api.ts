@@ -544,6 +544,10 @@ export interface RSVPRecord extends MyRSVP {
    *  required-document expectations. Independent of EventCollaborator
    *  (edit rights). */
   is_organizer: boolean;
+  /** Soft duplicate detection — populated when this RSVP shares a
+   *  normalized phone or name with another non-cancelled RSVP on the
+   *  same event. Used to render the "⚠ Možný duplikát" badge. */
+  duplicate_hints: ("same_phone" | "same_name")[];
   updated_at: string;
 }
 

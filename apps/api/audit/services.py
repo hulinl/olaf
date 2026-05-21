@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
+
+from django.utils import timezone
 
 from .models import AuditLog
 
@@ -17,6 +20,12 @@ if TYPE_CHECKING:
     from workspaces.models import Workspace
 
 logger = logging.getLogger(__name__)
+
+# Audit is append-only but unbounded growth would eventually slow the
+# `/admin/audit` viewer. 18 months keeps two camp seasons of history
+# (May-Sep cycle) - enough to retroactively spot anything that needs
+# digging out. Bumpable per workspace later if anyone wants longer.
+DEFAULT_RETENTION_DAYS = 18 * 30
 
 
 def log(
@@ -52,3 +61,15 @@ def log(
         with contextlib.suppress(Exception):
             return None
     return None
+
+
+def purge_old(retention_days: int = DEFAULT_RETENTION_DAYS) -> int:
+    """Hard-delete audit rows older than `retention_days`. Returns the
+    count of rows removed. Idempotent — running twice in a day removes
+    on the first call and is a no-op on the second."""
+    cutoff = timezone.now() - timedelta(days=retention_days)
+    qs = AuditLog.objects.filter(created_at__lt=cutoff)
+    count = qs.count()
+    if count:
+        qs.delete()
+    return count
