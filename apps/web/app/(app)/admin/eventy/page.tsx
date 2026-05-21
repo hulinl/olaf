@@ -94,9 +94,18 @@ export default function AdminEventyTablePage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs filter={filter} onChange={setFilter} />
-        <LinkButton href="/admin/eventy/new" variant="primary" size="md">
-          + Vytvořit akci
-        </LinkButton>
+        <div className="flex flex-wrap gap-2">
+          <LinkButton
+            href="/admin/eventy/new/from-source"
+            variant="secondary"
+            size="md"
+          >
+            ↗ Z odkazu (Notion)
+          </LinkButton>
+          <LinkButton href="/admin/eventy/new" variant="primary" size="md">
+            + Vytvořit akci
+          </LinkButton>
+        </div>
       </div>
 
       {loading && (

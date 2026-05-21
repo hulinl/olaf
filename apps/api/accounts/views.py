@@ -449,6 +449,111 @@ def push_test(request: Request) -> Response:
 
 
 # ---------------------------------------------------------------------------
+# Third-party integrations — user-scoped tokens for fetching content
+# from Notion / future OAuth providers. Token is stored encrypted; the
+# raw value never crosses back to the frontend.
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET", "PUT", "DELETE"])
+@permission_classes([IsAuthenticated])
+def notion_integration(request: Request) -> Response:
+    """Manage the calling user's Notion integration token.
+
+    GET → { connected: bool }
+    PUT { token } → store the encrypted token, returns { connected: true }
+    DELETE → wipe the token, returns { connected: false }
+
+    The token itself is never echoed back. Frontend only ever learns
+    whether the integration is set up.
+    """
+    from .integrations import encrypt_token
+
+    user = request.user
+
+    if request.method == "GET":
+        return Response(
+            {"connected": bool(user.notion_integration_token_encrypted)}
+        )
+
+    if request.method == "DELETE":
+        user.notion_integration_token_encrypted = ""
+        user.save(update_fields=["notion_integration_token_encrypted"])
+        return Response({"connected": False})
+
+    # PUT
+    raw = (request.data.get("token") or "").strip()
+    if not raw:
+        return Response(
+            {"token": "Token nesmí být prázdný."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # Notion internal-integration tokens are `secret_…` prefixed and
+    # at least ~50 chars. Cheap shape check so we don't accept obvious
+    # nonsense and have to find out at API-call time.
+    if not raw.startswith(("secret_", "ntn_")) or len(raw) < 40:
+        return Response(
+            {
+                "token": (
+                    "Tohle nevypadá jako platný Notion integration token "
+                    "(očekáváme prefix `secret_` nebo `ntn_`). Vygeneruj "
+                    "ho v notion.so/profile/integrations."
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user.notion_integration_token_encrypted = encrypt_token(raw)
+    user.save(update_fields=["notion_integration_token_encrypted"])
+    return Response({"connected": True})
+
+
+@api_view(["GET", "PUT", "DELETE"])
+@permission_classes([IsAuthenticated])
+def anthropic_integration(request: Request) -> Response:
+    """Manage the calling user's Anthropic API key.
+
+    Per-user so each creator's LLM calls go on their own bill. Same
+    contract as the Notion endpoint:
+      GET → { connected }
+      PUT { token } → { connected: true }
+      DELETE → { connected: false }
+    The raw key is never echoed back to the client.
+    """
+    from .integrations import encrypt_token
+
+    user = request.user
+
+    if request.method == "GET":
+        return Response({"connected": bool(user.anthropic_api_key_encrypted)})
+
+    if request.method == "DELETE":
+        user.anthropic_api_key_encrypted = ""
+        user.save(update_fields=["anthropic_api_key_encrypted"])
+        return Response({"connected": False})
+
+    raw = (request.data.get("token") or "").strip()
+    if not raw:
+        return Response(
+            {"token": "API key nesmí být prázdný."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not raw.startswith("sk-ant-") or len(raw) < 40:
+        return Response(
+            {
+                "token": (
+                    "Tohle nevypadá jako platný Anthropic API key "
+                    "(očekáváme prefix `sk-ant-`). Vygeneruj ho v "
+                    "console.anthropic.com → API Keys → Create."
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user.anthropic_api_key_encrypted = encrypt_token(raw)
+    user.save(update_fields=["anthropic_api_key_encrypted"])
+    return Response({"connected": True})
+
+
+# ---------------------------------------------------------------------------
 # Lidé — proto-CRM list of everyone who has RSVPed to creator's events
 # ---------------------------------------------------------------------------
 

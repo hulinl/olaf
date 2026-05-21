@@ -282,6 +282,73 @@ def owner_events(request: Request) -> Response:
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def ingest_event_from_source(request: Request) -> Response:
+    """Extract a draft Event payload from a Notion URL.
+
+    Uses the calling user's stored Notion + Anthropic credentials
+    (see /api/auth/me/integrations/). Returns the parsed draft so
+    the frontend can mount it in the standard event-create form for
+    the owner to review + edit before persisting — we never auto-
+    save, AI extracts are fallible.
+
+    Errors map to:
+      400 — bad URL, integration missing on this account, page
+            invisible to the integration, page empty, LLM didn't
+            return JSON.
+      502 — upstream Notion or Anthropic API failure (transient).
+    """
+    from accounts.integrations import safe_decrypt_token
+
+    from .notion_ingest import IngestError, ingest_event_from_notion_url
+
+    url = (request.data.get("url") or "").strip()
+    if not url:
+        return Response(
+            {"url": "URL je povinná."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    notion_token = safe_decrypt_token(
+        request.user.notion_integration_token_encrypted
+    )
+    anthropic_key = safe_decrypt_token(
+        request.user.anthropic_api_key_encrypted
+    )
+    if not notion_token:
+        return Response(
+            {
+                "detail": (
+                    "Nemáš připojený Notion. Otevři /settings/integrace "
+                    "a vlož svůj Notion integration token."
+                ),
+                "missing": "notion",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not anthropic_key:
+        return Response(
+            {
+                "detail": (
+                    "Nemáš připojený Anthropic API key. Otevři "
+                    "/settings/integrace a vlož svůj klíč."
+                ),
+                "missing": "anthropic",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        draft = ingest_event_from_notion_url(url, notion_token, anthropic_key)
+    except IngestError as e:
+        return Response(
+            {"detail": str(e)},
+            status=e.status_code,
+        )
+    return Response(draft)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def create_event(request: Request, workspace_slug: str) -> Response:
     """Owner-only create. The workspace is identified by URL slug."""
     from workspaces.models import Workspace
