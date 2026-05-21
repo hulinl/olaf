@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { CountryPicker } from "@/components/ui/country-picker";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -269,16 +270,10 @@ export default function BillingProfilesPage() {
                   />
                 </Field>
                 <Field label="Země" htmlFor="bp-country">
-                  <Input
+                  <CountryPicker
                     id="bp-country"
-                    maxLength={2}
                     value={draft.address_country ?? "CZ"}
-                    onChange={(e) =>
-                      update(
-                        "address_country",
-                        e.target.value.toUpperCase().slice(0, 2),
-                      )
-                    }
+                    onChange={(code) => update("address_country", code)}
                   />
                 </Field>
                 <Field
