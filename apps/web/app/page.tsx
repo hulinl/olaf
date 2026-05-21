@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HeroCta } from "@/components/marketing/hero-cta";
 import { TopographyBg } from "@/components/marketing/topography-bg";
 import { LinkButton } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
@@ -65,13 +66,8 @@ export default function Home() {
               firemní tým. Komunita má profil, akce mají landing page,
               přihlášky mají pořádek a tvůrce má cockpit, kde to všechno řídí.
             </p>
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-              <LinkButton href="/signup" variant="primary" size="lg">
-                Vytvořit účet
-              </LinkButton>
-              <LinkButton href="/login" variant="secondary" size="lg">
-                Mám už účet
-              </LinkButton>
+            <div className="mt-10">
+              <HeroCta />
             </div>
           </div>
         </section>
