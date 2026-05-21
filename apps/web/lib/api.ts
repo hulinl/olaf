@@ -198,6 +198,7 @@ export interface EventSummary {
   price_amount: string | null;
   price_currency: string;
   price_note: string;
+  deleted_at: string | null;
 }
 
 export interface EventImage {
@@ -1234,6 +1235,19 @@ export const events = {
     apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/cancel/`, {
       method: "POST",
       body: JSON.stringify({ reason }),
+    }),
+  trashList: () => apiFetch<EventSummary[]>("/api/events/trash/"),
+  softDelete: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/delete/`, {
+      method: "POST",
+    }),
+  restore: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<Event>(`/api/events/${workspaceSlug}/${eventSlug}/restore/`, {
+      method: "POST",
+    }),
+  purge: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<void>(`/api/events/${workspaceSlug}/${eventSlug}/purge/`, {
+      method: "POST",
     }),
   uploadCover: (workspaceSlug: string, eventSlug: string, file: File) => {
     const fd = new FormData();

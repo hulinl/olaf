@@ -4,8 +4,37 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
-from workspaces.managers import TenantScopedModel
+from workspaces.managers import TenantQuerySet, TenantScopedModel
 from workspaces.validators import SLUG_MAX_LENGTH, SLUG_RE
+
+
+class EventQuerySet(TenantQuerySet):
+    """Event queryset with explicit alive/deleted filters. Used by
+    both the default `objects` manager (alive-only) and the escape-
+    hatch `all_objects` manager (full set)."""
+
+    def alive(self) -> "EventQuerySet":
+        return self.filter(deleted_at__isnull=True)
+
+    def deleted(self) -> "EventQuerySet":
+        return self.filter(deleted_at__isnull=False)
+
+
+class AliveEventManager(models.Manager.from_queryset(EventQuerySet)):
+    """Default manager — hides soft-deleted rows. Existing list /
+    detail queries (`Event.objects.filter(...)`, `Event.objects.get(
+    slug=...)`) automatically exclude trashed events."""
+
+    def get_queryset(self) -> EventQuerySet:
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+
+class AllEventsManager(models.Manager.from_queryset(EventQuerySet)):
+    """Escape-hatch — used by the restore endpoint, the purge endpoint,
+    and the 30-day retention Celery task. NEVER use this from the
+    public event-list/detail views."""
+
+    pass
 
 
 def validate_event_slug(value: str) -> None:
@@ -243,6 +272,31 @@ class Event(TenantScopedModel):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Soft-delete columns. The default `objects` manager hides rows
+    # with deleted_at set; the parallel `all_objects` manager surfaces
+    # them for restore/purge flows + retention task.
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Set when the owner soft-deletes the event. NULL = alive. "
+            "Rows with deleted_at older than 30 days are hard-purged by "
+            "the `events.purge_old_soft_deletes` Celery task."
+        ),
+    )
+    deleted_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Audit pointer — who soft-deleted this event.",
+    )
+
+    objects = AliveEventManager()
+    all_objects = AllEventsManager()
+
     class Meta:
         db_table = "events_event"
         ordering = ["-starts_at"]
@@ -265,6 +319,29 @@ class Event(TenantScopedModel):
     @property
     def is_open_for_rsvp(self) -> bool:
         return self.status == self.STATUS_PUBLISHED
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self, user=None) -> None:
+        """Mark the event as deleted but keep the row. Restorable for
+        the retention window (30 days) before the Celery task hard-
+        purges it. Public + owner-facing queries hide deleted_at != null
+        events automatically via the default manager."""
+        if self.deleted_at is not None:
+            return
+        self.deleted_at = timezone.now()
+        self.deleted_by = user
+        self.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+
+    def restore(self) -> None:
+        """Undo a soft-delete. No-op when the event isn't deleted."""
+        if self.deleted_at is None:
+            return
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
 
     @property
     def effective_questionnaire_sections(self) -> list[str]:

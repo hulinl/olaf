@@ -94,7 +94,13 @@ export default function AdminEventyTablePage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs filter={filter} onChange={setFilter} />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/eventy/kos"
+            className="text-sm text-ink-500 hover:text-ink-900 focus-ring"
+          >
+            Koš
+          </Link>
           <LinkButton
             href="/admin/eventy/new/from-source"
             variant="secondary"

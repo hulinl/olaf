@@ -89,6 +89,21 @@ def complete_finished_events_task() -> dict[str, int]:
     return {"flipped": flipped}
 
 
+@shared_task(name="events.purge_old_soft_deletes")
+def purge_old_soft_deletes_task(retention_days: int = 30) -> dict[str, int]:
+    """Hard-delete events that have been soft-deleted longer than
+    `retention_days`. The Trash UI shows the deadline so owners aren't
+    surprised. Runs once daily from Celery beat."""
+    from datetime import timedelta
+
+    cutoff = timezone.now() - timedelta(days=retention_days)
+    qs = Event.all_objects.filter(deleted_at__lt=cutoff)
+    count = qs.count()
+    if count:
+        qs.delete()
+    return {"purged": count}
+
+
 @shared_task(name="events.send_checklist_reminder_now")
 def send_checklist_reminder_now_task(item_id: int) -> int:
     """Force-send a reminder for a single item (owner override).

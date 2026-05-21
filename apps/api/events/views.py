@@ -881,6 +881,121 @@ def cancel_event(
     return Response(EventPublicSerializer(event, context={"request": request}).data)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def soft_delete_event(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner soft-deletes an event. Row is hidden from the default
+    manager (so all public + admin lists stop showing it) but kept in
+    the DB for 30 days so it can be restored from the Trash. After
+    30 days the `events.purge_old_soft_deletes` Celery task hard-
+    deletes it."""
+    try:
+        event = Event.all_objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    event.soft_delete(user=request.user)
+    return Response(
+        EventPublicSerializer(event, context={"request": request}).data
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def restore_event(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Bring a soft-deleted event back. Only available while the row
+    is still inside the 30-day retention window."""
+    try:
+        event = Event.all_objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    if event.deleted_at is None:
+        return Response(
+            {"detail": "Akce není smazaná."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    event.restore()
+    return Response(
+        EventPublicSerializer(event, context={"request": request}).data
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def purge_event(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Hard-delete a soft-deleted event NOW (skip the 30-day wait).
+    Refuses to act on a live event — purge is destructive enough that
+    we want a two-step path (soft_delete → purge) every time."""
+    try:
+        event = Event.all_objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    if event.deleted_at is None:
+        return Response(
+            {
+                "detail": (
+                    "Před hard-delete musí být akce nejdřív v koši "
+                    "(soft-delete)."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    event.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def deleted_events_list(request: Request) -> Response:
+    """Trash list — soft-deleted events the calling user can manage.
+    Mirrors the scope of `owner_events`."""
+    from django.db.models import Q
+
+    from .models import EventCollaborator
+
+    managed_ws_ids = list(
+        Workspace.objects.filter(
+            members__user=request.user,
+            members__role__in=["owner", "admin"],
+        )
+        .values_list("id", flat=True)
+        .distinct()
+    )
+    collab_event_ids = list(
+        EventCollaborator.objects.filter(user=request.user)
+        .values_list("event_id", flat=True)
+        .distinct()
+    )
+    events = (
+        Event.all_objects.filter(deleted_at__isnull=False)
+        .filter(
+            Q(workspace_id__in=managed_ws_ids) | Q(id__in=collab_event_ids)
+        )
+        .select_related("workspace", "deleted_by")
+        .order_by("-deleted_at")
+        .distinct()
+    )
+    serializer = EventSummarySerializer(events, many=True)
+    return Response(serializer.data)
+
+
 def _owner_event_or_403(request, workspace_slug: str, event_slug: str):
     """Resolve event + verify manager access. Workspace owner/admin OR
     explicit event co-creator. Returns (event, None) on success or
