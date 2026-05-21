@@ -455,3 +455,46 @@ class AnthropicIntegrationTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertEqual(self.user.anthropic_api_key_encrypted, "")
+
+
+class NoStoreApiHeaderTests(TestCase):
+    """The user-reported "saved on web but mobile shows old data"
+    bug came from iOS Safari heuristically caching authenticated
+    GETs. NoStoreApiMiddleware forces Cache-Control: no-store on
+    every /api/* response. Verify the header is actually set."""
+
+    def setUp(self) -> None:
+        from rest_framework.test import APIClient
+
+        self.user = User.objects.create_user(
+            email="alice@nostore.example.com",
+            password="alpine-hike-2026",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_api_response_has_no_store_header(self) -> None:
+        resp = self.client.get("/api/auth/me/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn("Cache-Control", resp.headers)
+        self.assertIn("no-store", resp["Cache-Control"])
+
+    def test_non_api_response_not_touched(self) -> None:
+        from django.test import RequestFactory
+
+        from olaf.no_store_middleware import NoStoreApiMiddleware
+
+        # Use the middleware in isolation against a non-/api/ path so
+        # we don't depend on any specific Django view existing in the
+        # test env — just verify the path-scoping decision.
+        rf = RequestFactory()
+        request = rf.get("/some-frontend-page/")
+
+        def fake_get_response(_req):
+            from django.http import HttpResponse
+
+            return HttpResponse("ok")
+
+        mw = NoStoreApiMiddleware(fake_get_response)
+        response = mw(request)
+        self.assertNotIn("no-store", response.get("Cache-Control", "").lower())
