@@ -1,6 +1,7 @@
 """Event + RSVP views."""
 from __future__ import annotations
 
+import contextlib
 import secrets
 
 from django.contrib.auth import login
@@ -466,13 +467,34 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     shared_workspace_slugs = serializer.validated_data.pop(
         "shared_workspace_slugs", None
     )
+
+    # Snapshot participant-visible fields BEFORE save so we can
+    # diff against the post-save state and fan out a bell-feed
+    # notification per active RSVPed user.
+    from .notifications import (
+        diff_changed_fields,
+        notify_event_updated,
+        snapshot_event_for_diff,
+    )
+
+    before = snapshot_event_for_diff(event)
     event = serializer.save()
+    after = snapshot_event_for_diff(event)
+    changed = diff_changed_fields(before, after)
+
     if has_communities:
         _set_event_communities(event, community_slugs or [])
     if has_shared:
         _set_event_shared_workspaces(
             event, shared_workspace_slugs or [], requesting_user=request.user
         )
+
+    # Best-effort: notification fan-out runs after the structural
+    # save so a failure here (e.g. the DB hiccupping on bulk_create)
+    # doesn't unwind the event update itself.
+    with contextlib.suppress(Exception):
+        notify_event_updated(event, changed, actor=request.user)
+
     return Response(EventPublicSerializer(event, context={"request": request}).data)
 
 
@@ -911,6 +933,13 @@ def approve_rsvp(
     rsvp.save(update_fields=["status", "waitlist_position", "updated_at"])
 
     send_rsvp_confirmation_task.delay(rsvp.pk)
+
+    # In-app bell — best-effort, doesn't block on email/push pipeline.
+    with contextlib.suppress(Exception):
+        from .notifications import notify_rsvp_approved
+
+        notify_rsvp_approved(rsvp)
+
     return Response(RSVPSerializer(rsvp).data)
 
 
@@ -935,6 +964,12 @@ def reject_rsvp(
         )
 
     rsvp.cancel()
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_rsvp_rejected
+
+        notify_rsvp_rejected(rsvp)
+
     return Response(RSVPSerializer(rsvp).data)
 
 
