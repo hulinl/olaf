@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AppFooter } from "@/components/ui/app-footer";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
@@ -278,19 +279,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
           </section>
         )}
 
-        <footer className="bg-canvas">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              © {new Date().getFullYear()} {workspace.name}
-            </span>
-            <span>
-              <Link href="/" className="hover:text-ink-900">
-                olaf
-              </Link>{" "}
-              · EU-hosted · GDPR-clean
-            </span>
-          </div>
-        </footer>
+        <AppFooter />
       </main>
     </div>
   );
