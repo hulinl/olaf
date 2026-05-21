@@ -236,10 +236,13 @@ def cancel_my_rsvp(request: Request, workspace_slug: str, event_slug: str) -> Re
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_events(request: Request) -> Response:
-    """Events the current user is RSVP-ed to (any non-cancelled status)."""
+    """Events the current user is RSVP-ed to (any non-cancelled status).
+    Soft-deleted events are hidden — the owner's Trash decision needs
+    to be respected on the participant dashboard too."""
     rsvps = (
         RSVP.objects.filter(user=request.user)
         .exclude(status=RSVP.STATUS_CANCELLED)
+        .filter(event__deleted_at__isnull=True)
         .select_related("event", "event__workspace")
         .order_by("event__starts_at")
     )
