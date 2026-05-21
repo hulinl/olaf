@@ -495,6 +495,23 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     with contextlib.suppress(Exception):
         notify_event_updated(event, changed, actor=request.user)
 
+    if changed:
+        from audit.models import AuditLog
+        from audit.services import log as audit_log
+
+        audit_log(
+            actor=request.user,
+            action=AuditLog.ACTION_EVENT_UPDATE,
+            workspace=event.workspace,
+            target_type="event",
+            target_id=event.pk,
+            summary=(
+                f'Upravil akci „{event.title}" — '
+                f'{", ".join(changed)}'
+            ),
+            payload={"event_slug": event.slug, "changed_fields": changed},
+        )
+
     return Response(EventPublicSerializer(event, context={"request": request}).data)
 
 
@@ -877,6 +894,19 @@ def cancel_event(
     event.cancellation_reason = reason
     event.save(update_fields=["status", "cancellation_reason", "updated_at"])
 
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_CANCEL,
+        workspace=event.workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=f'Zrušil akci „{event.title}"',
+        payload={"event_slug": event.slug, "reason": reason},
+    )
+
     fan_out_event_cancellation_task.delay(event.pk, reason)
     return Response(EventPublicSerializer(event, context={"request": request}).data)
 
@@ -899,7 +929,21 @@ def soft_delete_event(
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
+    already_deleted = event.deleted_at is not None
     event.soft_delete(user=request.user)
+    if not already_deleted:
+        from audit.models import AuditLog
+        from audit.services import log as audit_log
+
+        audit_log(
+            actor=request.user,
+            action=AuditLog.ACTION_EVENT_SOFT_DELETE,
+            workspace=event.workspace,
+            target_type="event",
+            target_id=event.pk,
+            summary=f'Smazal akci „{event.title}" do koše',
+            payload={"event_slug": event.slug},
+        )
     return Response(
         EventPublicSerializer(event, context={"request": request}).data
     )
@@ -926,6 +970,18 @@ def restore_event(
             status=status.HTTP_400_BAD_REQUEST,
         )
     event.restore()
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_RESTORE,
+        workspace=event.workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=f'Obnovil akci „{event.title}" z koše',
+        payload={"event_slug": event.slug},
+    )
     return Response(
         EventPublicSerializer(event, context={"request": request}).data
     )
@@ -957,7 +1013,27 @@ def purge_event(
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+    # Capture identity BEFORE the row is gone — the audit row needs
+    # to outlive its target.
+    audit_ctx = {
+        "event_id": event.pk,
+        "event_slug": event.slug,
+        "event_title": event.title,
+        "workspace": event.workspace,
+    }
     event.delete()
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_PURGE,
+        workspace=audit_ctx["workspace"],
+        target_type="event",
+        target_id=audit_ctx["event_id"],
+        summary=f'Smazal akci „{audit_ctx["event_title"]}" napořád',
+        payload={"event_slug": audit_ctx["event_slug"]},
+    )
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -1055,6 +1131,23 @@ def approve_rsvp(
 
         notify_rsvp_approved(rsvp)
 
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    applicant_name = rsvp.user.get_full_name() if rsvp.user else "(neznámý)"
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_RSVP_APPROVE,
+        workspace=event.workspace,
+        target_type="rsvp",
+        target_id=rsvp.pk,
+        summary=f'Schválil přihlášku {applicant_name} na „{event.title}"',
+        payload={
+            "event_slug": event.slug,
+            "rsvp_status": rsvp.status,
+        },
+    )
+
     return Response(RSVPSerializer(rsvp).data)
 
 
@@ -1068,7 +1161,9 @@ def reject_rsvp(
     if err:
         return err
     try:
-        rsvp = RSVP.objects.get(pk=rsvp_id, event=event)
+        rsvp = RSVP.objects.select_related("user").get(
+            pk=rsvp_id, event=event
+        )
     except RSVP.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -1078,12 +1173,27 @@ def reject_rsvp(
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    reason = (request.data.get("reason") or "").strip()
     rsvp.cancel()
 
     with contextlib.suppress(Exception):
         from .notifications import notify_rsvp_rejected
 
-        notify_rsvp_rejected(rsvp)
+        notify_rsvp_rejected(rsvp, reason=reason)
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    applicant_name = rsvp.user.get_full_name() if rsvp.user else "(neznámý)"
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_RSVP_REJECT,
+        workspace=event.workspace,
+        target_type="rsvp",
+        target_id=rsvp.pk,
+        summary=f'Zamítl přihlášku {applicant_name} na „{event.title}"',
+        payload={"event_slug": event.slug, "reason": reason},
+    )
 
     return Response(RSVPSerializer(rsvp).data)
 

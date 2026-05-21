@@ -1974,3 +1974,45 @@ export const notifications = {
       method: "POST",
     }),
 };
+
+export interface AuditEntry {
+  id: number;
+  action: string;
+  summary: string;
+  target_type: string;
+  target_id: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  actor: { id: number; full_name: string; email: string } | null;
+}
+
+export interface AuditListResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  results: AuditEntry[];
+}
+
+export const audit = {
+  list: (params: {
+    workspace: string;
+    action?: string;
+    target_type?: string;
+    target_id?: string;
+    after?: string;
+    before?: string;
+    page?: number;
+    page_size?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    qs.set("workspace", params.workspace);
+    if (params.action) qs.set("action", params.action);
+    if (params.target_type) qs.set("target_type", params.target_type);
+    if (params.target_id) qs.set("target_id", params.target_id);
+    if (params.after) qs.set("after", params.after);
+    if (params.before) qs.set("before", params.before);
+    if (params.page) qs.set("page", String(params.page));
+    if (params.page_size) qs.set("page_size", String(params.page_size));
+    return apiFetch<AuditListResponse>(`/api/audit/?${qs}`);
+  },
+};
