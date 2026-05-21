@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { HeroCta } from "@/components/marketing/hero-cta";
 import { TopographyBg } from "@/components/marketing/topography-bg";
+import { AppFooter } from "@/components/ui/app-footer";
 import { LinkButton } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
@@ -151,12 +152,7 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="bg-canvas">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 border-t border-border px-4 py-10 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>© {new Date().getFullYear()} olaf</span>
-            <span>EU-hosted · GDPR-clean · PWA-first</span>
-          </div>
-        </footer>
+        <AppFooter variant="framed" />
       </main>
     </>
   );

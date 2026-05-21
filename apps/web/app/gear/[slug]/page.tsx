@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PublicGearBody } from "@/components/public-gear-body";
+import { AppFooter } from "@/components/ui/app-footer";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { type PublicGearList } from "@/lib/api";
@@ -135,16 +136,7 @@ export default async function PublicGearListPage({ params }: Props) {
           </div>
         </section>
 
-        <footer className="border-t border-border bg-canvas">
-          <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-8 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500">
-            <span>
-              © {new Date().getFullYear()}{" "}
-              <Link href="/" className="hover:text-ink-900">
-                olaf
-              </Link>
-            </span>
-          </div>
-        </footer>
+        <AppFooter />
       </main>
     </div>
   );

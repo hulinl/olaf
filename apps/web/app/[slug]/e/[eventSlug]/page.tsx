@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
+import { AppFooter } from "@/components/ui/app-footer";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
@@ -179,16 +180,7 @@ export default async function EventLandingPage({ params }: Props) {
             owner adds a Gallery block via the page builder when they
             want one, with their own eyebrow + title. */}
 
-        <footer className="border-t border-border bg-canvas">
-          <div className="mx-auto flex max-w-5xl items-center justify-center px-4 py-8 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500">
-            <span>
-              © {new Date().getFullYear()}{" "}
-              <Link href="/" className="hover:text-ink-900">
-                olaf
-              </Link>
-            </span>
-          </div>
-        </footer>
+        <AppFooter />
       </main>
     </div>
   );
@@ -258,16 +250,7 @@ function DraftPreviewPage({ preview }: { preview: EventDraftPreview }) {
         </div>
       </main>
 
-      <footer className="border-t border-border bg-canvas">
-        <div className="mx-auto flex max-w-5xl items-center justify-center px-4 py-8 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500">
-          <span>
-            © {new Date().getFullYear()}{" "}
-            <Link href="/" className="hover:text-ink-900">
-              olaf
-            </Link>
-          </span>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

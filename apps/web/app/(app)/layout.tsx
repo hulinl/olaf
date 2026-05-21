@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { AppFooter } from "@/components/ui/app-footer";
 import { AppHeader } from "@/components/ui/app-header";
 import { ApiError, User, auth } from "@/lib/api";
 import { UserContext } from "@/lib/user-context";
@@ -72,6 +73,7 @@ export default function AppLayout({
         signingOut={signingOut}
       />
       {children}
+      <AppFooter />
     </UserContext.Provider>
   );
 }
