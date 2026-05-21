@@ -31,6 +31,7 @@ class Notification(models.Model):
     # change; constants here are just hint-style references for the
     # backend fan-out code.
     KIND_DISCUSSION_REPLY = "discussion_reply"
+    KIND_DISCUSSION_ANNOUNCE = "discussion_announce"
     KIND_DISCUSSION_MENTION = "discussion_mention"
     KIND_EVENT_UPDATE = "event_update"
     KIND_RSVP_APPROVED = "rsvp_approved"
