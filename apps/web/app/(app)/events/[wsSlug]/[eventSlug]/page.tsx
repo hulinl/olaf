@@ -417,14 +417,16 @@ function TabBar({
   onChange: (next: TabKey) => void;
   hasGear: boolean;
 }) {
+  // Free-floating pill buttons (no surrounding panel) — matches the
+  // workspace-landing tab style the user explicitly liked
+  // ("oranžově a jsou to jenom dvě tlačítka"). The previous segmented
+  // grid worked but visually walled the tabs off; loose pills feel
+  // lighter and consistent with the komunita surface.
   return (
     <div
       role="tablist"
       aria-label="Sekce akce"
-      className={[
-        "grid gap-1 rounded-xl border border-border bg-surface-muted/50 p-1",
-        hasGear ? "grid-cols-3" : "grid-cols-2",
-      ].join(" ")}
+      className="flex flex-wrap gap-2 text-sm"
     >
       <TabButton
         active={tab === "nastenka"}
@@ -463,10 +465,10 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={[
-        "rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-ring",
+        "rounded-md border px-3 py-1.5 text-sm font-medium focus-ring",
         active
-          ? "bg-surface text-ink-900 shadow-sm"
-          : "text-ink-500 hover:text-ink-900",
+          ? "border-brand bg-brand text-brand-ink"
+          : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
       ].join(" ")}
     >
       {label}
