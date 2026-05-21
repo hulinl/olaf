@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 
 const ACTION_LABELS: Record<string, string> = {
+  "event.create": "Vytvoření akce",
   "event.soft_delete": "Smazání akce",
   "event.restore": "Obnovení akce",
   "event.purge": "Trvalé smazání",

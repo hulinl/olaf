@@ -584,8 +584,16 @@ def workspace_member_promote(
             status=status.HTTP_400_BAD_REQUEST,
         )
     if member.role != WorkspaceMember.ROLE_ADMIN:
+        old_role = member.role
         member.role = WorkspaceMember.ROLE_ADMIN
         member.save(update_fields=["role"])
+        _audit_role_change(
+            actor=request.user,
+            workspace=workspace,
+            member=member,
+            old_role=old_role,
+            new_role=member.role,
+        )
     return Response({"user_id": member.user_id, "role": member.role})
 
 
@@ -617,8 +625,16 @@ def workspace_member_demote(
             status=status.HTTP_400_BAD_REQUEST,
         )
     if member.role != WorkspaceMember.ROLE_MEMBER:
+        old_role = member.role
         member.role = WorkspaceMember.ROLE_MEMBER
         member.save(update_fields=["role"])
+        _audit_role_change(
+            actor=request.user,
+            workspace=workspace,
+            member=member,
+            old_role=old_role,
+            new_role=member.role,
+        )
     return Response({"user_id": member.user_id, "role": member.role})
 
 
@@ -677,12 +693,54 @@ def workspace_member_handover(
         target.role = WorkspaceMember.ROLE_OWNER
         target.save(update_fields=["role"])
 
+    _audit_role_change(
+        actor=request.user,
+        workspace=workspace,
+        member=target,
+        old_role=WorkspaceMember.ROLE_ADMIN,
+        new_role=target.role,
+    )
+    _audit_role_change(
+        actor=request.user,
+        workspace=workspace,
+        member=me,
+        old_role=WorkspaceMember.ROLE_OWNER,
+        new_role=me.role,
+    )
+
     return Response(
         {
             "new_owner_id": target.user_id,
             "old_owner_id": me.user_id,
             "old_owner_role": me.role,
         }
+    )
+
+
+def _audit_role_change(
+    *, actor, workspace, member, old_role: str, new_role: str
+) -> None:
+    """Single source of truth for the workspace_member.role_change audit row."""
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    target_name = (
+        member.user.get_full_name() if member.user_id else "(unknown user)"
+    )
+    audit_log(
+        actor=actor,
+        action=AuditLog.ACTION_MEMBER_ROLE_CHANGE,
+        workspace=workspace,
+        target_type="workspace_member",
+        target_id=member.pk,
+        summary=(
+            f'Změnil roli {target_name}: {old_role} → {new_role}'
+        ),
+        payload={
+            "user_id": member.user_id,
+            "old_role": old_role,
+            "new_role": new_role,
+        },
     )
 
 

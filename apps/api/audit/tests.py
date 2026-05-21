@@ -359,3 +359,141 @@ class AuditFromEventViewsTests(TestCase):
         self.assertEqual(r.status_code, 200)
         row = AuditLog.objects.get(action=AuditLog.ACTION_RSVP_REJECT)
         self.assertEqual(row.payload.get("reason"), "Plno.")
+
+    def test_create_writes_audit_row(self) -> None:
+        starts = (timezone.now() + timedelta(days=20)).isoformat()
+        ends = (timezone.now() + timedelta(days=20, hours=4)).isoformat()
+        url = reverse("events:create", kwargs={"workspace_slug": self.ws.slug})
+        r = self.client.post(
+            url,
+            data={
+                "slug": "novy-camp",
+                "title": "Nový camp",
+                "starts_at": starts,
+                "ends_at": ends,
+                "status": Event.STATUS_DRAFT,
+                "visibility": "public",
+                "tz": "Europe/Prague",
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.json())
+        row = AuditLog.objects.get(action=AuditLog.ACTION_EVENT_CREATE)
+        self.assertEqual(row.actor, self.owner)
+        self.assertEqual(row.workspace, self.ws)
+        self.assertEqual(row.payload.get("event_slug"), "novy-camp")
+
+    def test_update_with_no_changes_does_not_log(self) -> None:
+        # Empty PATCH against a saved event mustn't write a row — the
+        # audit log gets noisy fast if updates with no diff log too.
+        url = reverse(
+            "events:update",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": self.event.slug,
+            },
+        )
+        # Re-submit the same title (which has no observable effect on
+        # the diff helper for participant-visible fields).
+        r = self.client.patch(
+            url,
+            data={"title": self.event.title},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(
+            AuditLog.objects.filter(
+                action=AuditLog.ACTION_EVENT_UPDATE
+            ).exists()
+        )
+
+
+class AuditFromMemberRoleTests(TestCase):
+    """workspace_member.role_change is written by promote / demote /
+    handover endpoints. Handover writes two rows in one transaction."""
+
+    def setUp(self) -> None:
+        self.owner = _make_user("roleowner@a.com")
+        self.target = _make_user("roletarget@a.com")
+        self.ws = _make_workspace(self.owner, slug="rolews")
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=self.target,
+            role=WorkspaceMember.ROLE_MEMBER,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.owner)
+
+    def test_promote_writes_role_change(self) -> None:
+        r = self.client.post(
+            reverse(
+                "workspaces:member-promote",
+                kwargs={"slug": self.ws.slug, "user_id": self.target.pk},
+            )
+        )
+        self.assertEqual(r.status_code, 200)
+        row = AuditLog.objects.get(
+            action=AuditLog.ACTION_MEMBER_ROLE_CHANGE
+        )
+        self.assertEqual(row.payload["new_role"], "admin")
+        self.assertEqual(row.payload["old_role"], "member")
+        self.assertEqual(row.payload["user_id"], self.target.pk)
+
+    def test_demote_writes_role_change(self) -> None:
+        m = WorkspaceMember.objects.get(workspace=self.ws, user=self.target)
+        m.role = WorkspaceMember.ROLE_ADMIN
+        m.save(update_fields=["role"])
+        r = self.client.post(
+            reverse(
+                "workspaces:member-demote",
+                kwargs={"slug": self.ws.slug, "user_id": self.target.pk},
+            )
+        )
+        self.assertEqual(r.status_code, 200)
+        row = AuditLog.objects.get(
+            action=AuditLog.ACTION_MEMBER_ROLE_CHANGE
+        )
+        self.assertEqual(row.payload["new_role"], "member")
+        self.assertEqual(row.payload["old_role"], "admin")
+
+    def test_promote_no_op_does_not_log(self) -> None:
+        # Target is already admin → promote returns 200 but writes no row.
+        m = WorkspaceMember.objects.get(workspace=self.ws, user=self.target)
+        m.role = WorkspaceMember.ROLE_ADMIN
+        m.save(update_fields=["role"])
+        self.client.post(
+            reverse(
+                "workspaces:member-promote",
+                kwargs={"slug": self.ws.slug, "user_id": self.target.pk},
+            )
+        )
+        self.assertFalse(
+            AuditLog.objects.filter(
+                action=AuditLog.ACTION_MEMBER_ROLE_CHANGE
+            ).exists()
+        )
+
+    def test_handover_writes_two_role_change_rows(self) -> None:
+        # Promote target to admin first (so handover precondition holds).
+        m = WorkspaceMember.objects.get(workspace=self.ws, user=self.target)
+        m.role = WorkspaceMember.ROLE_ADMIN
+        m.save(update_fields=["role"])
+        # Reset any audit noise from setUp.
+        AuditLog.objects.all().delete()
+        r = self.client.post(
+            reverse(
+                "workspaces:member-handover",
+                kwargs={"slug": self.ws.slug, "user_id": self.target.pk},
+            )
+        )
+        self.assertEqual(r.status_code, 200)
+        rows = list(
+            AuditLog.objects.filter(
+                action=AuditLog.ACTION_MEMBER_ROLE_CHANGE
+            ).order_by("created_at")
+        )
+        self.assertEqual(len(rows), 2)
+        # First row: target was promoted to owner.
+        self.assertEqual(rows[0].payload["new_role"], "owner")
+        # Second row: original owner demoted to admin.
+        self.assertEqual(rows[1].payload["new_role"], "admin")

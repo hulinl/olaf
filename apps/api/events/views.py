@@ -385,6 +385,20 @@ def create_event(request: Request, workspace_slug: str) -> Response:
         _set_event_shared_workspaces(
             event, shared_workspace_slugs, requesting_user=request.user
         )
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_CREATE,
+        workspace=workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=f'Vytvořil akci „{event.title}"',
+        payload={"event_slug": event.slug, "status": event.status},
+    )
+
     return Response(
         EventPublicSerializer(event, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
