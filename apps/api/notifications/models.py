@@ -35,6 +35,7 @@ class Notification(models.Model):
     KIND_DISCUSSION_MENTION = "discussion_mention"
     KIND_EVENT_UPDATE = "event_update"
     KIND_RSVP_APPROVED = "rsvp_approved"
+    KIND_RSVP_REJECTED = "rsvp_rejected"
     KIND_PAYMENT_RECEIVED = "payment_received"
 
     recipient = models.ForeignKey(
