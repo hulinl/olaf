@@ -1,15 +1,14 @@
 import Link from "next/link";
 
 /**
- * Global footer — same structure as Slotly's so both apps share the
- * brand pattern; only the app name + its color change. Two
- * attributions on a single centered line:
+ * Global footer — same pattern as Slotly: one centered line, copyright
+ * + app name in brand color, separator bullet, BIfactory attribution.
  *
- *   [app] · Powered by [BIfactory logo]
+ *   © 2026 olaf · Powered by [BIfactory logo]
  *
- * The app name links home in the OLAF brand-amber; the BIfactory
- * link points to bifactory.cz with the company logo (light variant
- * for now — dark logo lives in public/ for future dark-mode pages).
+ * The two halves stay glued together with `whitespace-nowrap` so on
+ * narrow phones the logo can't break to its own line away from its
+ * label. The whole row centers horizontally at every viewport.
  */
 export function AppFooter({
   variant = "framed",
@@ -26,12 +25,15 @@ export function AppFooter({
   return (
     <footer className={wrapperClass}>
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-ink-500">
-        <Link
-          href="/"
-          className="font-semibold text-brand hover:underline"
-        >
-          olaf
-        </Link>
+        <span className="whitespace-nowrap">
+          © {new Date().getFullYear()}{" "}
+          <Link
+            href="/"
+            className="font-semibold text-brand hover:underline"
+          >
+            olaf
+          </Link>
+        </span>
         <span aria-hidden className="text-ink-300">
           ·
         </span>
@@ -39,7 +41,7 @@ export function AppFooter({
           href="https://bifactory.cz"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 font-medium text-ink-700 transition-colors hover:text-ink-900"
+          className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-ink-700 transition-colors hover:text-ink-900"
         >
           <span>Powered by</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
