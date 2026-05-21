@@ -149,6 +149,28 @@ class User(AbstractBaseUser, PermissionsMixin):
             "of, or on an event I'm RSVP'd to."
         ),
     )
+    notify_on_discussion_mention = models.BooleanField(
+        default=True,
+        help_text=(
+            "Bell + e-mail when someone @-mentions me in a comment. "
+            "Independent of the reply opt-out — mentions are louder."
+        ),
+    )
+    notify_on_event_update = models.BooleanField(
+        default=True,
+        help_text=(
+            "Bell + e-mail when the organiser of an event I've RSVPed "
+            "to changes a participant-visible field (date, location, "
+            "price, etc.)."
+        ),
+    )
+    notify_on_rsvp_status = models.BooleanField(
+        default=True,
+        help_text=(
+            "Bell when the owner approves or rejects my pending "
+            "registration."
+        ),
+    )
 
     # Third-party integrations (V2.1+). Stored encrypted at rest via
     # accounts.integrations.encrypt_token; raw value never crosses the

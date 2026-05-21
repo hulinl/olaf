@@ -16,7 +16,11 @@ import {
 
 type NotifyPrefs = Pick<
   User,
-  "notify_on_discussion_reply" | "notify_on_discussion_announce"
+  | "notify_on_discussion_reply"
+  | "notify_on_discussion_announce"
+  | "notify_on_discussion_mention"
+  | "notify_on_event_update"
+  | "notify_on_rsvp_status"
 >;
 
 export default function NotificationsSettingsPage() {
@@ -32,6 +36,9 @@ export default function NotificationsSettingsPage() {
         setPrefs({
           notify_on_discussion_reply: u.notify_on_discussion_reply,
           notify_on_discussion_announce: u.notify_on_discussion_announce,
+          notify_on_discussion_mention: u.notify_on_discussion_mention,
+          notify_on_event_update: u.notify_on_event_update,
+          notify_on_rsvp_status: u.notify_on_rsvp_status,
         }),
       )
       .catch((err) =>
@@ -84,20 +91,51 @@ export default function NotificationsSettingsPage() {
         <CardSection>
           <h3 className="text-base font-semibold text-ink-900">Nástěnka</h3>
           <p className="mt-1 text-sm text-ink-500">
-            E-maily o tématech a komentářích v komunitách a na akcích.
+            E-mail + zvoneček o tématech a komentářích v komunitách a
+            na akcích.
           </p>
           <div className="mt-5 flex flex-col gap-3">
             <ToggleRow
-              label="Upozorňovat na odpovědi v mých tématech"
-              hint="Když ti někdo odpoví na téma, které jsi založil/a."
+              label="Odpovědi v mých tématech"
+              hint="Někdo odpovídá na téma, které jsi založil/a."
               checked={prefs.notify_on_discussion_reply}
               onChange={() => toggle("notify_on_discussion_reply")}
             />
             <ToggleRow
-              label="Upozorňovat na nová témata v komunitách a akcích"
-              hint="Když owner nebo jiný člen otevře nové téma v komunitě, kde jsi člen, nebo na akci, kam jsi přihlášen/a."
+              label="Nová témata v komunitách a akcích"
+              hint="Owner nebo jiný člen otevře nové téma v komunitě, kde jsi člen, nebo na akci, kam jsi přihlášen/a."
               checked={prefs.notify_on_discussion_announce}
               onChange={() => toggle("notify_on_discussion_announce")}
+            />
+            <ToggleRow
+              label="@-zmínky v komentářích"
+              hint="Někdo tě označí v komentáři přes @jmeno."
+              checked={prefs.notify_on_discussion_mention}
+              onChange={() => toggle("notify_on_discussion_mention")}
+            />
+          </div>
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
+          <h3 className="text-base font-semibold text-ink-900">Akce</h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Zvoneček (a e-mail) o tom, co se mění na akcích, kde jsi
+            přihlášen/a.
+          </p>
+          <div className="mt-5 flex flex-col gap-3">
+            <ToggleRow
+              label="Změny v akci"
+              hint="Pořadatel upravil termín, místo, cenu nebo kapacitu akce, na kterou jsi přihlášen/a."
+              checked={prefs.notify_on_event_update}
+              onChange={() => toggle("notify_on_event_update")}
+            />
+            <ToggleRow
+              label="Status mé registrace"
+              hint="Pořadatel schválil nebo zamítl tvou čekající přihlášku."
+              checked={prefs.notify_on_rsvp_status}
+              onChange={() => toggle("notify_on_rsvp_status")}
             />
           </div>
         </CardSection>

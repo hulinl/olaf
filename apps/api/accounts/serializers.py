@@ -104,6 +104,9 @@ class UserSerializer(serializers.ModelSerializer):
             # Notifications
             "notify_on_discussion_reply",
             "notify_on_discussion_announce",
+            "notify_on_discussion_mention",
+            "notify_on_event_update",
+            "notify_on_rsvp_status",
             # Gear affiliate partners
             "affiliate_partners",
             # System

@@ -71,6 +71,9 @@ export interface User {
   // Notification preferences
   notify_on_discussion_reply: boolean;
   notify_on_discussion_announce: boolean;
+  notify_on_discussion_mention: boolean;
+  notify_on_event_update: boolean;
+  notify_on_rsvp_status: boolean;
   // Gear affiliate partners
   affiliate_partners: { domain: string; params: Record<string, string> }[];
   // System

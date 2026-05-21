@@ -138,6 +138,19 @@ class EventUpdateNotificationTests(TestCase):
         notif = Notification.objects.get(recipient=self.participant)
         self.assertEqual(notif.body.count("Termín"), 1)
 
+    def test_opted_out_participant_skipped(self) -> None:
+        # User toggled "Upozorňovat na změny v akci" off → no rows
+        # created for them.
+        self.participant.notify_on_event_update = False
+        self.participant.save()
+        n = notify_event_updated(
+            self.event, ["location_text"], actor=self.owner
+        )
+        self.assertEqual(n, 0)
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.participant).exists()
+        )
+
 
 class RsvpApproveRejectNotificationTests(TestCase):
     def setUp(self) -> None:
@@ -170,6 +183,19 @@ class RsvpApproveRejectNotificationTests(TestCase):
         notif = Notification.objects.get(recipient=self.applicant)
         # Falls back to the generic message when no reason supplied.
         self.assertIn("zamítl", notif.body.lower())
+
+    def test_opted_out_applicant_gets_no_notification(self) -> None:
+        # notify_on_rsvp_status=False suppresses both approve + reject.
+        self.applicant.notify_on_rsvp_status = False
+        self.applicant.save()
+        approved = notify_rsvp_approved(self.rsvp)
+        rejected = notify_rsvp_rejected(self.rsvp)
+        self.assertIsNone(approved)
+        self.assertIsNone(rejected)
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.applicant).count(),
+            0,
+        )
 
     def test_rsvp_without_user_id_no_notification(self) -> None:
         # Belt-and-braces: if a future migration adds nullable user_id

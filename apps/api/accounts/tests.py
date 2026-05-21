@@ -549,6 +549,28 @@ class ProfileSaveRoundTripTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.fitness_level, "")
 
+    def test_notification_prefs_round_trip(self) -> None:
+        """Locks in that every notification toggle the frontend
+        renders can be written and read back. Set was extended
+        2026-05-21 with mention / event_update / rsvp_status; this
+        test would catch a serializer drift that drops one of them."""
+        payload = {
+            "notify_on_discussion_reply": False,
+            "notify_on_discussion_announce": False,
+            "notify_on_discussion_mention": False,
+            "notify_on_event_update": False,
+            "notify_on_rsvp_status": False,
+        }
+        resp = self.client.patch(self.url, payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        for key, value in payload.items():
+            self.assertEqual(getattr(self.user, key), value)
+        get_resp = self.client.get(self.url).json()
+        for key in payload:
+            self.assertIn(key, get_resp)
+            self.assertFalse(get_resp[key])
+
     def test_country_codes_round_trip(self) -> None:
         for code in ["CZ", "SK", "AT", "DE", "GB", ""]:
             with self.subTest(code=code):

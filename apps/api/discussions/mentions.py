@@ -169,9 +169,7 @@ def notify_mentions(comment: Comment) -> int:
         user = _resolve_mention(token, eligible)
         if user is None or user.id in notified_ids:
             continue
-        if not user.notify_on_discussion_reply:
-            # Mention falls under the same opt-out as reply for V1 —
-            # easier than a third toggle. Refine later if users ask.
+        if not user.notify_on_discussion_mention:
             continue
         Notification.objects.create(
             recipient=user,
