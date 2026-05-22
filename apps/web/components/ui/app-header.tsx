@@ -71,14 +71,14 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
               onClick={() => setDrawerOpen(true)}
               aria-label="Open menu"
               aria-expanded={drawerOpen}
-              className="-ml-2 inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring sm:hidden"
+              className="-ml-2 inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring lg:hidden"
             >
               <HamburgerIcon />
             </button>
 
             <Link
               href="/dashboard"
-              className="ml-1 text-ink-900 transition-opacity hover:opacity-80 sm:ml-0"
+              className="ml-1 text-ink-900 transition-opacity hover:opacity-80 lg:ml-0"
               aria-label="olaf — dashboard"
             >
               <Logo size={26} />
@@ -86,7 +86,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
 
             <nav
               aria-label="Primary"
-              className="ml-6 hidden items-center gap-1 sm:flex"
+              className="ml-6 hidden items-center gap-1 lg:flex"
             >
               <NavLink href="/dashboard" pathname={pathname}>
                 Dashboard
@@ -128,7 +128,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
             <Link
               href="/admin"
               className={[
-                "hidden items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-ring sm:inline-flex",
+                "hidden items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-ring lg:inline-flex",
                 pathname.startsWith("/admin")
                   ? "border-brand bg-brand text-brand-ink"
                   : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
@@ -322,7 +322,7 @@ function MobileDrawer({
   }, [onClose, onMount]);
 
   return (
-    <div className="fixed inset-0 z-40 sm:hidden">
+    <div className="fixed inset-0 z-40 lg:hidden">
       <button
         type="button"
         aria-label="Close menu"
@@ -414,9 +414,38 @@ function MobileDrawer({
               ),
             )}
           </DrawerSection>
+
+          {/* Manuální „restart appky" odkaz pod nav — fallback pro
+              iOS PWA, který si někdy drží starou cache i poté co
+              auto-detekce přes /version.json proběhla. Když na něj
+              klikneš, vynutíme reload s cache-bustem v query
+              stringu. */}
+          <div className="mt-auto border-t border-border pt-3">
+            <ForceRefreshButton />
+          </div>
         </nav>
       </div>
     </div>
+  );
+}
+
+function ForceRefreshButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // location.reload() respektuje http cache; přidáním
+        // jednorázového query parametru se HTML i bundle načte
+        // čerstvě z origin (CDN cache na SWA tu jen klíčuje podle URL).
+        const url = new URL(window.location.href);
+        url.searchParams.set("_r", Date.now().toString());
+        window.location.replace(url.toString());
+      }}
+      className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+    >
+      <span>Aktualizovat appku</span>
+      <span aria-hidden className="text-ink-300">↻</span>
+    </button>
   );
 }
 
