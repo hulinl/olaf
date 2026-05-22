@@ -64,23 +64,22 @@ export default function Home() {
             drop the TOC entirely. Each section wrapped v Reveal,
             tedy fade-up když se objeví ve viewportu poprvé. */}
         <div className="bg-canvas">
-          {/* TOC je `position: fixed` mimo flow (viz feature-toc.tsx)
-              + jeho viditelnost se počítá ze dvou sentinel <div>ů
-              obklopujících features map. `lg:pr-64` na features
-              wrapperu rezervuje místo aby fixed TOC vpravo
-              nepřekrýval content. */}
-          <div className="mx-auto max-w-7xl px-4">
-            <div className="lg:pr-64">
-              <div id="feature-tour-start" aria-hidden />
+          {/* In-flow sticky TOC layout (anchored vedle features
+              column). `lg:items-start` zamezí flex stretch tak aby
+              aside height = content height a sticky release se
+              trigne přesně tam kde features column končí. Posledni
+              section dostává `pb-0` aby release nebyl 96px za
+              posledním bullet textem. */}
+          <div className="mx-auto max-w-7xl gap-10 px-4 lg:flex lg:items-start">
+            <div className="min-w-0 lg:flex-1 lg:[&>div:last-child_section]:pb-0">
               {FEATURES.map((feature) => (
                 <Reveal key={feature.id}>
                   <FeatureSection feature={feature} />
                 </Reveal>
               ))}
-              <div id="feature-tour-end" aria-hidden />
             </div>
+            <FeatureToc features={FEATURES} />
           </div>
-          <FeatureToc features={FEATURES} />
         </div>
 
         {/* SAMPLE community */}
