@@ -48,14 +48,20 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
 
   return (
     <aside
-      // Vertically align the TOC's first item with the first feature's
-      // eyebrow text. FeatureSection uses `py-24` on lg+, so we push
-      // the aside down by the same amount on first paint. Once the
-      // user scrolls past, the `sticky top-24` inside takes over.
-      className="hidden lg:block lg:w-44 lg:shrink-0 lg:pt-24"
+      // Sticky DIRECTLY on the aside (with `self-start` ho odepíchne
+      // od flex stretch behaviour, takže aside je vysoký jen jako
+      // jeho obsah, ne jako celý feature tour). To znamená sticky
+      // release se trigne když flex container (= sloupec features)
+      // skončí — perfektně synchronní s posledním feature blockem.
+      //
+      // `mt-24` na lg+ pushne aside dolů aby první item lícoval s
+      // první feature eyebrow `01 · Komunita` při no-scroll renderu;
+      // margin se neaplikuje pro sticky offset (na rozdíl od padding),
+      // takže při stickingu content sedí přímo pod hlavičkou.
+      className="hidden lg:block lg:sticky lg:top-24 lg:mt-24 lg:h-max lg:w-44 lg:shrink-0 lg:self-start"
       aria-label="Prohlídka sekcí"
     >
-      <div className="sticky top-24 flex flex-col gap-1 border-l border-border pl-5">
+      <div className="flex flex-col gap-1 border-l border-border pl-5">
         <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-500">
           Prohlídka
         </p>

@@ -51,10 +51,14 @@ export function ArticleToc({ headings }: { headings: MdxHeading[] }) {
 
   return (
     <aside
-      className="hidden lg:block lg:w-52 lg:shrink-0 lg:pt-16"
+      // Sticky on the aside itself s `self-start` aby aside nestretchoval
+      // celou flex výšku → sticky release synchronní s koncem článku, ne
+      // až na úrovni footeru. `mt-16` na lg+ srovná první item s první
+      // h2 (article má sm:py-16 vlastní top padding).
+      className="hidden lg:block lg:sticky lg:top-24 lg:mt-16 lg:h-max lg:w-52 lg:shrink-0 lg:self-start"
       aria-label="Obsah článku"
     >
-      <div className="sticky top-24 flex flex-col gap-1 border-l border-border pl-5">
+      <div className="flex flex-col gap-1 border-l border-border pl-5">
         <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-500">
           Obsah
         </p>
