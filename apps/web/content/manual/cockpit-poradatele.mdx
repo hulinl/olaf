@@ -1,0 +1,58 @@
+---
+title: "Cockpit pořadatele"
+excerpt: "Statistiky, roadmapa, risk checklist, profil účastníka. Co všechno tě cockpit povede přes přípravu akce."
+category: "akce"
+order: 80
+tags: ["cockpit", "roadmapa", "checklist", "risk"]
+updatedAt: "2026-05-22"
+---
+
+## Co cockpit umí
+
+Cockpit akce (otevřeš ho přes **Tvůrce** → **Akce** → klik na akci) je jeden screen, kde máš všechno, co potřebuješ pro vedení konkrétního campu:
+
+- **Statistiky** kapacity, čeká na schválení, neplaceno, dokumenty
+- **Roadmapa** — checklist přípravných úkonů s automatickými e-maily
+- **Risk checklist** — 6 kategorií, předvyplněná šablona
+- **Účastníci** — plná tabulka s PII a quick actions
+
+## Roadmapa
+
+Předdefinovaný checklist připomínek, který se posouvá podle data akce:
+
+- 3 týdny předem: pozvánky rozeslány
+- 8 dní předem: připomenout platbu
+- 6 dní předem: připomenout vybavení
+- 1 den předem: briefing před campem
+- v den D: stáhnout final roster
+- 4 dny po akci: post-event děkovný mail
+
+U každého řádku můžeš nastavit **scheduled e-mail účastníkům** (template-driven). Olaf rozešle automaticky v daný čas — nemusíš si pamatovat.
+
+## Risk checklist
+
+11 položek ve 6 kategoriích: **Počasí, Trasa, Vybavení, Zdraví, Komunikace, Doprava**. Pro každou položku zaškrtáváš stav (`pending` / `reviewed` / `mitigated` / `not_relevant`).
+
+Toto je **V1 baby step**. Plný rule-driven engine podle PRD §13 (auto-generování rizik z parametrů akce, prevention + crisis plans, scoring) je V2 práce.
+
+## Účastníci — tabulka + mobile karty
+
+Roster je responzivní:
+
+- **Desktop**: tabulka s 7 sloupci (účastník, status, tričko, doprava, platba, dokumenty, … podle dotazníku)
+- **Mobile**: karty s těmi samými údaji, ale stackované
+
+Quick actions přímo v řádku:
+
+- **Schválit / Zamítnout** (pro pending_approval)
+- **Označit jako zaplaceno**
+- **Označit jako organizátora** (vyjme z kapacity + payment + docs)
+- **Otevřít profil** (modal s plnými údaji a historií)
+
+## Duplicate badge
+
+Vedle jména účastníka může být ⚠ **Duplikát?** badge — znamená, že někdo jiný má stejný telefon nebo jméno. Klikni a porovnej — typicky dva e-maily jednoho člověka.
+
+## Tip
+
+Když cockpit akce vidíš s `STATUS: completed`, **roadmapa se shrnula do collapsed view** — všechny ticky jsou hotové, není už co dělat. Akce se na status flipne automaticky 15 minut po `ends_at` (Celery beat).

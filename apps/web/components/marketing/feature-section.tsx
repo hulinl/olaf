@@ -1,0 +1,112 @@
+import Link from "next/link";
+import Image from "next/image";
+
+import type { FeatureEntry } from "@/lib/site-config";
+
+/**
+ * One feature section on the homepage. Renders alternating left/right
+ * screenshot vs copy on lg+, single column on mobile.
+ *
+ * Screenshots are sourced from /public/screenshots — for now those are
+ * SVG placeholders; real PNGs will swap in via the same paths so this
+ * component doesn't change when we capture them.
+ */
+export function FeatureSection({ feature }: { feature: FeatureEntry }) {
+  const copy = (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.18em] text-brand">
+        <span className="font-mono">{feature.number}</span>
+        <span aria-hidden>·</span>
+        <span>{feature.tag}</span>
+      </div>
+      <h2
+        className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl"
+        style={{ letterSpacing: "-0.02em", lineHeight: 1.15 }}
+      >
+        {feature.highlight ? (
+          renderHighlighted(feature.title, feature.highlight)
+        ) : (
+          feature.title
+        )}
+      </h2>
+      <p className="text-lg leading-relaxed text-ink-700">{feature.lede}</p>
+      <ul className="flex flex-col gap-2.5 text-ink-700">
+        {feature.bullets.map((b) => (
+          <li key={b} className="flex gap-3">
+            <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-brand" />
+            <span dangerouslySetInnerHTML={{ __html: renderInlineCode(b) }} />
+          </li>
+        ))}
+      </ul>
+      {feature.manualSlug && (
+        <div>
+          <Link
+            href={`/manual/${feature.manualSlug}`}
+            className="inline-flex items-center gap-2 text-sm font-medium text-brand hover:text-brand-hover focus-ring"
+          >
+            Návod: {feature.title.toLowerCase()} →
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+
+  const visual = (
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface shadow-lg shadow-black/5">
+      <div className="aspect-[16/10] w-full bg-surface-muted">
+        <Image
+          src={feature.screenshot}
+          alt={feature.screenshotAlt ?? feature.title}
+          width={1280}
+          height={800}
+          className="h-full w-full object-cover"
+          unoptimized
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <section
+      id={feature.id}
+      className="scroll-mt-20 border-t border-border-strong/20 bg-canvas"
+    >
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
+        <div
+          className={[
+            "grid items-center gap-10 lg:grid-cols-2 lg:gap-14",
+            feature.side === "left" ? "lg:[&>*:first-child]:order-2" : "",
+          ].join(" ")}
+        >
+          {copy}
+          {visual}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function renderHighlighted(title: string, highlight: string) {
+  const idx = title.toLowerCase().indexOf(highlight.toLowerCase());
+  if (idx === -1) return title;
+  return (
+    <>
+      {title.slice(0, idx)}
+      <span className="text-brand">{title.slice(idx, idx + highlight.length)}</span>
+      {title.slice(idx + highlight.length)}
+    </>
+  );
+}
+
+function renderInlineCode(text: string): string {
+  // Allow simple backtick code in bullets — saves writing `<code>` in
+  // every config entry. Escapes HTML first to avoid injection.
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return escaped.replace(
+    /`([^`]+)`/g,
+    '<code class="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[0.9em] text-ink-900">$1</code>',
+  );
+}

@@ -1,0 +1,56 @@
+---
+title: "Skládání landing page akce"
+excerpt: "Stránka akce je složená z bloků — hero, program, mapa, fotky, FAQ. Drag-and-drop, žádný HTML, žádný vývojář."
+category: "akce"
+order: 90
+tags: ["landing", "builder", "obsah"]
+updatedAt: "2026-05-22"
+---
+
+## Princip
+
+Stránka akce na `olaf.events/{ws}/e/{event}` se nepíše do jednoho velkého textového pole. Místo toho ji **skládáš z bloků** — každý blok je jedna sekce (hero, text, program po dnech, statistiky, galerie…). Pořadí bloků určuje pořadí na výsledné stránce.
+
+Tahle volba znamená:
+
+- **Konzistentní typografie** — všechny tvoje akce vypadají stejně dobře, protože blok = předdefinovaný styl.
+- **Mobilní layout zdarma** — bloky se automaticky stackují na malých displejích.
+- **Bez HTML** — vyplňuješ formuláře, ne značky.
+
+## Typy bloků
+
+| Blok | Pro co | Klíčové pole |
+|---|---|---|
+| **Hero** | Vstupní obrazovka s claim a podtitulem | nadpis, podtitul, cover (volitelně) |
+| **Text** | Volný text v markdownu | nadpis, body (markdown) |
+| **Program po dnech** | Multi-day akce | dny + popis aktivit |
+| **Statistiky** | „Co tě čeká v číslech" | dvojice (číslo, popisek) |
+| **Co zahrnuje / Co ne** | Cena, ubytování, jídlo, doprava | dva sloupce odrážek |
+| **Galerie** | Fotky z minulých ročníků | upload + alt-text |
+| **Mapa** | Místo srazu / trasa | Mapy.cz odkaz, popis |
+| **FAQ** | Časté otázky | otázka / odpověď |
+| **Praktické info** | Co s sebou, jak se dostat | volný text |
+| **Gear list** | Doporučené vybavení | propojený gear template |
+
+## Jak na to
+
+1. V cockpitu akce → **Obsah**.
+2. V sidebaru vlevo klikni na typ bloku → vloží se na konec.
+3. Klikni na blok → otevře se inline formulář s poli.
+4. **Drag handle** vpravo nahoře blokem hýbe nahoru/dolů.
+5. Změny se ukládají autosave (vidíš stamp posledního uložení).
+
+## Cover fotka
+
+Cover je separátně od bloků — nastavuje se v **Detail akce** → **Cover**. Olaf automaticky downscaluje velký iPhone-original JPEG, takže nemusíš řešit kompresi sám.
+
+## Tipy pro hezkou stránku
+
+- **Hero podtitul ne víc než 12 slov.** Hlavní claim by měl jít říct na jeden výdech.
+- **Program po dnech rozčlen jasně.** „Den 1: Sraz, výjezd, večerní briefing" je užitečnější než vágní „Příjezd a aklimatizace".
+- **Galerie 6–12 fotek** — ne víc. Návštěvník hledá vibe, ne kompletní album.
+- **FAQ obsahuje vždy: vrácení peněz, co když prší, co dělat když nestihnu spoj.** Otázky, které ti přicházejí emailem 10× za sezónu.
+
+## Tip
+
+Bloky jsou per-akce, ne per-komunita. Ale když si připravíš jednu „šablonovou" akci a další roky ji **duplikuješ** přes „Duplikovat akci", všechny bloky (i cover, gear list, risk checklist) se zkopírují — stačí přepsat data a začít přihlašování.

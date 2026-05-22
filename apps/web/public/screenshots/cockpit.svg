@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800">
+  <defs><linearGradient id="cBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#faf8f4"/><stop offset="1" stop-color="#f4f1ea"/></linearGradient></defs>
+  <rect width="1280" height="800" fill="url(#cBg)"/>
+  <rect width="1280" height="56" fill="#fff"/>
+  <line x1="0" y1="56" x2="1280" y2="56" stroke="#e5e1d8"/>
+  <text x="32" y="34" font-family="system-ui,sans-serif" font-size="14" fill="#737373">Tvůrce / Akce / Spring Camp 2026</text>
+
+  <!-- Title row -->
+  <text x="40" y="110" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#f59e0b" letter-spacing="1.5">TVŮRCE</text>
+  <text x="40" y="148" font-family="system-ui,sans-serif" font-size="32" font-weight="700" fill="#1a1a1a">Spring Camp Beskydy 2026</text>
+  <text x="40" y="172" font-family="system-ui,sans-serif" font-size="13" fill="#737373">16.–19. 5. · Lysá hora · 12 / 16 přihlášených</text>
+
+  <!-- Stats tiles -->
+  <g font-family="system-ui,sans-serif">
+    <rect x="40" y="200" width="240" height="100" rx="14" fill="#fff" stroke="#e5e1d8"/>
+    <text x="60" y="228" font-size="11" font-weight="600" fill="#737373" letter-spacing="1.5">KAPACITA</text>
+    <text x="60" y="270" font-size="36" font-weight="700" fill="#1a1a1a">12<tspan font-size="18" fill="#737373" font-weight="400">/16</tspan></text>
+    <text x="60" y="290" font-size="11" fill="#737373">4 volná místa</text>
+
+    <rect x="300" y="200" width="240" height="100" rx="14" fill="#fff" stroke="#e5e1d8"/>
+    <text x="320" y="228" font-size="11" font-weight="600" fill="#737373" letter-spacing="1.5">ČEKÁ NA SCHVÁLENÍ</text>
+    <text x="320" y="270" font-size="36" font-weight="700" fill="#f59e0b">3</text>
+    <text x="320" y="290" font-size="11" fill="#737373">vyřiď dnes</text>
+
+    <rect x="560" y="200" width="240" height="100" rx="14" fill="#fff" stroke="#e5e1d8"/>
+    <text x="580" y="228" font-size="11" font-weight="600" fill="#737373" letter-spacing="1.5">NEZAPLACENO</text>
+    <text x="580" y="270" font-size="36" font-weight="700" fill="#dc2626">7</text>
+    <text x="580" y="290" font-size="11" fill="#737373">17 500 Kč celkem</text>
+
+    <rect x="820" y="200" width="240" height="100" rx="14" fill="#fff" stroke="#e5e1d8"/>
+    <text x="840" y="228" font-size="11" font-weight="600" fill="#737373" letter-spacing="1.5">DOKUMENTY</text>
+    <text x="840" y="270" font-size="36" font-weight="700" fill="#1a1a1a">8<tspan font-size="18" fill="#737373" font-weight="400">/12</tspan></text>
+    <text x="840" y="290" font-size="11" fill="#737373">67 % komplet</text>
+  </g>
+
+  <!-- Roadmapa -->
+  <rect x="40" y="324" width="780" height="440" rx="14" fill="#fff" stroke="#e5e1d8"/>
+  <text x="60" y="358" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#737373" letter-spacing="1.5">ROADMAPA</text>
+  <text x="60" y="386" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#1a1a1a">Checklist pořadatele</text>
+
+  <g font-family="system-ui,sans-serif" font-size="13" fill="#1a1a1a">
+    <!-- Items -->
+    <g><rect x="60" y="410" width="20" height="20" rx="4" fill="#16a34a"/><text x="70" y="425" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">✓</text><text x="92" y="425" fill="#737373">Pozvánky rozeslat (24. 4.)</text></g>
+    <g><rect x="60" y="446" width="20" height="20" rx="4" fill="#16a34a"/><text x="70" y="461" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">✓</text><text x="92" y="461" fill="#737373">Připomenout platbu (8. 5.)</text></g>
+    <g><rect x="60" y="482" width="20" height="20" rx="4" fill="#16a34a"/><text x="70" y="497" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">✓</text><text x="92" y="497" fill="#737373">Vybavení připomenout (10. 5.)</text></g>
+    <g><rect x="60" y="518" width="20" height="20" rx="4" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/><text x="92" y="533" font-weight="600">Briefing před campem (15. 5.) ← dnes</text></g>
+    <g><rect x="60" y="554" width="20" height="20" rx="4" fill="none" stroke="#d4d0c5" stroke-width="2"/><text x="92" y="569">Stáhnout final roster (16. 5.)</text></g>
+    <g><rect x="60" y="590" width="20" height="20" rx="4" fill="none" stroke="#d4d0c5" stroke-width="2"/><text x="92" y="605">Post-event děkovný mail (20. 5.)</text></g>
+  </g>
+
+  <!-- Risk panel -->
+  <rect x="840" y="324" width="400" height="440" rx="14" fill="#fff" stroke="#e5e1d8"/>
+  <text x="860" y="358" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#737373" letter-spacing="1.5">RISK CHECKLIST</text>
+  <text x="860" y="386" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="#1a1a1a">11 položek, 6 kategorií</text>
+  <g font-family="system-ui,sans-serif" font-size="13" fill="#1a1a1a">
+    <text x="860" y="424" fill="#525252">⛅ Počasí</text>
+    <text x="1100" y="424" fill="#16a34a" font-size="11" text-anchor="end">2/2 OK</text>
+    <line x1="860" y1="442" x2="1220" y2="442" stroke="#f0ede5"/>
+    <text x="860" y="468" fill="#525252">🥾 Trasa</text>
+    <text x="1100" y="468" fill="#16a34a" font-size="11" text-anchor="end">2/2 OK</text>
+    <line x1="860" y1="486" x2="1220" y2="486" stroke="#f0ede5"/>
+    <text x="860" y="512" fill="#525252">🎒 Vybavení</text>
+    <text x="1100" y="512" fill="#f59e0b" font-size="11" text-anchor="end">1/2 čeká</text>
+    <line x1="860" y1="530" x2="1220" y2="530" stroke="#f0ede5"/>
+    <text x="860" y="556" fill="#525252">⚕ Zdraví</text>
+    <text x="1100" y="556" fill="#16a34a" font-size="11" text-anchor="end">2/2 OK</text>
+    <line x1="860" y1="574" x2="1220" y2="574" stroke="#f0ede5"/>
+    <text x="860" y="600" fill="#525252">📞 Komunikace</text>
+    <text x="1100" y="600" fill="#16a34a" font-size="11" text-anchor="end">1/1 OK</text>
+    <line x1="860" y1="618" x2="1220" y2="618" stroke="#f0ede5"/>
+    <text x="860" y="644" fill="#525252">🚐 Doprava</text>
+    <text x="1100" y="644" fill="#dc2626" font-size="11" text-anchor="end">0/2 čeká</text>
+  </g>
+</svg>

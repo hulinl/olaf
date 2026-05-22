@@ -1,0 +1,60 @@
+---
+title: "První akce za 5 minut"
+excerpt: "Krok za krokem od registrace po publikovaný event, který může kdokoli vidět a přihlásit se."
+category: "zaciname"
+order: 100
+tags: ["začínáme", "tutorial", "rychlostart"]
+updatedAt: "2026-05-22"
+---
+
+## Co budeš mít po těchto 5 minutách
+
+Veřejnou stránku akce na `olaf.events/personal-{id}/e/{slug}`, kde **kdokoli s URL** může vidět detail a přihlásit se. Akce v draftu zůstává jen pro tebe, dokud nepublikuješ.
+
+## 1. Registrace + ověření e-mailu
+
+1. Otevři `olaf.events/signup`.
+2. Vyplň jméno + e-mail + heslo.
+3. Klik na verifikační link, který ti přijde do mailu.
+
+Po verifikaci máš automaticky **osobní komunitu** se slug `personal-{tvoje-id}`. Můžeš ji použít jako sandbox.
+
+## 2. Vytvořit akci
+
+1. V hlavičce **Tvůrce** → **Akce** → **+ Vytvořit akci**.
+2. Workspace nech jako osobní (nebo si vyrob novou).
+3. Vyplň **Název**, **URL slug** (např. `test-vykend`), **Termín začátku a konce**, **Místo**.
+4. Klikni **Vytvořit jako draft**.
+
+Akce existuje jako draft — neviditelná veřejně.
+
+## 3. Vyplnit landing page
+
+V cockpitu akce → **Obsah** → sidebar vlevo nabízí bloky:
+
+1. Klikni **Hero** → vyplň claim a podtitul.
+2. Klikni **Text** → markdown popis akce.
+3. (Volitelně) **Program po dnech**, **Statistiky**, **FAQ**.
+
+Tipy [najdeš v samostatném návodu →](/manual/skladani-landing-page).
+
+## 4. Nastavit přihlášky
+
+V detailu akce:
+
+- **Kapacita**: 12 (jakékoli číslo, nebo `null` pro bez limitu).
+- **Cena**: 2500 Kč (nebo 0 pro free).
+- **Dotazník**: zapni sekce, které dávají smysl (`profile` vždy, `transport` + `health` pro outdoor camp).
+- **Schvalování**: `requires_approval=true` pokud chceš každou přihlášku validovat.
+
+## 5. Publikovat
+
+V detailu akce → **Status: published**. Olaf zkontroluje, že máš všechno potřebné (cover, bankovní účet pro placené akce) a flipne na live.
+
+Veřejná URL je teď přístupná. Sdílej.
+
+## Co dál
+
+- Pošli URL pár lidem a otestuj registraci [→ Spravovat přihlášky](/manual/spravovat-prihlasky)
+- Pokud je akce placená, projdi [Platby — QR Platba a faktury](/manual/platby-qr-faktury)
+- Zkus [nastavit nástěnku](/manual/diskuse-nastenka) pro debaty účastníků

@@ -1,0 +1,61 @@
+---
+title: "Platby — QR Platba a faktury"
+excerpt: "QR kód s variabilním symbolem, auto-vystavené faktury v PDF, mark-as-paid jedním klikem nebo Fio CSV import."
+category: "platby"
+order: 90
+tags: ["platby", "QR", "Fio", "faktury", "iDoklad"]
+updatedAt: "2026-05-22"
+---
+
+## Co účastník vidí
+
+Po přihlášce na placenou akci dostane účastník na své stránce **Moje registrace** sub-tab **Platba** s:
+
+- **Částkou** (přesně, v Kč nebo EUR)
+- **Číslem účtu** + IBAN
+- **Variabilním symbolem** — generujem stabilní per RSVP (`{event_id:04d}{rsvp_id:06d}`)
+- **QR Platbou** podle SPAYD specifikace (Česká banka, naskenuj v bankovní aplikaci, doplní automaticky)
+
+A jakmile zaplatí + ty platbu označíš (nebo Fio reconcile zachytí transakci), na sub-tabu **Faktura** se objeví automaticky vygenerované PDF k stažení.
+
+## Co nastavit, než akci publikuješ
+
+1. V **Workspace → Nastavení** vyplň:
+   - **Bankovní účet** (formát „123456789 / 0800" nebo IBAN)
+   - **Měna** (CZK default)
+   - **Splatnost** (kolik dní od přihlášky)
+2. V detailu akce vyplň **Cena** + **Měna**.
+
+Bez bankovního účtu nemůžeš mít placenou akci — olaf na to upozorní.
+
+## Hotovostní platby
+
+Pro malé akce / interní campy zaškrtni v detailu akce **Hotovostní platby**. Účastník neuvidí QR, ale jen instrukci „Zaplať na místě 2 500 Kč" — a ty platby zaznačuješ ručně v cockpitu.
+
+## Mark-as-paid
+
+Když ti účastník pošle peníze a uvidíš to v bance, otevři jeho profil v rosteru → tlačítko **Označit jako zaplaceno**. Faktura se automaticky vygeneruje a pošle e-mailem (pokud máš zapnutý billing profile).
+
+## Fio CSV reconcile (V1.0)
+
+Nemusíš platby značit ručně. V cockpitu komunity → **Platby** → **Import Fio CSV**:
+
+1. V internetbankingu Fio: **Stažení v CSV** → vyber rozsah dat → stáhni.
+2. Soubor nahraj v olafu.
+3. Olaf projde řádky, **matchuje variabilní symbol** k pending RSVP a označí jako zaplaceno.
+4. Auto-generuje faktury.
+
+Při tom rozpoznává:
+
+- **Czech locale**: čárka jako desetinný oddělovač, NBSP jako tisícový oddělovač
+- **Vedoucí nuly v VS** — odřízne („0000123" → „123")
+- **Pouze inbound credits** (debity ignoruje)
+- **Amount mismatch** — pokud platba ≠ částka, dostane v UI příznak „nesedí částka" (matchne ale neoznačí jako fully paid)
+
+## V1.5 — Fio webhook + iDoklad
+
+Plánovaná evoluce: místo manuálního CSV importu webhook od Fio (automatic poll), faktury generuje **iDoklad API** s plnými DPH náležitostmi.
+
+## Tip
+
+VS je **stabilní per RSVP** — i když si účastník přihlášku „cancel + znova přihlásí", ten samý VS zůstane. Šetří ti to lov v bance, když přijde platba se starým VS.

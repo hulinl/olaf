@@ -1,0 +1,74 @@
+---
+title: "Spring Camp Beskydy 2026: jak nám olaf pomohl odbavit 16 lidí na 4 dny"
+excerpt: "První velký multi-day camp, který jsme uřídili kompletně přes olaf — od pozvánek přes platby po post-event děkovku. Co fungovalo, co bych příště udělal jinak."
+category: "pripadovka"
+publishedAt: "2026-05-22"
+author: 'Lubomír „Olaf" Hulín'
+tags: ["case study", "spring camp", "beskydy", "post-mortem"]
+---
+
+## Kontext
+
+Spring Camp Beskydy 2026 jsme dělali **16.–19. května 2026** — 4 dny, 16 účastníků, ubytování v chatě pod Lysou horou, dva hřebenové výlety, večerní program. Klasický multi-day camp formát, jaký Olaf Adventures pořádá několikrát za sezónu.
+
+V minulých letech jsme přihlášky řešili **Google Form + Excel + WhatsApp**. Letos celá organizace prošla skrz olaf — od první pozvánky po poslední „díky všem, fotky tady" e-mail. Tady je co se osvědčilo, co bolelo a co půjde do V1.5.
+
+## Co fungovalo
+
+### Landing builder
+
+Stránka [olafadventures/e/spring-camp-beskydy-2026](https://olaf.events/olafadventures) vznikla za hodinu. **Hero → Program po dnech → Cena → FAQ → Mapa → Co s sebou** — všechno klikáním v builderu. Žádné HTML, žádný "ale tohle musí být modře, ne zeleně".
+
+Mobilní layout dostal každý blok zdarma — návštěvníci ze sociálních sítí to otevřou na telefonu a stránka funguje.
+
+### QR Platba
+
+Tohle byla největší úleva. Účastník dostal e-mail s odkazem do svojí registrace, na sub-tabu **Platba** uviděl QR kód → naskenoval v ČSOB/KB/Fio appce → cena, číslo účtu, variabilní symbol se předvyplnily.
+
+Za 4 dny po publikování bylo zaplaceno 12 ze 16 přihlášek. Bez urgování. Variabilní symbol je per-RSVP stabilní, takže když pak přišla platba na účet, šla 1:1 namatchovat (Fio CSV reconcile teď shipnul).
+
+### Schvalování přihlášek
+
+Camp byl po-pozvánce-only, takže `requires_approval=true`. **Pending_approval flow** zachytil dvě přihlášky, které nepatřily k naší partě — někdo poslal odkaz dál, ne všechno bylo OK. Jeden klik „Zamítnout" s textem důvodu, pryč.
+
+### Notifikace a nástěnka
+
+Vlastní eventová nástěnka pro Camp se ukázala jako překvapivý win. Lidi tam řešili „kdo veze koho", „co je s vagónem ČD do Frýdku", „máte spacák o 5 cm delší než 200?". Místo WhatsApp skupiny, která se ztratí v hromadě memes a pětník diskusí.
+
+@-mentions jsou klíč. „**@Honza** ten výborový kontakt, můžeš ho hodit sem?" — Honza dostal push notifikaci a do 30 minut odepsal. Žádný „kde to bylo, v messengeru nebo na nástěnce?".
+
+## Co bolelo
+
+### Dokumenty
+
+`required_documents` JSON v admin UI funguje, ale UX pro účastníka při uploadu není ideální — musí kliknout do své registrace → sub-tab Dokumenty → upload každý zvlášť. Polovina lidí dokumenty doložila až den před campem, museli jsem urgovat.
+
+**Co dál**: připomenutí přes scheduled e-mail (Celery beat to umí — jen potřebuju template) a možná i bulk-upload („vlož všechno najednou").
+
+### Last-minute změny
+
+Termín srazu jsme posunuli o hodinu 24 hodin před campem. Update akce → fan-out e-mailu funguje, ale push notifikace ji nezachytí (V1 only e-mail pro event_update). Pár lidí přijelo o hodinu dřív, protože si push pamatovalo originál a e-mail prošvihli.
+
+**Co dál**: push pro event_update s vyšší prioritou.
+
+### Risk checklist V1 baby step
+
+Šablonu jsem vyplnil před campem (počasí — větrná předpověď OK, trasa — vyznačená Lysá → Smrk, atd.). Ale **nic mě nepošťuchovalo** abych se k tomu vrátil v den D. Plný engine podle PRD §13 by tohle udělal automaticky — pošle připomínku 24h před akcí „mrkni na risk checklist", a v terénu zobrazí prevention tips pro každé scoring high risk.
+
+## Číselný výstup
+
+| Metrika | Hodnota |
+|---|---|
+| Přihlášených (potvrzeno) | 16 / 16 |
+| Schvalování (pending → yes) | 14 |
+| Schvalování (pending → rejected) | 2 |
+| Zaplaceno do 7 dnů | 13 |
+| Zaplaceno po reminderu | 3 |
+| Dokumenty kompletní v den D | 13 / 16 |
+| Cancellations po publikaci | 0 |
+
+## Verdikt
+
+**Bez olafu bych tenhle camp letos nedal.** Zní to dramaticky, ale v minulých letech jsem trávil 4 večery předtím na vyřízování platby, dokumentů, last-minute change ping-pongů. Letos to bylo večery dva — a šly do programu, ne do logistiky.
+
+Příští kemp je **Letní kemp Pitztal** (25. 7.–1. 8.). Stačí v olafu kliknout **Duplikovat akci** na Spring Camp, přepsat data + ceny, a první draft mám hotov za 10 minut.

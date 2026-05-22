@@ -24,33 +24,55 @@ export function AppFooter({
 
   return (
     <footer className={wrapperClass}>
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-ink-500">
-        <span className="whitespace-nowrap">
-          © {new Date().getFullYear()}{" "}
-          <Link
-            href="/"
-            className="font-semibold text-brand hover:underline"
-          >
-            olaf
-          </Link>
-        </span>
-        <span aria-hidden className="text-ink-300">
-          ·
-        </span>
-        <a
-          href="https://bifactory.cz"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-ink-700 transition-colors hover:text-ink-900"
+      <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 text-xs text-ink-500">
+        <nav
+          aria-label="Patička"
+          className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
         >
-          <span>Powered by</span>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/bifactory-logo.png"
-            alt="BIfactory s.r.o."
-            className="h-6 w-6"
-          />
-        </a>
+          <Link href="/" className="text-ink-700 hover:text-ink-900">
+            Úvod
+          </Link>
+          <Link href="/manual" className="text-ink-700 hover:text-ink-900">
+            Návody
+          </Link>
+          <Link href="/blog" className="text-ink-700 hover:text-ink-900">
+            Blog
+          </Link>
+          <Link href="/login" className="text-ink-700 hover:text-ink-900">
+            Přihlásit
+          </Link>
+          <Link href="/signup" className="text-ink-700 hover:text-ink-900">
+            Účet zdarma
+          </Link>
+        </nav>
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <span className="whitespace-nowrap">
+            © {new Date().getFullYear()}{" "}
+            <Link
+              href="/"
+              className="font-semibold text-brand hover:underline"
+            >
+              olaf
+            </Link>
+          </span>
+          <span aria-hidden className="text-ink-300">
+            ·
+          </span>
+          <a
+            href="https://bifactory.cz"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-ink-700 transition-colors hover:text-ink-900"
+          >
+            <span>Powered by</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/bifactory-logo.png"
+              alt="BIfactory s.r.o."
+              className="h-6 w-6"
+            />
+          </a>
+        </div>
       </div>
     </footer>
   );

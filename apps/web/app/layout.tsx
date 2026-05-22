@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { UpdateBanner } from "@/components/update-banner";
+import { SITE } from "@/lib/site-config";
 
 import "./globals.css";
 
@@ -16,9 +17,53 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "olaf — where adventures begin",
-  description:
-    "A community-and-event platform for adventure organizers, sports communities, and corporate event hosts.",
+  metadataBase: new URL(SITE.url),
+  title: {
+    default: `${SITE.name} — ${SITE.tagline}`,
+    template: `%s · ${SITE.name}`,
+  },
+  description: SITE.description,
+  keywords: [
+    "olaf",
+    "outdoor",
+    "komunita",
+    "akce",
+    "kemp",
+    "expedice",
+    "přihlášky",
+    "QR Platba",
+    "faktury",
+    "Česko",
+    "Slovensko",
+  ],
+  authors: [{ name: "Lubomír Hulín" }],
+  creator: "Lubomír Hulín",
+  publisher: "olaf.events",
+  alternates: {
+    canonical: SITE.url,
+  },
+  openGraph: {
+    type: "website",
+    locale: SITE.locale,
+    url: SITE.url,
+    siteName: SITE.name,
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.description,
+    images: [
+      {
+        url: SITE.ogImage,
+        width: 1200,
+        height: 630,
+        alt: `${SITE.name} — ${SITE.tagline}`,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.description,
+    images: [SITE.ogImage],
+  },
   // Lets iOS Safari treat Add-to-Home-Screen as a real PWA: launches
   // standalone, dark status bar matches the brand. Without this the
   // installed app opens with a generic white status bar + browser
@@ -26,7 +71,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "olaf",
+    title: SITE.name,
   },
 };
 
@@ -56,7 +101,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="cs"
       data-theme="paper"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
