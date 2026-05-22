@@ -8,23 +8,22 @@ import { useState } from "react";
  * From lg up shows everything always (desktop has the vertical real
  * estate, no need to gate).
  *
- * `renderItem` injects each item — keeps inline-code rendering in
- * one place (FeatureSection passes its `renderInlineCode` helper).
+ * Inline-code rendering happens INSIDE this component (not via a
+ * function prop from the parent) — server components can't pass
+ * function props into client components, and ExpandableBullets is
+ * always rendered by FeatureSection (server). Caused the homepage
+ * to crash with a Server Components error on first deploy.
  */
 export function ExpandableBullets({
   items,
   previewCount = 2,
-  renderItem,
 }: {
   items: string[];
   previewCount?: number;
-  renderItem: (text: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   const hasOverflow = items.length > previewCount;
-  // On lg+ all items are visible regardless of `expanded` (CSS makes
-  // the hidden items show themselves at lg breakpoint).
   return (
     <div>
       <ul className="flex flex-col gap-2.5 text-ink-700">
@@ -42,7 +41,9 @@ export function ExpandableBullets({
                 aria-hidden
                 className="mt-2 size-1.5 shrink-0 rounded-full bg-brand"
               />
-              <span dangerouslySetInnerHTML={{ __html: renderItem(bullet) }} />
+              <span
+                dangerouslySetInnerHTML={{ __html: renderInlineCode(bullet) }}
+              />
             </li>
           );
         })}
@@ -57,5 +58,18 @@ export function ExpandableBullets({
         </button>
       )}
     </div>
+  );
+}
+
+function renderInlineCode(text: string): string {
+  // Backtick → <code> v bullets. Escapuje HTML aby <code> v
+  // dangerouslySetInnerHTML nikoho nezranilo.
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return escaped.replace(
+    /`([^`]+)`/g,
+    '<code class="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[0.9em] text-ink-900">$1</code>',
   );
 }
