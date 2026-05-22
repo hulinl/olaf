@@ -236,8 +236,11 @@ export const BLOG_CATEGORIES: BlogCategory[] = [
   { id: "uvahy", label: "Úvahy" },
 ];
 
+// Public marketing nav — blog je záměrně skryt z header + footer
+// dokud nebudou články kurátované. Routy `/blog` a `/blog/[slug]`
+// pořád existují a fungují (přímý URL otevře článek), jen je
+// neprodávám.
 export const PUBLIC_NAV = [
   { href: "/", label: "Úvod" },
   { href: "/manual", label: "Návody" },
-  { href: "/blog", label: "Blog" },
 ] as const;

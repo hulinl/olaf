@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { FeatureSection } from "@/components/marketing/feature-section";
+import { FeatureToc } from "@/components/marketing/feature-toc";
 import { HeroBg } from "@/components/marketing/hero-bg";
 import { HeroCta } from "@/components/marketing/hero-cta";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
@@ -45,29 +46,20 @@ export default function Home() {
           </div>
         </section>
 
-        {/* TOC strip — sits right under the hero, visible jump targets
-            for the long-scroll feature tour. */}
-        <section className="border-y border-border-strong/20 bg-canvas">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 text-sm text-ink-700">
-            <span className="text-xs font-medium uppercase tracking-[0.16em] text-ink-500">
-              Prohlídka
-            </span>
-            {FEATURES.map((f) => (
-              <Link
-                key={f.id}
-                href={`#${f.id}`}
-                className="font-medium hover:text-brand focus-ring"
-              >
-                {f.tag}
-              </Link>
-            ))}
+        {/* FEATURE TOUR — sticky right-side TOC on lg+ follows the
+            scroll and highlights the active section. On mobile we
+            drop the TOC entirely (burger menu + long scroll is
+            enough; a horizontal strip would steal space). */}
+        <div className="border-t border-border-strong/20 bg-canvas">
+          <div className="mx-auto flex max-w-7xl gap-10 px-4 py-2 lg:py-0">
+            <div className="min-w-0 flex-1">
+              {FEATURES.map((feature) => (
+                <FeatureSection key={feature.id} feature={feature} />
+              ))}
+            </div>
+            <FeatureToc features={FEATURES} />
           </div>
-        </section>
-
-        {/* FEATURE TOUR */}
-        {FEATURES.map((feature) => (
-          <FeatureSection key={feature.id} feature={feature} />
-        ))}
+        </div>
 
         {/* SAMPLE community */}
         <section className="bg-ink-900 text-ink-inverse">

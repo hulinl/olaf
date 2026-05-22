@@ -35,9 +35,6 @@ export function AppFooter({
           <Link href="/manual" className="text-ink-700 hover:text-ink-900">
             Návody
           </Link>
-          <Link href="/blog" className="text-ink-700 hover:text-ink-900">
-            Blog
-          </Link>
           <Link href="/login" className="text-ink-700 hover:text-ink-900">
             Přihlásit
           </Link>
