@@ -5,59 +5,99 @@ import { useEffect, useState } from "react";
 import type { FeatureEntry } from "@/lib/site-config";
 
 /**
- * Sticky right-side TOC for the feature tour. Highlights the currently-
- * visible section via IntersectionObserver; clicks scroll to the
- * matching `id`. Visible only on lg+ — on mobile the user has the
- * burger menu and a long-scroll page; a sticky strip would steal
- * precious horizontal space without paying for it.
+ * Floating right-side TOC for the feature tour.
  *
- * Inspired by the bifactory-web article reading nav (right-side TOC
- * follows scroll, highlights active heading).
+ * Why `position: fixed` + JS visibility toggle instead of pure CSS
+ * sticky: CSS sticky's release point is the parent's content-area
+ * bottom, but the practical "I'm done with this section" moment is
+ * when the LAST feature's content ends — not when the parent's
+ * padding box ends, not at the start of the next dark section.
+ *
+ * Two observers run in parallel:
+ *   - `activeObs` highlights the section currently nearest viewport top
+ *   - `visibilityObs` (with rootMargin `-30% 0 -10% 0`) flips the
+ *     `visible` flag based on whether ANY feature's middle band is
+ *     in the viewport. The TOC unmounts as soon as the last feature
+ *     scrolls past the top half of the viewport.
+ *
+ * `lg:fixed` positions independently of layout — the page reserves
+ * 14rem of right-side space via `lg:pr-56` on the features wrapper
+ * so the floating column doesn't overlap content.
  */
 export function FeatureToc({ features }: { features: FeatureEntry[] }) {
   const [active, setActive] = useState<string | null>(features[0]?.id ?? null);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("IntersectionObserver" in window)) return;
+    if (!("IntersectionObserver" in window)) {
+      // Old browser fallback — keep TOC always visible during tour.
+      setVisible(true);
+      return;
+    }
 
-    // Trigger when the section's top crosses ~30 % from viewport top.
-    // That's the point where the user "feels" they're reading it.
-    const observer = new IntersectionObserver(
+    const featureEls = features
+      .map((f) => document.getElementById(f.id))
+      .filter((el): el is HTMLElement => el !== null);
+
+    // Active-section highlight — pick the one closest to viewport top.
+    const activeObs = new IntersectionObserver(
       (entries) => {
-        const visible = entries
+        const inView = entries
           .filter((e) => e.isIntersecting)
           .sort(
             (a, b) =>
               Math.abs(a.boundingClientRect.top) -
               Math.abs(b.boundingClientRect.top),
           );
-        if (visible.length > 0) {
-          setActive(visible[0].target.id);
+        if (inView.length > 0) {
+          setActive(inView[0].target.id);
         }
       },
       { rootMargin: "-30% 0px -60% 0px", threshold: 0 },
     );
 
-    for (const f of features) {
-      const el = document.getElementById(f.id);
-      if (el) observer.observe(el);
+    // Visibility — TOC visible if ANY feature has its "reading zone"
+    // (top 70 % of viewport) intersecting the viewport. The moment
+    // the last feature scrolls past, all observers go offscreen and
+    // `visibilityState` collapses to "no intersections" → hide.
+    let intersectingCount = 0;
+    const visibilityObs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) intersectingCount++;
+          else intersectingCount--;
+        }
+        setVisible(intersectingCount > 0);
+      },
+      { rootMargin: "0px 0px -30% 0px", threshold: 0 },
+    );
+
+    for (const el of featureEls) {
+      activeObs.observe(el);
+      visibilityObs.observe(el);
     }
-    return () => observer.disconnect();
+
+    return () => {
+      activeObs.disconnect();
+      visibilityObs.disconnect();
+    };
   }, [features]);
 
   return (
     <aside
-      // Absolute-positioned right column = explicit sticky container.
-      // Parent má `relative` + `pr-56` rezervaci pro tento sloupec.
-      // Aside je `h-full` parentu (= features list height), sticky
-      // uvnitř drží během features touru a propustí přesně na konci
-      // posledního feature contentu — žádný stretching do navazující
-      // sekce.
-      className="pointer-events-none absolute right-4 top-0 hidden lg:bottom-0 lg:block lg:h-full lg:w-44"
+      // Fixed positioning v pravo, mimo flow stránky. `visible`
+      // řídí display takže TOC nezamořuje viewport mimo feature tour.
+      // `lg:pr-56` na features wrapperu rezervuje místo aby nedošlo
+      // k překryvu s nábožně klikatelnými prvky vpravo.
+      className={[
+        "fixed right-6 top-24 z-10 hidden w-44 transition-opacity duration-200 lg:block",
+        visible ? "opacity-100" : "pointer-events-none opacity-0",
+      ].join(" ")}
       aria-label="Prohlídka sekcí"
+      aria-hidden={!visible}
     >
-      <div className="pointer-events-auto sticky top-24 mt-24 flex flex-col gap-1 border-l border-border pl-5">
+      <div className="flex flex-col gap-1 border-l border-border pl-5">
         <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-500">
           Prohlídka
         </p>
