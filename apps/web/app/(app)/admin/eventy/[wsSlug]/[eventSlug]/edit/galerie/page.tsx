@@ -285,7 +285,13 @@ export default function EventGalleryPage({ params }: Props) {
                 <div
                   className={[
                     "absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 text-white transition-opacity",
-                    isBusy ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                    // Touch + tablet portrait nemají :hover, takže
+                    // controls musí být vždy vidět. Na lg+ (desktop
+                    // s myší) je necháme schované a ukážeme jen na
+                    // hover, aby fotka šla vychutnat v plné kráse.
+                    isBusy
+                      ? "opacity-100"
+                      : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100",
                   ].join(" ")}
                 >
                   <div className="flex gap-1">
