@@ -2,10 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { FeatureSection } from "@/components/marketing/feature-section";
+import { HeroBg } from "@/components/marketing/hero-bg";
 import { HeroCta } from "@/components/marketing/hero-cta";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
-import { StatsStrip } from "@/components/marketing/stats-strip";
-import { TopographyBg } from "@/components/marketing/topography-bg";
 import { AppFooter } from "@/components/ui/app-footer";
 import { LinkButton } from "@/components/ui/button";
 import { FEATURES, SITE } from "@/lib/site-config";
@@ -24,36 +23,31 @@ export default function Home() {
       <main className="flex flex-1 flex-col">
         {/* HERO */}
         <section className="relative isolate overflow-hidden">
-          <TopographyBg />
+          <HeroBg />
           <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-20 text-center sm:py-28">
             <h1
-              className="text-balance text-5xl font-semibold leading-[1.05] text-ink-900 sm:text-6xl md:text-7xl"
-              style={{ letterSpacing: "-0.035em" }}
+              className="hero-rise text-balance text-5xl font-semibold leading-[1.05] text-ink-900 sm:text-6xl md:text-7xl"
+              style={{ letterSpacing: "-0.035em", animationDelay: "100ms" }}
             >
               Kde začíná dobrodružství.
             </h1>
-            <p className="mt-6 max-w-xl text-balance text-lg text-ink-700 sm:text-xl">
+            <p
+              className="hero-rise mt-6 max-w-xl text-balance text-lg text-ink-700 sm:text-xl"
+              style={{ animationDelay: "280ms" }}
+            >
               olaf je domov pro vaši outdoor partu, sportovní komunitu nebo
               firemní tým. Komunita má profil, akce mají landing page,
               přihlášky mají pořádek a tvůrce má cockpit, kde to všechno řídí.
             </p>
-            <div className="mt-10">
+            <div className="hero-rise mt-10" style={{ animationDelay: "460ms" }}>
               <HeroCta />
-            </div>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs uppercase tracking-[0.16em] text-ink-500">
-              <span>účet zdarma</span>
-              <span aria-hidden>·</span>
-              <span>bez kreditky</span>
-              <span aria-hidden>·</span>
-              <span>první akce za pár minut</span>
             </div>
           </div>
         </section>
 
-        <StatsStrip />
-
-        {/* TOC strip — visible jump targets for the long-scroll feature tour */}
-        <section className="border-b border-border-strong/20 bg-canvas">
+        {/* TOC strip — sits right under the hero, visible jump targets
+            for the long-scroll feature tour. */}
+        <section className="border-y border-border-strong/20 bg-canvas">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 text-sm text-ink-700">
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-ink-500">
               Prohlídka
@@ -109,17 +103,31 @@ export default function Home() {
           </div>
         </section>
 
-        {/* FINAL CTA */}
+        {/* FINAL CTA — emphasises "free + by-athletes-for-athletes +
+            powered by BIfactory" instead of the generic "start like
+            your party did" line. */}
         <section className="bg-canvas">
           <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:py-20">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-brand">
+              Pojďme do toho
+            </p>
             <h2
-              className="text-4xl font-semibold text-ink-900 sm:text-5xl"
+              className="mt-3 text-4xl font-semibold text-ink-900 sm:text-5xl"
               style={{ letterSpacing: "-0.03em", lineHeight: 1.05 }}
             >
-              Začni stejně, jako začala tvoje parta — venku.
+              Celá aplikace je zdarma.
             </h2>
             <p className="mt-5 mx-auto max-w-xl text-balance text-lg text-ink-700">
-              Účet zdarma. Žádná kreditka. První akce za pár minut.
+              Od outdoor nadšenců pro outdoor nadšence. Postavený s láskou v{" "}
+              <a
+                href="https://bifactory.cz"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-ink-900 underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
+              >
+                BIfactory
+              </a>
+              .
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <LinkButton href="/signup" variant="primary" size="lg">

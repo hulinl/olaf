@@ -202,3 +202,59 @@ select:not([multiple]):not([size]) {
   background-position: right 0.625rem center;
   background-size: 0.7rem auto;
 }
+
+/* ---------------------------------------------------------------------------
+   Marketing hero animations
+   --------------------------------------------------------------------------- */
+
+/* Staggered fade-up for hero title / subtitle / CTA. */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.hero-rise {
+  opacity: 0;
+  animation: hero-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Slow horizontal drift on the topo contour layer — ambient,
+ * never grabs attention. */
+@keyframes topo-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-40px); }
+}
+.topo-drift {
+  animation: topo-drift 40s ease-in-out infinite alternate;
+}
+
+/* Sunrise amber glow — slow breathe behind the headline. */
+@keyframes sunrise-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.08); }
+}
+.sunrise-glow {
+  animation: sunrise-glow 8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Independently floating dots (members / scattered light). Each
+ * <span> sets its own animation-delay inline so they don't sync. */
+@keyframes float-dot {
+  0% { transform: translateY(0) translateX(0); opacity: 0.35; }
+  50% { transform: translateY(-14px) translateX(4px); opacity: 0.65; }
+  100% { transform: translateY(0) translateX(0); opacity: 0.35; }
+}
+.float-dot {
+  animation: float-dot 12s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise,
+  .topo-drift,
+  .sunrise-glow,
+  .float-dot {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

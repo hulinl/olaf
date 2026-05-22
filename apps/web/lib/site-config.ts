@@ -68,8 +68,8 @@ export const FEATURES: FeatureEntry[] = [
   {
     id: "landing-builder",
     number: "02",
-    tag: "Landing builder",
-    title: "Stránka akce, bez vývojáře",
+    tag: "Stránka akce",
+    title: "Vlastní stránka pro každou akci, bez vývojáře",
     highlight: "bez vývojáře",
     lede:
       "Skládáš stránku akce z bloků jako z Lega. Hero, program po dnech, mapa, fotky, cena, FAQ. Co naskládáš dovnitř, to lidi vidí venku.",

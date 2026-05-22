@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 
 import type { FeatureEntry } from "@/lib/site-config";
 
@@ -54,13 +53,20 @@ export function FeatureSection({ feature }: { feature: FeatureEntry }) {
   const visual = (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-surface shadow-lg shadow-black/5">
       <div className="aspect-[16/10] w-full bg-surface-muted">
-        <Image
+        {/* SVG mockupy renderujem jako native <img> — next/image
+            přidává URL transformace přes /_next/image které u SVG v
+            public/ na SWA neumí (vrací 404 nebo nesprávný MIME).
+            <img> je pro statický asset bez paramterů ten správný
+            primitiv. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={feature.screenshot}
           alt={feature.screenshotAlt ?? feature.title}
           width={1280}
           height={800}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
-          unoptimized
         />
       </div>
     </div>
