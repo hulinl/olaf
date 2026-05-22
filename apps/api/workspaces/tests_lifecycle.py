@@ -185,7 +185,7 @@ class WorkspaceEventsListTests(TestCase):
         self.assertIn("draft", slugs)
 
     def test_soft_deleted_events_excluded(self) -> None:
-        event = self._make_event(slug="visible")
+        self._make_event(slug="visible")
         deleted = self._make_event(slug="trash")
         deleted.soft_delete(user=self.owner)
         # I owner nevidí soft-deleted v events listingu (jen ve trash).
