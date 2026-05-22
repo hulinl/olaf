@@ -57,18 +57,22 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
       { rootMargin: "-30% 0px -60% 0px", threshold: 0 },
     );
 
-    // Visibility — TOC visible if ANY feature has its "reading zone"
-    // (top 70 % of viewport) intersecting the viewport. The moment
-    // the last feature scrolls past, all observers go offscreen and
-    // `visibilityState` collapses to "no intersections" → hide.
-    let intersectingCount = 0;
+    // Visibility — TOC visible if ANY feature je momentálně v
+    // viewport reading zóně (top 70 %). Set místo counteru: counter
+    // by se dostal do mínusu když IntersectionObserver na init
+    // vyplivne `isIntersecting=false` pro všech 7 features pod
+    // viewportem.
+    const intersectingEls = new Set<Element>();
     const visibilityObs = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting) intersectingCount++;
-          else intersectingCount--;
+          if (e.isIntersecting) {
+            intersectingEls.add(e.target);
+          } else {
+            intersectingEls.delete(e.target);
+          }
         }
-        setVisible(intersectingCount > 0);
+        setVisible(intersectingEls.size > 0);
       },
       { rootMargin: "0px 0px -30% 0px", threshold: 0 },
     );
