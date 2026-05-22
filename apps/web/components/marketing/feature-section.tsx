@@ -30,11 +30,7 @@ export function FeatureSection({ feature }: { feature: FeatureEntry }) {
         )}
       </h2>
       <p className="text-lg leading-relaxed text-ink-700">{feature.lede}</p>
-      <ExpandableBullets
-        items={feature.bullets}
-        previewCount={2}
-        renderItem={renderInlineCode}
-      />
+      <ExpandableBullets items={feature.bullets} previewCount={2} />
       {feature.manualSlug && (
         <div>
           <Link
@@ -102,15 +98,3 @@ function renderHighlighted(title: string, highlight: string) {
   );
 }
 
-function renderInlineCode(text: string): string {
-  // Allow simple backtick code in bullets — saves writing `<code>` in
-  // every config entry. Escapes HTML first to avoid injection.
-  const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return escaped.replace(
-    /`([^`]+)`/g,
-    '<code class="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[0.9em] text-ink-900">$1</code>',
-  );
-}
