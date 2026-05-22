@@ -414,9 +414,38 @@ function MobileDrawer({
               ),
             )}
           </DrawerSection>
+
+          {/* Manuální „restart appky" odkaz pod nav — fallback pro
+              iOS PWA, který si někdy drží starou cache i poté co
+              auto-detekce přes /version.json proběhla. Když na něj
+              klikneš, vynutíme reload s cache-bustem v query
+              stringu. */}
+          <div className="mt-auto border-t border-border pt-3">
+            <ForceRefreshButton />
+          </div>
         </nav>
       </div>
     </div>
+  );
+}
+
+function ForceRefreshButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // location.reload() respektuje http cache; přidáním
+        // jednorázového query parametru se HTML i bundle načte
+        // čerstvě z origin (CDN cache na SWA tu jen klíčuje podle URL).
+        const url = new URL(window.location.href);
+        url.searchParams.set("_r", Date.now().toString());
+        window.location.replace(url.toString());
+      }}
+      className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+    >
+      <span>Aktualizovat appku</span>
+      <span aria-hidden className="text-ink-300">↻</span>
+    </button>
   );
 }
 
