@@ -1,0 +1,61 @@
+---
+title: "Proč má každý uživatel olafu vlastní komunitu (i když ji nikdy nepoužije)"
+excerpt: "Architektonické rozhodnutí, které se nakonec ukázalo jako klíčové. Eventy jsou first-class, komunity jsou volitelný kontejner."
+category: "uvahy"
+publishedAt: "2026-05-19"
+author: 'Lubomír „Olaf" Hulín'
+tags: ["architektura", "design", "decision-log"]
+---
+
+## Problém
+
+Když jsem začínal s olafem, představa byla jednoduchá: **uživatel si založí komunitu** (= workspace/tenant), v té komunitě **vytvoří akce**. Komunita je první vstup, akce druhá. Stejně jako Slack workspace → channely → zprávy.
+
+Po pár týdnech uživatelského testování ale začaly chodit dotazy:
+
+> „Já chci jen pozvat 8 lidí na víkendovku. Komunitu zakládat nechci, žádnou party nemám. Můžu udělat akci napřímo?"
+
+A:
+
+> „Mám outdoor partu (Olaf Adventures) a zároveň občas dělám firemní team-building pro klienta. To je vlastně jiný workspace. Ale nechci se přepínat ručně."
+
+## Rozhodnutí
+
+**Eventy jsou first-class. Komunity (workspaces) jsou volitelný kontejner.**
+
+Každý uživatel dostane **automaticky vytvořený osobní workspace** se slugem `personal-{user_id}`. Vždy. I ten, kdo nikdy nebude pořádat větší než víkendovku se 6 kamarády.
+
+Když chce uživatel akci sdílet i pod víc partami, vytvoří si **druhý workspace** (`olafadventures`, `firemni-camp`, …) a v detailu akce nastaví **shared_workspaces** — akce se objeví v přehledu obou.
+
+## Co to změnilo
+
+### „+ Vytvořit akci" je vždy dostupné
+
+V Tvůrce sekci je tlačítko **+ Vytvořit akci** zobrazeno **bez podmínky vlastnictví komunity**. Žádný onboarding wall („nejdřív musíš…"). Klik, formulář, akce vznikne v tvojí osobní komunitě.
+
+### Veřejná URL akce nezávisí na komunitě
+
+Stránka akce je `olaf.events/{ws-slug}/e/{event-slug}`. Pro osobní workspace to vypadá jako `olaf.events/personal-42/e/spring-camp` — funkční, jen ne moc krásné. Když uživateli začne záležet na brandu, vytvoří `olafadventures` workspace a akce se v něm objeví (nebo přesune).
+
+### Komunita zůstává pro to, co skutečně dává smysl
+
+Komunitní funkce — nástěnka pro dlouhodobé debaty, seznam členů, public landing party — jsou pro lidi, kteří **mají co prezentovat**. Ne pro každého. Není to wall na používání produktu.
+
+## Co se z toho naučit
+
+Kdykoli mě product manager / designer / kdokoli tlačí na **„nejdřív musíš nastavit X, pak teprve můžeš Y"**, zeptám se: **co je hodnota Y bez X?** Pokud je nenulová, X je opt-in feature, ne onboarding required.
+
+V olafu:
+
+- **Akce bez komunity?** Hodnota = vlastní landing page + přihlášky + platby. Nenulová → komunita je opt-in.
+- **Komunita bez akce?** Hodnota = veřejný profil + nástěnka. Nenulová → akce je opt-in.
+
+Žádné z nich není required předtím, než druhé.
+
+Mimochodem: tohle samé pravidlo aplikuju i na ostatní decisions. „Musíš mít vyplněnou bankovní informaci, než publikuješ akci"? Jen pokud je akce **placená**. Free akce publikuj rovnou.
+
+## Kdy bych to udělal jinak
+
+Nejsem si jistý, jestli `personal-{id}` slug je ten nejlepší tvar. „Olaf Hulin" v UI vidí `personal-42` jako svůj workspace slug — pro power-user OK, pro běžného uživatele zbytečně technické.
+
+Možná fallback na `{first-name}-{last-name}` (transliterated), s collision handlerem. Ale to je polish, ne core. Až bude čas.

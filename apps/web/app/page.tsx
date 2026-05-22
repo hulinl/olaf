@@ -1,55 +1,25 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
+import { FeatureSection } from "@/components/marketing/feature-section";
 import { HeroCta } from "@/components/marketing/hero-cta";
+import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { StatsStrip } from "@/components/marketing/stats-strip";
 import { TopographyBg } from "@/components/marketing/topography-bg";
 import { AppFooter } from "@/components/ui/app-footer";
 import { LinkButton } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
-import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
-import { SectionHead } from "@/components/ui/section-head";
+import { FEATURES, SITE } from "@/lib/site-config";
 
-const FEATURES = [
-  {
-    title: "Domov pro vaši partu",
-    body: "Veřejný profil komunity s logem, popisem a všemi akcemi na jednom místě. Účastníci vidí, kdo jste a kam chystáte další výpravu.",
-  },
-  {
-    title: "Landing page bez vývojáře",
-    body: "Skládáš stránku akce z bloků — hero, program, mapa, fotky, cena, FAQ. Co dáš dovnitř, to lidi vidí venku.",
-  },
-  {
-    title: "Přihlášky, jak je chceš mít",
-    body: "Vlastní otázky podle akce (velikost trička, doprava, zdravotní omezení), waitlist, schvalování. Profil účastníka se předvyplní sám.",
-  },
-  {
-    title: "Nástěnka pro komunitu i akci",
-    body: "Témata, lajky, komentáře, e-mail při novém příspěvku. Vlastní prostor pro každou partu i pro konkrétní akci.",
-  },
-  {
-    title: "Platby a faktury bez chaosu",
-    body: "QR Platba s variabilním symbolem, automatické faktury v PDF, mark-as-paid jedním klikem. Hotovostní platby taky.",
-  },
-  {
-    title: "Role tvůrce — cockpit pro pořadatele",
-    body: "Roadmapa akce, checklist, scheduled připomínky účastníkům, profily přihlášených. Vidíš, co je hotovo a co řešit dnes.",
-  },
-];
+export const metadata: Metadata = {
+  title: `${SITE.name} — ${SITE.tagline}`,
+  description: SITE.description,
+  alternates: { canonical: SITE.url },
+};
 
 export default function Home() {
   return (
     <>
-      <header className="sticky top-0 z-10 border-b border-border bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link
-            href="/"
-            className="text-ink-900 transition-opacity hover:opacity-80"
-            aria-label="olaf"
-          >
-            <Logo size={26} />
-          </Link>
-          <PublicAuthIndicator />
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main className="flex flex-1 flex-col">
         {/* HERO */}
@@ -70,54 +40,61 @@ export default function Home() {
             <div className="mt-10">
               <HeroCta />
             </div>
-          </div>
-        </section>
-
-        {/* FEATURES */}
-        <section className="bg-canvas">
-          <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map((f) => (
-                <article
-                  key={f.title}
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-7 shadow-sm transition-shadow hover:shadow-md"
-                >
-                  <h3
-                    className="text-lg font-semibold text-ink-900 sm:text-xl"
-                    style={{ letterSpacing: "-0.02em", lineHeight: 1.2 }}
-                  >
-                    {f.title}
-                  </h3>
-                  <p
-                    className="text-ink-700"
-                    style={{ fontSize: 15, lineHeight: 1.6 }}
-                  >
-                    {f.body}
-                  </p>
-                </article>
-              ))}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs uppercase tracking-[0.16em] text-ink-500">
+              <span>účet zdarma</span>
+              <span aria-hidden>·</span>
+              <span>bez kreditky</span>
+              <span aria-hidden>·</span>
+              <span>první akce za pár minut</span>
             </div>
           </div>
         </section>
 
-        {/* SAMPLE */}
+        <StatsStrip />
+
+        {/* TOC strip — visible jump targets for the long-scroll feature tour */}
+        <section className="border-b border-border-strong/20 bg-canvas">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 text-sm text-ink-700">
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-ink-500">
+              Prohlídka
+            </span>
+            {FEATURES.map((f) => (
+              <Link
+                key={f.id}
+                href={`#${f.id}`}
+                className="font-medium hover:text-brand focus-ring"
+              >
+                {f.tag}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* FEATURE TOUR */}
+        {FEATURES.map((feature) => (
+          <FeatureSection key={feature.id} feature={feature} />
+        ))}
+
+        {/* SAMPLE community */}
         <section className="bg-ink-900 text-ink-inverse">
-          <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
             <div className="grid items-center gap-10 sm:grid-cols-[1fr_auto] sm:gap-14">
               <div>
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-brand">
+                  Live ukázka
+                </p>
                 <h2
-                  className="max-w-2xl text-3xl font-semibold text-ink-inverse sm:text-4xl"
+                  className="mt-3 max-w-2xl text-3xl font-semibold sm:text-4xl"
                   style={{ letterSpacing: "-0.025em", lineHeight: 1.15 }}
                 >
-                  Podívej se, jak to vypadá v praxi
+                  Mrkni, jak to vypadá v praxi
                 </h2>
                 <p
                   className="mt-4 max-w-xl text-white/70"
                   style={{ fontSize: 16, lineHeight: 1.6 }}
                 >
                   Olaf Adventures — outdoor komunita z Beskyd — používá olaf
-                  pro multi-day kempy, víkendovky a tréninky. Mrkni na jejich
-                  profil a aktuální akce.
+                  pro multi-day kempy, víkendovky a tréninky.
                 </p>
               </div>
               <div className="shrink-0">
@@ -141,12 +118,15 @@ export default function Home() {
             >
               Začni stejně, jako začala tvoje parta — venku.
             </h2>
-            <p className="mt-5 max-w-xl text-balance text-lg text-ink-700 mx-auto">
+            <p className="mt-5 mx-auto max-w-xl text-balance text-lg text-ink-700">
               Účet zdarma. Žádná kreditka. První akce za pár minut.
             </p>
-            <div className="mt-8">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <LinkButton href="/signup" variant="primary" size="lg">
                 Vytvořit účet
+              </LinkButton>
+              <LinkButton href="/manual" variant="secondary" size="lg">
+                Projít návody
               </LinkButton>
             </div>
           </div>

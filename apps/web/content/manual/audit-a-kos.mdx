@@ -1,0 +1,59 @@
+---
+title: "Audit log a Koš"
+excerpt: "Co se v komunitě stalo a kdo to udělal. A jak vrátit akci, kterou jsi omylem smazal."
+category: "pokrocile"
+order: 70
+tags: ["audit", "koš", "soft-delete", "trash"]
+updatedAt: "2026-05-22"
+---
+
+## Aktivita (audit log)
+
+V hlavičce **Tvůrce** → **Aktivita** je workspace-scoped feed všeho, co se v komunitě stalo:
+
+- vytvoření akce
+- úprava akce (s výpisem změněných polí)
+- zrušení / smazání / obnovení akce
+- schválení / zamítnutí přihlášky
+- změna role člena (promote / demote / handover)
+- smazání tématu nebo komentáře (včetně flagu, jestli to byla moderace)
+
+Feed je **append-only** — řádky se nedají přepsat ani smazat ručně. Po 18 měsících se nejstarší automaticky pročistí (denní retention task).
+
+## K čemu je to dobré
+
+- **Owner přehled**: „Kdo schválil tu pochybnou přihlášku?"
+- **Compliance**: pokud někdo zpochybňuje rozhodnutí, máš audit trail.
+- **Debug**: „Proč najednou nevidím tu akci?" — koukneš, kdo a kdy ji smazal.
+
+Filtruj podle **Typu akce** (10 kategorií) a **Workspace** (pokud spravuješ víc komunit).
+
+## Koš (soft-delete akcí)
+
+Když smažeš akci v cockpitu („Smazat akci" v Danger Zone), neletí navždy pryč. Místo toho **30 dní sedí v koši**:
+
+- mizí z přehledu akcí, z dashboardu účastníků, z veřejné stránky komunity
+- ale data zůstávají — RSVPs, dokumenty, faktury, audit log
+- můžeš ji **vrátit jedním klikem**
+
+V hlavičce **Tvůrce** → **Akce** → odkaz **Koš** uvidíš smazané akce s odpočtem „smaže se za X dní". Tlačítka:
+
+- **Vrátit** — akce se vrátí do přehledu jako by se nic nestalo
+- **Smazat napořád** — hard-delete, druhá potvrzovací otázka
+
+Po 30 dnech denní Celery task `events.purge_old_soft_deletes` ji hard-deletuje automaticky.
+
+## Co se loguje vs. co ne
+
+| Logujeme | Nelogujeme |
+|---|---|
+| vytvoření / úprava / smazání event | vytvoření / smazání komentáře (jen smazání) |
+| schválení / zamítnutí RSVP | nahrání dokumentu (jen verifikaci by mod) |
+| změna role člena | login / logout |
+| smazání tématu / komentáře (s `by_moderator` flagem) | čtení (read) — žádné |
+
+Audit není security forensics. Pokud potřebuješ tracking přístupů, použij Application Insights na úrovni infra.
+
+## Tip
+
+Před deletem akce s mnoha přihláškami: lepší je **zrušit** (status = cancelled, pošle se hromadný e-mail s důvodem) než **smazat** (zmizí beze stopy). Smaž jen draft akce, které nikdy nepublikoval.

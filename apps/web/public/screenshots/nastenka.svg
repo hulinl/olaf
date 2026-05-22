@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800">
+  <defs><linearGradient id="nBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#faf8f4"/><stop offset="1" stop-color="#f4f1ea"/></linearGradient></defs>
+  <rect width="1280" height="800" fill="url(#nBg)"/>
+  <rect width="1280" height="56" fill="#fff"/>
+  <line x1="0" y1="56" x2="1280" y2="56" stroke="#e5e1d8"/>
+  <text x="32" y="34" font-family="system-ui,sans-serif" font-size="14" fill="#737373">Spring Camp / </text>
+  <text x="140" y="34" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="#1a1a1a">Nástěnka</text>
+  <!-- Bell with badge -->
+  <circle cx="1200" cy="28" r="14" fill="#fafaf7" stroke="#e5e1d8"/>
+  <path d="M 1196 25 v -3 a 4 4 0 0 1 8 0 v 3 c 0 1.5 0.5 3 2 4.5 h -12 c 1.5 -1.5 2 -3 2 -4.5 z" stroke="#1a1a1a" stroke-width="1.5" fill="none"/>
+  <circle cx="1208" cy="22" r="4" fill="#dc2626"/>
+  <text x="1208" y="25" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+
+  <!-- Topic header -->
+  <rect x="80" y="100" width="1120" height="640" rx="14" fill="#fff" stroke="#e5e1d8"/>
+  <text x="120" y="142" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#f59e0b" letter-spacing="1.5">TÉMA · 📌 PŘIPNUTO</text>
+  <text x="120" y="180" font-family="system-ui,sans-serif" font-size="24" font-weight="700" fill="#1a1a1a">Sraz v 9 nebo v 10?</text>
+  <text x="120" y="206" font-family="system-ui,sans-serif" font-size="13" fill="#737373">Petr S. · před 2 hodinami · 7 komentářů · 12 ♥</text>
+  <line x1="120" y1="230" x2="1160" y2="230" stroke="#f0ede5"/>
+
+  <!-- Comments -->
+  <g font-family="system-ui,sans-serif">
+    <!-- C1 -->
+    <circle cx="148" cy="280" r="20" fill="#1a1a1a"/>
+    <text x="148" y="285" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">JD</text>
+    <text x="184" y="278" font-size="14" font-weight="600" fill="#1a1a1a">Jan Dvořák</text>
+    <text x="280" y="278" font-size="12" fill="#737373">před 90 min</text>
+    <text x="184" y="302" font-size="14" fill="#525252">Já bych byl pro 10:00, sraz po dálnici 60 min cesta.</text>
+    <text x="184" y="324" font-size="12" fill="#737373">♥ 4 · Odpovědět</text>
+
+    <!-- C2 with mention -->
+    <circle cx="148" cy="370" r="20" fill="#7a5c3a"/>
+    <text x="148" y="375" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">MM</text>
+    <text x="184" y="368" font-size="14" font-weight="600" fill="#1a1a1a">Marta M.</text>
+    <text x="270" y="368" font-size="12" fill="#737373">před 65 min</text>
+    <text x="184" y="392" font-size="14" fill="#525252">
+      <tspan font-weight="600" fill="#f59e0b">@Jan.Dvorak</tspan> souhlas, 10 mi sedí líp.
+    </text>
+    <text x="184" y="414" font-size="12" fill="#737373">♥ 2 · Odpovědět</text>
+
+    <!-- C3 nested reply -->
+    <rect x="180" y="442" width="980" height="100" rx="10" fill="#faf8f4" stroke="#e5e1d8"/>
+    <circle cx="218" cy="478" r="16" fill="#3a5c4a"/>
+    <text x="218" y="483" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">PS</text>
+    <text x="248" y="476" font-size="13" font-weight="600" fill="#1a1a1a">Petr Skála</text>
+    <text x="330" y="476" font-size="11" fill="#737373">před 30 min</text>
+    <text x="248" y="498" font-size="13" fill="#525252">OK, fixujeme 10:00. Doplnil jsem do popisu akce.</text>
+    <text x="248" y="520" font-size="11" fill="#737373">♥ 3 · Odpovědět</text>
+
+    <!-- Composer -->
+    <rect x="120" y="572" width="1040" height="120" rx="10" fill="#fafaf7" stroke="#e5e1d8"/>
+    <text x="140" y="608" font-size="13" fill="#a3a3a3">Napiš komentář — můžeš @ označit kohokoli z accentu…</text>
+    <rect x="140" y="652" width="32" height="28" rx="6" fill="#fff" stroke="#e5e1d8"/>
+    <text x="156" y="671" font-size="12" text-anchor="middle">📎</text>
+    <rect x="1080" y="650" width="64" height="30" rx="6" fill="#1a1a1a"/>
+    <text x="1112" y="670" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Odeslat</text>
+  </g>
+</svg>

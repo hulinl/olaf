@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800">
+  <defs>
+    <linearGradient id="payBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#faf8f4"/><stop offset="1" stop-color="#f4f1ea"/></linearGradient>
+    <pattern id="qr" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+      <rect width="14" height="14" fill="#fff"/>
+      <rect width="7" height="7" fill="#1a1a1a"/>
+      <rect x="7" y="7" width="7" height="7" fill="#1a1a1a"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="800" fill="url(#payBg)"/>
+  <rect width="1280" height="56" fill="#fff"/>
+  <line x1="0" y1="56" x2="1280" y2="56" stroke="#e5e1d8"/>
+  <text x="32" y="34" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="#1a1a1a">Pokyny k platbě</text>
+
+  <!-- Card -->
+  <rect x="80" y="100" width="1120" height="600" rx="18" fill="#fff" stroke="#e5e1d8"/>
+  <text x="120" y="148" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#f59e0b" letter-spacing="1.5">PLATBA</text>
+  <text x="120" y="186" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="#1a1a1a">Spring Camp Beskydy 2026</text>
+  <text x="120" y="210" font-family="system-ui,sans-serif" font-size="14" fill="#737373">Variabilní symbol jednoznačně identifikuje tvou registraci.</text>
+
+  <!-- Amount -->
+  <line x1="120" y1="240" x2="1160" y2="240" stroke="#e5e1d8"/>
+  <text x="120" y="282" font-family="system-ui,sans-serif" font-size="13" fill="#737373">Částka</text>
+  <text x="120" y="322" font-family="system-ui,sans-serif" font-size="36" font-weight="700" fill="#1a1a1a">2 500,00 Kč</text>
+
+  <!-- IBAN -->
+  <text x="120" y="380" font-family="system-ui,sans-serif" font-size="13" fill="#737373">Číslo účtu</text>
+  <text x="120" y="408" font-family="ui-monospace, Menlo, monospace" font-size="18" fill="#1a1a1a">2002145399 / 0800</text>
+  <text x="120" y="436" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#737373">CZ65 0800 0000 1920 0014 5399</text>
+
+  <!-- VS -->
+  <text x="120" y="490" font-family="system-ui,sans-serif" font-size="13" fill="#737373">Variabilní symbol</text>
+  <text x="120" y="524" font-family="ui-monospace, Menlo, monospace" font-size="24" font-weight="600" fill="#1a1a1a">20240001</text>
+
+  <!-- Message -->
+  <text x="120" y="582" font-family="system-ui,sans-serif" font-size="13" fill="#737373">Zpráva pro příjemce</text>
+  <text x="120" y="606" font-family="system-ui,sans-serif" font-size="15" fill="#1a1a1a">Spring Camp 2026 — Jan Dvořák</text>
+
+  <!-- QR -->
+  <rect x="800" y="270" width="320" height="320" rx="12" fill="#fff" stroke="#e5e1d8"/>
+  <rect x="820" y="290" width="280" height="280" fill="url(#qr)"/>
+  <text x="960" y="640" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373" text-anchor="middle" letter-spacing="2">QR PLATBA</text>
+  <text x="960" y="660" font-family="system-ui,sans-serif" font-size="12" fill="#525252" text-anchor="middle">Naskenuj v bankovní aplikaci</text>
+</svg>

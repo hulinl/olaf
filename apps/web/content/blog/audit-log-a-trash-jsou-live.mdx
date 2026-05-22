@@ -1,0 +1,63 @@
+---
+title: "Novinka: Audit log a 30-day Koš jsou live"
+excerpt: "Co se v komunitě stalo, vidíš teď v Aktivitě. A když omylem smažeš akci, sedí 30 dní v koši — kdykoli ji vrátíš."
+category: "novinka"
+publishedAt: "2026-05-21"
+author: "olaf dev"
+tags: ["release", "audit", "soft-delete", "moderace"]
+---
+
+## TL;DR
+
+Tento týden přibyly v olafu dvě věci, které ti dají větší klid při správě komunity:
+
+- **Aktivita** (`/admin/audit`) — append-only feed všeho, co se v komunitě stalo. Kdo schválil přihlášku, kdo smazal komentář, kdo změnil termín akce.
+- **Koš** (`/admin/eventy/kos`) — smazaná akce 30 dní čeká, můžeš ji vrátit zpátky jedním klikem. Po 30 dnech se hard-deletuje automaticky.
+
+## Proč to potřebujeme
+
+V minulých sezónách se nám stalo:
+
+1. **„Kdo schválil tu pochybnou přihlášku?"** Někdo se přihlásil pod jménem, které nebylo v seznamu pozvaných. Po campu jsem zjistil, že přihláška šla přes admina, který už si nepamatoval, proč. Bez auditu to byla detektivka.
+2. **„Promiň, smazal jsem tu akci, asi špatný klik."** V old olafu hard-delete = byebye. Šance, že někdo omylem klikne **Smazat akci** na publikovanou akci s 12 lidmi? Jen otázka času.
+
+Obojí teď máme vyřešené:
+
+## Aktivita
+
+Workspace-scoped feed v Tvůrce shellu. Loguje se:
+
+- vytvoření / úprava / zrušení / smazání / obnovení / hard-delete akce
+- schválení / zamítnutí přihlášky (s důvodem zamítnutí)
+- změna role člena (promote / demote / handover — handover píše dva rowy v transakci)
+- smazání tématu nebo komentáře (s flagem `by_moderator` — rozlišuje moderaci od self-cleanup)
+
+Filtruj podle **typu akce** (10 kategorií) nebo **workspace** (pokud spravuješ víc komunit). Feed je read-only — rowy nelze upravovat ani mazat ručně. Po 18 měsících se nejstarší vyčistí denním retention taskem.
+
+## Koš
+
+**Tři nové endpointy:**
+
+- `POST /events/<ws>/<event>/delete/` — soft-delete, akce zmizí z přehledů
+- `POST /events/<ws>/<event>/restore/` — vrátit z koše
+- `POST /events/<ws>/<event>/purge/` — hard-delete teď (jen pokud už je v koši)
+
+**UI:**
+
+V cockpitu akce **Danger Zone** má vedle „Zrušit akci" nový blok „Smazat akci". Klik tě varuje („Pozor: 12 potvrzených přihlášek ztratí přístup"), potvrzení = soft-delete, redirect do koše.
+
+V hlavičce Tvůrce shellu je pill **Koš** s odpočtem dní pro každou smazanou akci.
+
+## Testovací coverage
+
+Tahle změna přidala 17 nových testů (model, API, retention task, integration s audit logem). Celkem teď máme **387 testů** pokrývajících kritické cesty backendu.
+
+## Co dál
+
+V backlogu je:
+
+- **bulk audit export** do CSV pro účetnictví / compliance
+- **soft-delete pro topicy a komentáře** (zatím hard-delete s audit row, pokud chceš data zachovat)
+- **moderator nudge** — když mod smaže obsah, autora to upozorní s důvodem
+
+Pokud máš nápad, co by ti v audit logu chybělo, [napiš mi](mailto:hulin@bifactory.cz) nebo otevři issue v repu.

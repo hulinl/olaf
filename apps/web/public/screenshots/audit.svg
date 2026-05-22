@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800">
+  <defs><linearGradient id="aBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#faf8f4"/><stop offset="1" stop-color="#f4f1ea"/></linearGradient></defs>
+  <rect width="1280" height="800" fill="url(#aBg)"/>
+  <rect width="1280" height="56" fill="#fff"/>
+  <line x1="0" y1="56" x2="1280" y2="56" stroke="#e5e1d8"/>
+  <text x="32" y="34" font-family="system-ui,sans-serif" font-size="14" fill="#737373">Tvůrce / Aktivita</text>
+
+  <text x="40" y="110" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#f59e0b" letter-spacing="1.5">TVŮRCE</text>
+  <text x="40" y="148" font-family="system-ui,sans-serif" font-size="32" font-weight="700" fill="#1a1a1a">Aktivita</text>
+  <text x="40" y="172" font-family="system-ui,sans-serif" font-size="13" fill="#737373">Co se ve workspace stalo. Append-only.</text>
+
+  <!-- Filters -->
+  <text x="40" y="220" font-family="system-ui,sans-serif" font-size="12" fill="#737373">Workspace:</text>
+  <rect x="125" y="206" width="200" height="28" rx="6" fill="#fff" stroke="#e5e1d8"/>
+  <text x="138" y="225" font-family="system-ui,sans-serif" font-size="13" fill="#1a1a1a">Olaf Adventures ▾</text>
+
+  <text x="345" y="220" font-family="system-ui,sans-serif" font-size="12" fill="#737373">Typ akce:</text>
+  <rect x="415" y="206" width="180" height="28" rx="6" fill="#fff" stroke="#e5e1d8"/>
+  <text x="428" y="225" font-family="system-ui,sans-serif" font-size="13" fill="#1a1a1a">Vše ▾</text>
+
+  <!-- List -->
+  <g font-family="system-ui,sans-serif" font-size="13">
+    <!-- Row 1 -->
+    <rect x="40" y="260" width="1200" height="76" rx="10" fill="#fff" stroke="#e5e1d8"/>
+    <text x="62" y="288" font-weight="600" fill="#1a1a1a">Olaf Hulin</text>
+    <text x="1218" y="288" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#737373" text-anchor="end">22. 5. 14:32</text>
+    <text x="62" y="308" fill="#525252">Smazal akci „Podzimní víkendovka" do koše</text>
+    <rect x="62" y="316" width="120" height="20" rx="4" fill="#fafaf7"/>
+    <text x="74" y="330" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">Smazání akce</text>
+    <rect x="190" y="316" width="86" height="20" rx="4" fill="#fafaf7"/>
+    <text x="202" y="330" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">event #142</text>
+
+    <!-- Row 2 -->
+    <rect x="40" y="346" width="1200" height="76" rx="10" fill="#fff" stroke="#e5e1d8"/>
+    <text x="62" y="374" font-weight="600" fill="#1a1a1a">Olaf Hulin</text>
+    <text x="1218" y="374" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#737373" text-anchor="end">22. 5. 14:18</text>
+    <text x="62" y="394" fill="#525252">Schválil přihlášku Jan Dvořák na „Spring Camp Beskydy 2026"</text>
+    <rect x="62" y="402" width="158" height="20" rx="4" fill="#fafaf7"/>
+    <text x="74" y="416" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">Schválení přihlášky</text>
+    <rect x="228" y="402" width="80" height="20" rx="4" fill="#fafaf7"/>
+    <text x="240" y="416" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">rsvp #57</text>
+
+    <!-- Row 3 -->
+    <rect x="40" y="432" width="1200" height="76" rx="10" fill="#fff" stroke="#e5e1d8"/>
+    <text x="62" y="460" font-weight="600" fill="#1a1a1a">Marta Member</text>
+    <text x="1218" y="460" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#737373" text-anchor="end">22. 5. 11:04</text>
+    <text x="62" y="480" fill="#525252">Smazal téma „Test příspěvek" (moderátor)</text>
+    <rect x="62" y="488" width="120" height="20" rx="4" fill="#fafaf7"/>
+    <text x="74" y="502" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">Smazání tématu</text>
+
+    <!-- Row 4 -->
+    <rect x="40" y="518" width="1200" height="76" rx="10" fill="#fff" stroke="#e5e1d8"/>
+    <text x="62" y="546" font-weight="600" fill="#1a1a1a">Olaf Hulin</text>
+    <text x="1218" y="546" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#737373" text-anchor="end">21. 5. 18:22</text>
+    <text x="62" y="566" fill="#525252">Upravil akci „Spring Camp Beskydy 2026" — termín, místo</text>
+    <rect x="62" y="574" width="100" height="20" rx="4" fill="#fafaf7"/>
+    <text x="74" y="588" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">Úprava akce</text>
+
+    <!-- Row 5 -->
+    <rect x="40" y="604" width="1200" height="76" rx="10" fill="#fff" stroke="#e5e1d8"/>
+    <text x="62" y="632" font-weight="600" fill="#1a1a1a">Olaf Hulin</text>
+    <text x="1218" y="632" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#737373" text-anchor="end">20. 5. 09:14</text>
+    <text x="62" y="652" fill="#525252">Změnil roli Petr Skála: member → admin</text>
+    <rect x="62" y="660" width="140" height="20" rx="4" fill="#fafaf7"/>
+    <text x="74" y="674" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#737373">Změna role člena</text>
+  </g>
+</svg>

@@ -1,0 +1,60 @@
+---
+title: "Spravovat přihlášky"
+excerpt: "Dotazník, kapacita, waitlist, schvalování, duplicate detection — jak to chodí a kde co najdeš."
+category: "prihlasky"
+order: 95
+tags: ["přihlášky", "rsvp", "waitlist", "schvalování"]
+updatedAt: "2026-05-22"
+---
+
+## Co to umí
+
+Když publikuješ akci, dostane veřejnou registrační stránku `olaf.events/{ws}/e/{event}/rsvp`. Účastník (i bez účtu) vyplní formulář, dostane potvrzovací e-mail a — pokud je akce placená — pokyny k platbě.
+
+Tobě v cockpitu naskočí přihláška do tabulky **Účastníci** s plnou PII (jméno, e-mail, telefon, otázky z dotazníku).
+
+## Dotazník — co tam dát
+
+Olaf má **konfigurovatelný dotazník** rozdělený do sekcí:
+
+| Sekce | Co se ptá |
+|---|---|
+| `profile` | Jméno, příjmení, e-mail, telefon (vždy zapnutá) |
+| `address` | Adresa pro fakturaci |
+| `emergency` | Kontakt v nouzi |
+| `transport` | Vlastní auto / spolujízda / vlak |
+| `meals` | Strava, alergie, dietní specifika |
+| `health` | Zdravotní omezení, léky |
+| `gear` | Co si přiveze + co si zapůjčí |
+| `tshirt` | Velikost trička |
+
+V **Detail akce** → **Dotazník** zapínáš jen ty sekce, které k téhle akci dávají smysl. Pro firemní team-building nebudeš chtít `health`. Pro mountain bike camp ano.
+
+Účastník, který už má profil z minulé akce, **má pole předvyplněná**. Šetří ti to čas i jemu.
+
+## Kapacita + waitlist
+
+- **Bez schvalování + s kapacitou**: prvních N se potvrdí, další jdou na waitlist (pokud máš `waitlist_enabled=true`).
+- **Se schvalováním**: každá nová přihláška jde do **pending_approval**. Ty schvaluješ v cockpitu jeden po druhém (zelené `Schválit` / červené `Zamítnout`).
+- **Cancel ze strany účastníka**: jeden klik, místo se uvolní. Pokud existuje waitlist, **první v pořadí dostane e-mail s pozvánkou** doplatit a stát se confirmed.
+
+## Duplicate detection
+
+V tabulce uvidíš u některých řádků **⚠ Duplikát?** badge. Vlastní detekce — match na:
+
+- **stejný telefon** (po normalizaci, ignoruje +420 prefix a mezery)
+- **stejné jméno** (case-insensitive, accent-fold — „Honza Dvořák" = „honza dvorak")
+
+Nikdy nic nemažeme automaticky — jen tě upozorníme, ať se podíváš (typicky: stejný člověk se přihlásil dvakrát pod různými e-maily).
+
+## Profil účastníka
+
+Klikni na jméno v tabulce → modal s plným profilem (kontakty, adresa, dosavadní účast, dokumenty, platby, gear). Z profilu můžeš:
+
+- označit jako **organizátora** — nepočítá se do kapacity, nepožaduje se platba ani dokumenty
+- ručně označit platbu jako zaplacenou
+- ověřit nahraný dokument (zaškrtnout zelené)
+
+## Tip
+
+Pokud používáš schvalování a chceš účastníkům dát vědět, **proč** byli zamítnuti, vyplň pole „Důvod" ve dialogu zamítnutí — text se zobrazí v e-mailu i v bell-feed notifikaci.

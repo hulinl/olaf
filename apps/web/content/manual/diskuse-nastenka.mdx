@@ -1,0 +1,58 @@
+---
+title: "Diskuse a nástěnka"
+excerpt: "Témata, komentáře, @-mentions, push notifikace. Vlastní nástěnka pro komunitu a pro každou akci."
+category: "komunita"
+order: 80
+tags: ["nástěnka", "diskuse", "notifikace", "mention"]
+updatedAt: "2026-05-22"
+---
+
+## Dvě úrovně nástěnek
+
+Olaf má diskusi na dvou místech, vždy se stejnou logikou:
+
+- **Komunitní nástěnka** — viditelná všem členům workspace. Pro dlouhodobé organizační debaty, „kdy další schůzka" apod.
+- **Eventová nástěnka** — viditelná jen přihlášeným na konkrétní akci. Pro debaty „kdo veze koho", „co s sebou", „sraz v 9 nebo v 10".
+
+## Témata a komentáře
+
+Jedno **téma** = nadpis + first post. Komentáře jsou flat (max 1 úroveň hloubky — reply na reply se anchoruje ke root komentu). Lze:
+
+- ♥ lajkovat téma i jednotlivé komentáře
+- 📎 přiložit obrázek ke komentáři (max 6 MB)
+- 📌 pin (jen moderátoři)
+- 🔒 lock — nová komentář nelze přidat (jen moderátoři)
+
+## @-mentions
+
+Napiš `@Marta` v komentáři → Marta dostane bell-feed notifikaci + e-mail (pokud má zapnuté `notify_on_discussion_mention`).
+
+Resolver matchuje:
+
+1. **Dotted form** `@Jan.Dvorak` → first_name + last_name
+2. **Display name** `@MartaPunaru`
+3. **First name only** `@Marta` — když je v eligible pool unikátní
+
+„Eligible pool" je workspace members + RSVPed účastníci na dané akci. **Nikdy nemůžeš @-mentnovat náhodnýho člověka mimo svojí komunitu** — privacy by design.
+
+## Notifikace
+
+- **Bell-feed** v hlavičce — vždy. Polluje každých 60s, badge ukazuje unread count.
+- **E-mail** — pro reply ve tvém tématu, pro nová témata v komunitě/akci, pro @-mentions, pro update akce, pro RSVP schválení/zamítnutí.
+- **Web Push** — pokud máš zapnutý service worker (iOS: jen v PWA). Stejné triggery jako e-mail, ale okamžitě.
+
+V **Nastavení** → **Notifikace** máš per-kind toggle: dvě sekce („Nástěnka", „Akce") s 5 přepínači. Co dáš pryč, to ti nechodí.
+
+## Moderace
+
+Owner i admin (oba spadají pod „moderator") mohou:
+
+- mazat libovolné téma / komentář
+- pin / lock
+- editovat cizí téma (rare-use)
+
+Když moderátor smaže cizí příspěvek, do **Audit logu** se zapíše row s `by_moderator=true`. Když mažeš vlastní příspěvek, flag se nenastaví — to je „self-cleanup", ne moderace.
+
+## Tip
+
+Lock vlákno jakmile už nemá smysl pokračovat (sraz dohodnut, otázka odpovězena). Účastníci pořád vidí historii, ale nemůžou ji rozdmýchat zbytečnými komentáři.
