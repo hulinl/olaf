@@ -66,12 +66,13 @@ export function PublicAuthIndicator() {
 
   return (
     <div className="flex items-center gap-2 text-sm sm:gap-3">
-      {/* Dashboard chip is hidden on the cramped mobile public header.
-          UserMenu (the avatar) is the universal entry-point — opens a
-          dropdown that includes "Dashboard" + sign-out. */}
+      {/* Dashboard chip — visible i na mobilu. Authed user na public
+          landingu by jinak měl jen avatar dropdown a cesta do appky
+          by byla dva tapy (otevřít menu → kliknout). Chip + avatar
+          zabírá ~150-180px headeru což je v pohodě i na 360px wide. */}
       <Link
         href="/dashboard"
-        className="hidden rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring sm:inline-block"
+        className="inline-block rounded-md border border-border bg-surface px-3 py-1.5 font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
       >
         Dashboard
       </Link>
