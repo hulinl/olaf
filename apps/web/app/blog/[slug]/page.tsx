@@ -2,10 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { ArticleToc } from "@/components/marketing/article-toc";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MdxContent } from "@/components/marketing/mdx-content";
 import { AppFooter } from "@/components/ui/app-footer";
-import { getBlogPost, listBlogPosts } from "@/lib/content";
+import {
+  extractMdxHeadings,
+  getBlogPost,
+  listBlogPosts,
+} from "@/lib/content";
 import { BLOG_CATEGORIES, SITE } from "@/lib/site-config";
 
 interface Props {
@@ -52,12 +57,14 @@ export default async function BlogPostPage({ params }: Props) {
   if (!doc) notFound();
 
   const cat = BLOG_CATEGORIES.find((c) => c.id === doc.frontmatter.category);
+  const headings = extractMdxHeadings(doc.content);
 
   return (
     <>
       <MarketingHeader />
       <main className="flex flex-1 flex-col">
-        <article className="mx-auto w-full max-w-3xl px-4 py-12 sm:py-16">
+        <div className="mx-auto flex w-full max-w-7xl gap-10 px-4">
+          <article className="min-w-0 flex-1 py-12 sm:py-16 lg:max-w-3xl">
           <nav aria-label="Breadcrumbs" className="mb-6 text-sm text-ink-500">
             <Link href="/blog" className="hover:text-brand focus-ring">
               Blog
@@ -106,6 +113,8 @@ export default async function BlogPostPage({ params }: Props) {
             </Link>
           </div>
         </article>
+        <ArticleToc headings={headings} />
+        </div>
         <AppFooter variant="framed" />
       </main>
     </>

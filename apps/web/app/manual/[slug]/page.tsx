@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { ArticleToc } from "@/components/marketing/article-toc";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MdxContent } from "@/components/marketing/mdx-content";
 import { AppFooter } from "@/components/ui/app-footer";
 import {
+  extractMdxHeadings,
   getManualArticle,
   listManualArticles,
 } from "@/lib/content";
@@ -55,11 +57,14 @@ export default async function ManualArticlePage({ params }: Props) {
     )
     .slice(0, 4);
 
+  const headings = extractMdxHeadings(doc.content);
+
   return (
     <>
       <MarketingHeader />
       <main className="flex flex-1 flex-col">
-        <article className="mx-auto w-full max-w-3xl px-4 py-12 sm:py-16">
+        <div className="mx-auto flex w-full max-w-7xl gap-10 px-4">
+          <article className="min-w-0 flex-1 py-12 sm:py-16 lg:max-w-3xl">
           <nav aria-label="Breadcrumbs" className="mb-6 text-sm text-ink-500">
             <Link href="/manual" className="hover:text-brand focus-ring">
               Návody
@@ -130,6 +135,8 @@ export default async function ManualArticlePage({ params }: Props) {
             </Link>
           </div>
         </article>
+        <ArticleToc headings={headings} />
+        </div>
         <AppFooter variant="framed" />
       </main>
     </>

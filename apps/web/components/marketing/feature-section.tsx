@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ExpandableBullets } from "@/components/marketing/expandable-bullets";
 import type { FeatureEntry } from "@/lib/site-config";
 
 /**
@@ -29,14 +30,11 @@ export function FeatureSection({ feature }: { feature: FeatureEntry }) {
         )}
       </h2>
       <p className="text-lg leading-relaxed text-ink-700">{feature.lede}</p>
-      <ul className="flex flex-col gap-2.5 text-ink-700">
-        {feature.bullets.map((b) => (
-          <li key={b} className="flex gap-3">
-            <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-brand" />
-            <span dangerouslySetInnerHTML={{ __html: renderInlineCode(b) }} />
-          </li>
-        ))}
-      </ul>
+      <ExpandableBullets
+        items={feature.bullets}
+        previewCount={2}
+        renderItem={renderInlineCode}
+      />
       {feature.manualSlug && (
         <div>
           <Link

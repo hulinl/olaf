@@ -1,8 +1,33 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
 import Link from "next/link";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import remarkGfm from "remark-gfm";
+
+import { slugifyHeading } from "@/lib/content";
+
+/** Pull a plain-text string out of any React children tree, so we
+ *  can derive an `id` slug from the heading content even when MDX
+ *  has injected inline tags (e.g. `<code>` inside an h2). */
+function childrenToText(children: ReactNode): string {
+  if (typeof children === "string" || typeof children === "number") {
+    return String(children);
+  }
+  if (Array.isArray(children)) {
+    return children.map(childrenToText).join("");
+  }
+  if (
+    children &&
+    typeof children === "object" &&
+    "props" in children &&
+    children.props &&
+    typeof children.props === "object" &&
+    "children" in children.props
+  ) {
+    return childrenToText(children.props.children as ReactNode);
+  }
+  return "";
+}
 
 /**
  * Tailwind-styled MDX wrapper. Headings, code, lists, tables all
@@ -14,19 +39,31 @@ import remarkGfm from "remark-gfm";
  */
 
 const components = {
-  h2: (props: ComponentProps<"h2">) => (
-    <h2
-      className="mt-12 scroll-mt-24 text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl"
-      style={{ letterSpacing: "-0.02em" }}
-      {...props}
-    />
-  ),
-  h3: (props: ComponentProps<"h3">) => (
-    <h3
-      className="mt-8 scroll-mt-24 text-xl font-semibold text-ink-900"
-      {...props}
-    />
-  ),
+  h2: ({ children, ...props }: ComponentProps<"h2">) => {
+    const id = slugifyHeading(childrenToText(children));
+    return (
+      <h2
+        id={id}
+        className="mt-12 scroll-mt-24 text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl"
+        style={{ letterSpacing: "-0.02em" }}
+        {...props}
+      >
+        {children}
+      </h2>
+    );
+  },
+  h3: ({ children, ...props }: ComponentProps<"h3">) => {
+    const id = slugifyHeading(childrenToText(children));
+    return (
+      <h3
+        id={id}
+        className="mt-8 scroll-mt-24 text-xl font-semibold text-ink-900"
+        {...props}
+      >
+        {children}
+      </h3>
+    );
+  },
   p: (props: ComponentProps<"p">) => (
     <p className="mt-4 leading-relaxed text-ink-700" {...props} />
   ),

@@ -99,3 +99,45 @@ export function listBlogPosts(): MdxDoc<BlogFrontmatter>[] {
 export function getBlogPost(slug: string): MdxDoc<BlogFrontmatter> | null {
   return readMdx<BlogFrontmatter>("blog", slug);
 }
+
+export interface MdxHeading {
+  level: 2 | 3;
+  title: string;
+  slug: string;
+}
+
+/**
+ * Slugify Czech heading text → URL-safe anchor id.
+ * Accent-folds (Dvořák → dvorak), lowercases, replaces non-word chars
+ * with dashes. Must match the slug generation inside MdxContent so
+ * the TOC's `#slug` anchors actually land on the right heading.
+ */
+export function slugifyHeading(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "") // strip combining diacritics
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+/**
+ * Pull h2 + h3 headings out of raw MDX content for the article TOC.
+ * Regex-based (no MDX parse) — only matches lines that start with
+ * `## ` or `### `, so headings inside ``` code fences would slip
+ * through. Articles in `content/manual/` and `content/blog/` use no
+ * markdown headings inside code blocks, so this is fine for V1.
+ */
+export function extractMdxHeadings(content: string): MdxHeading[] {
+  const out: MdxHeading[] = [];
+  for (const raw of content.split("\n")) {
+    const m = raw.match(/^(#{2,3})\s+(.+?)\s*$/);
+    if (!m) continue;
+    const level = m[1].length === 2 ? 2 : 3;
+    const title = m[2].trim();
+    out.push({ level, title, slug: slugifyHeading(title) });
+  }
+  return out;
+}
