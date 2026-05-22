@@ -1,15 +1,19 @@
 /**
- * Layered marketing hero background. Inspired by bifactory-web's
- * Hero, adapted to OLAF's Sunrise brand (mountain + sun + amber).
+ * Layered marketing hero background — sunrise over a contoured ridge.
  *
- * Layers (bottom → top):
- *   1) Amber sunrise glow (radial, sits behind headline, slow pulse)
- *   2) Topographic contours (slow horizontal drift)
- *   3) Mountain silhouette ridge along bottom
- *   4) Floating dots — community / light specks (independent drifts)
+ * Layers (bottom → top in z-order):
+ *   1) Amber radial glow (the diffuse light wash)
+ *   2) Sun disc rising behind the ridge (small amber circle, soft edge)
+ *   3) Topographic contours (slow horizontal drift)
+ *   4) Mountain ridge silhouettes — two layers for parallax depth
  *
- * All animations are CSS-driven (no JS). `prefers-reduced-motion`
- * disables them at the global stylesheet level.
+ * All animations are CSS-driven (no JS). prefers-reduced-motion disables
+ * them at the stylesheet level.
+ *
+ * Note: dropped the floating amber dots — on a topographic map a dot
+ * marks a peak, so scattering them over contour lines reads as a
+ * cartographic error to anyone who reads maps. The sun disc takes
+ * over the warm-point role.
  */
 export function HeroBg() {
   return (
@@ -17,18 +21,30 @@ export function HeroBg() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
     >
-      {/* 1) Sunrise glow — amber radial behind the centre of the hero */}
+      {/* 1) Diffuse amber wash — slow breathe pulse */}
       <div
         className="sunrise-glow absolute left-1/2 top-1/2 h-[120%] w-[120%] -translate-x-1/2 -translate-y-1/2"
         style={{
           background:
-            "radial-gradient(ellipse at center, rgba(245, 158, 11, 0.20) 0%, rgba(245, 158, 11, 0.08) 35%, transparent 65%)",
+            "radial-gradient(ellipse at center, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0.08) 38%, transparent 68%)",
         }}
       />
 
-      {/* 2) Topographic contour layer — slow horizontal drift */}
+      {/* 2) Sun disc — small amber orb rising just behind the ridge.
+          Positioned bottom-right so it reads as morning sun over the
+          mountains rather than centered/midday. */}
+      <div
+        className="sunrise-glow absolute bottom-20 right-[18%] h-40 w-40 rounded-full sm:bottom-24 sm:right-[22%] sm:h-52 sm:w-52"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(245, 158, 11, 0.85) 0%, rgba(245, 158, 11, 0.45) 40%, rgba(245, 158, 11, 0) 75%)",
+          animationDelay: "1.2s",
+        }}
+      />
+
+      {/* 3) Topo contours — slow horizontal drift */}
       <svg
-        className="topo-drift absolute inset-y-0 -left-12 right-0 h-full w-[calc(100%+96px)] text-ink-900/[0.09]"
+        className="topo-drift absolute inset-y-0 -left-12 right-0 h-full w-[calc(100%+96px)] text-ink-900/[0.10]"
         viewBox="0 0 1200 600"
         preserveAspectRatio="xMidYMid slice"
       >
@@ -59,62 +75,33 @@ export function HeroBg() {
         </g>
       </svg>
 
-      {/* 3) Mountain ridge at bottom — static, frames the section */}
+      {/* 4) Mountain ridges — back layer (lighter) + front layer
+          (darker). Two ridges with different silhouettes give a
+          parallax-ish depth without needing JS. */}
       <svg
-        className="absolute inset-x-0 bottom-0 h-32 w-full text-ink-900/15 sm:h-44"
-        viewBox="0 0 1200 200"
+        className="absolute inset-x-0 bottom-0 h-40 w-full text-ink-900 sm:h-56"
+        viewBox="0 0 1200 240"
         preserveAspectRatio="xMidYEnd slice"
       >
         <defs>
-          <linearGradient id="ridge-fade" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="ridge-fade-bg" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="currentColor" stopOpacity="0" />
-            <stop offset="60%" stopColor="currentColor" stopOpacity="1" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="1" />
+            <stop offset="55%" stopColor="currentColor" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0.32" />
           </linearGradient>
         </defs>
+        {/* Back ridge — lighter, further away */}
         <path
-          d="M 0 200 L 0 120 L 120 80 L 220 110 L 320 60 L 420 95 L 520 50 L 640 90 L 760 55 L 880 95 L 980 70 L 1080 110 L 1200 75 L 1200 200 Z"
-          fill="url(#ridge-fade)"
+          d="M 0 240 L 0 130 L 90 100 L 180 130 L 280 70 L 380 105 L 500 60 L 620 95 L 740 55 L 860 90 L 960 70 L 1080 110 L 1200 80 L 1200 240 Z"
+          fill="url(#ridge-fade-bg)"
         />
+        {/* Front ridge — darker, more defined */}
         <path
-          d="M 0 200 L 0 160 L 100 130 L 240 155 L 360 125 L 500 145 L 620 115 L 740 140 L 880 120 L 1000 145 L 1120 130 L 1200 150 L 1200 200 Z"
+          d="M 0 240 L 0 180 L 80 160 L 200 185 L 320 145 L 460 170 L 580 140 L 700 165 L 820 145 L 940 170 L 1060 150 L 1200 175 L 1200 240 Z"
           fill="currentColor"
-          opacity="0.5"
+          opacity="0.45"
         />
       </svg>
-
-      {/* 4) Floating dots — 5 specks with independent delays */}
-      <FloatingDots />
     </div>
-  );
-}
-
-function FloatingDots() {
-  // Brand-amber dots that drift slowly. Coordinates kept off the
-  // headline so the eye stays on text. Delays staggered so they
-  // never sync.
-  const dots = [
-    { x: "12%", y: "22%", size: 8, delay: "0s" },
-    { x: "18%", y: "68%", size: 5, delay: "3s" },
-    { x: "78%", y: "30%", size: 6, delay: "1.5s" },
-    { x: "88%", y: "72%", size: 7, delay: "5s" },
-    { x: "52%", y: "12%", size: 4, delay: "7s" },
-  ];
-  return (
-    <>
-      {dots.map((d, i) => (
-        <span
-          key={i}
-          className="float-dot absolute rounded-full bg-brand"
-          style={{
-            left: d.x,
-            top: d.y,
-            width: d.size,
-            height: d.size,
-            animationDelay: d.delay,
-          }}
-        />
-      ))}
-    </>
   );
 }

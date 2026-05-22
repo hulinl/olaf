@@ -21,6 +21,10 @@ export default function robots(): MetadataRoute.Robots {
           "/invitations/",
           "/join/",
           "/workspaces/",
+          // Blog je dočasně neveřejný (žádné odkazy z nav/footer
+          // ani sitemap); search engines ho neindexují.
+          "/blog",
+          "/blog/",
         ],
       },
     ],
