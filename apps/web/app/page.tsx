@@ -64,13 +64,13 @@ export default function Home() {
             drop the TOC entirely. Each section wrapped v Reveal,
             tedy fade-up když se objeví ve viewportu poprvé. */}
         <div className="bg-canvas">
-          {/* Relative parent + absolute TOC column = explicit sticky
-              containing block. Features render normálně (s `lg:pr-56`
-              místem pro TOC sloupec). TOC column je `absolute right-0
-              h-full` = přesně tak vysoký jako features list. Sticky
-              uvnitř TOC se uvolní přesně tam kde features končí, ne
-              až na boundary s navazující sekcí. */}
-          <div className="relative mx-auto max-w-7xl px-4">
+          {/* TOC je `position: fixed` mimo flow (viz feature-toc.tsx)
+              + řízeno IntersectionObserverem, takže visibility je
+              explicitně vázaná na viditelnost feature sekcí ve
+              viewportu, ne na CSS sticky boundary. `lg:pr-56` na
+              features wrapperu rezervuje místo aby fixed TOC vpravo
+              nepřekrýval content. */}
+          <div className="mx-auto max-w-7xl px-4">
             <div className="lg:pr-56">
               {FEATURES.map((feature) => (
                 <Reveal key={feature.id}>
@@ -78,8 +78,8 @@ export default function Home() {
                 </Reveal>
               ))}
             </div>
-            <FeatureToc features={FEATURES} />
           </div>
+          <FeatureToc features={FEATURES} />
         </div>
 
         {/* SAMPLE community */}
