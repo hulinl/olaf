@@ -23,7 +23,9 @@ import type { FeatureEntry } from "@/lib/site-config";
  */
 export function FeatureToc({ features }: { features: FeatureEntry[] }) {
   const [active, setActive] = useState<string | null>(features[0]?.id ?? null);
+  const [fadeOut, setFadeOut] = useState(false);
 
+  // Active highlight — sekce nejblíž viewport topu.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("IntersectionObserver" in window)) return;
@@ -51,10 +53,42 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
     return () => observer.disconnect();
   }, [features]);
 
+  // Early fade-out — user feedback: TOC by měla zmizet už BĚHEM
+  // poslední feature (audit), ne až po ní. Pure sticky-do-konce-
+  // column drží layout dál a TOC se „přejíždí" do navazující
+  // sekce. Tady přidáme JS-driven opacity toggle: jakmile top
+  // poslední feature dosáhne 40 % viewportu, fade-out.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const lastFeature = features[features.length - 1];
+    if (!lastFeature) return;
+    const el = document.getElementById(lastFeature.id);
+    if (!el) return;
+
+    function compute() {
+      const rect = el!.getBoundingClientRect();
+      // Poslední feature začíná být aktivně čtená když její top
+      // překročil viewport-top + 40 % výšky viewportu. Tam fade.
+      setFadeOut(rect.top < window.innerHeight * 0.4);
+    }
+    compute();
+    window.addEventListener("scroll", compute, { passive: true });
+    window.addEventListener("resize", compute);
+    return () => {
+      window.removeEventListener("scroll", compute);
+      window.removeEventListener("resize", compute);
+    };
+  }, [features]);
+
   return (
     <aside
-      className="hidden lg:block lg:sticky lg:top-24 lg:mt-24 lg:h-max lg:w-56 lg:shrink-0 lg:self-start"
+      className={[
+        "hidden lg:block lg:sticky lg:top-24 lg:mt-24 lg:h-max lg:w-56 lg:shrink-0 lg:self-start",
+        "transition-opacity duration-300",
+        fadeOut ? "pointer-events-none opacity-0" : "opacity-100",
+      ].join(" ")}
       aria-label="Prohlídka sekcí"
+      aria-hidden={fadeOut}
     >
       <div className="flex flex-col gap-1 border-l border-border pl-5">
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-500">
