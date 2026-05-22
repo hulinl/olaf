@@ -6,8 +6,10 @@ import { FeatureToc } from "@/components/marketing/feature-toc";
 import { HeroBg } from "@/components/marketing/hero-bg";
 import { HeroCta } from "@/components/marketing/hero-cta";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { Reveal } from "@/components/marketing/reveal";
 import { AppFooter } from "@/components/ui/app-footer";
 import { LinkButton } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import { FEATURES, SITE } from "@/lib/site-config";
 
 export const metadata: Metadata = {
@@ -26,21 +28,32 @@ export default function Home() {
         <section className="relative isolate overflow-hidden">
           <HeroBg />
           <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-20 text-center sm:py-28">
+            {/* Brand mark sám o sobě (bez wordmarku) jako tichý
+                vizuální kotvící bod nad nadpisem. Wordmark by tu
+                duplikoval logo z hlavičky; samotná značka funguje
+                víc jako emblém / razítko. */}
+            <div
+              className="hero-rise mb-8 text-ink-900"
+              style={{ animationDelay: "0ms" }}
+              aria-hidden="true"
+            >
+              <Logo size={64} wordmark={false} accent="amber" />
+            </div>
             <h1
               className="hero-rise text-balance text-5xl font-semibold leading-[1.05] text-ink-900 sm:text-6xl md:text-7xl"
-              style={{ letterSpacing: "-0.035em", animationDelay: "100ms" }}
+              style={{ letterSpacing: "-0.035em", animationDelay: "180ms" }}
             >
               Kde začíná dobrodružství.
             </h1>
             <p
               className="hero-rise mt-6 max-w-xl text-balance text-lg text-ink-700 sm:text-xl"
-              style={{ animationDelay: "280ms" }}
+              style={{ animationDelay: "360ms" }}
             >
               olaf je domov pro vaši outdoor partu, sportovní komunitu nebo
               firemní tým. Komunita má profil, akce mají landing page,
               přihlášky mají pořádek a tvůrce má cockpit, kde to všechno řídí.
             </p>
-            <div className="hero-rise mt-10" style={{ animationDelay: "460ms" }}>
+            <div className="hero-rise mt-10" style={{ animationDelay: "540ms" }}>
               <HeroCta />
             </div>
           </div>
@@ -48,13 +61,15 @@ export default function Home() {
 
         {/* FEATURE TOUR — sticky right-side TOC on lg+ follows the
             scroll and highlights the active section. On mobile we
-            drop the TOC entirely (burger menu + long scroll is
-            enough; a horizontal strip would steal space). */}
+            drop the TOC entirely. Each section wrapped v Reveal,
+            tedy fade-up když se objeví ve viewportu poprvé. */}
         <div className="border-t border-border-strong/20 bg-canvas">
           <div className="mx-auto flex max-w-7xl gap-10 px-4 py-2 lg:py-0">
             <div className="min-w-0 flex-1">
               {FEATURES.map((feature) => (
-                <FeatureSection key={feature.id} feature={feature} />
+                <Reveal key={feature.id}>
+                  <FeatureSection feature={feature} />
+                </Reveal>
               ))}
             </div>
             <FeatureToc features={FEATURES} />
@@ -62,6 +77,7 @@ export default function Home() {
         </div>
 
         {/* SAMPLE community */}
+        <Reveal>
         <section className="bg-ink-900 text-ink-inverse">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
             <div className="grid items-center gap-10 sm:grid-cols-[1fr_auto] sm:gap-14">
@@ -94,10 +110,12 @@ export default function Home() {
             </div>
           </div>
         </section>
+        </Reveal>
 
         {/* FINAL CTA — emphasises "free + by-athletes-for-athletes +
             powered by BIfactory" instead of the generic "start like
             your party did" line. */}
+        <Reveal>
         <section className="bg-canvas">
           <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:py-20">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-brand">
@@ -115,9 +133,16 @@ export default function Home() {
                 href="https://bifactory.cz"
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium text-ink-900 underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
+                className="inline-flex items-center gap-1.5 align-middle font-medium text-ink-900 underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
               >
-                BIfactory
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/bifactory-logo.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="inline-block h-5 w-5"
+                />
+                <span>BIfactory</span>
               </a>
               .
             </p>
@@ -131,6 +156,7 @@ export default function Home() {
             </div>
           </div>
         </section>
+        </Reveal>
 
         <AppFooter variant="framed" />
       </main>

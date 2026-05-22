@@ -48,7 +48,11 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
 
   return (
     <aside
-      className="hidden lg:block lg:w-44 lg:shrink-0"
+      // Vertically align the TOC's first item with the first feature's
+      // eyebrow text. FeatureSection uses `py-24` on lg+, so we push
+      // the aside down by the same amount on first paint. Once the
+      // user scrolls past, the `sticky top-24` inside takes over.
+      className="hidden lg:block lg:w-44 lg:shrink-0 lg:pt-24"
       aria-label="Prohlídka sekcí"
     >
       <div className="sticky top-24 flex flex-col gap-1 border-l border-border pl-5">
