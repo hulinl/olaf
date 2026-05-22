@@ -7,41 +7,31 @@ import type { FeatureEntry } from "@/lib/site-config";
 /**
  * Floating right-side TOC for the feature tour.
  *
- * Why `position: fixed` + JS visibility toggle instead of pure CSS
- * sticky: CSS sticky's release point is the parent's content-area
- * bottom, but the practical "I'm done with this section" moment is
- * when the LAST feature's content ends — not when the parent's
- * padding box ends, not at the start of the next dark section.
+ * Visibility uses two sentinel DOM nodes (`#tour-start`, `#tour-end`)
+ * placed by the page around the features map. On every scroll tick
+ * we read their getBoundingClientRect and apply a simple rule:
  *
- * Two observers run in parallel:
- *   - `activeObs` highlights the section currently nearest viewport top
- *   - `visibilityObs` (with rootMargin `-30% 0 -10% 0`) flips the
- *     `visible` flag based on whether ANY feature's middle band is
- *     in the viewport. The TOC unmounts as soon as the last feature
- *     scrolls past the top half of the viewport.
+ *   visible = start.top < THRESHOLD_TOP
+ *             AND end.top > THRESHOLD_BOTTOM
  *
- * `lg:fixed` positions independently of layout — the page reserves
- * 14rem of right-side space via `lg:pr-56` on the features wrapper
- * so the floating column doesn't overlap content.
+ * — i.e. user has scrolled past the start of the tour AND hasn't yet
+ * scrolled past the end. Predictable, no IntersectionObserver quirks
+ * around root-margin or initial dispatch states.
+ *
+ * Active-section highlight stays on IntersectionObserver (cheap +
+ * doesn't need to be perfectly synced with visibility).
  */
 export function FeatureToc({ features }: { features: FeatureEntry[] }) {
   const [active, setActive] = useState<string | null>(features[0]?.id ?? null);
   const [visible, setVisible] = useState(false);
 
+  // Active highlight — same observer pattern as before, separate
+  // concern from visibility.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("IntersectionObserver" in window)) {
-      // Old browser fallback — keep TOC always visible during tour.
-      setVisible(true);
-      return;
-    }
+    if (!("IntersectionObserver" in window)) return;
 
-    const featureEls = features
-      .map((f) => document.getElementById(f.id))
-      .filter((el): el is HTMLElement => el !== null);
-
-    // Active-section highlight — pick the one closest to viewport top.
-    const activeObs = new IntersectionObserver(
+    const observer = new IntersectionObserver(
       (entries) => {
         const inView = entries
           .filter((e) => e.isIntersecting)
@@ -57,45 +47,50 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
       { rootMargin: "-30% 0px -60% 0px", threshold: 0 },
     );
 
-    // Visibility — TOC visible if ANY feature je momentálně v
-    // viewport reading zóně (top 70 %). Set místo counteru: counter
-    // by se dostal do mínusu když IntersectionObserver na init
-    // vyplivne `isIntersecting=false` pro všech 7 features pod
-    // viewportem.
-    const intersectingEls = new Set<Element>();
-    const visibilityObs = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            intersectingEls.add(e.target);
-          } else {
-            intersectingEls.delete(e.target);
-          }
-        }
-        setVisible(intersectingEls.size > 0);
-      },
-      { rootMargin: "0px 0px -30% 0px", threshold: 0 },
-    );
+    for (const f of features) {
+      const el = document.getElementById(f.id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [features]);
 
-    for (const el of featureEls) {
-      activeObs.observe(el);
-      visibilityObs.observe(el);
+  // Visibility — scroll-based sentinel polling. Cheaper than
+  // double-IntersectionObserver and easier to reason about.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function compute() {
+      const start = document.getElementById("feature-tour-start");
+      const end = document.getElementById("feature-tour-end");
+      if (!start || !end) {
+        setVisible(false);
+        return;
+      }
+      const startTop = start.getBoundingClientRect().top;
+      const endTop = end.getBoundingClientRect().top;
+      // TOC zobrazujeme jakmile start sentinel proletěl nad horní
+      // pětinou viewportu (= user už opustil hero), a schováváme
+      // hned jakmile end sentinel dosáhne stejné linky (= user
+      // narazil na konec posledního feature contentu).
+      const threshold = Math.max(120, window.innerHeight * 0.2);
+      setVisible(startTop < threshold && endTop > threshold);
     }
 
+    compute();
+    window.addEventListener("scroll", compute, { passive: true });
+    window.addEventListener("resize", compute);
     return () => {
-      activeObs.disconnect();
-      visibilityObs.disconnect();
+      window.removeEventListener("scroll", compute);
+      window.removeEventListener("resize", compute);
     };
-  }, [features]);
+  }, []);
 
   return (
     <aside
-      // Fixed positioning v pravo, mimo flow stránky. `visible`
-      // řídí display takže TOC nezamořuje viewport mimo feature tour.
-      // `lg:pr-56` na features wrapperu rezervuje místo aby nedošlo
-      // k překryvu s nábožně klikatelnými prvky vpravo.
+      // Wider (`w-48` = 192px) + further from edge (`right-10` = 40px)
+      // tak aby na desktop monitoru nepůsobila vystrčená z viewportu.
       className={[
-        "fixed right-6 top-24 z-10 hidden w-44 transition-opacity duration-200 lg:block",
+        "fixed right-10 top-28 z-10 hidden w-48 transition-opacity duration-200 lg:block",
         visible ? "opacity-100" : "pointer-events-none opacity-0",
       ].join(" ")}
       aria-label="Prohlídka sekcí"
@@ -105,7 +100,7 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
         <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-ink-500">
           Prohlídka
         </p>
-        <ul className="mt-2 flex flex-col gap-1">
+        <ul className="mt-2 flex flex-col gap-1.5">
           {features.map((f) => {
             const isActive = active === f.id;
             return (
@@ -113,7 +108,7 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
                 <a
                   href={`#${f.id}`}
                   className={[
-                    "group flex items-baseline gap-2 rounded py-1 text-sm transition-colors focus-ring",
+                    "group flex items-baseline gap-2 rounded py-0.5 text-sm leading-tight transition-colors focus-ring",
                     isActive
                       ? "text-brand"
                       : "text-ink-500 hover:text-ink-900",

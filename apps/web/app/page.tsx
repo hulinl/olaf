@@ -65,18 +65,19 @@ export default function Home() {
             tedy fade-up když se objeví ve viewportu poprvé. */}
         <div className="bg-canvas">
           {/* TOC je `position: fixed` mimo flow (viz feature-toc.tsx)
-              + řízeno IntersectionObserverem, takže visibility je
-              explicitně vázaná na viditelnost feature sekcí ve
-              viewportu, ne na CSS sticky boundary. `lg:pr-56` na
-              features wrapperu rezervuje místo aby fixed TOC vpravo
+              + jeho viditelnost se počítá ze dvou sentinel <div>ů
+              obklopujících features map. `lg:pr-64` na features
+              wrapperu rezervuje místo aby fixed TOC vpravo
               nepřekrýval content. */}
           <div className="mx-auto max-w-7xl px-4">
-            <div className="lg:pr-56">
+            <div className="lg:pr-64">
+              <div id="feature-tour-start" aria-hidden />
               {FEATURES.map((feature) => (
                 <Reveal key={feature.id}>
                   <FeatureSection feature={feature} />
                 </Reveal>
               ))}
+              <div id="feature-tour-end" aria-hidden />
             </div>
           </div>
           <FeatureToc features={FEATURES} />
