@@ -14,7 +14,7 @@ Pokyny k platbě
 Banka: {{ workspace.payment_bank_name }}{% endif %}
 Variabilní symbol: {{ rsvp.variable_symbol }}
 Zpráva: {{ workspace.name }} — {{ event.title }}
-Splatnost: {{ workspace.payment_due_days }} dní od registrace
+Splatnost: {% if payment_due_str %}{{ payment_due_str }}{% else %}{{ workspace.payment_due_days }} dní od registrace{% endif %}
 
 QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.{% endif %}
 

@@ -103,6 +103,7 @@ class TemplateSmokeTests(TestCase):
                 "event_url": "https://x.com/spring-camp",
                 "workspace": event.workspace,
                 "event_when": "pátek 16. 5. 2026 v 14:00",
+                "payment_due_str": "do pondělí 8. 6. 2026",
             },
         )
         # Core content v obou.
@@ -112,9 +113,31 @@ class TemplateSmokeTests(TestCase):
             self.assertIn("Lysá hora", body)
             self.assertIn("20240001", body)  # variable symbol
             self.assertIn("2500.00", body)
+            # Splatnost — konkrétní datum, ne "X dní od registrace".
+            self.assertIn("do pondělí 8. 6. 2026", body)
+            self.assertNotIn("dní od registrace", body)
         # HTML payment card.
         self.assertIn("Pokyny k platbě", html)
         self.assertIn("CZ65", html)  # IBAN
+
+    def test_rsvp_confirmation_fallback_when_due_str_missing(self) -> None:
+        # Když payment_due_str není v contextu, template fallbackne na
+        # generic "X dní od registrace" — back-compat safety net.
+        event = _fake_event()
+        text, html = self._render(
+            "emails/rsvp_confirmation",
+            {
+                "user": _fake_user(),
+                "event": event,
+                "rsvp": _fake_rsvp(_fake_user(), event),
+                "status": "yes",
+                "event_url": "https://x.com/spring-camp",
+                "workspace": event.workspace,
+                "event_when": "pátek 16. 5. 2026 v 14:00",
+            },
+        )
+        for body in (text, html):
+            self.assertIn("14 dní od registrace", body)
 
     def test_rsvp_confirmation_without_payment(self) -> None:
         # status=yes ale payment je paid → žádný payment card.
@@ -140,15 +163,39 @@ class TemplateSmokeTests(TestCase):
             {
                 "user": _fake_user(),
                 "event": event,
+                "rsvp": _fake_rsvp(_fake_user(), event),
                 "event_url": "https://x.com/spring-camp",
                 "workspace": event.workspace,
                 "event_when": "pátek 16. 5. 2026 v 14:00",
+                "payment_due_str": "do pondělí 8. 6. 2026",
             },
         )
         for body in (text, html):
             self.assertIn("Marta", body)
             self.assertIn("Spring Camp", body)
             self.assertIn("uvolnilo", body.lower())
+            # Promoted users teď taky vidí payment instructions.
+            self.assertIn("20240001", body)
+            self.assertIn("2500.00", body)
+            self.assertIn("do pondělí 8. 6. 2026", body)
+        self.assertIn("Pokyny k platbě", html)
+
+    def test_rsvp_promoted_paid_no_payment_card(self) -> None:
+        # Když je už zaplaceno (přes manuální match nebo waitlist promotion
+        # v cash-in-hand případě), payment card se neobjeví.
+        event = _fake_event()
+        _text, html = self._render(
+            "emails/rsvp_promoted",
+            {
+                "user": _fake_user(),
+                "event": event,
+                "rsvp": _fake_rsvp(_fake_user(), event, payment_status="paid"),
+                "event_url": "https://x.com/spring-camp",
+                "workspace": event.workspace,
+                "event_when": "pátek 16. 5. 2026 v 14:00",
+            },
+        )
+        self.assertNotIn("Pokyny k platbě", html)
 
     def test_event_cancelled_with_reason(self) -> None:
         event = _fake_event()

@@ -4,7 +4,7 @@ from __future__ import annotations
 from django.conf import settings
 
 from notifications.email_sender import send_branded_email
-from notifications.formatters import format_event_dt
+from notifications.formatters import format_event_dt, format_payment_due
 
 from .models import RSVP, Event
 
@@ -35,6 +35,9 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
             "event_url": _frontend_event_url(event),
             "workspace": event.workspace,
             "event_when": format_event_dt(event.starts_at),
+            "payment_due_str": format_payment_due(
+                rsvp.created_at, event.workspace.payment_due_days
+            ),
         },
         recipient_list=[rsvp.user.email],
     )
@@ -49,9 +52,13 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
         context={
             "user": rsvp.user,
             "event": event,
+            "rsvp": rsvp,
             "event_url": _frontend_event_url(event),
             "workspace": event.workspace,
             "event_when": format_event_dt(event.starts_at),
+            "payment_due_str": format_payment_due(
+                rsvp.created_at, event.workspace.payment_due_days
+            ),
         },
         recipient_list=[rsvp.user.email],
     )

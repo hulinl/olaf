@@ -43,7 +43,23 @@
     </tr>
   </table>
 
-  <p style="margin:0;font-size:13px;color:#737373;">
+  {% if rsvp.payment_status == 'pending' and rsvp.payment_due_amount %}
+    {# Payment instructions — promoted user typicky platí poprvé #}
+    <div style="margin:24px 0 8px;padding:16px 18px;background-color:#fef3c7;border:1px solid #fde68a;border-radius:10px;">
+      <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#92400e;">Pokyny k platbě</p>
+      <div style="font-size:14px;color:#1a1a1a;line-height:1.8;">
+        <div><strong>Částka:</strong> {{ rsvp.payment_due_amount }} {{ rsvp.payment_currency }}</div>
+        <div><strong>Účet:</strong> {{ workspace.payment_iban|default:"(organizátor ještě nezadal IBAN)" }}{% if workspace.payment_bank_name %} · {{ workspace.payment_bank_name }}{% endif %}</div>
+        <div><strong>Variabilní symbol:</strong> <span style="font-family:Menlo,Consolas,monospace;">{{ rsvp.variable_symbol }}</span></div>
+        <div><strong>Splatnost:</strong> {% if payment_due_str %}{{ payment_due_str }}{% else %}{{ workspace.payment_due_days }} dní od potvrzení{% endif %}</div>
+      </div>
+      <p style="margin:12px 0 0;font-size:13px;color:#92400e;">
+        QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.
+      </p>
+    </div>
+  {% endif %}
+
+  <p style="margin:20px 0 0;font-size:13px;color:#737373;">
     Pokud to nakonec nevyjde, dej nám prosím vědět — místo se uvolní pro dalšího z waitlistu.
   </p>
 {% endblock %}
