@@ -8,6 +8,7 @@ import {
   type EventBlock,
 } from "@/lib/event-blocks";
 
+import { PresetPicker } from "./preset-picker";
 import { DaysForm } from "./forms/days-form";
 import { FaqForm } from "./forms/faq-form";
 import { GalleryForm } from "./forms/gallery-form";
@@ -63,12 +64,19 @@ export function Builder({
   // to edit.
   const [openId, setOpenId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [presetPickerOpen, setPresetPickerOpen] = useState(false);
 
   function add(type: BlockType) {
     const block = makeBlock(type);
     onChange([...blocks, block]);
     setOpenId(block.id);
     setPickerOpen(false);
+  }
+
+  function applyPreset(presetBlocks: EventBlock[]) {
+    onChange(presetBlocks);
+    setOpenId(null);
+    setPresetPickerOpen(false);
   }
 
   function update(id: string, payload: EventBlock["payload"]) {
@@ -168,8 +176,14 @@ export function Builder({
         );
       })}
 
-      <div className="mt-2">
-        {pickerOpen ? (
+      <div className="mt-2 flex flex-col gap-2">
+        {presetPickerOpen ? (
+          <PresetPicker
+            hasExistingBlocks={blocks.length > 0}
+            onPick={applyPreset}
+            onCancel={() => setPresetPickerOpen(false)}
+          />
+        ) : pickerOpen ? (
           <div className="rounded-md border border-border bg-canvas p-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-medium text-ink-900">Vyber typ bloku</p>
@@ -195,13 +209,23 @@ export function Builder({
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className="w-full rounded-md border border-dashed border-border-strong bg-surface px-3 py-3 text-sm font-medium text-ink-700 hover:border-brand hover:bg-surface-muted focus-ring"
-          >
-            + Přidat blok
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="flex-1 rounded-md border border-dashed border-border-strong bg-surface px-3 py-3 text-sm font-medium text-ink-700 hover:border-brand hover:bg-surface-muted focus-ring"
+            >
+              + Přidat blok
+            </button>
+            <button
+              type="button"
+              onClick={() => setPresetPickerOpen(true)}
+              className="rounded-md border border-border bg-surface px-3 py-3 text-sm font-medium text-ink-700 hover:border-brand hover:bg-surface-muted focus-ring sm:px-5"
+              title="Začni od šablony — předvyplněné bloky pro typické scénáře"
+            >
+              Použít vzor…
+            </button>
+          </div>
         )}
       </div>
     </div>
