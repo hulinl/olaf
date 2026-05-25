@@ -359,3 +359,115 @@ class EventCoverTests(TestCase):
         png.name = "cover.png"
         r = self.client.post(self.url, {"cover": png}, format="multipart")
         self.assertIn(r.status_code, (401, 403))
+
+
+class BlockImageUploadTests(TestCase):
+    """Upload endpoint pro images referenced from block payload
+    (hero cover, prose, day image, …). Lands in media/events/blocks/<id>/
+    a vrací URL — nezakládá EventImage row.
+
+    PR #192 přidal downscale+EXIF pipeline; tyhle testy chrání před
+    regresí na auth + 4xx paths + že se downscale skutečně volá.
+    """
+
+    def setUp(self) -> None:
+        self.owner = _make_user("o@blk.com")
+        self.outsider = _make_user("x@blk.com")
+        self.ws = _make_workspace(self.owner, slug="blkws")
+        self.event = _make_event(self.ws)
+        self.client = APIClient()
+        self.url = reverse(
+            "events:block-image-upload",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": self.event.slug,
+            },
+        )
+        # Patch downscale (loaded lazy uvnitř view) na source modul.
+        self._patcher = mock.patch(
+            "events.image_utils.downscale_upload", _passthrough_downscale
+        )
+        self._patcher.start()
+
+    def tearDown(self) -> None:
+        self._patcher.stop()
+
+    def test_owner_uploads(self) -> None:
+        self.client.force_authenticate(self.owner)
+        png = io.BytesIO(_png_bytes())
+        png.name = "hero.png"
+        r = self.client.post(
+            self.url, {"image": png}, format="multipart"
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        body = r.json()
+        self.assertIn("url", body)
+        # Path je under events/blocks/<event-id>/.
+        self.assertIn(f"events/blocks/{self.event.pk}/", body["url"])
+
+    def test_outsider_blocked(self) -> None:
+        self.client.force_authenticate(self.outsider)
+        png = io.BytesIO(_png_bytes())
+        png.name = "hero.png"
+        r = self.client.post(
+            self.url, {"image": png}, format="multipart"
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_anon_blocked(self) -> None:
+        png = io.BytesIO(_png_bytes())
+        png.name = "hero.png"
+        r = self.client.post(
+            self.url, {"image": png}, format="multipart"
+        )
+        self.assertIn(r.status_code, (401, 403))
+
+    def test_missing_file_400(self) -> None:
+        self.client.force_authenticate(self.owner)
+        r = self.client.post(self.url, {}, format="multipart")
+        self.assertEqual(r.status_code, 400)
+
+    def test_unknown_event_404(self) -> None:
+        self.client.force_authenticate(self.owner)
+        bogus_url = reverse(
+            "events:block-image-upload",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": "does-not-exist",
+            },
+        )
+        png = io.BytesIO(_png_bytes())
+        png.name = "x.png"
+        r = self.client.post(bogus_url, {"image": png}, format="multipart")
+        self.assertEqual(r.status_code, 404)
+
+    def test_event_collaborator_can_upload(self) -> None:
+        # EventCollaborator gates jsou kritické — block builder je
+        # i pro co-creators, ne jen workspace ownery.
+        from events.models import EventCollaborator
+
+        collaborator = _make_user("c@blk.com")
+        EventCollaborator.objects.create(
+            event=self.event, user=collaborator, added_by=self.owner
+        )
+        self.client.force_authenticate(collaborator)
+        png = io.BytesIO(_png_bytes())
+        png.name = "x.png"
+        r = self.client.post(self.url, {"image": png}, format="multipart")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def test_downscale_pipeline_invoked(self) -> None:
+        # PR #192 regression guard — sledujeme, že `downscale_upload`
+        # se volá při each block upload (předtím se file ukládal as-is).
+        self.client.force_authenticate(self.owner)
+        png = io.BytesIO(_png_bytes())
+        png.name = "x.png"
+        with mock.patch(
+            "events.image_utils.downscale_upload",
+            wraps=_passthrough_downscale,
+        ) as spy:
+            r = self.client.post(
+                self.url, {"image": png}, format="multipart"
+            )
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(spy.call_count, 1)
