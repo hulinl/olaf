@@ -792,12 +792,21 @@ def event_block_image_upload(
 
     from django.core.files.storage import default_storage
 
-    ext = (
+    # Pass through the same downscale + EXIF-rotation pipeline as the
+    # gallery uploads. Předtím se file ukládal as-is → 4000+ px iPhone
+    # JPEGy zpomalovaly landing + portrait fotky byly naležato.
+    from .image_utils import downscale_upload
+
+    processed = downscale_upload(upload)
+
+    # JPEG output po downscale; pokud Pillow nezvládl input, vrátí raw.
+    raw_ext = (
         upload.name.rsplit(".", 1)[-1] if "." in (upload.name or "") else "jpg"
     ).lower()
+    ext = "jpg" if processed is not upload else raw_ext
     # Keep filenames opaque — they're embedded in block payloads.
     name = f"events/blocks/{event.pk}/{secrets.token_urlsafe(12)}.{ext}"
-    saved_path = default_storage.save(name, upload)
+    saved_path = default_storage.save(name, processed)
     return Response(
         {"url": default_storage.url(saved_path)},
         status=status.HTTP_201_CREATED,
