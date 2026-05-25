@@ -1078,9 +1078,12 @@ export interface Community {
   created_at: string;
 }
 
+export type CommunityMemberRole = "admin" | "member";
+
 export interface CommunityMemberRecord {
   id: number;
   status: "pending" | "member" | "declined" | "removed";
+  role: CommunityMemberRole;
   joined_at: string;
   decided_at: string | null;
   user_email: string;
@@ -1144,6 +1147,16 @@ export const communities = {
     apiFetch<void>(
       `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/`,
       { method: "DELETE" },
+    ),
+  setMemberRole: (
+    workspaceSlug: string,
+    communitySlug: string,
+    memberId: number,
+    role: CommunityMemberRole,
+  ) =>
+    apiFetch<CommunityMemberRecord>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/role/`,
+      { method: "POST", body: JSON.stringify({ role }) },
     ),
 };
 
