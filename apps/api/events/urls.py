@@ -203,4 +203,9 @@ urlpatterns = [
         views.checklist_from_preset,
         name="checklist-from-preset",
     ),
+    path(
+        "<slug:workspace_slug>/payments/bulk-match/",
+        views.bulk_match_payments,
+        name="payments-bulk-match",
+    ),
 ]
