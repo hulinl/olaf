@@ -24,6 +24,7 @@ def send_branded_email(
     template_base: str,
     context: dict,
     recipient_list: Iterable[str],
+    reply_to: Iterable[str] | None = None,
     fail_silently: bool = False,
 ) -> int:
     """Render `<template_base>.txt` + `<template_base>.html` from a
@@ -32,6 +33,10 @@ def send_branded_email(
 
     `template_base` is the path WITHOUT extension, e.g.
     `"emails/rsvp_confirmation"`.
+
+    `reply_to` se hodí pro workspace broadcast e-maily — owner pošle
+    bulk-e-mail svým členům a chce, aby odpovědi šly zpět jemu, ne
+    na platform inbox.
     """
     site_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
     enriched_context = {
@@ -50,6 +55,7 @@ def send_branded_email(
         body=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=list(recipient_list),
+        reply_to=list(reply_to) if reply_to else None,
     )
     msg.attach_alternative(html_body, "text/html")
     return msg.send(fail_silently=fail_silently)

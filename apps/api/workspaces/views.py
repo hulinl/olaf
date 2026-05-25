@@ -1048,8 +1048,6 @@ def workspace_members_bulk_email(
     workspace — same surface the Lidé endpoint exposes — so owners
     can't spray to arbitrary user ids.
     """
-    from django.conf import settings as _s
-    from django.core.mail import EmailMessage
     from django.db.models import Q as DQ
 
     from accounts.models import User
@@ -1111,16 +1109,13 @@ def workspace_members_bulk_email(
 
     sent = 0
     skipped = 0
-    from_addr = getattr(_s, "DEFAULT_FROM_EMAIL", "olaf@olaf.events")
-    reply_to = (
-        [request.user.email] if request.user.email else None
-    )
-    # Footer reminds the recipient where the e-mail came from so it
-    # doesn't read as platform spam.
-    footer = (
-        f"\n\n— {request.user.get_full_name() or request.user.email}"
-        f" · {workspace.name}"
-    )
+    author_name = request.user.get_full_name() or request.user.email
+    reply_to = [request.user.email] if request.user.email else None
+    # Owner's free-form body je vsazen do branded HTML šablony
+    # (workspace_broadcast). Reply-To míří zpět na ownera tak že
+    # případné odpovědi nelandnou na platform inbox.
+    from notifications.email_sender import send_branded_email
+
     for uid in user_ids:
         try:
             uid_int = int(uid)
@@ -1139,13 +1134,19 @@ def workspace_members_bulk_email(
             skipped += 1
             continue
         try:
-            EmailMessage(
+            send_branded_email(
                 subject=subject,
-                body=body + footer,
-                from_email=from_addr,
-                to=[recipient.email],
+                template_base="emails/workspace_broadcast",
+                context={
+                    "subject": subject,
+                    "body": body,
+                    "author_name": author_name,
+                    "workspace": workspace,
+                },
+                recipient_list=[recipient.email],
                 reply_to=reply_to,
-            ).send(fail_silently=True)
+                fail_silently=True,
+            )
             sent += 1
         except Exception:
             skipped += 1

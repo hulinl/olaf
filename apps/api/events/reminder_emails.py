@@ -9,11 +9,10 @@ Dispatch happens via the Celery periodic task in events.tasks.
 from __future__ import annotations
 
 from django.conf import settings
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
 from django.utils import timezone
 
 from accounts.models import User
+from notifications.email_sender import send_branded_email
 from workspaces.models import WorkspaceMember
 
 from .models import RSVP, EventChecklistItem
@@ -72,18 +71,16 @@ def send_checklist_reminder(item: EventChecklistItem) -> int:
 
     sent = 0
     for user in audience:
-        context = {
-            "item": item,
-            "event": event,
-            "recipient": user,
-            "cockpit_url": cockpit_url,
-            "is_participants": is_participants,
-        }
-        body = render_to_string("events/checklist_reminder.txt", context)
-        send_mail(
+        send_branded_email(
             subject=subject,
-            message=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            template_base="events/checklist_reminder",
+            context={
+                "item": item,
+                "event": event,
+                "recipient": user,
+                "cockpit_url": cockpit_url,
+                "is_participants": is_participants,
+            },
             recipient_list=[user.email],
             fail_silently=True,
         )
