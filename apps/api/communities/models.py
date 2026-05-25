@@ -108,6 +108,22 @@ class CommunityMember(models.Model):
         (STATUS_REMOVED, "Removed — owner removed them"),
     ]
 
+    # Multi-admin community (V2 Slice 1) — within an active membership
+    # (status=member), `role` distinguishes between regular members and
+    # community admins. Admins will (in later slices) be able to edit
+    # community profile, moderate the nástěnka, and manage members.
+    #
+    # Workspace owners/admins stay implicitly above community admins —
+    # they can manage *any* community in their workspace, regardless of
+    # their CommunityMember.role. This slice ships the field + backfill
+    # only; permission wiring lands in Slice 2.
+    ROLE_ADMIN = "admin"
+    ROLE_MEMBER = "member"
+    ROLE_CHOICES = [
+        (ROLE_ADMIN, "Admin — community management"),
+        (ROLE_MEMBER, "Member — regular member"),
+    ]
+
     community = models.ForeignKey(
         Community, on_delete=models.CASCADE, related_name="memberships"
     )
@@ -120,6 +136,17 @@ class CommunityMember(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default=STATUS_PENDING,
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default=ROLE_MEMBER,
+        help_text=(
+            "Community-level role within an active membership. Backfill "
+            "promotes the first member (chronologically) of each existing "
+            "community to admin so V1 communities always have an explicit "
+            "manager beyond the workspace owner."
+        ),
     )
     joined_at = models.DateTimeField(default=timezone.now)
     decided_at = models.DateTimeField(null=True, blank=True)
