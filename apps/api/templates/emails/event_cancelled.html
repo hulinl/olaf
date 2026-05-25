@@ -1,0 +1,34 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}Akce zrušena — {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name }},
+  </p>
+  <p style="margin:0 0 20px;">
+    bohužel — akce <strong>„{{ event.title }}"</strong> byla zrušena.
+  </p>
+
+  {% if reason %}
+    <div style="margin:0 0 20px;padding:14px 16px;background-color:#fee2e2;border-left:4px solid #dc2626;border-radius:6px;">
+      <div style="font-size:12px;font-weight:600;color:#991b1b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Důvod</div>
+      <div style="font-size:14px;color:#1a1a1a;">{{ reason }}</div>
+    </div>
+  {% endif %}
+
+  {% if event_when or event.location_text %}
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 20px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+      <tr>
+        <td style="padding:14px 18px;font-size:13px;color:#737373;">
+          {% if event_when %}<div>Původní termín: <span style="color:#1a1a1a;">{{ event_when }}</span></div>{% endif %}
+          {% if event.location_text %}<div>Místo: <span style="color:#1a1a1a;">{{ event.location_text }}</span></div>{% endif %}
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
+  <p style="margin:0;">
+    Tvoje registrace je tímto zrušená. Pokud něco potřebuješ, ozvi se nám.
+  </p>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}Nové téma — {{ topic.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj{% if recipient.first_name %} {{ recipient.first_name }}{% endif %},
+  </p>
+  <p style="margin:0 0 20px;">
+    <strong>{{ author_name }}</strong> otevřel/a nové téma v {{ parent_label }}:
+  </p>
+
+  <div style="margin:0 0 24px;padding:16px 18px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+    <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#1a1a1a;">„{{ topic.title }}"</p>
+    {% if topic.body %}
+      <p style="margin:0;font-size:14px;color:#525252;line-height:1.6;white-space:pre-wrap;">{{ topic.body }}</p>
+    {% endif %}
+  </div>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ topic_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Připojit se k diskuzi</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-size:12px;color:#a3a3a3;">
+    Nechceš tyto e-maily? V <a href="{{ site_url }}/settings/notifications" style="color:#737373;">Nastavení → Notifikace</a> vypni „Nová témata v komunitách a akcích".
+  </p>
+{% endblock %}

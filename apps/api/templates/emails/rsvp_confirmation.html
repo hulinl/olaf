@@ -1,0 +1,81 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}Tvoje registrace — {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name }},
+  </p>
+
+  {% if status == 'yes' %}
+    <p style="margin:0 0 20px;">
+      máš potvrzenou registraci na <strong>„{{ event.title }}"</strong>. Těšíme se na tebe!
+    </p>
+  {% elif status == 'waitlist' %}
+    <p style="margin:0 0 20px;">
+      jsi na waitlistu pro <strong>„{{ event.title }}"</strong>. Ozveme se hned, jak se uvolní místo.
+    </p>
+  {% elif status == 'pending_approval' %}
+    <p style="margin:0 0 20px;">
+      tvoje registrace na <strong>„{{ event.title }}"</strong> čeká na schválení od pořadatele. Brzy se ti ozveme.
+    </p>
+  {% else %}
+    <p style="margin:0 0 20px;">
+      tvoje registrace na <strong>„{{ event.title }}"</strong> je zaznamenaná.
+    </p>
+  {% endif %}
+
+  {# Event details card #}
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+    <tr>
+      <td style="padding:16px 18px;">
+        {% if event_when %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:60px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Kdy</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event_when }}</span>
+          </div>
+        {% endif %}
+        {% if event.location_text %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:60px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Kde</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event.location_text }}</span>
+          </div>
+        {% endif %}
+        {% if event.meeting_point_text %}
+          <div>
+            <span style="display:inline-block;width:60px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Sraz</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event.meeting_point_text }}</span>
+          </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ event_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Otevřít stránku akce</a>
+      </td>
+    </tr>
+  </table>
+
+  {% if rsvp.payment_status == 'pending' and rsvp.payment_due_amount %}
+    {# Payment instructions block #}
+    <div style="margin:24px 0 8px;padding:16px 18px;background-color:#fef3c7;border:1px solid #fde68a;border-radius:10px;">
+      <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#92400e;">Pokyny k platbě</p>
+      <div style="font-size:14px;color:#1a1a1a;line-height:1.8;">
+        <div><strong>Částka:</strong> {{ rsvp.payment_due_amount }} {{ rsvp.payment_currency }}</div>
+        <div><strong>Účet:</strong> {{ workspace.payment_iban|default:"(organizátor ještě nezadal IBAN)" }}{% if workspace.payment_bank_name %} · {{ workspace.payment_bank_name }}{% endif %}</div>
+        <div><strong>Variabilní symbol:</strong> <span style="font-family:Menlo,Consolas,monospace;">{{ rsvp.variable_symbol }}</span></div>
+        <div><strong>Splatnost:</strong> {{ workspace.payment_due_days }} dní od registrace</div>
+      </div>
+      <p style="margin:12px 0 0;font-size:13px;color:#92400e;">
+        QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.
+      </p>
+    </div>
+  {% endif %}
+
+  <p style="margin:20px 0 0;font-size:13px;color:#737373;">
+    Registraci si můžeš kdykoli zkontrolovat a upravit na stránce akce.
+  </p>
+{% endblock %}
