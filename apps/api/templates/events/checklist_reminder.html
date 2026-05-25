@@ -1,0 +1,35 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}
+  {% if is_participants %}Připomínka — {{ event.title }}: {{ item.title }}{% else %}[Checklist] {{ event.title }}: {{ item.title }}{% endif %}
+{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj{% if recipient.first_name %} {{ recipient.first_name }}{% endif %},
+  </p>
+  <p style="margin:0 0 20px;">
+    {% if is_participants %}
+      organizátor akce <strong>„{{ event.title }}"</strong> tě upozorňuje:
+    {% else %}
+      připomínka k akci <strong>„{{ event.title }}"</strong>:
+    {% endif %}
+  </p>
+
+  <div style="margin:0 0 24px;padding:16px 18px;background-color:#faf8f4;border-left:3px solid #f59e0b;border-radius:6px;">
+    <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#1a1a1a;">„{{ item.title }}"</p>
+    {% if item.description %}
+      <p style="margin:0;font-size:14px;color:#525252;line-height:1.6;white-space:pre-wrap;">{{ item.description }}</p>
+    {% endif %}
+  </div>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ cockpit_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">
+          {% if is_participants %}Otevřít akci{% else %}Otevřít checklist{% endif %}
+        </a>
+      </td>
+    </tr>
+  </table>
+{% endblock %}

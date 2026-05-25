@@ -1,0 +1,15 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}{{ subject }}{% endblock %}
+
+{% block body %}
+  {# Owner's free-form text — preserve newlines via white-space:pre-wrap.
+     Žádný markdown parsing (V1), ale paragrafování přes <br> by se chtělo
+     až se ukáže že to user píše s formatováním v hlavě. #}
+  <div style="font-size:15px;line-height:1.6;color:#262626;white-space:pre-wrap;">{{ body }}</div>
+
+  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #f0ede5;font-size:13px;color:#737373;">
+    — {{ author_name }}<br>
+    <span style="color:#a3a3a3;">{{ workspace.name }}</span>
+  </div>
+{% endblock %}

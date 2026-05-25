@@ -1,0 +1,5 @@
+{{ body }}
+
+—
+{{ author_name }}
+{{ workspace.name }}
