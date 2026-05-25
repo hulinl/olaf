@@ -67,7 +67,7 @@
         <div><strong>Částka:</strong> {{ rsvp.payment_due_amount }} {{ rsvp.payment_currency }}</div>
         <div><strong>Účet:</strong> {{ workspace.payment_iban|default:"(organizátor ještě nezadal IBAN)" }}{% if workspace.payment_bank_name %} · {{ workspace.payment_bank_name }}{% endif %}</div>
         <div><strong>Variabilní symbol:</strong> <span style="font-family:Menlo,Consolas,monospace;">{{ rsvp.variable_symbol }}</span></div>
-        <div><strong>Splatnost:</strong> {{ workspace.payment_due_days }} dní od registrace</div>
+        <div><strong>Splatnost:</strong> {% if payment_due_str %}{{ payment_due_str }}{% else %}{{ workspace.payment_due_days }} dní od registrace{% endif %}</div>
       </div>
       <p style="margin:12px 0 0;font-size:13px;color:#92400e;">
         QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.
