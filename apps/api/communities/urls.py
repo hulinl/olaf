@@ -25,4 +25,9 @@ urlpatterns = [
         views.community_member_detail,
         name="member-detail",
     ),
+    path(
+        "workspaces/<slug:workspace_slug>/<slug:community_slug>/members/<int:member_id>/role/",
+        views.community_member_role,
+        name="member-role",
+    ),
 ]
