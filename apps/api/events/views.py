@@ -230,6 +230,18 @@ def cancel_my_rsvp(request: Request, workspace_slug: str, event_slug: str) -> Re
         )
 
     rsvp.cancel()
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_RSVP_CANCEL,
+        workspace=event.workspace,
+        target_type="rsvp",
+        target_id=rsvp.pk,
+        summary=f"Zrušil přihlášku na akci „{event.title}”.",
+    )
     return Response(MyRSVPSerializer(rsvp).data)
 
 
@@ -398,7 +410,7 @@ def create_event(request: Request, workspace_slug: str) -> Response:
         workspace=workspace,
         target_type="event",
         target_id=event.pk,
-        summary=f'Vytvořil akci „{event.title}"',
+        summary=f'Vytvořil akci „{event.title}”',
         payload={"event_slug": event.slug, "status": event.status},
     )
 
@@ -523,7 +535,7 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
             target_type="event",
             target_id=event.pk,
             summary=(
-                f'Upravil akci „{event.title}" — '
+                f'Upravil akci „{event.title}” — '
                 f'{", ".join(changed)}'
             ),
             payload={"event_slug": event.slug, "changed_fields": changed},
@@ -933,7 +945,7 @@ def cancel_event(
         workspace=event.workspace,
         target_type="event",
         target_id=event.pk,
-        summary=f'Zrušil akci „{event.title}"',
+        summary=f'Zrušil akci „{event.title}”',
         payload={"event_slug": event.slug, "reason": reason},
     )
 
@@ -971,7 +983,7 @@ def soft_delete_event(
             workspace=event.workspace,
             target_type="event",
             target_id=event.pk,
-            summary=f'Smazal akci „{event.title}" do koše',
+            summary=f'Smazal akci „{event.title}” do koše',
             payload={"event_slug": event.slug},
         )
     return Response(
@@ -1009,7 +1021,7 @@ def restore_event(
         workspace=event.workspace,
         target_type="event",
         target_id=event.pk,
-        summary=f'Obnovil akci „{event.title}" z koše',
+        summary=f'Obnovil akci „{event.title}” z koše',
         payload={"event_slug": event.slug},
     )
     return Response(
@@ -1171,7 +1183,7 @@ def approve_rsvp(
         workspace=event.workspace,
         target_type="rsvp",
         target_id=rsvp.pk,
-        summary=f'Schválil přihlášku {applicant_name} na „{event.title}"',
+        summary=f'Schválil přihlášku {applicant_name} na „{event.title}”',
         payload={
             "event_slug": event.slug,
             "rsvp_status": rsvp.status,
@@ -1221,7 +1233,7 @@ def reject_rsvp(
         workspace=event.workspace,
         target_type="rsvp",
         target_id=rsvp.pk,
-        summary=f'Zamítl přihlášku {applicant_name} na „{event.title}"',
+        summary=f'Zamítl přihlášku {applicant_name} na „{event.title}”',
         payload={"event_slug": event.slug, "reason": reason},
     )
 
@@ -1429,6 +1441,26 @@ def mark_rsvp_paid(
     rsvp.paid_at = timezone.now()
     rsvp.save(update_fields=["payment_status", "paid_at", "updated_at"])
 
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_RSVP_MARK_PAID,
+        workspace=rsvp.event.workspace,
+        target_type="rsvp",
+        target_id=rsvp.pk,
+        summary=(
+            f"Označil/a přihlášku {rsvp.user.get_full_name() or rsvp.user.email} "
+            f"na akci „{rsvp.event.title}” jako zaplacenou."
+        ),
+        payload={
+            "amount": str(rsvp.payment_due_amount or ""),
+            "currency": rsvp.payment_currency or "",
+            "variable_symbol": rsvp.variable_symbol or "",
+        },
+    )
+
     # Auto-generate the invoice (Slice 8). Idempotent.
     # Don't block mark-paid on invoice issues; owner can regenerate later.
     import contextlib
@@ -1488,6 +1520,23 @@ def toggle_rsvp_organizer(
             "paid_at",
             "updated_at",
         ]
+    )
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_RSVP_TOGGLE_ORGANIZER,
+        workspace=rsvp.event.workspace,
+        target_type="rsvp",
+        target_id=rsvp.pk,
+        summary=(
+            f"{'Označil/a' if is_organizer else 'Zrušil/a'} "
+            f"{rsvp.user.get_full_name() or rsvp.user.email} jako organizátora "
+            f"akce „{rsvp.event.title}”."
+        ),
+        payload={"is_organizer": is_organizer},
     )
     return Response(RSVPSerializer(rsvp).data)
 
