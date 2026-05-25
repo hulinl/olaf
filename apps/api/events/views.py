@@ -2173,3 +2173,161 @@ def event_collaborator_detail(
         return err
     EventCollaborator.objects.filter(event=event, user_id=user_id).delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def bulk_match_payments(
+    request: Request, workspace_slug: str
+) -> Response:
+    """Workspace-scoped bulk payment matching.
+
+    Pro každý vstupní záznam `{variable_symbol, amount}` najde RSVP
+    s odpovídajícím VS v daném workspace, ověří amount match a
+    flipne payment_status na `paid`. Idempotentní — už zaplacené
+    RSVPs jsou v `already_paid`, nikdy se nedupluje audit row nebo
+    invoice.
+
+    Tento endpoint je generic JSON sink — frontend ho volá s daty
+    vytaženými z paste Fio statementu (V1.5 pak Fio webhook adapter
+    posílá rovnou sem). Žádná závislost na konkrétním bank API.
+
+    Body:
+        {
+          "matches": [
+            {"variable_symbol": "20240042", "amount": "1500.00", "currency": "CZK"},
+            ...
+          ]
+        }
+
+    Returns 200 + summary:
+        {
+          "matched":      [{vs, rsvp_id, user_email, amount}],
+          "amount_mismatch": [{vs, rsvp_id, expected, received}],
+          "already_paid": [{vs, rsvp_id}],
+          "not_found":    [{vs}],
+          "summary": {matched, amount_mismatch, already_paid, not_found}
+        }
+    """
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        workspace = Workspace.objects.get(slug=workspace_slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    matches_in = request.data.get("matches")
+    if not isinstance(matches_in, list):
+        return Response(
+            {"detail": "`matches` musí být list objektů s `variable_symbol` a `amount`."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    matched: list[dict] = []
+    amount_mismatch: list[dict] = []
+    already_paid: list[dict] = []
+    not_found: list[dict] = []
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    from .models import generate_invoice_for_rsvp
+
+    for entry in matches_in:
+        if not isinstance(entry, dict):
+            continue
+        vs = str(entry.get("variable_symbol", "")).strip()
+        amount_raw = entry.get("amount")
+        if not vs or amount_raw is None:
+            continue
+        try:
+            amount = Decimal(str(amount_raw))
+        except (InvalidOperation, ValueError):
+            continue
+
+        rsvp = (
+            RSVP.objects.filter(
+                event__workspace=workspace,
+                variable_symbol=vs,
+            )
+            .select_related("event", "event__workspace", "user")
+            .order_by("created_at")
+            .first()
+        )
+        if rsvp is None:
+            not_found.append({"variable_symbol": vs})
+            continue
+
+        if rsvp.payment_status == RSVP.PAYMENT_PAID:
+            already_paid.append(
+                {"variable_symbol": vs, "rsvp_id": rsvp.pk}
+            )
+            continue
+
+        expected = rsvp.payment_due_amount
+        if expected is not None and abs(amount - expected) > Decimal("1.00"):
+            # Tolerance 1 Kč — někdy přijde s diakrtikou v haléřích.
+            amount_mismatch.append(
+                {
+                    "variable_symbol": vs,
+                    "rsvp_id": rsvp.pk,
+                    "expected": str(expected),
+                    "received": str(amount),
+                }
+            )
+            continue
+
+        rsvp.payment_status = RSVP.PAYMENT_PAID
+        rsvp.paid_at = timezone.now()
+        rsvp.save(update_fields=["payment_status", "paid_at", "updated_at"])
+
+        audit_log(
+            actor=request.user,
+            action=AuditLog.ACTION_RSVP_MARK_PAID,
+            workspace=workspace,
+            target_type="rsvp",
+            target_id=rsvp.pk,
+            summary=(
+                f"Spárováno přes bulk-match: přihláška "
+                f"{rsvp.user.get_full_name() or rsvp.user.email} na "
+                f'akci „{rsvp.event.title}".'
+            ),
+            payload={
+                "amount": str(amount),
+                "currency": entry.get("currency") or rsvp.payment_currency,
+                "variable_symbol": vs,
+                "source": "bulk_match",
+            },
+        )
+
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            generate_invoice_for_rsvp(rsvp)
+
+        matched.append(
+            {
+                "variable_symbol": vs,
+                "rsvp_id": rsvp.pk,
+                "user_email": rsvp.user.email,
+                "amount": str(amount),
+            }
+        )
+
+    return Response(
+        {
+            "matched": matched,
+            "amount_mismatch": amount_mismatch,
+            "already_paid": already_paid,
+            "not_found": not_found,
+            "summary": {
+                "matched": len(matched),
+                "amount_mismatch": len(amount_mismatch),
+                "already_paid": len(already_paid),
+                "not_found": len(not_found),
+            },
+        }
+    )
