@@ -34,6 +34,15 @@ const STATUS_TONE: Record<CommunityMemberRecord["status"], string> = {
   removed: "bg-danger-soft text-danger",
 };
 
+const ROLE_LABELS: Record<CommunityMemberRecord["role"], string> = {
+  admin: "Admin",
+  member: "Člen",
+};
+
+// Admin badge se zobrazuje, jen když role=admin — běžný member nemá
+// vizuální šum „member" vedle status badge. Status už říká „Člen".
+const ROLE_BADGE_TONE = "bg-brand/15 text-brand";
+
 export default function CommunityDetailPage({ params }: Props) {
   const { slug: wsSlug, communitySlug } = use(params);
   const router = useRouter();
@@ -121,6 +130,35 @@ export default function CommunityDetailPage({ params }: Props) {
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Odstranění selhalo.");
+    }
+  }
+
+  async function handleRoleChange(member: CommunityMemberRecord) {
+    const promoting = member.role === "member";
+    const confirmMsg = promoting
+      ? `Povýšit ${member.user_full_name} na admina komunity?`
+      : `Snížit ${member.user_full_name} z admina na běžného člena?`;
+    if (!confirm(confirmMsg)) return;
+    try {
+      const updated = await communitiesApi.setMemberRole(
+        wsSlug,
+        communitySlug,
+        member.id,
+        promoting ? "admin" : "member",
+      );
+      setMembers((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, role: updated.role } : m)),
+      );
+      setError(null);
+    } catch (err) {
+      // Server vrací 403 s `detail` (Czech) pro last-admin guard atd.
+      // ApiError.message už obsahuje data.detail když je string (viz
+      // ApiError konstruktor). Stačí předat err.message.
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Změna role selhala.");
+      }
     }
   }
 
@@ -256,6 +294,26 @@ export default function CommunityDetailPage({ params }: Props) {
                   >
                     {STATUS_LABELS[m.status]}
                   </span>
+                  {m.role === "admin" && m.status === "member" && (
+                    <span
+                      className={[
+                        "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
+                        ROLE_BADGE_TONE,
+                      ].join(" ")}
+                      title="Community admin — má oprávnění spravovat komunitu"
+                    >
+                      {ROLE_LABELS.admin}
+                    </span>
+                  )}
+                  {m.status === "member" && (
+                    <button
+                      type="button"
+                      onClick={() => handleRoleChange(m)}
+                      className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
+                    >
+                      {m.role === "admin" ? "Snížit na člena" : "Povýšit na admina"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleRemove(m)}
