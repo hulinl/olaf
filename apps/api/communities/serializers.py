@@ -51,6 +51,7 @@ class CommunityMemberSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "status",
+            "role",
             "joined_at",
             "decided_at",
             "user_email",

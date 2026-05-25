@@ -13,6 +13,11 @@ from events.permissions import is_workspace_owner
 from workspaces.models import Workspace
 
 from .models import Community, CommunityMember
+from .permissions import (
+    can_change_role,
+    can_manage_community,
+    can_remove_member,
+)
 from .serializers import CommunityMemberSerializer, CommunitySerializer
 
 
@@ -80,12 +85,18 @@ def community_detail(
     if request.method == "GET":
         return Response(CommunitySerializer(community).data)
 
-    if not is_workspace_owner(request.user, community.workspace):
-        return Response(status=status.HTTP_403_FORBIDDEN)
-
+    # DELETE je destructive — drží se na úrovni workspace ownera, ne
+    # community admina. Community admin smí editovat, ne mazat celou
+    # komunitu (např. omylem klikne ten správný button).
     if request.method == "DELETE":
+        if not is_workspace_owner(request.user, community.workspace):
+            return Response(status=status.HTTP_403_FORBIDDEN)
         community.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # PATCH — edit profilu — community admin smí.
+    if not can_manage_community(request.user, community):
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
     serializer = CommunitySerializer(community, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -115,7 +126,7 @@ def community_members(
     if err:
         return err
 
-    if not is_workspace_owner(request.user, community.workspace):
+    if not can_manage_community(request.user, community):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
@@ -179,19 +190,97 @@ def community_member_detail(
     community_slug: str,
     member_id: int,
 ) -> Response:
-    """Remove a member from a community (owner-only)."""
+    """Remove a member from a community.
+
+    Workspace owner/admin: anyone.
+    Community admin: only non-admin members (must demote first).
+    """
     community, err = _community_or_404(workspace_slug, community_slug)
     if err:
         return err
-    if not is_workspace_owner(request.user, community.workspace):
-        return Response(status=status.HTTP_403_FORBIDDEN)
 
     try:
         member = community.memberships.get(pk=member_id)
     except CommunityMember.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+    if not can_remove_member(request.user, member):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
     member.status = CommunityMember.STATUS_REMOVED
     member.decided_at = timezone.now()
     member.save(update_fields=["status", "decided_at"])
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def community_member_role(
+    request: Request,
+    workspace_slug: str,
+    community_slug: str,
+    member_id: int,
+) -> Response:
+    """Promote / demote a member's role in this community.
+
+    Body: `{"role": "admin"}` or `{"role": "member"}`.
+
+    Permission rules in `permissions.can_change_role`. Returns 403 with
+    a localized `detail` when denied (e.g. last admin self-demote).
+    """
+    community, err = _community_or_404(workspace_slug, community_slug)
+    if err:
+        return err
+
+    try:
+        member = community.memberships.select_related("user").get(pk=member_id)
+    except CommunityMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    new_role = request.data.get("role")
+    if new_role not in (
+        CommunityMember.ROLE_ADMIN,
+        CommunityMember.ROLE_MEMBER,
+    ):
+        return Response(
+            {"role": 'Role musí být "admin" nebo "member".'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    allowed, reason = can_change_role(request.user, member, new_role)
+    if not allowed:
+        return Response(
+            {"detail": reason}, status=status.HTTP_403_FORBIDDEN
+        )
+
+    if member.role == new_role:
+        # Idempotent — no state change, no audit row.
+        return Response(CommunityMemberSerializer(member).data)
+
+    old_role = member.role
+    member.role = new_role
+    member.save(update_fields=["role"])
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_COMMUNITY_MEMBER_ROLE_CHANGE,
+        workspace=community.workspace,
+        target_type="community_member",
+        target_id=member.pk,
+        summary=(
+            ('Povýšil' if new_role == CommunityMember.ROLE_ADMIN else 'Snížil')
+            + f' {member.user.get_full_name() or member.user.email} '
+            + f'v komunitě „{community.name}" na '
+            + ('admina.' if new_role == CommunityMember.ROLE_ADMIN else 'člena.')
+        ),
+        payload={
+            "community_id": community.pk,
+            "community_slug": community.slug,
+            "old_role": old_role,
+            "new_role": new_role,
+        },
+    )
+    return Response(CommunityMemberSerializer(member).data)
