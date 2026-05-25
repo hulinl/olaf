@@ -150,6 +150,24 @@ class GalleryUploadTests(TestCase):
         )
         self.assertEqual(orders, [1, 2, 3])
 
+    def test_event_collaborator_can_upload(self) -> None:
+        # Regression: gallery upload kdysi gateoval `is_workspace_owner`
+        # což odřízlo EventCollaborator. Sjednoceno s `can_manage_event`.
+        from events.models import EventCollaborator
+
+        collaborator = _make_user("collab@gal.com")
+        EventCollaborator.objects.create(
+            event=self.event, user=collaborator, added_by=self.owner
+        )
+        self.client.force_authenticate(collaborator)
+        png = io.BytesIO(_png_bytes())
+        png.name = "by-collab.png"
+        r = self.client.post(
+            self.url, {"image": png}, format="multipart"
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(EventImage.objects.filter(event=self.event).count(), 1)
+
 
 class GalleryDeleteTests(TestCase):
     def setUp(self) -> None:

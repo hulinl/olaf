@@ -15,12 +15,24 @@ def downscale_upload(upload, *, max_dim: int = 1600, quality: int = 82):
     """Return a Django InMemoryUploadedFile, downscaled + re-encoded
     as JPEG. Falls back to the original file if Pillow can't open it
     (e.g. unsupported format / corrupt header), so we never block a
-    valid upload on this."""
-    from PIL import Image
+    valid upload on this.
+
+    EXIF orientation: phones save portrait JPEGs as landscape pixels
+    + an "Orientation=6" EXIF tag telling viewers to rotate 90°.
+    Pillow's `Image.open` doesn't auto-rotate, and our subsequent
+    `save()` drops the tag — výsledek byl, že portrait uploads
+    skončily uložené naležato. `ImageOps.exif_transpose` přečte tag,
+    fyzicky otočí pixely a tag pak ze ztratí (= viewer ho už nehledá
+    a obrázek je správně i tak).
+    """
+    from PIL import Image, ImageOps
 
     try:
         upload.seek(0)
         img = Image.open(upload)
+        # Apply EXIF rotation BEFORE conversion + resize, jinak bychom
+        # pracovali s unrotated pixel daty.
+        img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")  # Drop alpha; JPEG output anyway.
         w, h = img.size
         scale = min(1.0, max_dim / max(w, h))

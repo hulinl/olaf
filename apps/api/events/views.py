@@ -672,9 +672,13 @@ def event_images(
         qs = event.images.all()
         return Response(EventImageSerializer(qs, many=True).data)
 
-    # POST — owner-only upload
-    if not request.user.is_authenticated or not is_workspace_owner(
-        request.user, event.workspace
+    # POST — gallery upload. Předtím to gateoval `is_workspace_owner`,
+    # což ale vyloučí EventCollaborators (co-creators) → 403 i pro
+    # legitimní spolutvůrce. Sjednoceno s ostatními event-management
+    # endpointy které používají `can_manage_event` (workspace
+    # owner/admin OR explicit collaborator).
+    if not request.user.is_authenticated or not can_manage_event(
+        request.user, event
     ):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
