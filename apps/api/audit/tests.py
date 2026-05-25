@@ -696,3 +696,107 @@ class AuditFromDiscussionTests(TestCase):
                 action=AuditLog.ACTION_TOPIC_DELETE
             ).exists()
         )
+
+
+class AuditFromRsvpViewsTests(TestCase):
+    """Coverage pro RSVP audit gaps shipped together: cancel, mark_paid,
+    toggle_organizer. Předtím tyhle endpointy nezanechávaly žádný
+    audit row, takže owner v audit feedu neviděl, kdo zrušil přihlášku
+    ani kdy něco označil zaplacené."""
+
+    def setUp(self) -> None:
+        self.owner = _make_user("owner_rsvp@a.com")
+        self.participant = _make_user("part_rsvp@a.com")
+        self.ws = _make_workspace(self.owner, slug="rsvpaudws")
+        self.event = _make_event(self.ws, slug="rsvpaev")
+        # Event needs price + workspace.payment_iban so RSVP gets a
+        # payment_due_amount + variable_symbol auto-populated.
+        from decimal import Decimal
+
+        self.event.price_amount = Decimal("1500.00")
+        self.event.price_currency = "CZK"
+        self.event.save(update_fields=["price_amount", "price_currency"])
+        self.ws.payment_iban = "CZ65 0800 0000 1920 0014 5399"
+        self.ws.payment_due_days = 14
+        self.ws.save(update_fields=["payment_iban", "payment_due_days"])
+        self.client = APIClient()
+
+    def _rsvp(self):
+        """Create an RSVP directly via ORM — bypasses questionnaire
+        validation. Real payment fields aren't auto-populated, so we
+        set them explicitly to mimic the production state.
+        """
+        from decimal import Decimal
+
+        rsvp = RSVP.objects.create(
+            event=self.event,
+            user=self.participant,
+            status=RSVP.STATUS_YES,
+            payment_status=RSVP.PAYMENT_PENDING,
+            payment_due_amount=Decimal("1500.00"),
+            payment_currency="CZK",
+            variable_symbol="20240042",
+        )
+        return rsvp
+
+    def test_cancel_writes_audit_row(self) -> None:
+        self._rsvp()
+        # Participant zruší vlastní přihlášku — endpoint je POST
+        # (cancel = state transition, ne DELETE row).
+        self.client.force_authenticate(self.participant)
+        r = self.client.post(
+            reverse(
+                "events:rsvp-cancel",
+                kwargs={
+                    "workspace_slug": self.ws.slug,
+                    "event_slug": self.event.slug,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_RSVP_CANCEL)
+        self.assertEqual(row.actor, self.participant)
+        self.assertEqual(row.workspace, self.ws)
+        self.assertEqual(row.target_type, "rsvp")
+
+    def test_mark_paid_writes_audit_row_with_amount(self) -> None:
+        rsvp = self._rsvp()
+        self.client.force_authenticate(self.owner)
+        r = self.client.post(
+            reverse(
+                "events:rsvp-mark-paid",
+                kwargs={
+                    "workspace_slug": self.ws.slug,
+                    "event_slug": self.event.slug,
+                    "rsvp_id": rsvp.pk,
+                },
+            )
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_RSVP_MARK_PAID)
+        self.assertEqual(row.actor, self.owner)
+        self.assertEqual(row.workspace, self.ws)
+        self.assertEqual(row.target_id, str(rsvp.pk))
+        # Payload zachycuje konkrétní částku (audit forensics value).
+        self.assertEqual(row.payload["amount"], "1500.00")
+        self.assertEqual(row.payload["currency"], "CZK")
+        self.assertTrue(row.payload["variable_symbol"])
+
+    def test_toggle_organizer_writes_audit_row(self) -> None:
+        rsvp = self._rsvp()
+        self.client.force_authenticate(self.owner)
+        r = self.client.post(
+            reverse(
+                "events:rsvp-toggle-organizer",
+                kwargs={
+                    "workspace_slug": self.ws.slug,
+                    "event_slug": self.event.slug,
+                    "rsvp_id": rsvp.pk,
+                },
+            ),
+            data={"is_organizer": True},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        row = AuditLog.objects.get(action=AuditLog.ACTION_RSVP_TOGGLE_ORGANIZER)
+        self.assertEqual(row.payload["is_organizer"], True)
