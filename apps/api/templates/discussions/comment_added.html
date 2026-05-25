@@ -1,0 +1,30 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}{{ author_name }} odpověděl/a — {{ topic.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj{% if topic.author.first_name %} {{ topic.author.first_name }}{% endif %},
+  </p>
+  <p style="margin:0 0 20px;">
+    <strong>{{ author_name }}</strong> přidal/a odpověď do tvého tématu <strong>„{{ topic.title }}"</strong> ({{ parent_label }}).
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#faf8f4;border-left:3px solid #f59e0b;border-radius:6px;">
+    <tr>
+      <td style="padding:14px 18px;font-size:14px;color:#262626;line-height:1.6;white-space:pre-wrap;">{{ comment.body }}</td>
+    </tr>
+  </table>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ topic_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Otevřít téma</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-size:12px;color:#a3a3a3;">
+    Nechceš tyto e-maily? V <a href="{{ site_url }}/settings/notifications" style="color:#737373;">Nastavení → Notifikace</a> vypni „Odpovědi v mých tématech".
+  </p>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}Místo se uvolnilo — {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name }},
+  </p>
+  <p style="margin:0 0 20px;">
+    dobrá zpráva — uvolnilo se místo na <strong>„{{ event.title }}"</strong> a postoupil/a jsi z waitlistu. Tvoje registrace je potvrzená.
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#dcfce7;border:1px solid #bbf7d0;border-radius:10px;">
+    <tr>
+      <td style="padding:16px 18px;">
+        {% if event_when %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:60px;font-size:12px;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Kdy</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event_when }}</span>
+          </div>
+        {% endif %}
+        {% if event.location_text %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:60px;font-size:12px;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Kde</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event.location_text }}</span>
+          </div>
+        {% endif %}
+        {% if event.meeting_point_text %}
+          <div>
+            <span style="display:inline-block;width:60px;font-size:12px;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Sraz</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event.meeting_point_text }}</span>
+          </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ event_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Otevřít stránku akce</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-size:13px;color:#737373;">
+    Pokud to nakonec nevyjde, dej nám prosím vědět — místo se uvolní pro dalšího z waitlistu.
+  </p>
+{% endblock %}

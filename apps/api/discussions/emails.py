@@ -9,8 +9,6 @@ Both respect the recipient's `notify_on_discussion_*` opt-out toggles.
 from __future__ import annotations
 
 from django.conf import settings
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
 
 from accounts.models import User
 from events.models import RSVP, Event
@@ -70,13 +68,13 @@ def send_comment_notification(comment: Comment) -> None:
         "parent_label": _parent_label(topic),
         "author_name": author_name,
     }
-    body = render_to_string("discussions/comment_added.txt", context)
-    send_mail(
+    from notifications.email_sender import send_branded_email
+
+    send_branded_email(
         subject=f"Nová odpověď: {topic.title}",
-        message=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        template_base="discussions/comment_added",
+        context=context,
         recipient_list=[topic.author.email],
-        fail_silently=False,
     )
     # Push on top of e-mail. Best-effort; failure here doesn't unwind
     # the e-mail send. Import lazily so the discussions app doesn't
@@ -177,11 +175,12 @@ def send_topic_announce(topic: Topic) -> None:
             "recipient": user,
             "author_name": author_name,
         }
-        body = render_to_string("discussions/topic_announced.txt", context)
-        send_mail(
+        from notifications.email_sender import send_branded_email
+
+        send_branded_email(
             subject=f"Nové téma v {parent_label}: {topic.title}",
-            message=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            template_base="discussions/topic_announced",
+            context=context,
             recipient_list=[user.email],
             fail_silently=True,  # one bad address shouldn't drop the rest
         )

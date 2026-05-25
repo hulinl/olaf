@@ -1229,31 +1229,26 @@ def _frontend_base() -> str:
 
 def _send_workspace_invitation_email(invitation):
     """Best-effort: send the e-mail, never let it crash the request."""
-    from django.conf import settings as _s
-    from django.core.mail import EmailMessage
-    from django.template.loader import render_to_string
+    from notifications.email_sender import send_branded_email
 
     accept_url = f"{_frontend_base()}/invitations/{invitation.token}"
-    body = render_to_string(
-        "emails/workspace_invitation.txt",
-        {
-            "invitation": invitation,
-            "workspace": invitation.workspace,
-            "accept_url": accept_url,
-            "invited_by_name": (
-                invitation.invited_by.get_full_name()
-                if invitation.invited_by
-                else ""
-            ),
-        },
-    )
     with contextlib.suppress(Exception):
-        EmailMessage(
+        send_branded_email(
             subject=f"Pozvánka do komunity {invitation.workspace.name} — olaf",
-            body=body,
-            from_email=getattr(_s, "DEFAULT_FROM_EMAIL", "olaf@olaf.events"),
-            to=[invitation.email],
-        ).send(fail_silently=True)
+            template_base="emails/workspace_invitation",
+            context={
+                "invitation": invitation,
+                "workspace": invitation.workspace,
+                "accept_url": accept_url,
+                "invited_by_name": (
+                    invitation.invited_by.get_full_name()
+                    if invitation.invited_by
+                    else ""
+                ),
+            },
+            recipient_list=[invitation.email],
+            fail_silently=True,
+        )
 
 
 @api_view(["POST"])

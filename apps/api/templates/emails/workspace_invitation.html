@@ -1,0 +1,35 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}Pozvánka do {{ workspace.name }} na olafu{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj,
+  </p>
+  <p style="margin:0 0 20px;">
+    {% if invited_by_name %}<strong>{{ invited_by_name }}</strong>{% else %}někdo{% endif %}
+    tě pozval/a do komunity <strong>„{{ workspace.name }}"</strong> na olafu.
+  </p>
+
+  {% if workspace.bio %}
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+      <tr>
+        <td style="padding:14px 18px;font-size:14px;font-style:italic;color:#525252;line-height:1.6;">
+          {{ workspace.bio }}
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ accept_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Přijmout pozvánku</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;font-size:13px;color:#737373;">
+    Pokud na olafu ještě nemáš účet, založíš si ho při přijetí pozvánky se stejným e-mailem ({{ invitation.email }}).
+  </p>
+{% endblock %}

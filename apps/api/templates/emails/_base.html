@@ -1,0 +1,70 @@
+{% comment %}
+Base HTML layout for transactional e-mails. Inline styles only —
+Gmail / Outlook strip <style> blocks. Table-based layout for max
+client compatibility (Outlook 2007–2019 is still 30 % of biz traffic
+and ignores most modern CSS).
+
+Children should override `body` block with their message. Optional
+`cta_url` + `cta_label` render a single amber Sunrise-brand button.
+
+Brand mark loaded from `https://olaf.events/icon-192.png` — must
+match what we ship at /public/icon-192.png. Image referenced by
+absolute URL (not data URI) because Gmail decodes data URIs on
+mobile only since ~2024 and silently fails on older clients.
+{% endcomment %}<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block subject %}olaf{% endblock %}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f1ea;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f4f1ea;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="560" style="max-width:560px;background-color:#ffffff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);overflow:hidden;">
+          {# Brand mark header — amber gradient s logem #}
+          <tr>
+            <td align="center" style="padding:32px 24px 20px;background:linear-gradient(135deg,#fff7ea 0%,#fef3c7 100%);">
+              <a href="{{ site_url|default:'https://olaf.events' }}" style="text-decoration:none;color:#1a1a1a;">
+                <img src="{{ brand_logo_url|default:'https://olaf.events/icon-192.png' }}" alt="olaf" width="56" height="56" style="display:block;border:0;margin:0 auto 8px;">
+                <div style="font-size:22px;font-weight:600;letter-spacing:-0.02em;color:#1a1a1a;">olaf</div>
+              </a>
+            </td>
+          </tr>
+
+          {# Main body #}
+          <tr>
+            <td style="padding:32px 32px 24px;font-size:15px;line-height:1.6;color:#262626;">
+              {% block body %}{% endblock %}
+
+              {% if cta_url and cta_label %}
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 8px;">
+                  <tr>
+                    <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+                      <a href="{{ cta_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">{{ cta_label }}</a>
+                    </td>
+                  </tr>
+                </table>
+              {% endif %}
+            </td>
+          </tr>
+
+          {# Footer #}
+          <tr>
+            <td style="padding:20px 32px 28px;border-top:1px solid #f0ede5;font-size:12px;line-height:1.5;color:#737373;text-align:center;">
+              <div style="margin-bottom:6px;">— Aplikace olaf</div>
+              <div>
+                <a href="{{ site_url|default:'https://olaf.events' }}" style="color:#737373;text-decoration:none;">olaf.events</a>
+                &nbsp;·&nbsp;
+                Powered by
+                <a href="https://bifactory.cz" style="color:#737373;text-decoration:none;">BIfactory</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
