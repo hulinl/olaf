@@ -46,11 +46,25 @@ export function ImageUploadField({
       const res = await events.uploadBlockImage(workspaceSlug, eventSlug, file);
       if (res.url) onChange(res.url);
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.firstFieldError() ?? err.message
-          : "Upload se nepodařil.",
-      );
+      // Předtím tu byl jen generic "Upload se nepodařil." — když
+      // backend vrátí 500 (nebo třeba HEIC bez pluginu, max-size 4xx
+      // s konkrétním textem), user neviděl proč. Teď ukazujeme status
+      // + payload, ať dokáže ohlásit reálnou chybu.
+      if (err instanceof ApiError) {
+        const fieldErr = err.firstFieldError();
+        const detail = fieldErr ?? err.message;
+        setError(
+          err.status >= 500
+            ? `Server vrátil chybu ${err.status}. Zkus to znovu, případně menší soubor.`
+            : detail,
+        );
+      } else {
+        setError(
+          err instanceof Error
+            ? `Upload se nepodařil: ${err.message}`
+            : "Upload se nepodařil.",
+        );
+      }
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";

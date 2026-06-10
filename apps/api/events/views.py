@@ -661,9 +661,11 @@ def duplicate_event(
 
 GALLERY_MAX_IMAGES = 20
 # Modern phone photos commonly land in the 4-10 MB range — 5 MB was rejecting
-# typical uploads. Bumped to 12 MB; if storage starts hurting we'll add
-# server-side compression rather than tighten the gate.
-GALLERY_MAX_BYTES = 12 * 1024 * 1024
+# typical uploads. Bumped to 20 MB v 06/2026 — iPhone 16 ProRAW + HEIC full-
+# res atakují 15+ MB a typický owner po campu sype celou kolekci. Server-side
+# downscale + JPEG re-encode v downscale_upload sníží disk footprint zpátky
+# na sub-MB hodnoty, takže větší vstup nezdraží storage.
+GALLERY_MAX_BYTES = 20 * 1024 * 1024
 
 
 @api_view(["GET", "POST"])
@@ -721,7 +723,15 @@ def event_images(
     # 1600px on the long side + re-encode JPEG at quality 82 before
     # we persist, keeping the original aspect ratio. Result: 200-400
     # KB per image, fast load on 4G + PWA.
-    processed = _downscale_upload(upload)
+    from .image_utils import UnsupportedImageError
+
+    try:
+        processed = _downscale_upload(upload)
+    except UnsupportedImageError as exc:
+        return Response(
+            {"image": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     img = EventImage.objects.create(
         event=event,
         image=processed,
@@ -807,17 +817,18 @@ def event_block_image_upload(
     # Pass through the same downscale + EXIF-rotation pipeline as the
     # gallery uploads. Předtím se file ukládal as-is → 4000+ px iPhone
     # JPEGy zpomalovaly landing + portrait fotky byly naležato.
-    from .image_utils import downscale_upload
+    from .image_utils import UnsupportedImageError, downscale_upload
 
-    processed = downscale_upload(upload)
+    try:
+        processed = downscale_upload(upload)
+    except UnsupportedImageError as exc:
+        return Response(
+            {"detail": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    # JPEG output po downscale; pokud Pillow nezvládl input, vrátí raw.
-    raw_ext = (
-        upload.name.rsplit(".", 1)[-1] if "." in (upload.name or "") else "jpg"
-    ).lower()
-    ext = "jpg" if processed is not upload else raw_ext
-    # Keep filenames opaque — they're embedded in block payloads.
-    name = f"events/blocks/{event.pk}/{secrets.token_urlsafe(12)}.{ext}"
+    # downscale vždycky vrací JPEG (raise → fallback výš).
+    name = f"events/blocks/{event.pk}/{secrets.token_urlsafe(12)}.jpg"
     saved_path = default_storage.save(name, processed)
     return Response(
         {"url": default_storage.url(saved_path)},
@@ -900,14 +911,22 @@ def event_cover(
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if event.cover:
-        event.cover.delete(save=False)
     # Same downscale + JPEG re-encode pipeline as the gallery uploads —
     # owners drop iPhone-original 4000+ px JPEGs in here and the public
     # landing pays the load-time cost on every visit otherwise.
-    from .image_utils import downscale_upload
+    from .image_utils import UnsupportedImageError, downscale_upload
 
-    event.cover = downscale_upload(upload)
+    try:
+        processed = downscale_upload(upload)
+    except UnsupportedImageError as exc:
+        return Response(
+            {"cover": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if event.cover:
+        event.cover.delete(save=False)
+    event.cover = processed
     event.save(update_fields=["cover", "updated_at"])
     return Response(EventPublicSerializer(event, context={"request": request}).data)
 

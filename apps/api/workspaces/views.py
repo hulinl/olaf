@@ -275,16 +275,24 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if file_field:
-        file_field.delete(save=False)
     # Same downscale + JPEG pipeline as event uploads — phones produce
     # multi-megabyte JPEGs that crush mobile pageload time otherwise.
     # Logos are usually small (rare for someone to upload a 4000px
     # logo), but the helper short-circuits when the source is already
     # under max_dim so calling it costs nothing in the common case.
-    from events.image_utils import downscale_upload
+    from events.image_utils import UnsupportedImageError, downscale_upload
 
-    setattr(workspace, field, downscale_upload(upload))
+    try:
+        processed = downscale_upload(upload)
+    except UnsupportedImageError as exc:
+        return Response(
+            {"detail": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if file_field:
+        file_field.delete(save=False)
+    setattr(workspace, field, processed)
     workspace.save(update_fields=[field])
     return Response(
         WorkspacePublicSerializer(workspace, context={"request": request}).data

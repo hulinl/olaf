@@ -99,11 +99,25 @@ export default function EventGalleryPage({ params }: Props) {
         setUploadDone(i + 1);
       }
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.firstFieldError() ?? err.message
-          : "Upload selhal.",
-      );
+      // Generic "Upload selhal." nedávalo userovi šanci pochopit proč
+      // — HEIC bez pluginu, max-size 4xx, 5xx z Azure Blob, expired
+      // session. Teď propisujeme status + payload, ať lze problém
+      // alespoň ohlásit.
+      if (err instanceof ApiError) {
+        const fieldErr = err.firstFieldError();
+        const detail = fieldErr ?? err.message;
+        setError(
+          err.status >= 500
+            ? `Server vrátil chybu ${err.status}. Zkus menší soubor nebo to zkus znovu.`
+            : detail,
+        );
+      } else {
+        setError(
+          err instanceof Error
+            ? `Upload selhal: ${err.message}`
+            : "Upload selhal.",
+        );
+      }
     } finally {
       setUploading(false);
       setUploadTotal(0);
@@ -218,7 +232,7 @@ export default function EventGalleryPage({ params }: Props) {
           {event.title}
         </h1>
         <p className="mt-2 text-sm text-ink-500">
-          Nahraj až {MAX_IMAGES} obrázků (5 MB každý). Zobrazí se jako grid na
+          Nahraj až {MAX_IMAGES} obrázků (20 MB každý). Zobrazí se jako grid na
           veřejné stránce akce. Pořadí změníš tlačítky ↑/↓.
         </p>
       </header>

@@ -16,6 +16,11 @@ azure-communication-email==1.0.0
 gunicorn==23.0.0
 whitenoise==6.8.2
 pillow==11.1.0
+# HEIC/HEIF reader plugin pro Pillow — iPhone defaultně ukládá fotky
+# v HEIC. Bez tohohle dependency Image.open() na HEIC hodí exception,
+# downscale_upload spadne do fallbacku a uloží surový HEIC, který
+# žádný prohlížeč nevykreslí → user vidí "rozbitý" upload.
+pillow-heif==0.22.0
 qrcode==8.0
 weasyprint==63.1
 python-dotenv==1.0.1

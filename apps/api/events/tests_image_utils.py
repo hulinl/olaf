@@ -113,13 +113,18 @@ class ExifOrientationTests(TestCase):
         self.assertEqual(out.width, 800)
         self.assertEqual(out.height, 600)
 
-    def test_fallback_on_unprocessable_input(self) -> None:
-        # Garbage bytes → Pillow open selže → vrátí raw upload.
+    def test_unsupported_input_raises(self) -> None:
+        # Garbage bytes → Pillow open selže → UnsupportedImageError.
+        # Předtím se vracel raw upload (fallback), což ale skončilo
+        # uložením nečitelného souboru — user dostal "úspěch" se
+        # zlomenou fotkou v galerii. Teď view chytá výjimku a vrátí
+        # 400.
+        from events.image_utils import UnsupportedImageError
+
         buf = io.BytesIO(b"not an image at all")
         upload = InMemoryUploadedFile(
             buf, "image", "trash.jpg", "image/jpeg",
             buf.getbuffer().nbytes, None,
         )
-        result = downscale_upload(upload)
-        # Vrátí same object (fallback path).
-        self.assertIs(result, upload)
+        with self.assertRaises(UnsupportedImageError):
+            downscale_upload(upload)
