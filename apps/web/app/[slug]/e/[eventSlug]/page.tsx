@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!event) return { title: "Not found — olaf" };
   if (isDraftPreview(event)) {
     return {
-      title: `${event.title} — chystá se · ${event.workspace_name}`,
+      title: `${event.title} — chystá se`,
       // Tell search engines + link previews to skip — draft pages
       // shouldn't be indexed.
       robots: { index: false, follow: false },
@@ -45,12 +45,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const cover =
     assetUrl(event.cover_url) ?? assetUrl(event.workspace_logo_url);
+  // Description fallback dřív začínal "${workspace} on olaf — ${title}",
+  // což připíchlo jméno workspace do search snippetů i tehdy, když si
+  // owner workspace pojmenoval generic ("Personal — ...") a nechtěl ho
+  // ve veřejných meta tag-ách. Default je teď čistě event title.
   const description =
-    event.description.split("\n")[0]?.slice(0, 180) ||
-    `${event.workspace_name} on olaf — ${event.title}.`;
+    event.description.split("\n")[0]?.slice(0, 180) || event.title;
 
+  // Event titul stojí na vlastních nohou — předtím tu byl
+  // "${event.title} — ${event.workspace_name}", což user explicitně
+  // odmítl (každá akce má být svá, workspace je jen container, ne
+  // prefix v browser tabu nebo OG titulu).
   return {
-    title: `${event.title} — ${event.workspace_name}`,
+    title: event.title,
     description,
     openGraph: {
       title: event.title,
@@ -93,7 +100,7 @@ export default async function EventLandingPage({ params }: Props) {
             <ShareButton
               url={`/${event.workspace_slug}/e/${event.slug}`}
               title={event.title}
-              text={`${event.workspace_name} — ${event.title}`}
+              text={event.title}
               variant="soft"
             />
             <OwnerCockpitLink
@@ -145,7 +152,11 @@ export default async function EventLandingPage({ params }: Props) {
                 <BlockRenderer
                   key={b.id}
                   block={b}
-                  fallbackTitle={`${event.workspace_name} — ${event.title}`}
+                  // Fallback pro hero H1 když si owner nepřepsal
+                  // `title_override`. Předtím se sem zřetězilo
+                  // "${workspace} — ${title}" a workspace dominoval
+                  // hero každé akce. Teď stojí na sobě jen event title.
+                  fallbackTitle={event.title}
                   fallbackCtaHref={cta_href}
                   heroBadge={i === heroIndex ? heroBadge : undefined}
                   images={event.images}
