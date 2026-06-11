@@ -422,7 +422,7 @@ export default function RSVPPage({ params }: Props) {
                     <Field
                       label="Telefon"
                       htmlFor="phone"
-                      hint="Pro emergency kontakt v terénu."
+                      hint="Pro případ nouze nebo rychlou komunikaci."
                     >
                       <Input
                         id="phone"

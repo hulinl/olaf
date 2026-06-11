@@ -127,8 +127,14 @@ function AdminEventDetail({ params }: Props) {
   const waitlist = rsvps.filter((r) => r.status === "waitlist");
   const pending = rsvps.filter((r) => r.status === "pending_approval");
   const cancelled = rsvps.filter((r) => r.status === "cancelled");
+  // "Vše" v hlavním rosteru = aktivní registrace; zrušené mají
+  // dedikovaný stat tile a vlastní filtr, aby nepřekážely v denní
+  // práci ownera. Když user explicitně klikne na "Zrušeno", uvidí
+  // jen je.
   const filteredRsvps =
-    filter === "all" ? rsvps : rsvps.filter((r) => r.status === filter);
+    filter === "all"
+      ? rsvps.filter((r) => r.status !== "cancelled")
+      : rsvps.filter((r) => r.status === filter);
 
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
@@ -533,46 +539,58 @@ function RsvpRow({
               </button>
             </div>
           )}
-          <button
-            type="button"
-            onClick={handleToggleOrganizer}
-            disabled={busy !== null}
-            className="text-left text-[11px] font-medium text-ink-500 hover:text-brand disabled:opacity-50"
-          >
-            {busy === "organizer"
-              ? "..."
-              : rsvp.is_organizer
-                ? "Odebrat organizátora"
-                : "Označit organizátorem"}
-          </button>
+          {/* Akce na účastníkovi mají smysl jen dokud je registrace
+              aktivní. Cancelled row ukazuje jen status badge —
+              organizer toggle / "odebrat" mizí, jinak by tam zůstaly
+              klikatelné kontroly nad zrušenou registrací. */}
           {rsvp.status !== "cancelled" && (
-            <button
-              type="button"
-              onClick={handleRemove}
-              disabled={busy !== null}
-              className="text-left text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
-            >
-              {busy === "remove" ? "..." : "Odebrat z akce"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleToggleOrganizer}
+                disabled={busy !== null}
+                className="text-left text-[11px] font-medium text-ink-500 hover:text-brand disabled:opacity-50"
+              >
+                {busy === "organizer"
+                  ? "..."
+                  : rsvp.is_organizer
+                    ? "Odebrat organizátora"
+                    : "Označit organizátorem"}
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={busy !== null}
+                title="Odebrat z akce"
+                aria-label="Odebrat z akce"
+                className="inline-flex h-6 w-6 items-center justify-center self-start rounded-full text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
+              >
+                {busy === "remove" ? (
+                  <span className="text-[10px]">…</span>
+                ) : (
+                  <span aria-hidden className="text-base leading-none">×</span>
+                )}
+              </button>
+            </>
           )}
         </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        {rsvp.is_organizer ? (
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
           <span className="text-ink-300">—</span>
         ) : (
           <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={busy === "paid"} />
         )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        {rsvp.is_organizer ? (
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
           <span className="text-ink-300">—</span>
         ) : (
           <InvoiceCell rsvp={rsvp} wsSlug={wsSlug} eventSlug={eventSlug} />
         )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        {rsvp.is_organizer ? (
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
           <span className="text-ink-300">—</span>
         ) : (
           <DocCell
@@ -584,7 +602,7 @@ function RsvpRow({
         )}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
-        {rsvp.is_organizer ? (
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
           <span className="text-ink-300">—</span>
         ) : (
           <DocCell
@@ -851,7 +869,7 @@ function RsvpCard({
         </div>
       )}
 
-      {rsvp.payment_status !== "waived" && (
+      {rsvp.payment_status !== "waived" && rsvp.status !== "cancelled" && (
         <div className="flex items-baseline justify-between text-xs">
           <span className="text-ink-500">Platba</span>
           {rsvp.payment_status === "paid" ? (
@@ -875,9 +893,15 @@ function RsvpCard({
           type="button"
           onClick={handleRemove}
           disabled={busy !== null}
-          className="self-start text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+          title="Odebrat z akce"
+          aria-label="Odebrat z akce"
+          className="inline-flex h-7 w-7 items-center justify-center self-start rounded-full text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
         >
-          {busy === "remove" ? "..." : "Odebrat z akce"}
+          {busy === "remove" ? (
+            <span className="text-xs">…</span>
+          ) : (
+            <span aria-hidden className="text-lg leading-none">×</span>
+          )}
         </button>
       )}
     </div>
