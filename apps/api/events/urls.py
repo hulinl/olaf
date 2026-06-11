@@ -119,6 +119,11 @@ urlpatterns = [
         name="rsvp-reject",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/remove/",
+        views.remove_rsvp,
+        name="rsvp-remove",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/payment/",
         views.my_rsvp_payment,
         name="rsvp-payment",

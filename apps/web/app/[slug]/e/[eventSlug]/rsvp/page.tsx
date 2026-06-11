@@ -309,9 +309,6 @@ export default function RSVPPage({ params }: Props) {
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
               {event.title}
             </h1>
-            <p className="mt-1 text-sm text-ink-500">
-              {event.workspace_name}
-            </p>
             {user && (
               <p className="mt-3 rounded-md border border-border bg-surface-muted/40 px-3 py-2 text-xs text-ink-700">
                 Některá pole jsme předvyplnili z tvého{" "}

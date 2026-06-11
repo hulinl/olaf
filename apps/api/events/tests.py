@@ -774,6 +774,68 @@ class ConfigurableQuestionnaireTests(TestCase):
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_owner_can_remove_confirmed_rsvp(self) -> None:
+        # Použití pro duplicate cleanup — owner odebere potvrzeného
+        # účastníka (`reject_rsvp` umí jen pending, tady jde o yes/
+        # waitlist). RSVP přechází na cancelled, NOT delete.
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.assertEqual(rsvp.status, RSVP.STATUS_YES)
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        rsvp.refresh_from_db()
+        self.assertEqual(rsvp.status, RSVP.STATUS_CANCELLED)
+
+    def test_remove_is_idempotent(self) -> None:
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        rsvp.cancel()
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_non_owner_blocked_from_remove(self) -> None:
+        outsider = User.objects.create_user(
+            email="rm@example.com", password="pass-abcdef-1234",
+            first_name="X", last_name="Y", email_verified=True,
+        )
+        _, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.client.force_authenticate(outsider)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_blocks_default_to_empty(self) -> None:
         self.assertEqual(self.event.blocks, [])
 

@@ -373,7 +373,7 @@ function RsvpRow({
   onOpenProfile: () => void;
 }) {
   const [busy, setBusy] = useState<
-    "paid" | "approve" | "reject" | "organizer" | null
+    "paid" | "approve" | "reject" | "organizer" | "remove" | null
   >(null);
   const created = new Date(rsvp.created_at);
   const requiredKeys = new Set(requiredDocs.map((d) => d.key));
@@ -454,6 +454,26 @@ function RsvpRow({
     }
   }
 
+  async function handleRemove() {
+    if (busy) return;
+    const who = rsvp.user_full_name || rsvp.user_email;
+    if (
+      !confirm(
+        `Odebrat ${who} z akce?\n\nRegistraci přepneme na "cancelled"; pokud byla potvrzená, posune se další z waitlistu. Akci nesmaže — historie se zachová v auditu.`,
+      )
+    )
+      return;
+    setBusy("remove");
+    try {
+      const updated = await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <tr className="group hover:bg-brand/10">
       <td className="px-4 py-3">
@@ -525,6 +545,16 @@ function RsvpRow({
                 ? "Odebrat organizátora"
                 : "Označit organizátorem"}
           </button>
+          {rsvp.status !== "cancelled" && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              disabled={busy !== null}
+              className="text-left text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+            >
+              {busy === "remove" ? "..." : "Odebrat z akce"}
+            </button>
+          )}
         </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -704,7 +734,9 @@ function RsvpCard({
   onUpdate: (updated: RSVPRecord) => void;
   onOpenProfile: () => void;
 }) {
-  const [busy, setBusy] = useState<"paid" | "approve" | "reject" | null>(null);
+  const [busy, setBusy] = useState<
+    "paid" | "approve" | "reject" | "remove" | null
+  >(null);
 
   async function handleApprove() {
     setBusy("approve");
@@ -734,6 +766,24 @@ function RsvpCard({
     setBusy("paid");
     try {
       const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function handleRemove() {
+    const who = rsvp.user_full_name || rsvp.user_email;
+    if (
+      !confirm(
+        `Odebrat ${who} z akce?\n\nRegistraci přepneme na "cancelled"; pokud byla potvrzená, posune se další z waitlistu.`,
+      )
+    )
+      return;
+    setBusy("remove");
+    try {
+      const updated = await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
       onUpdate(updated);
     } catch {
       /* keep quiet */
@@ -819,6 +869,16 @@ function RsvpCard({
             </button>
           )}
         </div>
+      )}
+      {rsvp.status !== "cancelled" && (
+        <button
+          type="button"
+          onClick={handleRemove}
+          disabled={busy !== null}
+          className="self-start text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+        >
+          {busy === "remove" ? "..." : "Odebrat z akce"}
+        </button>
       )}
     </div>
   );

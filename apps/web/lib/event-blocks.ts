@@ -249,24 +249,20 @@ export function extractGoogleMapsCoords(
 }
 
 /**
- * Vrátí embed URL pro Google Maps share-link, ale RENDEROVANÝ přes
- * OpenStreetMap — Google `output=embed` má `X-Frame-Options:
- * SAMEORIGIN`, takže by se v iframe-u nevykreslil. OSM `/export/embed.html`
- * je naopak otevřený, bez API klíče, vrací 200 bez frame restrictions.
+ * Vrátí embed URL pro Google Maps share-link.
  *
  * Pipeline:
  *   1. Krátký `maps.app.goo.gl/…` rozbalí 302 redirect na full URL.
  *   2. Z full URL extrahujeme lat/lng (Google to do path-u píše různě
  *      podle typu sdílení — viz `extractGoogleMapsCoords`).
- *   3. Postavíme OSM embed s bbox kolem souřadnic + markerem.
- *
- * Plusy:
- *   - Žádný API klíč, žádné runtime costs.
- *   - Iframe se vždy vykreslí (vs. Google SAMEORIGIN-block).
- *
- * Minus:
- *   - OSM neukáže POI label z Google (jiné mapové podklady). User to
- *     kliknutím na "Otevřít v Google Maps" dostane plnohodnotně.
+ *   3. Pokud je `GOOGLE_MAPS_EMBED_API_KEY` v env, použijeme oficiální
+ *      Google Maps Embed API (`maps/embed/v1/place`) — vrátí Google
+ *      branded mapu, kterou Češi znají. Free tier 25k loads/měsíc.
+ *      Klíč musí mít HTTP-referrer restrikci na `olaf.events/*` +
+ *      lokální dev origins.
+ *   4. Bez klíče fallbackneme na OpenStreetMap embed s markerem — funkčně
+ *      OK, ale podklady neukážou Google POI label. User pak používá
+ *      "Otevřít v Google Maps ↗" jako fallback.
  *
  * Pokud z URL nelze extrahovat souřadnice (URL je třeba `/place/Name`
  * bez lat/lng), vrátíme `null` — MapBlock pak pouze ukáže link na
@@ -296,7 +292,18 @@ export async function resolveGoogleMapsEmbedUrl(
   const lat = parseFloat(coords.lat);
   const lng = parseFloat(coords.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  // ~1 km bbox kolem bodu → comfortable zoom level v OSM viewportu.
+
+  // Preferujeme Google Maps Embed API, když je klíč dostupný — vlastní
+  // Google branded mapa, kterou Češi znají. Klíč musí mít HTTP-referrer
+  // restrikci na olaf.events doménu, jinak Google nahradí mapu chybou.
+  const apiKey = process.env.GOOGLE_MAPS_EMBED_API_KEY;
+  if (apiKey) {
+    return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=15`;
+  }
+
+  // Fallback: OSM embed bez API key. ~1 km bbox kolem bodu → comfortable
+  // zoom level v OSM viewportu. Visually OSM, ale "Otevřít v Google
+  // Maps" link pod mapou pořád vede na původní Google URL.
   const d = 0.005;
   const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;

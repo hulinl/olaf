@@ -1296,6 +1296,59 @@ def reject_rsvp(
     return Response(RSVPSerializer(rsvp).data)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def remove_rsvp(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Owner-side cancel libovolného RSVP.
+
+    `reject_rsvp` funguje jen na `pending_approval` (zamítnutí žádosti).
+    Když ale ownerovi vznikne duplicitní účastník (přihláška dvakrát ze
+    stejného telefonu / jména, badge `⚠ Duplikát?`), potřebuje ho jít
+    smazat z rosteru. Tady force-cancel přes `rsvp.cancel()` — FIFO
+    promote z waitlistu se vyřeší automaticky uvnitř `cancel()`.
+
+    Idempotentní: pokud je RSVP už cancelled, vrátíme 200 s aktuálním
+    stavem (frontend si stejně refreshne).
+    """
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        rsvp = RSVP.objects.select_related("user").get(pk=rsvp_id, event=event)
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if rsvp.status != RSVP.STATUS_CANCELLED:
+        rsvp.cancel()
+
+        from audit.models import AuditLog
+        from audit.services import log as audit_log
+
+        participant_name = (
+            rsvp.user.get_full_name() if rsvp.user else "(neznámý)"
+        )
+        audit_log(
+            actor=request.user,
+            action=AuditLog.ACTION_RSVP_REJECT,
+            workspace=event.workspace,
+            target_type="rsvp",
+            target_id=rsvp.pk,
+            summary=(
+                f'Odebral účastníka „{participant_name}” z akce '
+                f'„{event.title}”'
+            ),
+            payload={
+                "event_slug": event.slug,
+                "rsvp_id": rsvp.pk,
+                "removed_by_owner": True,
+            },
+        )
+
+    return Response(RSVPSerializer(rsvp).data)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def participant_profile(

@@ -1360,6 +1360,14 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,
       { method: "POST" },
     ),
+  /** Owner-side hard-remove libovolného RSVP — typicky duplikátní
+   *  registrace, kterou roster přihlásil dvakrát. `rejectRsvp` umí jen
+   *  `pending_approval`; tohle je univerzální. */
+  removeRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
+    apiFetch<RSVPRecord>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/remove/`,
+      { method: "POST" },
+    ),
   paymentInstructions: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<RSVPPaymentInstructions>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvp/payment/`,

@@ -293,10 +293,7 @@ function FallbackHero({
   return (
     <section className="bg-canvas">
       <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-          {event.workspace_name}
-        </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-ink-900 sm:text-5xl">
+        <h1 className="text-4xl font-semibold tracking-tight text-ink-900 sm:text-5xl">
           {event.title}
         </h1>
         <p className="mt-3 text-base text-ink-500">
