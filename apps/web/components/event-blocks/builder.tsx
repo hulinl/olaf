@@ -36,6 +36,10 @@ interface Props {
   /** Surfaced to the included_split form so it can render price + currency
    *  + note as read-only (single source of truth = event detail). */
   eventPrice?: EventPriceContext;
+  /** Event-level `location_url` z Detaily formu. Předplníme se ho do
+   *  nově přidaného Map blocku (`map_url`), aby user nemusel URL
+   *  zadávat dvakrát. Backend pak po save synchronizuje obě pole. */
+  eventLocationUrl?: string;
 }
 
 const ADD_OPTIONS: BlockType[] = [
@@ -57,6 +61,7 @@ export function Builder({
   workspaceSlug,
   eventSlug,
   eventPrice,
+  eventLocationUrl,
 }: Props) {
   // Default to all blocks collapsed — opening the builder with a
   // long page used to dump every form on screen at once, eating
@@ -67,7 +72,7 @@ export function Builder({
   const [presetPickerOpen, setPresetPickerOpen] = useState(false);
 
   function add(type: BlockType) {
-    const block = makeBlock(type);
+    const block = makeBlock(type, { eventLocationUrl });
     onChange([...blocks, block]);
     setOpenId(block.id);
     setPickerOpen(false);
@@ -300,7 +305,10 @@ function BlockForm({
   }
 }
 
-function makeBlock(type: BlockType): EventBlock {
+function makeBlock(
+  type: BlockType,
+  defaults: { eventLocationUrl?: string } = {},
+): EventBlock {
   const id =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
@@ -320,7 +328,14 @@ function makeBlock(type: BlockType): EventBlock {
     case "gallery":
       return { id, type, payload: {} };
     case "map":
-      return { id, type, payload: { map_url: "" } };
+      // Prefill z event.location_url když ho user vyplnil v Detaily —
+      // ušetří mu druhý paste. Sync v backendu pak drží oba fieldy
+      // konzistentní.
+      return {
+        id,
+        type,
+        payload: { map_url: defaults.eventLocationUrl ?? "" },
+      };
     case "faq":
       return { id, type, payload: { items: [] } };
     case "practical":

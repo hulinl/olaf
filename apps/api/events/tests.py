@@ -438,6 +438,82 @@ class CreateUpdateEventTests(TestCase):
         resp = self.client.patch(url, {"title": "Hack"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_location_url_syncs_to_existing_map_block(self) -> None:
+        # User chce jeden zdroj pravdy pro URL mapy. Když uloží
+        # Detaily form s `location_url`, backend rozsynchronizuje
+        # existující Map block tak, aby `map_url` v něm sedl.
+        event = _build_event(self.ws, slug="sync-detaily-2026")
+        event.blocks = [
+            {
+                "id": "m1",
+                "type": "map",
+                "payload": {
+                    "title": "Trasa",
+                    "eyebrow": "Mapa",
+                    "caption": "",
+                    "map_url": "https://mapy.com/old",
+                },
+            }
+        ]
+        event.save(update_fields=["blocks"])
+
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "events:update",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "sync-detaily-2026",
+            },
+        )
+        new_url = "https://maps.app.goo.gl/abc123"
+        resp = self.client.patch(
+            url, {"location_url": new_url}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        event.refresh_from_db()
+        self.assertEqual(event.location_url, new_url)
+        self.assertEqual(event.blocks[0]["payload"]["map_url"], new_url)
+
+    def test_map_block_url_syncs_back_to_location_url(self) -> None:
+        # Druhý směr: user uloží Obsah s novým `map_url`, backend
+        # propíše do `event.location_url`, aby Detaily form ukazoval
+        # stejné. Bez tohohle uživatel viděl divergovaná pole.
+        event = _build_event(self.ws, slug="sync-obsah-2026")
+        event.location_url = "https://mapy.com/old"
+        event.save(update_fields=["location_url"])
+
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "events:update",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "sync-obsah-2026",
+            },
+        )
+        new_url = "https://maps.app.goo.gl/xyz789"
+        resp = self.client.patch(
+            url,
+            {
+                "blocks": [
+                    {
+                        "id": "m2",
+                        "type": "map",
+                        "payload": {
+                            "title": "Trasa",
+                            "eyebrow": "Mapa",
+                            "caption": "",
+                            "map_url": new_url,
+                        },
+                    }
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        event.refresh_from_db()
+        self.assertEqual(event.location_url, new_url)
+        self.assertEqual(event.blocks[0]["payload"]["map_url"], new_url)
+
 
 class CancelEventTests(TestCase):
     def setUp(self) -> None:

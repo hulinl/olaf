@@ -508,6 +508,43 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
 
     before = snapshot_event_for_diff(event)
     event = serializer.save()
+
+    # Sync `event.location_url` <-> Map block's `map_url`. Existují
+    # dvě surface, kde owner zadává URL mapy (Detaily form +
+    # `/edit/obsah` Map block). User je chtěl propisovat oběma směry:
+    # editace na jednom místě se má objevit i na druhém. Detaily PATCH
+    # nese `location_url` ale nikoli `blocks`; Obsah PATCH naopak nese
+    # `blocks` ale nikoli `location_url`. Tady to spojíme:
+    #
+    # - Detaily save → projdi `event.blocks`, přepiš `map_url` ve všech
+    #   Map blocích na novou hodnotu `event.location_url`.
+    # - Obsah save → vezmi `map_url` z prvního Map blocku (pokud existuje)
+    #   a propiš ho do `event.location_url`.
+    location_url_in = "location_url" in serializer.validated_data
+    blocks_in = "blocks" in serializer.validated_data
+    if location_url_in and event.blocks:
+        new_url = event.location_url or ""
+        updated_blocks = False
+        for block in event.blocks:
+            if block.get("type") == "map":
+                payload = block.get("payload") or {}
+                if payload.get("map_url") != new_url and new_url:
+                    payload["map_url"] = new_url
+                    block["payload"] = payload
+                    updated_blocks = True
+        if updated_blocks:
+            event.save(update_fields=["blocks", "updated_at"])
+    elif blocks_in:
+        first_map = next(
+            (b for b in (event.blocks or []) if b.get("type") == "map"),
+            None,
+        )
+        if first_map:
+            map_url = (first_map.get("payload") or {}).get("map_url") or ""
+            if map_url and map_url != event.location_url:
+                event.location_url = map_url[:500]  # URLField max_length
+                event.save(update_fields=["location_url", "updated_at"])
+
     after = snapshot_event_for_diff(event)
     changed = diff_changed_fields(before, after)
 
