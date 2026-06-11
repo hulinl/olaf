@@ -1,10 +1,11 @@
 {% extends "emails/_base.html" %}
+{% load czech %}
 
 {% block subject %}Tvoje registrace — {{ event.title }}{% endblock %}
 
 {% block body %}
   <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
-    Ahoj {{ user.first_name }},
+    Ahoj {{ user.first_name|czech_vocative }},
   </p>
 
   {% if status == 'yes' %}
@@ -39,6 +40,12 @@
           <div style="margin-bottom:8px;">
             <span style="display:inline-block;width:60px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Kde</span>
             <span style="font-size:14px;color:#1a1a1a;">{{ event.location_text }}</span>
+          </div>
+        {% endif %}
+        {% if event.location_url %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:60px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Mapa</span>
+            <a href="{{ event.location_url }}" style="font-size:14px;color:#dc2626;text-decoration:underline;">Otevřít na mapě ↗</a>
           </div>
         {% endif %}
         {% if event.meeting_point_text %}

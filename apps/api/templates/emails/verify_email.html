@@ -1,10 +1,11 @@
 {% extends "emails/_base.html" %}
+{% load czech %}
 
 {% block subject %}Potvrď svůj olaf účet{% endblock %}
 
 {% block body %}
   <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
-    Ahoj {{ user.first_name }},
+    Ahoj {{ user.first_name|czech_vocative }},
   </p>
   <p style="margin:0 0 16px;">
     vítej na olafu — kde začíná dobrodružství.

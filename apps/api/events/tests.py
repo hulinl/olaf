@@ -621,6 +621,26 @@ class RsvpCancelByTokenTests(TestCase):
         self.rsvp.refresh_from_db()
         self.assertEqual(self.rsvp.status, RSVP.STATUS_CANCELLED)
 
+    def test_post_sends_cancellation_email(self) -> None:
+        # Closing-the-loop e-mail po zrušení — user dostal confirmation,
+        # teď ho informujeme, že je registrace pryč.
+        from django.core import mail as djmail
+
+        djmail.outbox = []
+        self.client.post(
+            self.url,
+            {"token": str(self.rsvp.cancel_token)},
+            format="json",
+        )
+        # Některé maily mohou zařadit waitlist promote – chytíme jen
+        # ten náš subjekt.
+        cancel_mails = [m for m in djmail.outbox if "Registrace zrušena" in m.subject]
+        self.assertTrue(cancel_mails, f"Cancellation email not sent: {djmail.outbox}")
+        self.assertIn(self.event.title, cancel_mails[0].subject)
+        # Cancellation mail by NEMĚL flagovat owner-driven, když si user
+        # zrušil registraci sám.
+        self.assertNotIn("Zrušení udělal pořadatel", cancel_mails[0].body)
+
     def test_idempotent_on_already_cancelled(self) -> None:
         self.rsvp.cancel()
         resp = self.client.post(

@@ -33,13 +33,13 @@ class SendBrandedEmailTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         msg = mail.outbox[0]
         # Plain text body je v main body.
-        self.assertIn("Ahoj Marta", msg.body)
+        self.assertIn("Ahoj Marto", msg.body)  # vokativ Marta → Marto
         self.assertIn("https://example.com/verify/abc", msg.body)
         # HTML alternative je připojená.
         self.assertEqual(len(msg.alternatives), 1)
         html, mime = msg.alternatives[0]
         self.assertEqual(mime, "text/html")
-        self.assertIn("Ahoj Marta", html)
+        self.assertIn("Ahoj Marto", html)
         # Brand mark URL (z _base.html) přítomný.
         self.assertIn("icon-192.png", html)
         # Sunrise amber CTA tlačítko.

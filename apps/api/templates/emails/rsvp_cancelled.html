@@ -1,0 +1,30 @@
+{% extends "emails/_base.html" %}
+{% load czech %}
+
+{% block subject %}Registrace zrušena — {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name|czech_vocative }},
+  </p>
+
+  <p style="margin:0 0 20px;">
+    tvoje registrace na <strong>„{{ event.title }}"</strong> byla zrušena.
+  </p>
+
+  <p style="margin:0 0 20px;color:#404040;">
+    {% if cancelled_by_owner %}
+      Zrušení udělal pořadatel — pokud si myslíš, že je to omyl, ozvi se mu napřímo.
+    {% else %}
+      Pokud sis registraci zrušil/a omylem, můžeš se znovu přihlásit na stránce akce.
+    {% endif %}
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ event_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Otevřít stránku akce</a>
+      </td>
+    </tr>
+  </table>
+{% endblock %}

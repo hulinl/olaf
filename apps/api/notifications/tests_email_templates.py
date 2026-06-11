@@ -74,7 +74,9 @@ class TemplateSmokeTests(TestCase):
             {"user": _fake_user(), "link": "https://x.com/verify", "expires_hours": 24},
         )
         for body in (text, html):
-            self.assertIn("Marta", body)
+            # Pole "Marta" se v oslovení vokativem mění na "Marto".
+            # Checkneme přesný greeting tvar.
+            self.assertIn("Ahoj Marto", body)
             self.assertIn("verify", body.lower())
         # HTML-only assertions.
         self.assertIn("icon-192.png", html)  # brand mark
@@ -87,7 +89,9 @@ class TemplateSmokeTests(TestCase):
             {"user": _fake_user(), "link": "https://x.com/reset", "expires_hours": 1},
         )
         for body in (text, html):
-            self.assertIn("Marta", body)
+            # Pole "Marta" se v oslovení vokativem mění na "Marto".
+            # Checkneme přesný greeting tvar.
+            self.assertIn("Ahoj Marto", body)
             self.assertIn("obnov", body.lower())
         self.assertIn("Nastavit nové heslo", html)
 
@@ -108,7 +112,9 @@ class TemplateSmokeTests(TestCase):
         )
         # Core content v obou.
         for body in (text, html):
-            self.assertIn("Marta", body)
+            # Pole "Marta" se v oslovení vokativem mění na "Marto".
+            # Checkneme přesný greeting tvar.
+            self.assertIn("Ahoj Marto", body)
             self.assertIn("Spring Camp", body)
             self.assertIn("Lysá hora", body)
             self.assertIn("20240001", body)  # variable symbol
@@ -171,7 +177,9 @@ class TemplateSmokeTests(TestCase):
             },
         )
         for body in (text, html):
-            self.assertIn("Marta", body)
+            # Pole "Marta" se v oslovení vokativem mění na "Marto".
+            # Checkneme přesný greeting tvar.
+            self.assertIn("Ahoj Marto", body)
             self.assertIn("Spring Camp", body)
             self.assertIn("uvolnilo", body.lower())
             # Promoted users teď taky vidí payment instructions.
@@ -355,7 +363,9 @@ class TemplateSmokeTests(TestCase):
             },
         )
         for body in (text, html):
-            self.assertIn("Marta", body)
+            # Pole "Marta" se v oslovení vokativem mění na "Marto".
+            # Checkneme přesný greeting tvar.
+            self.assertIn("Ahoj Marto", body)
             self.assertIn("Co s sebou", body)
             self.assertIn("akce Spring Camp", body)
 

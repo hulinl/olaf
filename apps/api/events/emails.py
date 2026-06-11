@@ -77,6 +77,31 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
     )
 
 
+def send_rsvp_cancellation(rsvp: RSVP, *, cancelled_by_owner: bool = False) -> None:
+    """Po zrušení RSVP (ať už uživatelem nebo ownerem) pošleme
+    informativní mail — user měl předtím confirmation, teď ho chceme
+    zavřít smyčku. `cancelled_by_owner=True` mění copy ("zrušení udělal
+    pořadatel") aby user věděl proč mu zmizela registrace.
+
+    Best-effort: pokud user nemá usable e-mail (např. ACS odmítne),
+    necháme to spadnout silently uvnitř send_branded_email; cancel sám
+    už proběhl."""
+    event = rsvp.event
+    send_branded_email(
+        subject=f"Registrace zrušena — {event.title}",
+        template_base="emails/rsvp_cancelled",
+        context={
+            "user": rsvp.user,
+            "event": event,
+            "rsvp": rsvp,
+            "cancelled_by_owner": cancelled_by_owner,
+            "event_url": _frontend_event_url(event),
+            "workspace": event.workspace,
+        },
+        recipient_list=[rsvp.user.email],
+    )
+
+
 def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
     """Notify a participant that the event they RSVP-ed to was cancelled."""
     event = rsvp.event

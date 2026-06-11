@@ -1,4 +1,4 @@
-Ahoj {{ user.first_name }},
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
 
 vítej na olafu — kde začíná dobrodružství.
 

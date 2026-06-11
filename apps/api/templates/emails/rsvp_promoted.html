@@ -1,10 +1,11 @@
 {% extends "emails/_base.html" %}
+{% load czech %}
 
 {% block subject %}Místo se uvolnilo — {{ event.title }}{% endblock %}
 
 {% block body %}
   <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
-    Ahoj {{ user.first_name }},
+    Ahoj {{ user.first_name|czech_vocative }},
   </p>
   <p style="margin:0 0 20px;">
     dobrá zpráva — uvolnilo se místo na <strong>„{{ event.title }}"</strong> a postoupil/a jsi z waitlistu. Tvoje registrace je potvrzená.

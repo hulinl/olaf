@@ -296,6 +296,15 @@ def cancel_my_rsvp(request: Request, workspace_slug: str, event_slug: str) -> Re
         target_id=rsvp.pk,
         summary=f"Zrušil přihlášku na akci „{event.title}”.",
     )
+
+    # Informativní e-mail "registrace zrušena" — closing-the-loop.
+    # Best-effort: pokud send selže, cancel sám už proběhl a my
+    # nechceme spadnout 500.
+    with contextlib.suppress(Exception):
+        from .emails import send_rsvp_cancellation
+
+        send_rsvp_cancellation(rsvp, cancelled_by_owner=False)
+
     return Response(MyRSVPSerializer(rsvp).data)
 
 
@@ -363,6 +372,11 @@ def cancel_rsvp_by_token(request: Request) -> Response:
             ),
             payload={"event_slug": rsvp.event.slug, "via_token": True},
         )
+
+        with contextlib.suppress(Exception):
+            from .emails import send_rsvp_cancellation
+
+            send_rsvp_cancellation(rsvp, cancelled_by_owner=False)
 
     return Response({"status": rsvp.status})
 
@@ -1467,6 +1481,11 @@ def remove_rsvp(
                 "removed_by_owner": True,
             },
         )
+
+        with contextlib.suppress(Exception):
+            from .emails import send_rsvp_cancellation
+
+            send_rsvp_cancellation(rsvp, cancelled_by_owner=True)
 
     return Response(RSVPSerializer(rsvp).data)
 

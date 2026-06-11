@@ -1,11 +1,12 @@
-Ahoj {{ user.first_name }},
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
 
 {% if status == 'yes' %}máš potvrzenou registraci na „{{ event.title }}". Těšíme se na tebe.{% elif status == 'waitlist' %}jsi na waitlistu pro „{{ event.title }}". Ozveme se hned, jak se uvolní místo.{% elif status == 'pending_approval' %}tvoje registrace na „{{ event.title }}" čeká na schválení od pořadatele. Brzy se ti ozveme.{% else %}tvoje registrace na „{{ event.title }}" je zaznamenaná.{% endif %}
 
 Stránka akce: {{ event_url }}
 {% if event_when %}
 Kdy: {{ event_when }}{% endif %}{% if event.location_text %}
-Kde: {{ event.location_text }}{% endif %}{% if event.meeting_point_text %}
+Kde: {{ event.location_text }}{% endif %}{% if event.location_url %}
+Mapa: {{ event.location_url }}{% endif %}{% if event.meeting_point_text %}
 Sraz: {{ event.meeting_point_text }}{% endif %}{% if rsvp.payment_status == 'pending' and rsvp.payment_due_amount %}
 
 Pokyny k platbě
