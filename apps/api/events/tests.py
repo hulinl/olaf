@@ -274,6 +274,10 @@ class RSVPEndpointTests(TestCase):
             email="petr@example.com", password="pass-abcdef-1234",
             first_name="Petr", last_name="Runner", email_verified=True,
         )
+        # `diet` sekce musí být enabled, aby validator vyžadoval její
+        # validity. Po opravě `[] = nic` nesmí test spoléhat na default.
+        self.event.enabled_questionnaire_sections = ["diet"]
+        self.event.save()
         self.client.force_authenticate(user)
         bad = _valid_answers()
         bad["diet"] = "other"
@@ -670,12 +674,19 @@ class ConfigurableQuestionnaireTests(TestCase):
             kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
         )
 
-    def test_default_event_requires_all_sections(self) -> None:
-        # No sections configured = all enabled = full set required.
+    def test_empty_sections_let_rsvp_through_with_no_answers(self) -> None:
+        # `enabled_questionnaire_sections=[]` znamená "owner si vypnul
+        # všechny extra sekce, žádná pole na dotazníku". Backend musí
+        # přijmout RSVP bez vyplněných polí. Předtím tu byl
+        # `enabled or full_list` — falsy [] padlo na plný seznam, user
+        # po anon RSVP dostal "answers.tshirt_size: required" i když
+        # frontend (správně) nic neposílal.
+        self.event.enabled_questionnaire_sections = []
+        self.event.save()
         resp = self.client.post(
             self._rsvp_url(),
             {
-                "answers": {"tshirt_size": "M"},
+                "answers": {},
                 "account": {
                     "email": "p@example.com",
                     "first_name": "P", "last_name": "One",
@@ -683,7 +694,7 @@ class ConfigurableQuestionnaireTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
 
     def test_minimal_sections_let_rsvp_through(self) -> None:
         # Only photo_consent required.

@@ -41,7 +41,14 @@ def build_questionnaire_serializer(enabled_sections: list[str]):
     not persisted.
     """
 
-    enabled = set(enabled_sections or list(SECTION_FIELDS.keys()))
+    # `None` (= caller nepředal vůbec nic) padáme na full set jako
+    # legacy default. Prázdný `[]` ale znamená "vědomě nic" a respekt-
+    # neme to — owner si vypnul všechny sekce a nechce ten chtít po
+    # uživateli kompletní vyplnění. Předtím tu byl `or fallback`, což
+    # falsy [] padlo na plný seznam a backend pak vyžadoval všechno.
+    if enabled_sections is None:
+        enabled_sections = list(SECTION_FIELDS.keys())
+    enabled = set(enabled_sections)
     allowed_fields: set[str] = set()
     for s, fields in SECTION_FIELDS.items():
         if s in enabled:
@@ -372,8 +379,19 @@ class RSVPCreateSerializer(serializers.Serializer):
     )
 
     def validate_answers(self, value):
+        # `enabled` může být:
+        #   - None: context vůbec není (např. v testech bez kontextu) →
+        #     padáme zpátky na všechny sekce, validátor je strict.
+        #   - []: explicitně prázdný (owner si vypnul všechny sekce) →
+        #     žádná sekce není required. Předtím tu bylo `enabled or
+        #     fallback`, což falsy [] padlo na full list a backend pak
+        #     chtěl všechny pole, i když frontend nic neposlal. User
+        #     po anon RSVP dostal "answers.tshirt_size: required".
+        #   - list[str]: jen vyjmenované sekce.
         enabled = (self.context or {}).get("event_sections")
-        validator_cls = build_questionnaire_serializer(enabled or list(SECTION_FIELDS.keys()))
+        if enabled is None:
+            enabled = list(SECTION_FIELDS.keys())
+        validator_cls = build_questionnaire_serializer(enabled)
         inner = validator_cls(data=value)
         inner.is_valid(raise_exception=True)
         return inner.validated_data
