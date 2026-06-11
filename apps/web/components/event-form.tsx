@@ -126,7 +126,6 @@ export function EventForm({
   const [meetingPoint, setMeetingPoint] = useState(
     initial?.meeting_point_text ?? "",
   );
-  const [locationUrl, setLocationUrl] = useState(initial?.location_url ?? "");
 
   const [capacity, setCapacity] = useState<string>(
     initial?.capacity != null ? String(initial.capacity) : "",
@@ -255,7 +254,6 @@ export function EventForm({
         tz,
         location_text: location,
         meeting_point_text: meetingPoint,
-        location_url: locationUrl,
         capacity: capacity ? Number(capacity) : null,
         waitlist_enabled: waitlistEnabled,
         requires_approval: requiresApproval,
@@ -394,20 +392,10 @@ export function EventForm({
                 onChange={(e) => setMeetingPoint(e.target.value)}
               />
             </Field>
-            <div className="sm:col-span-2">
-              <Field
-                label="Odkaz na mapu"
-                htmlFor="locurl"
-                hint="Google Maps, Mapy.cz, …"
-              >
-                <Input
-                  id="locurl"
-                  type="url"
-                  value={locationUrl}
-                  onChange={(e) => setLocationUrl(e.target.value)}
-                />
-              </Field>
-            </div>
+            {/* Pole "Odkaz na mapu" tu bylo dřív, ale nikam se na public
+                landing nepropisovalo a uživatele to mátlo s map URL v
+                Map blocku (`/edit/obsah`), kde reálně visí embedovaná
+                mapa. Single source of truth = Map block. */}
           </div>
         </CardSection>
       </Card>
