@@ -1241,6 +1241,22 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/rsvp/cancel/`,
       { method: "POST" },
     ),
+  /** Magic-link cancel pro guest RSVP. Endpoint je nezávislý na
+   *  workspace/event slug — token sám identifikuje RSVP, anon user
+   *  nepotřebuje session. */
+  rsvpCancelInfoByToken: (token: string) =>
+    apiFetch<{
+      event_title: string;
+      event_starts_at: string;
+      workspace_name: string;
+      status: string;
+      user_name: string;
+    }>(`/api/events/rsvp/cancel-by-token/?token=${encodeURIComponent(token)}`),
+  rsvpCancelByToken: (token: string) =>
+    apiFetch<{ status: string }>(
+      `/api/events/rsvp/cancel-by-token/`,
+      { method: "POST", body: JSON.stringify({ token }) },
+    ),
   mine: () => apiFetch<EventSummary[]>("/api/events/mine/"),
   owner: () => apiFetch<EventSummary[]>("/api/events/owner/"),
   rsvpList: (workspaceSlug: string, eventSlug: string) =>

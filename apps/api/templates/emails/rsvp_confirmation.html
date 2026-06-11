@@ -78,4 +78,11 @@
   <p style="margin:20px 0 0;font-size:13px;color:#737373;">
     Registraci si můžeš kdykoli zkontrolovat a upravit na stránce akce.
   </p>
+
+  {% if cancel_url %}
+    <p style="margin:14px 0 0;font-size:13px;color:#737373;">
+      Nemůžeš dorazit? <a href="{{ cancel_url }}" style="color:#dc2626;text-decoration:underline;">Zrušit registraci</a>
+      <span style="color:#a3a3a3;">(odkaz funguje bez přihlášení — drž ho jen pro sebe).</span>
+    </p>
+  {% endif %}
 {% endblock %}

@@ -8,6 +8,16 @@ urlpatterns = [
     path("mine/", views.my_events, name="mine"),
     path("owner/", views.owner_events, name="owner"),
     path("trash/", views.deleted_events_list, name="trash"),
+    # Magic-link RSVP cancel pro guest registranty. Musí být deklarovaný
+    # PŘED `<slug:workspace_slug>/<slug:event_slug>/` workspace-scoped
+    # patterny, jinak by `rsvp/cancel-by-token/` matchnul jako
+    # `workspace_slug=rsvp, event_slug=cancel-by-token` → 405 z
+    # public_event view-u.
+    path(
+        "rsvp/cancel-by-token/",
+        views.cancel_rsvp_by_token,
+        name="rsvp-cancel-by-token",
+    ),
     path(
         "from-source/",
         views.ingest_event_from_source,

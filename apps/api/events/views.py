@@ -299,6 +299,74 @@ def cancel_my_rsvp(request: Request, workspace_slug: str, event_slug: str) -> Re
     return Response(MyRSVPSerializer(rsvp).data)
 
 
+@api_view(["GET", "POST"])
+@permission_classes([AllowAny])
+def cancel_rsvp_by_token(request: Request) -> Response:
+    """Magic-link cancel pro guest RSVP.
+
+    Anon registranti nemají session — confirmation e-mail proto obsahuje
+    odkaz `…/rsvp/cancel?token=<UUID>` který směřuje na frontend page;
+    page volá tenhle endpoint a vrátí status. GET = jen vrátí info o
+    RSVP (event title, status), aby se page mohla zeptat na potvrzení;
+    POST = sám cancel + audit zápis (`removed_by_self_via_token`).
+    Idempotentní — opakovaný POST už-cancelled RSVP vrátí 200.
+
+    Token nese plnou autoritu cancel-u na ten konkrétní RSVP — proto
+    UUID v4 (122 bits entropy) místo nějakého kratšího hash-e.
+    """
+    token = (request.query_params.get("token") or request.data.get("token") or "").strip()
+    if not token:
+        return Response(
+            {"detail": "Missing token."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        rsvp = RSVP.objects.select_related("event", "event__workspace", "user").get(
+            cancel_token=token
+        )
+    except (RSVP.DoesNotExist, DjangoValidationError, ValueError):
+        # ValueError padá pro malformed UUID; DoesNotExist pro neznámý.
+        # Oba mappnem na 404 — nesplývají info "token existuje vs. ne",
+        # což omezuje value bruteforce-em za nulu.
+        return Response(
+            {"detail": "Invalid token."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if request.method == "GET":
+        return Response(
+            {
+                "event_title": rsvp.event.title,
+                "event_starts_at": rsvp.event.starts_at.isoformat(),
+                "workspace_name": rsvp.event.workspace.name,
+                "status": rsvp.status,
+                "user_name": rsvp.user.get_full_name() if rsvp.user else "",
+            }
+        )
+
+    # POST → cancel + audit (idempotentní).
+    if rsvp.status != RSVP.STATUS_CANCELLED:
+        rsvp.cancel()
+
+        from audit.models import AuditLog
+        from audit.services import log as audit_log
+
+        audit_log(
+            actor=rsvp.user,
+            action=AuditLog.ACTION_RSVP_CANCEL,
+            workspace=rsvp.event.workspace,
+            target_type="rsvp",
+            target_id=rsvp.pk,
+            summary=(
+                f'Zrušil registraci na akci „{rsvp.event.title}” '
+                f'přes magic-link z e-mailu.'
+            ),
+            payload={"event_slug": rsvp.event.slug, "via_token": True},
+        )
+
+    return Response({"status": rsvp.status})
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_events(request: Request) -> Response:

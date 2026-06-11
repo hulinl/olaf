@@ -14,6 +14,17 @@ def _frontend_event_url(event: Event) -> str:
     return f"{base}/{event.workspace.slug}/e/{event.slug}"
 
 
+def _frontend_cancel_url(rsvp: RSVP) -> str:
+    """Magic-link URL pro guest cancel — `rsvp.cancel_token` jako query
+    param. Tu URL posíláme do confirmation e-mailu, aby anon registrant
+    mohl registraci zrušit bez přihlášení do aplikace."""
+    base = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return (
+        f"{base}/{rsvp.event.workspace.slug}/e/{rsvp.event.slug}"
+        f"/rsvp/cancel?token={rsvp.cancel_token}"
+    )
+
+
 def send_rsvp_confirmation(rsvp: RSVP) -> None:
     """Email a participant that their RSVP was recorded."""
     event = rsvp.event
@@ -33,6 +44,7 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
             "rsvp": rsvp,
             "status": rsvp.status,
             "event_url": _frontend_event_url(event),
+            "cancel_url": _frontend_cancel_url(rsvp),
             "workspace": event.workspace,
             "event_when": format_event_dt(event.starts_at, event.tz),
             "payment_due_str": format_payment_due(
@@ -54,6 +66,7 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
             "event": event,
             "rsvp": rsvp,
             "event_url": _frontend_event_url(event),
+            "cancel_url": _frontend_cancel_url(rsvp),
             "workspace": event.workspace,
             "event_when": format_event_dt(event.starts_at, event.tz),
             "payment_due_str": format_payment_due(

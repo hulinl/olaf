@@ -1,4 +1,6 @@
 """Event + RSVP models (PRD §4.5, §4.6, §8)."""
+import uuid
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -436,6 +438,18 @@ class RSVP(models.Model):
     )
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=STATUS_YES
+    )
+    # Magic-link token pro guest-side cancel. Anon RSVP nemá session,
+    # takže registrant nemůže přijít přes klasický auth-required
+    # `/rsvp/cancel/` endpoint. V confirmation mailu posíláme odkaz
+    # `/{ws}/e/{slug}/rsvp/cancel?token=<this>` který zvládne cancel
+    # bez přihlášení. UUID v4 stačí — bruteforce neuhodí (122 bits
+    # entropy + per-RSVP unique).
+    cancel_token = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
     )
     questionnaire_answers = models.JSONField(default=dict, blank=True)
     waitlist_position = models.PositiveIntegerField(null=True, blank=True)

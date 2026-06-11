@@ -577,6 +577,84 @@ class CreateUpdateEventTests(TestCase):
         self.assertEqual(event.blocks[0]["payload"]["map_url"], new_url)
 
 
+class RsvpCancelByTokenTests(TestCase):
+    """Magic-link cancel — anon guest RSVP musí jít zrušit z e-mailu
+    bez session. Token na RSVP nese plnou autoritu cancel-u."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.ws = Workspace.objects.create(
+            slug="olafadventures", name="Olaf Adventures"
+        )
+        self.event = _build_event(self.ws)
+        self.user = User.objects.create_user(
+            email="guest@example.com",
+            password="alpine-hike-2026",
+            first_name="Guest",
+            last_name="User",
+            email_verified=True,
+        )
+        self.rsvp = RSVP.create_for_event(
+            event=self.event, user=self.user, questionnaire_answers={}
+        )
+        self.url = reverse("events:rsvp-cancel-by-token")
+
+    def test_get_returns_rsvp_info(self) -> None:
+        # GET — žádný cancel side-effect; jen vrátí, aby frontend mohl
+        # vykreslit potvrzovací prompt.
+        resp = self.client.get(f"{self.url}?token={self.rsvp.cancel_token}")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        body = resp.json()
+        self.assertEqual(body["event_title"], self.event.title)
+        self.assertEqual(body["status"], RSVP.STATUS_YES)
+        self.rsvp.refresh_from_db()
+        self.assertEqual(self.rsvp.status, RSVP.STATUS_YES)
+
+    def test_post_cancels_rsvp(self) -> None:
+        resp = self.client.post(
+            self.url,
+            {"token": str(self.rsvp.cancel_token)},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        self.assertEqual(resp.json()["status"], RSVP.STATUS_CANCELLED)
+        self.rsvp.refresh_from_db()
+        self.assertEqual(self.rsvp.status, RSVP.STATUS_CANCELLED)
+
+    def test_idempotent_on_already_cancelled(self) -> None:
+        self.rsvp.cancel()
+        resp = self.client.post(
+            self.url,
+            {"token": str(self.rsvp.cancel_token)},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.json()["status"], RSVP.STATUS_CANCELLED)
+
+    def test_missing_token_400(self) -> None:
+        resp = self.client.post(self.url, {}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unknown_token_404(self) -> None:
+        resp = self.client.post(
+            self.url,
+            {"token": "00000000-0000-0000-0000-000000000000"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_malformed_token_404(self) -> None:
+        # ValueError pro non-UUID string padá do stejné 404 jako neznámý
+        # token — chceme aby endpoint nedával otisk "existující token vs.
+        # malformed", což by usnadnilo bruteforce-y.
+        resp = self.client.post(
+            self.url,
+            {"token": "not-a-uuid"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+
 class CancelEventTests(TestCase):
     def setUp(self) -> None:
         self.client = APIClient()

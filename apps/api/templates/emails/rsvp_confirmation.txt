@@ -18,6 +18,10 @@ Splatnost: {% if payment_due_str %}{{ payment_due_str }}{% else %}{{ workspace.p
 
 QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.{% endif %}
 
-Registraci si můžeš kdykoli zkontrolovat na stránce akce výše. Pokud něco nevyjde nebo potřebuješ zrušit, otevři si stránku a uprav svou registraci.
+Registraci si můžeš kdykoli zkontrolovat na stránce akce výše.{% if cancel_url %} Pokud nemůžeš dorazit, zruš registraci tímhle odkazem:
+
+{{ cancel_url }}
+
+(Odkaz funguje bez přihlášení — drž ho jen pro sebe.){% endif %}
 
 — Aplikace olaf
