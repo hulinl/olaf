@@ -283,6 +283,11 @@ function AdminEventDetail({ params }: Props) {
                   <th className="px-4 py-3 text-right">Smlouva</th>
                   <th className="px-4 py-3 text-right">Pojištění</th>
                   <th className="px-4 py-3">Přihlášen</th>
+                  {/* Akční sloupec na pravém konci řádku — daleko od
+                      dat, snižuje riziko misclick-u při procházení
+                      rosteru. Hlavička prázdná, ikona-only buttony
+                      v rowu (popelnice). */}
+                  <th className="px-2 py-3" aria-label="Akce" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -541,37 +546,22 @@ function RsvpRow({
           )}
           {/* Akce na účastníkovi mají smysl jen dokud je registrace
               aktivní. Cancelled row ukazuje jen status badge —
-              organizer toggle / "odebrat" mizí, jinak by tam zůstaly
-              klikatelné kontroly nad zrušenou registrací. */}
+              organizer toggle mizí, jinak by tam zůstaly klikatelné
+              kontroly nad zrušenou registrací. Remove (popelnice) je
+              v dedikovaném sloupci na konci řádku. */}
           {rsvp.status !== "cancelled" && (
-            <>
-              <button
-                type="button"
-                onClick={handleToggleOrganizer}
-                disabled={busy !== null}
-                className="text-left text-[11px] font-medium text-ink-500 hover:text-brand disabled:opacity-50"
-              >
-                {busy === "organizer"
-                  ? "..."
-                  : rsvp.is_organizer
-                    ? "Odebrat organizátora"
-                    : "Označit organizátorem"}
-              </button>
-              <button
-                type="button"
-                onClick={handleRemove}
-                disabled={busy !== null}
-                title="Odebrat z akce"
-                aria-label="Odebrat z akce"
-                className="inline-flex h-6 w-6 items-center justify-center self-start rounded-full text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
-              >
-                {busy === "remove" ? (
-                  <span className="text-[10px]">…</span>
-                ) : (
-                  <span aria-hidden className="text-base leading-none">×</span>
-                )}
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={handleToggleOrganizer}
+              disabled={busy !== null}
+              className="text-left text-[11px] font-medium text-ink-500 hover:text-brand disabled:opacity-50"
+            >
+              {busy === "organizer"
+                ? "..."
+                : rsvp.is_organizer
+                  ? "Odebrat organizátora"
+                  : "Označit organizátorem"}
+            </button>
           )}
         </div>
       </td>
@@ -620,6 +610,24 @@ function RsvpRow({
           year: "numeric",
         })}
       </td>
+      <td className="whitespace-nowrap px-2 py-3 text-right">
+        {rsvp.status !== "cancelled" && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={busy !== null}
+            title="Odebrat z akce"
+            aria-label="Odebrat z akce"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
+          >
+            {busy === "remove" ? (
+              <span className="text-[10px]">…</span>
+            ) : (
+              <TrashIcon className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </td>
     </tr>
   );
 }
@@ -643,6 +651,29 @@ function DuplicateBadge({
     >
       ⚠ Duplikát?
     </span>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  // Inline SVG popelnice — žádný extra dep, snadno barvitelný přes
+  // currentColor (text-* tailwind classy).
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6l-1.5 13.5a2 2 0 0 1-2 1.8h-7a2 2 0 0 1-2-1.8L5 6" />
+      <path d="M9 6V4a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 4v2" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
   );
 }
 
@@ -895,12 +926,12 @@ function RsvpCard({
           disabled={busy !== null}
           title="Odebrat z akce"
           aria-label="Odebrat z akce"
-          className="inline-flex h-7 w-7 items-center justify-center self-start rounded-full text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
+          className="inline-flex h-8 w-8 items-center justify-center self-end rounded-md text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
         >
           {busy === "remove" ? (
             <span className="text-xs">…</span>
           ) : (
-            <span aria-hidden className="text-lg leading-none">×</span>
+            <TrashIcon className="h-4 w-4" />
           )}
         </button>
       )}
