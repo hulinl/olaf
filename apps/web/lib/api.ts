@@ -621,6 +621,31 @@ export interface ParticipantProfile {
   };
 }
 
+function findFirstError(value: unknown, path: string): string | null {
+  // Skip `detail` na top-level — to už je v `err.message`.
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value) {
+    return path ? `${path}: ${value}` : value;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const r = findFirstError(item, path);
+      if (r) return r;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      if (!path && key === "detail") continue;
+      const sub = (value as Record<string, unknown>)[key];
+      const nextPath = path ? `${path}.${key}` : key;
+      const r = findFirstError(sub, nextPath);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
 export class ApiError extends Error {
   status: number;
   data: Record<string, unknown>;
@@ -637,21 +662,17 @@ export class ApiError extends Error {
 
   /** Convenience for showing the first per-field error in a form.
    *
-   * Handles both DRF's array-of-messages shape (`{field: ["msg"]}`) and our
-   * own ad-hoc string-per-field responses (`{field: "msg"}`). Skips the
-   * generic `detail` key — that's already exposed as `err.message`. */
+   * Handles DRF's serializer error shapes:
+   *   - top-level array of messages: `{field: ["msg"]}`
+   *   - top-level string: `{field: "msg"}` (our ad-hoc responses)
+   *   - nested serializer errors: `{answers: {emergency_contact_phone:
+   *     ["This field may not be blank."]}}` — předtím vracelo null
+   *     a user viděl jen "Request failed with status 400".
+   *
+   * Skips the generic `detail` key — that's already exposed as
+   * `err.message`. */
   firstFieldError(): string | null {
-    for (const key of Object.keys(this.data)) {
-      if (key === "detail") continue;
-      const value = this.data[key];
-      if (Array.isArray(value) && value.length > 0) {
-        return `${key}: ${value[0]}`;
-      }
-      if (typeof value === "string" && value) {
-        return value;
-      }
-    }
-    return null;
+    return findFirstError(this.data, "");
   }
 }
 
