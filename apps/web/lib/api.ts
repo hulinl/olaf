@@ -548,6 +548,11 @@ export interface RSVPRecord extends MyRSVP {
    *  normalized phone or name with another non-cancelled RSVP on the
    *  same event. Used to render the "⚠ Možný duplikát" badge. */
   duplicate_hints: ("same_phone" | "same_name")[];
+  /** Pro cancelled rows — kdo zrušil. `""` = aktivní RSVP nebo legacy
+   *  bez záznamu. Owner v rosteru tím vidí kontext na cancelled buňce
+   *  ("Sám zrušil" / "Mailem" / "Zrušil pořadatel"). */
+  cancellation_reason: "" | "self" | "by_token" | "owner";
+  cancelled_at: string | null;
   updated_at: string;
 }
 

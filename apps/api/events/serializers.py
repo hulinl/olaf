@@ -431,6 +431,8 @@ class RSVPSerializer(serializers.ModelSerializer):
             "verified_doc_keys",
             "invoice_id",
             "duplicate_hints",
+            "cancellation_reason",
+            "cancelled_at",
             "created_at",
             "updated_at",
         )

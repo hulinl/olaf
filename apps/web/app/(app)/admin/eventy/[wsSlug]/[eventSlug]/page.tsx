@@ -27,6 +27,15 @@ const RSVP_STATUS_LABEL: Record<RSVPRecord["status"], string> = {
   cancelled: "Zrušeno",
 };
 
+const CANCELLATION_REASON_LABEL: Record<
+  Exclude<RSVPRecord["cancellation_reason"], "">,
+  string
+> = {
+  self: "Sám zrušil",
+  by_token: "Mailem",
+  owner: "Zrušil pořadatel",
+};
+
 const RSVP_STATUS_TONE: Record<RSVPRecord["status"], string> = {
   yes: "bg-success/15 text-success",
   maybe: "bg-surface-muted text-ink-500",
@@ -524,6 +533,11 @@ function RsvpRow({
               )}
             </span>
           )}
+          {rsvp.status === "cancelled" && rsvp.cancellation_reason !== "" && (
+            <span className="text-[11px] text-ink-500">
+              {CANCELLATION_REASON_LABEL[rsvp.cancellation_reason]}
+            </span>
+          )}
           {rsvp.status === "pending_approval" && !rsvp.is_organizer && (
             <div className="flex gap-1">
               <button
@@ -865,17 +879,24 @@ function RsvpCard({
             Organizátor
           </span>
         ) : (
-          <span
-            className={[
-              "inline-flex shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-              RSVP_STATUS_TONE[rsvp.status],
-            ].join(" ")}
-          >
-            {RSVP_STATUS_LABEL[rsvp.status]}
-            {rsvp.waitlist_position != null && (
-              <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span
+              className={[
+                "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                RSVP_STATUS_TONE[rsvp.status],
+              ].join(" ")}
+            >
+              {RSVP_STATUS_LABEL[rsvp.status]}
+              {rsvp.waitlist_position != null && (
+                <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+              )}
+            </span>
+            {rsvp.status === "cancelled" && rsvp.cancellation_reason !== "" && (
+              <span className="text-[10px] text-ink-500">
+                {CANCELLATION_REASON_LABEL[rsvp.cancellation_reason]}
+              </span>
             )}
-          </span>
+          </div>
         )}
       </div>
 

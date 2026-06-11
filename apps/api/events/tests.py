@@ -620,6 +620,10 @@ class RsvpCancelByTokenTests(TestCase):
         self.assertEqual(resp.json()["status"], RSVP.STATUS_CANCELLED)
         self.rsvp.refresh_from_db()
         self.assertEqual(self.rsvp.status, RSVP.STATUS_CANCELLED)
+        # cancellation_reason stamped pro roster — owner uvidí "Mailem"
+        # badge na zrušeném řádku.
+        self.assertEqual(self.rsvp.cancellation_reason, RSVP.CANCELLATION_BY_TOKEN)
+        self.assertIsNotNone(self.rsvp.cancelled_at)
 
     def test_post_sends_cancellation_email(self) -> None:
         # Closing-the-loop e-mail po zrušení — user dostal confirmation,
@@ -982,6 +986,8 @@ class ConfigurableQuestionnaireTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
         rsvp.refresh_from_db()
         self.assertEqual(rsvp.status, RSVP.STATUS_CANCELLED)
+        # cancellation_reason = owner → roster ukáže "Zrušil pořadatel"
+        self.assertEqual(rsvp.cancellation_reason, RSVP.CANCELLATION_OWNER)
 
     def test_owner_remove_sends_cancellation_email_with_owner_copy(self) -> None:
         # Když owner odebere účastníka z rosteru, informativní mail mu

@@ -283,7 +283,7 @@ def cancel_my_rsvp(request: Request, workspace_slug: str, event_slug: str) -> Re
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    rsvp.cancel()
+    rsvp.cancel(reason=RSVP.CANCELLATION_SELF)
 
     from audit.models import AuditLog
     from audit.services import log as audit_log
@@ -355,7 +355,7 @@ def cancel_rsvp_by_token(request: Request) -> Response:
 
     # POST → cancel + audit (idempotentní).
     if rsvp.status != RSVP.STATUS_CANCELLED:
-        rsvp.cancel()
+        rsvp.cancel(reason=RSVP.CANCELLATION_BY_TOKEN)
 
         from audit.models import AuditLog
         from audit.services import log as audit_log
@@ -1408,7 +1408,7 @@ def reject_rsvp(
         )
 
     reason = (request.data.get("reason") or "").strip()
-    rsvp.cancel()
+    rsvp.cancel(reason=RSVP.CANCELLATION_OWNER)
 
     with contextlib.suppress(Exception):
         from .notifications import notify_rsvp_rejected
@@ -1457,7 +1457,7 @@ def remove_rsvp(
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     if rsvp.status != RSVP.STATUS_CANCELLED:
-        rsvp.cancel()
+        rsvp.cancel(reason=RSVP.CANCELLATION_OWNER)
 
         from audit.models import AuditLog
         from audit.services import log as audit_log

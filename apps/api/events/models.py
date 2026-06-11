@@ -451,6 +451,24 @@ class RSVP(models.Model):
         unique=True,
         db_index=True,
     )
+    # Kdo zrušil registraci — owner v rosteru vidí "Sám zrušil" vs
+    # "Zrušil pořadatel" badge, aby měl kontext na cancelled řádkách.
+    # Prázdný string = aktivní RSVP nebo legacy bez záznamu.
+    CANCELLATION_SELF = "self"
+    CANCELLATION_BY_TOKEN = "by_token"  # magic-link z e-mailu
+    CANCELLATION_OWNER = "owner"
+    CANCELLATION_CHOICES = [
+        (CANCELLATION_SELF, "Self"),
+        (CANCELLATION_BY_TOKEN, "Via magic-link"),
+        (CANCELLATION_OWNER, "Owner"),
+    ]
+    cancellation_reason = models.CharField(
+        max_length=20,
+        choices=CANCELLATION_CHOICES,
+        blank=True,
+        default="",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True)
     questionnaire_answers = models.JSONField(default=dict, blank=True)
     waitlist_position = models.PositiveIntegerField(null=True, blank=True)
     attended = models.BooleanField(
@@ -612,15 +630,32 @@ class RSVP(models.Model):
         return (last or 0) + 1
 
     @transaction.atomic
-    def cancel(self) -> None:
-        """Cancel this RSVP and FIFO-promote the head of the waitlist."""
+    def cancel(self, *, reason: str = "") -> None:
+        """Cancel this RSVP and FIFO-promote the head of the waitlist.
+
+        `reason` ukládá kontext, kdo nebo jak cancel proběhl, ať to v
+        rosteru u zrušených registrací owner viděl ("Sám zrušil" /
+        "Zrušil pořadatel" / "Magic-link z mailu"). Prázdný string =
+        legacy bez záznamu. Hodnoty z `RSVP.CANCELLATION_CHOICES`.
+        """
         if self.status == self.STATUS_CANCELLED:
             return
 
         was_confirmed = self.status == self.STATUS_YES
         self.status = self.STATUS_CANCELLED
         self.waitlist_position = None
-        self.save(update_fields=["status", "waitlist_position", "updated_at"])
+        if reason:
+            self.cancellation_reason = reason
+        self.cancelled_at = timezone.now()
+        self.save(
+            update_fields=[
+                "status",
+                "waitlist_position",
+                "cancellation_reason",
+                "cancelled_at",
+                "updated_at",
+            ]
+        )
 
         if was_confirmed and self.event.waitlist_enabled:
             head = (
