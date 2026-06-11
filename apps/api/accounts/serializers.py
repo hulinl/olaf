@@ -29,9 +29,18 @@ class SignupSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
 
     def validate_email(self, value: str) -> str:
+        # Existující VERIFIED user → klasická chyba "Účet už existuje,
+        # přihlas se." Existující UNVERIFIED user (= guest po anon RSVP)
+        # signup naopak nesmí blokovat — view ten případ rozpozná a
+        # převezme existující row místo aby tvořil duplikát. Bez tohohle
+        # by guest user uvízl mezi: "Tvůj e-mail je v DB, ale nemůžeš se
+        # přihlásit ani signupnout."
         value = value.lower().strip()
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
+        existing = User.objects.filter(email=value).first()
+        if existing and existing.email_verified:
+            raise serializers.ValidationError(
+                "An account with this email already exists."
+            )
         return value
 
 

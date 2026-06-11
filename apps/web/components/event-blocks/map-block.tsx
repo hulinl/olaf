@@ -1,3 +1,4 @@
+import { MapEmbedShell } from "./map-embed-shell";
 import { SectionHead } from "@/components/ui/section-head";
 import {
   type BlockTone,
@@ -45,6 +46,15 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
   // kterých sestavíme legacy `output=embed` URL.
   const iframeSrc = provider ? await buildEmbedSrc(payload.map_url, provider) : null;
 
+  // Google Embed API dostává `gestureHandling=cooperative` query param
+  // a sama hlídá zoom přes Ctrl+scroll. OSM (default fallback) a
+  // Mapy.cz ten param neznají, takže do nich strkáme overlay přes
+  // klientskou komponentu — `pointer-events:none` na iframe-u dokud
+  // user neklikne, scroll pak prošumí na parent stránku jako wheel
+  // event a stránka se odscrollovává správně.
+  const isGoogleEmbed =
+    typeof iframeSrc === "string" && iframeSrc.includes("gestureHandling=");
+
   return (
     <section
       className={[
@@ -59,30 +69,14 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
           tone={dark ? "dark" : "light"}
         />
         {iframeSrc ? (
-          <div
-            className={[
-              "relative w-full overflow-hidden rounded-md border",
-              dark
-                ? "border-white/10 bg-white/[0.04]"
-                : "border-border bg-surface",
-            ].join(" ")}
-            // overflow-anchor: none vypne browser scroll-anchoring, který
-            // při změně výšky iframe obsahu (mapa, dlaždice) jinak posunul
-            // viewport k tomuto bloku.
-            style={{ aspectRatio: "16 / 9", overflowAnchor: "none" }}
-          >
-            <iframe
-              loading="lazy"
-              src={iframeSrc}
-              title={title}
-              // tabIndex=-1 vyřadí iframe z tab orderu — když Mapy / Google
-              // uvnitř volají focus() na svůj canvas, prohlížeč už nemá
-              // důvod scrollovat parent stránku k iframe-u.
-              tabIndex={-1}
-              referrerPolicy="no-referrer-when-downgrade"
-              className="absolute inset-0 h-full w-full border-0"
-            />
-          </div>
+          <MapEmbedShell
+            src={iframeSrc}
+            title={title}
+            dark={dark}
+            // OSM / Mapy embed nemá gesture override → klient
+            // hlídá overlay; Google si vystačí sám.
+            needsScrollGuard={!isGoogleEmbed}
+          />
         ) : (
           <a
             href={payload.map_url}

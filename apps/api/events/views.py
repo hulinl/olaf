@@ -4,7 +4,6 @@ from __future__ import annotations
 import contextlib
 import secrets
 
-from django.contrib.auth import login
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponse
 from django.utils import timezone
@@ -110,13 +109,34 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     return Response(payload)
 
 
-def _create_light_user(account_payload: dict) -> User | None:
-    """Create a verified light-registration user for the public RSVP flow.
+class _ExistingVerifiedUser(Exception):
+    """Raised když anon RSVP odkazuje na e-mail, který patří plnohodnotnému
+    (verified) accountu. Předtím se v tomhle případě accountu zalogoval
+    pod RSVP-em — což znamenalo, že kdokoli znalý cizího mailu mohl
+    submitnout RSVP formulář a dostat se do session toho usera. Teď to
+    odmítáme a frontend ukáže "Tenhle e-mail už má účet, přihlas se."
+    """
 
-    The user is auto-verified (no email confirmation) because the RSVP itself
-    is the proof of email — a confirmation lands in their inbox right after.
-    A random password is set; the user is prompted to use password reset to
-    pick their own.
+
+def _create_light_user(account_payload: dict) -> User | None:
+    """Najít nebo vytvořit guest usera pro public RSVP flow.
+
+    Předtím tahle funkce dělala dvě věci: vytvářela auto-verified usera
+    s random heslem A registrovala ho do session přes `login()` ve view.
+    User pak po submitu RSVP formuláře skončil v aplikaci jako přihlášený,
+    což zaskočilo všechny, kteří si chtěli jen RSVPnout a aplikaci
+    používat zatím nehodlali.
+
+    Po refaktoru: guest user je `email_verified=False` s unusable
+    password. Žádný auto-login. Pokud si user později vytvoří účet
+    (signup s tím samým e-mailem), endpoint signup detekuje existující
+    unverified row a převezme ho — nastaví heslo, pošle ověřovací mail,
+    a všechna jeho předchozí RSVPs (přivázaná FK na User row) zůstávají
+    nadále jeho.
+
+    Vrací `None` když chybí povinná pole. Hází `_ExistingVerifiedUser`
+    když email patří verified accountu — anon submitter nesmí přepsat
+    cizí session.
     """
     email = (account_payload.get("email") or "").strip().lower()
     first_name = (account_payload.get("first_name") or "").strip()
@@ -126,23 +146,41 @@ def _create_light_user(account_payload: dict) -> User | None:
     if not (email and first_name and last_name):
         return None
 
-    user, created = User.objects.get_or_create(
+    try:
+        existing = User.objects.get(email=email)
+    except User.DoesNotExist:
+        existing = None
+
+    if existing is not None:
+        if existing.email_verified:
+            raise _ExistingVerifiedUser()
+        # Reuse unverified ("guest") row. Doplň prázdná pole — uživatel
+        # mohl uvést telefon u druhé akce, který nezadal u první.
+        updates: list[str] = []
+        if phone and not existing.phone:
+            existing.phone = phone
+            updates.append("phone")
+        if first_name and not existing.first_name:
+            existing.first_name = first_name
+            updates.append("first_name")
+        if last_name and not existing.last_name:
+            existing.last_name = last_name
+            updates.append("last_name")
+        if updates:
+            existing.save(update_fields=updates)
+        return existing
+
+    user = User.objects.create(
         email=email,
-        defaults={
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": phone,
-            "email_verified": True,
-        },
+        first_name=first_name,
+        last_name=last_name,
+        phone=phone,
+        email_verified=False,
     )
-    if created:
-        user.set_password(secrets.token_urlsafe(24))
-        user.save(update_fields=["password"])
-    elif not user.email_verified:
-        user.email_verified = True
-        if phone and not user.phone:
-            user.phone = phone
-        user.save(update_fields=["email_verified", "phone"])
+    # Unusable password = login se nepovede dokud user nepřejde přes
+    # signup nebo reset-password flow.
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
     return user
 
 
@@ -177,7 +215,23 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
     user = request.user if request.user.is_authenticated else None
     if user is None:
         account = data.get("account") or {}
-        user = _create_light_user(account)
+        try:
+            user = _create_light_user(account)
+        except _ExistingVerifiedUser:
+            # Frontend ten kód detekuje a ukáže "Tento e-mail už má účet,
+            # přihlas se" link. Nezakládáme cizímu uživateli session ani
+            # nezavoláme jakoukoli akci, která by jeho data změnila.
+            return Response(
+                {
+                    "account": {
+                        "email": (
+                            "Tento e-mail už má účet. Přihlas se, prosím."
+                        ),
+                    },
+                    "code": "email_has_account",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         if user is None:
             return Response(
                 {
@@ -188,9 +242,9 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Log them in so subsequent edits to their RSVP work without a
-        # separate password flow.
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        # Žádný auto-login — guest RSVP zůstává guest. Pokud chce user
+        # spravovat svoje registrace, projde signup flow s tím samým
+        # e-mailem.
 
     try:
         rsvp = RSVP.create_for_event(

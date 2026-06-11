@@ -41,15 +41,43 @@ class SignupTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("password", resp.json())
 
-    def test_rejects_duplicate_email(self) -> None:
+    def test_rejects_duplicate_verified_email(self) -> None:
+        # Verified user už má účet → signup s tím samým e-mailem se
+        # odmítá, user musí použít login / reset password.
         User.objects.create_user(
             email="marta@example.com",
             password="alpine-hike-2026",
             first_name="Marta",
             last_name="Member",
+            email_verified=True,
         )
         resp = self.client.post(self.url, self.payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_takes_over_unverified_email(self) -> None:
+        # Unverified user (= někdo, kdo nakliknul anon RSVP) → signup
+        # převezme existující row, nastaví heslo + jméno, pošle
+        # verification e-mail. Žádný duplicitní account. Pozn:
+        # email_verified zůstane False dokud user neproklikne odkaz.
+        existing = User.objects.create_user(
+            email="marta@example.com",
+            password=None,  # unusable; nastavíme přes signup
+            first_name="",
+            last_name="",
+        )
+        existing.set_unusable_password()
+        existing.email_verified = False
+        existing.save()
+
+        resp = self.client.post(self.url, self.payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
+        existing.refresh_from_db()
+        # Heslo nastaveno + name updatnuté z payloadu, ale verified
+        # stále False (čeká na klik).
+        self.assertTrue(existing.has_usable_password())
+        self.assertEqual(existing.first_name, "Marta")
+        self.assertEqual(existing.last_name, "Member")
+        self.assertFalse(existing.email_verified)
 
 
 class EmailVerificationTests(TestCase):

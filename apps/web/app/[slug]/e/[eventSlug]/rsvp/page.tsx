@@ -185,7 +185,19 @@ export default function RSVPPage({ params }: Props) {
       );
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.firstFieldError() ?? err.message);
+        // Speciální případ: 409 + code=email_has_account znamená, že
+        // ten e-mail už má plnohodnotný (verified) účet. Posíláme
+        // usera na login místo generického "tento e-mail už existuje",
+        // což z hlediska UX líp navádí. Bezpečnostní pojistka: anon
+        // submitter nemůže přepsat / "vetknout se" do session
+        // vlastníka e-mailu.
+        if (err.status === 409 && err.data?.code === "email_has_account") {
+          setError(
+            'Tento e-mail už má účet. Přihlas se prosím a registraci zopakuj.',
+          );
+        } else {
+          setError(err.firstFieldError() ?? err.message);
+        }
       } else {
         setError("Něco se pokazilo. Zkus to prosím znovu.");
       }
@@ -211,29 +223,67 @@ export default function RSVPPage({ params }: Props) {
         : submitted === "waitlist"
           ? "Jsi na waitlistu"
           : "Registrace přijata — čeká na schválení";
+    // Akce bez ceny / s waived platbou nemá "pokyny k platbě" — ten
+    // text byl pro free akce zavádějící. Vlastní copy pro pending /
+    // waitlist / free / paid, ať pokaždé sedne na to, co user
+    // skutečně dostane v mailu + co bude muset udělat dál.
+    const isPaid =
+      event.price_amount != null && Number(event.price_amount) > 0;
+    const successBody =
+      submitted === "pending_approval"
+        ? "Poslali jsme ti potvrzení na e-mail. Až tvojí registraci pořadatel schválí, dáme vědět."
+        : submitted === "waitlist"
+          ? "Jakmile se uvolní místo, povýšíme tě z waitlistu a pošleme ti e-mail s dalšími kroky."
+          : isPaid
+            ? user
+              ? "Poslali jsme ti potvrzení na e-mail. Pokyny k platbě a další kroky najdeš ve své účasti."
+              : "Poslali jsme ti potvrzení na e-mail s pokyny k platbě a dalšími kroky."
+            : user
+              ? "Poslali jsme ti potvrzení na e-mail. Detaily akce najdeš ve své účasti."
+              : "Poslali jsme ti potvrzení na e-mail. Detaily akce najdeš v něm.";
     return (
       <main className="flex flex-1 flex-col items-center px-4 py-16">
         <div className="w-full max-w-xl text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
             {headline}
           </h1>
-          <p className="mt-3 text-ink-700">
-            Poslali jsme ti potvrzení na e-mail. Pokyny k platbě a další
-            kroky najdeš ve své účasti.
-          </p>
+          <p className="mt-3 text-ink-700">{successBody}</p>
+          {/* Anonymous flow → žádný auto-login, žádné "Moje účast"
+              cesty do aplikace. Místo toho ukážeme měkkou nabídku
+              vytvořit si účet s pre-filled e-mailem; pokud user
+              vyplnil ne-prázdnou hodnotu v acctEmail, předáme ho do
+              signup URL. */}
+          {!user && (
+            <p className="mt-6 text-sm text-ink-500">
+              Chceš spravovat svoje registrace a vidět všechny své akce na
+              jednom místě?{" "}
+              <Link
+                href={
+                  acctEmail
+                    ? `/signup?email=${encodeURIComponent(acctEmail)}`
+                    : "/signup"
+                }
+                className="font-medium text-ink-900 underline hover:text-brand"
+              >
+                Vytvořit si tu zdarma účet →
+              </Link>
+            </p>
+          )}
         </div>
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <LinkButton
-            href={`/events/${slug}/${eventSlug}`}
-            variant="primary"
-            size="lg"
-          >
-            Moje účast →
-          </LinkButton>
+          {user ? (
+            <LinkButton
+              href={`/events/${slug}/${eventSlug}`}
+              variant="primary"
+              size="lg"
+            >
+              Moje účast →
+            </LinkButton>
+          ) : null}
           <LinkButton
             href={`/${slug}/e/${eventSlug}`}
-            variant="secondary"
+            variant={user ? "secondary" : "primary"}
             size="lg"
           >
             Zpět na stránku akce

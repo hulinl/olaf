@@ -296,9 +296,12 @@ export async function resolveGoogleMapsEmbedUrl(
   // Preferujeme Google Maps Embed API, když je klíč dostupný — vlastní
   // Google branded mapa, kterou Češi znají. Klíč musí mít HTTP-referrer
   // restrikci na olaf.events doménu, jinak Google nahradí mapu chybou.
+  // `gestureHandling=cooperative` přinutí Ctrl/Cmd+scroll pro zoom —
+  // bez Ctrl scroll prosviští skrz na parent stránku, místo aby
+  // zoomoval mapu pod kurzorem na touchpadu.
   const apiKey = process.env.GOOGLE_MAPS_EMBED_API_KEY;
   if (apiKey) {
-    return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=15`;
+    return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=15&gestureHandling=cooperative`;
   }
 
   // Fallback: OSM embed bez API key. ~1 km bbox kolem bodu → comfortable

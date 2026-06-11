@@ -34,7 +34,7 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
             "status": rsvp.status,
             "event_url": _frontend_event_url(event),
             "workspace": event.workspace,
-            "event_when": format_event_dt(event.starts_at),
+            "event_when": format_event_dt(event.starts_at, event.tz),
             "payment_due_str": format_payment_due(
                 rsvp.created_at, event.workspace.payment_due_days
             ),
@@ -55,7 +55,7 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
             "rsvp": rsvp,
             "event_url": _frontend_event_url(event),
             "workspace": event.workspace,
-            "event_when": format_event_dt(event.starts_at),
+            "event_when": format_event_dt(event.starts_at, event.tz),
             "payment_due_str": format_payment_due(
                 rsvp.created_at, event.workspace.payment_due_days
             ),
@@ -75,7 +75,7 @@ def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
             "event": event,
             "reason": reason,
             "workspace": event.workspace,
-            "event_when": format_event_dt(event.starts_at),
+            "event_when": format_event_dt(event.starts_at, event.tz),
         },
         recipient_list=[rsvp.user.email],
     )

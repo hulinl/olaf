@@ -173,7 +173,11 @@ class RSVPEndpointTests(TestCase):
             kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
         )
 
-    def test_anonymous_rsvp_creates_light_user(self) -> None:
+    def test_anonymous_rsvp_creates_unverified_guest_user(self) -> None:
+        # Anon RSVP zakládá guest usera (`email_verified=False`,
+        # unusable password) — žádný auto-login, žádný plnohodnotný
+        # účet. Verifikace + heslo se nastaví až přes signup flow s
+        # tím samým e-mailem.
         resp = self.client.post(
             self.url,
             {
@@ -190,9 +194,63 @@ class RSVPEndpointTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
         body = resp.json()
         self.assertEqual(body["status"], RSVP.STATUS_YES)
-        self.assertTrue(User.objects.filter(email="marta@example.com").exists())
+        user = User.objects.get(email="marta@example.com")
+        self.assertFalse(user.email_verified)
+        self.assertFalse(user.has_usable_password())
+        # A confirmation e-mail dorazí; ale uživatel není přihlášený.
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Letní kemp", mail.outbox[0].subject)
+
+    def test_anonymous_rsvp_does_not_create_session(self) -> None:
+        # Předtím se po anon RSVP volalo `login(request, user)` — user
+        # skončil v aplikaci přihlášený, což zaskočilo všechny, kteří
+        # si chtěli jen RSVPnout a aplikaci nepoužívat. Test brání
+        # regresi: po RSVP musí být klient pořád anonymní.
+        self.client.post(
+            self.url,
+            {
+                "answers": _valid_answers(),
+                "account": {
+                    "email": "marta@example.com",
+                    "first_name": "Marta",
+                    "last_name": "Runner",
+                },
+            },
+            format="json",
+        )
+        # /api/auth/me/ by měl 401 — žádná session.
+        me = self.client.get("/api/auth/me/")
+        self.assertIn(me.status_code, (401, 403))
+
+    def test_anonymous_rsvp_under_verified_email_returns_409(self) -> None:
+        # Bezpečnostní test: cizí uživatel nesmí přes anon RSVP přepsat
+        # nebo se "vetnout" do session vlastníka e-mailu, který má v
+        # systému plnohodnotný (verified) účet. Předtím auto-login
+        # tohle umožňoval.
+        User.objects.create_user(
+            email="real@example.com",
+            password="pass-abcdef-1234",
+            first_name="Real",
+            last_name="User",
+            email_verified=True,
+        )
+        resp = self.client.post(
+            self.url,
+            {
+                "answers": _valid_answers(),
+                "account": {
+                    "email": "real@example.com",
+                    "first_name": "Imposter",
+                    "last_name": "User",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(resp.json().get("code"), "email_has_account")
+        # Real user se nezměnil.
+        real = User.objects.get(email="real@example.com")
+        self.assertEqual(real.first_name, "Real")
 
     def test_anonymous_rsvp_missing_account_rejected(self) -> None:
         resp = self.client.post(

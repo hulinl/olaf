@@ -23,18 +23,37 @@ from .throttles import LoginThrottle, PasswordResetThrottle, RegisterThrottle
 @permission_classes([AllowAny])
 @throttle_classes([RegisterThrottle])
 def signup(request: Request) -> Response:
-    """Create a new user. Sends an email verification link. PRD §4.1."""
+    """Create a new user. Sends an email verification link. PRD §4.1.
+
+    Take-over flow pro guest RSVP: pokud už existuje neverifikovaný User
+    s tímhle e-mailem (= dříve submitl anon RSVP formulář), nezakládáme
+    duplikát — převezmeme jeho row, nastavíme heslo + nové name/phone,
+    pošleme verification e-mail. Všechny RSVPs co k tomu e-mailu od
+    minula sedí (přivázané FK), zůstávají u něj.
+    """
     serializer = SignupSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
-    user = User.objects.create_user(
-        email=data["email"],
-        password=data["password"],
-        first_name=data["first_name"],
-        last_name=data["last_name"],
-        phone=data.get("phone", ""),
-    )
+    existing = User.objects.filter(email=data["email"]).first()
+    if existing is not None and not existing.email_verified:
+        existing.set_password(data["password"])
+        existing.first_name = data["first_name"]
+        existing.last_name = data["last_name"]
+        if data.get("phone"):
+            existing.phone = data["phone"]
+        existing.save(
+            update_fields=["password", "first_name", "last_name", "phone"]
+        )
+        user = existing
+    else:
+        user = User.objects.create_user(
+            email=data["email"],
+            password=data["password"],
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            phone=data.get("phone", ""),
+        )
     token = EmailVerificationToken.objects.create(user=user)
     send_verification_email(user, token)
 

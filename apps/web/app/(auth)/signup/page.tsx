@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 
 import { AuthShell } from "@/components/ui/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,24 @@ import { Field, Input } from "@/components/ui/field";
 import { ApiError, auth } from "@/lib/api";
 
 export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
+  // `?email=` query param se používá z RSVP success page — anon user
+  // klikne "Vytvořit si tu zdarma účet" a e-mail z RSVP formuláře
+  // se předvyplní. Bez Suspense wrapperu Next 16 build hodí
+  // PrerenderError na useSearchParams.
+  const searchParams = useSearchParams();
+  const prefilledEmail = searchParams.get("email") ?? "";
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefilledEmail);
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
