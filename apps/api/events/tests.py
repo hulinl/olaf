@@ -640,6 +640,25 @@ class RsvpCancelByTokenTests(TestCase):
         # Cancellation mail by NEMĚL flagovat owner-driven, když si user
         # zrušil registraci sám.
         self.assertNotIn("Zrušení udělal pořadatel", cancel_mails[0].body)
+        # Vokativ použit — user "Guest" → "Gueste".
+        self.assertIn("Ahoj Gueste,", cancel_mails[0].body)
+
+    def test_idempotent_cancel_does_not_send_email_again(self) -> None:
+        # Druhý cancel už neposílá další mail (RSVP už je cancelled).
+        from django.core import mail as djmail
+
+        self.rsvp.cancel()
+        djmail.outbox = []
+        self.client.post(
+            self.url,
+            {"token": str(self.rsvp.cancel_token)},
+            format="json",
+        )
+        cancel_mails = [m for m in djmail.outbox if "Registrace zrušena" in m.subject]
+        self.assertFalse(
+            cancel_mails,
+            "Cancellation email should NOT be re-sent for idempotent retry",
+        )
 
     def test_idempotent_on_already_cancelled(self) -> None:
         self.rsvp.cancel()
@@ -963,6 +982,31 @@ class ConfigurableQuestionnaireTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
         rsvp.refresh_from_db()
         self.assertEqual(rsvp.status, RSVP.STATUS_CANCELLED)
+
+    def test_owner_remove_sends_cancellation_email_with_owner_copy(self) -> None:
+        # Když owner odebere účastníka z rosteru, informativní mail mu
+        # musí říct že to udělal pořadatel — bez toho by si user mohl
+        # myslet, že to byla technická chyba.
+        from django.core import mail as djmail
+
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        djmail.outbox = []
+        self.client.post(url)
+        cancel_mails = [m for m in djmail.outbox if "Registrace zrušena" in m.subject]
+        self.assertTrue(cancel_mails, "Cancellation email not sent for owner-remove")
+        self.assertIn("Zrušení udělal pořadatel", cancel_mails[0].body)
 
     def test_remove_is_idempotent(self) -> None:
         owner, applicant = self._make_owner_and_applicant()
