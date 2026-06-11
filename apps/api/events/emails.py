@@ -86,6 +86,11 @@ def send_rsvp_cancellation(rsvp: RSVP, *, cancelled_by_owner: bool = False) -> N
     Best-effort: pokud user nemá usable e-mail (např. ACS odmítne),
     necháme to spadnout silently uvnitř send_branded_email; cancel sám
     už proběhl."""
+    # Legacy / collaborator RSVPs můžou mít `user=None` (gear-list FK
+    # nebo ručně vložené row přes admin). Bez recipient-u nemá smysl
+    # mail posílat — ticho ven.
+    if rsvp.user is None or not rsvp.user.email:
+        return
     event = rsvp.event
     send_branded_email(
         subject=f"Registrace zrušena — {event.title}",
