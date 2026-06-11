@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   src: string;
@@ -16,9 +16,41 @@ interface Props {
 
 export function MapEmbedShell({ src, title, dark, needsScrollGuard }: Props) {
   const [interactive, setInteractive] = useState(!needsScrollGuard);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Re-lock když user klikne mimo mapu / přepne tab / scrollne window
+  // pomocí kolečka mimo mapový region. Bez tohohle by se overlay
+  // jednou aktivoval a už nikdy nezavřel — user pak při dalším
+  // scrollování ztratí ovládání stránky, jakmile kurzor zase přejede
+  // mapu. Cross-origin iframe (Google/OSM/Mapy) parent ne-dostává
+  // mouse/scroll eventy z vnitřku, takže `mousedown` / `wheel` mimo
+  // wrapper bezpečně značí "user už mapu nepoužívá".
+  useEffect(() => {
+    if (!interactive || !needsScrollGuard) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    function isOutside(target: EventTarget | null): boolean {
+      return !(
+        target instanceof Node && wrapper!.contains(target)
+      );
+    }
+
+    function handleLockOnOutside(ev: Event) {
+      if (isOutside(ev.target)) setInteractive(false);
+    }
+
+    document.addEventListener("mousedown", handleLockOnOutside);
+    document.addEventListener("wheel", handleLockOnOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleLockOnOutside);
+      document.removeEventListener("wheel", handleLockOnOutside);
+    };
+  }, [interactive, needsScrollGuard]);
 
   return (
     <div
+      ref={wrapperRef}
       className={[
         "relative w-full overflow-hidden rounded-md border",
         dark
