@@ -2,8 +2,10 @@ import { SectionHead } from "@/components/ui/section-head";
 import {
   type BlockTone,
   type MapBlockPayload,
+  type MapProvider,
+  detectMapProvider,
   ensureMapyFrameParam,
-  isMapyEmbedUrl,
+  resolveGoogleMapsEmbedUrl,
   resolveMapyEmbedUrl,
 } from "@/lib/event-blocks";
 
@@ -12,24 +14,36 @@ interface Props {
   tone?: BlockTone;
 }
 
+const PROVIDER_LABELS: Record<MapProvider, string> = {
+  mapy: "Mapy.cz",
+  google: "Google Maps",
+};
+
+async function buildEmbedSrc(
+  url: string,
+  provider: MapProvider,
+): Promise<string | null> {
+  if (provider === "mapy") {
+    const resolved = await resolveMapyEmbedUrl(url);
+    return ensureMapyFrameParam(resolved);
+  }
+  // google
+  return resolveGoogleMapsEmbedUrl(url);
+}
+
 export async function MapBlock({ payload, tone = "canvas" }: Props) {
   if (!payload.map_url) return null;
-  const embeddable = isMapyEmbedUrl(payload.map_url);
+  const provider = detectMapProvider(payload.map_url);
   const eyebrow = payload.eyebrow || "Mapa";
   const title = payload.title || "Kudy poběžíme";
   const dark = tone === "ink";
 
-  // Mapy.com / Mapy.cz krátké odkazy (`/s/<code>`) vrací HTTP 404 s body
-  // obsahující meta-refresh / "Moved Permanently" anchor. Iframe ten
-  // soft-redirect nedokáže dohonit, takže místo mapy zobrazí buďto 404
-  // hlášku, nebo (po JS redirectu uvnitř iframe-u) způsobí reflow, který
-  // browser vyřeší auto-scrollem na blok. Server-side krátké odkazy
-  // rozbalíme na cílovou URL ještě před renderováním, aby iframe dostal
-  // rovnou koncový tvar bez redirect chain.
-  const resolvedUrl = embeddable
-    ? await resolveMapyEmbedUrl(payload.map_url)
-    : payload.map_url;
-  const iframeSrc = embeddable ? ensureMapyFrameParam(resolvedUrl) : undefined;
+  // Provider-aware embed builder. Mapy.cz krátké linky nutno
+  // server-side rozbalit přes og:url (HTTP 404 + SPA body). Google
+  // krátké linky `maps.app.goo.gl` mají normální 302 redirect, ale
+  // pro embed potřebujeme z koncové URL extrahovat lat/lng, ze
+  // kterých sestavíme legacy `output=embed` URL.
+  const iframeSrc = provider ? await buildEmbedSrc(payload.map_url, provider) : null;
 
   return (
     <section
@@ -44,7 +58,7 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
           title={title}
           tone={dark ? "dark" : "light"}
         />
-        {embeddable && iframeSrc ? (
+        {iframeSrc ? (
           <div
             className={[
               "relative w-full overflow-hidden rounded-md border",
@@ -61,9 +75,9 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
               loading="lazy"
               src={iframeSrc}
               title={title}
-              // tabIndex=-1 vyřadí iframe z tab orderu — když Mapy uvnitř
-              // volají focus() na svůj canvas, prohlížeč už nemá důvod
-              // scrollovat parent stránku k iframe-u.
+              // tabIndex=-1 vyřadí iframe z tab orderu — když Mapy / Google
+              // uvnitř volají focus() na svůj canvas, prohlížeč už nemá
+              // důvod scrollovat parent stránku k iframe-u.
               tabIndex={-1}
               referrerPolicy="no-referrer-when-downgrade"
               className="absolute inset-0 h-full w-full border-0"
@@ -84,7 +98,7 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
             Otevřít mapu →
           </a>
         )}
-        {(payload.caption || embeddable) && (
+        {(payload.caption || (provider && iframeSrc)) && (
           <div
             className={[
               "mt-3 flex flex-wrap items-center justify-between gap-3 text-sm",
@@ -92,7 +106,7 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
             ].join(" ")}
           >
             {payload.caption && <span>{payload.caption}</span>}
-            {embeddable && (
+            {provider && iframeSrc && (
               <a
                 href={payload.map_url}
                 target="_blank"
@@ -104,7 +118,7 @@ export async function MapBlock({ payload, tone = "canvas" }: Props) {
                     : "text-ink-700 hover:text-ink-900",
                 ].join(" ")}
               >
-                Otevřít v Mapy.cz ↗
+                Otevřít v {PROVIDER_LABELS[provider]} ↗
               </a>
             )}
           </div>

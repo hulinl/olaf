@@ -13,13 +13,13 @@ export function MapForm({ payload, onChange }: Props) {
     <div className="flex flex-col gap-4">
       <Field
         label="URL mapy *"
-        hint="Mapy.cz / Mapy.com odkaz na trasu. Embed přidáme automaticky."
+        hint="Mapy.cz / Mapy.com nebo Google Maps odkaz (i krátký share link). Embed přidáme automaticky."
       >
         <Input
           required
           value={payload.map_url ?? ""}
           onChange={(e) => onChange({ ...payload, map_url: e.target.value })}
-          placeholder="https://mapy.com/cs/turisticka?…"
+          placeholder="https://mapy.com/… nebo https://maps.app.goo.gl/…"
         />
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

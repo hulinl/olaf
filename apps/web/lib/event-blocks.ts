@@ -151,6 +151,8 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   gear: "Vybavení — odkaz na tvůj gear list",
 };
 
+export type MapProvider = "mapy" | "google";
+
 /** Detect Mapy.cz / mapy.com URLs we should embed as iframe. */
 export function isMapyEmbedUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -160,6 +162,30 @@ export function isMapyEmbedUrl(url: string | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/** Detect Google Maps URLs (long links + maps.app.goo.gl shorteners). */
+export function isGoogleMapsUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname === "maps.google.com" ||
+      u.hostname.endsWith(".google.com") && u.pathname.startsWith("/maps") ||
+      u.hostname === "maps.app.goo.gl" ||
+      u.hostname === "goo.gl"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Provider router — vyhodí typ podle URL, případně `null` pokud to
+ *  není rozpoznatelná mapová služba. */
+export function detectMapProvider(url: string | undefined): MapProvider | null {
+  if (isMapyEmbedUrl(url)) return "mapy";
+  if (isGoogleMapsUrl(url)) return "google";
+  return null;
 }
 
 /** Append `frame=1` to a Mapy.cz URL so it renders without their chrome. */
@@ -186,6 +212,96 @@ export function ensureMapyFrameParam(url: string): string {
  *
  * Next.js fetch cache na 24 h — krátké odkazy se nemění.
  */
+/**
+ * Vytáhne lat/lng souřadnice z libovolné Google Maps URL formy.
+ *
+ * Pokrývá:
+ *   /maps/search/49.0,17.4              → search forma
+ *   /maps/place/Name/@49.0,17.4,15z     → place forma
+ *   /maps/@49.0,17.4,15z                → centered view
+ *   ?q=49.0,17.4                        → query parameter
+ *
+ * Záporné souřadnice (jižní polokoule, západní polokoule) cca pokryté.
+ */
+export function extractGoogleMapsCoords(
+  url: string,
+): { lat: string; lng: string } | null {
+  try {
+    const u = new URL(url);
+    // ?q=lat,lng
+    const q = u.searchParams.get("q");
+    const qMatch = q?.match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
+    if (qMatch) return { lat: qMatch[1], lng: qMatch[2] };
+
+    // /maps/.../@lat,lng,zoom — Google používá `@` pro centroid
+    const atMatch = u.pathname.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) return { lat: atMatch[1], lng: atMatch[2] };
+
+    // /maps/search/lat,+lng nebo /maps/search/lat,lng
+    const searchMatch = u.pathname.match(
+      /\/maps\/search\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
+    );
+    if (searchMatch) return { lat: searchMatch[1], lng: searchMatch[2] };
+  } catch {
+    /* invalid URL → null */
+  }
+  return null;
+}
+
+/**
+ * Vrátí embed URL pro Google Maps share-link, ale RENDEROVANÝ přes
+ * OpenStreetMap — Google `output=embed` má `X-Frame-Options:
+ * SAMEORIGIN`, takže by se v iframe-u nevykreslil. OSM `/export/embed.html`
+ * je naopak otevřený, bez API klíče, vrací 200 bez frame restrictions.
+ *
+ * Pipeline:
+ *   1. Krátký `maps.app.goo.gl/…` rozbalí 302 redirect na full URL.
+ *   2. Z full URL extrahujeme lat/lng (Google to do path-u píše různě
+ *      podle typu sdílení — viz `extractGoogleMapsCoords`).
+ *   3. Postavíme OSM embed s bbox kolem souřadnic + markerem.
+ *
+ * Plusy:
+ *   - Žádný API klíč, žádné runtime costs.
+ *   - Iframe se vždy vykreslí (vs. Google SAMEORIGIN-block).
+ *
+ * Minus:
+ *   - OSM neukáže POI label z Google (jiné mapové podklady). User to
+ *     kliknutím na "Otevřít v Google Maps" dostane plnohodnotně.
+ *
+ * Pokud z URL nelze extrahovat souřadnice (URL je třeba `/place/Name`
+ * bez lat/lng), vrátíme `null` — MapBlock pak pouze ukáže link na
+ * původní Google URL.
+ */
+export async function resolveGoogleMapsEmbedUrl(
+  url: string,
+): Promise<string | null> {
+  let target = url;
+  // Krátký link → followovat redirect na long URL.
+  try {
+    const u = new URL(url);
+    if (u.hostname === "maps.app.goo.gl" || u.hostname === "goo.gl") {
+      const res = await fetch(url, {
+        redirect: "follow",
+        headers: { "User-Agent": "Mozilla/5.0 olaf.events-link-resolver" },
+        next: { revalidate: 60 * 60 * 24 },
+      });
+      target = res.url;
+    }
+  } catch {
+    /* fetch failed → zkusíme extract z původní URL, stejně to není fatal */
+  }
+
+  const coords = extractGoogleMapsCoords(target);
+  if (!coords) return null;
+  const lat = parseFloat(coords.lat);
+  const lng = parseFloat(coords.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  // ~1 km bbox kolem bodu → comfortable zoom level v OSM viewportu.
+  const d = 0.005;
+  const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
+}
+
 export async function resolveMapyEmbedUrl(url: string): Promise<string> {
   if (!/^https?:\/\/(?:[a-z]+\.)?mapy\.(?:com|cz)\/s\/[A-Za-z0-9_-]+/.test(url)) {
     return url;
