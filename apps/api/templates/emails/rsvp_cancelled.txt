@@ -1,6 +1,9 @@
 {% load czech %}Ahoj {{ user.first_name|czech_vocative }},
 
 tvoje registrace na „{{ event.title }}" byla zrušena.
+{% if event_when %}
+Kdy bylo: {{ event_when }}{% endif %}{% if event.location_text %}
+Kde: {{ event.location_text }}{% endif %}
 
 {% if cancelled_by_owner %}Zrušení udělal pořadatel — pokud si myslíš, že je to omyl, ozvi se mu.{% else %}Pokud sis registraci zrušil/a omylem, můžeš se znovu přihlásit na stránce akce.{% endif %}
 

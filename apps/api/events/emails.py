@@ -101,6 +101,7 @@ def send_rsvp_cancellation(rsvp: RSVP, *, cancelled_by_owner: bool = False) -> N
             "rsvp": rsvp,
             "cancelled_by_owner": cancelled_by_owner,
             "event_url": _frontend_event_url(event),
+            "event_when": format_event_dt(event.starts_at, event.tz),
             "workspace": event.workspace,
         },
         recipient_list=[rsvp.user.email],

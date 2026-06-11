@@ -12,6 +12,27 @@
     tvoje registrace na <strong>„{{ event.title }}"</strong> byla zrušena.
   </p>
 
+  {% if event_when or event.location_text %}
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 20px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+      <tr>
+        <td style="padding:14px 16px;">
+          {% if event_when %}
+            <div style="margin-bottom:6px;">
+              <span style="display:inline-block;width:70px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Kdy bylo</span>
+              <span style="font-size:14px;color:#1a1a1a;">{{ event_when }}</span>
+            </div>
+          {% endif %}
+          {% if event.location_text %}
+            <div>
+              <span style="display:inline-block;width:70px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Kde</span>
+              <span style="font-size:14px;color:#1a1a1a;">{{ event.location_text }}</span>
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
   <p style="margin:0 0 20px;color:#404040;">
     {% if cancelled_by_owner %}
       Zrušení udělal pořadatel — pokud si myslíš, že je to omyl, ozvi se mu napřímo.
