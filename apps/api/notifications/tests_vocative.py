@@ -41,6 +41,40 @@ class VocativeMaleTests(TestCase):
         # Jména na -í většinou zůstávají.
         self.assertEqual(to_czech_vocative("Jiří"), "Jiří")
 
+    def test_zdenek_palatalizes_to_nku(self) -> None:
+        # User report 2026-06-11: "Ahoj Zdeněku" musí být "Ahoj Zdeňku" —
+        # -něk pattern dropuje -ě + palatalizuje n → ň + -ku.
+        self.assertEqual(to_czech_vocative("Zdeněk"), "Zdeňku")
+
+    def test_vladimir_r_after_vowel_does_not_palatalize(self) -> None:
+        # Petr → Petře (r po konsonantu), ale Vladimír → Vladimíre
+        # (r po samohlásce nepalatalizuje). Tahle distinction je
+        # netriviální, brání to bývalé regresí "Vladimíře".
+        self.assertEqual(to_czech_vocative("Vladimír"), "Vladimíre")
+
+    def test_kazimir_r_after_vowel(self) -> None:
+        self.assertEqual(to_czech_vocative("Kazimír"), "Kazimíre")
+
+    def test_lubomir_r_after_vowel(self) -> None:
+        self.assertEqual(to_czech_vocative("Lubomír"), "Lubomíre")
+
+    def test_otakar_r_after_vowel(self) -> None:
+        self.assertEqual(to_czech_vocative("Otakar"), "Otakare")
+
+    def test_igor_r_after_vowel(self) -> None:
+        self.assertEqual(to_czech_vocative("Igor"), "Igore")
+
+    def test_petr_r_after_consonant_still_palatalizes(self) -> None:
+        # Sanity check že distinction nezničila Petra.
+        self.assertEqual(to_czech_vocative("Petr"), "Petře")
+
+    def test_slavek_drops_e_velar(self) -> None:
+        self.assertEqual(to_czech_vocative("Slávek"), "Slávku")
+
+    def test_standa_female_pattern_to_o(self) -> None:
+        # Mužský diminutiv končící na -a → female-pattern (Stando).
+        self.assertEqual(to_czech_vocative("Standa"), "Stando")
+
 
 class VocativeFemaleTests(TestCase):
     def test_petra_a_to_o(self) -> None:

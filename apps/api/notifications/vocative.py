@@ -34,6 +34,23 @@ _OVERRIDES_MASC: dict[str, str] = {
     "Patrik": "Patriku",
     "Dominik": "Dominiku",
     "Radek": "Radku",
+    "Slávek": "Slávku",
+    "Honzík": "Honzíku",
+    "Erik": "Eriku",
+    # -něk → palatalizace n → ň, drop -ě, -ku (Zdeněk → Zdeňku).
+    # User report 2026-06-11: "Ahoj Zdeněku" → musí být "Ahoj Zdeňku".
+    "Zdeněk": "Zdeňku",
+    # -r po samohlásce → -e (NEpalatalizuje, ne jako Petr → Petře).
+    "Vladimír": "Vladimíre",
+    "Kazimír": "Kazimíre",
+    "Lubomír": "Lubomíre",
+    "Otakar": "Otakare",
+    "Igor": "Igore",
+    "Oldřich": "Oldřichu",
+    "Bedřich": "Bedřichu",
+    # Diminutiv končící na -a → female pattern -o
+    "Standa": "Stando",
+    "Sláva": "Slávo",
     # Soft consonants → -i
     "Tomáš": "Tomáši",
     "Lukáš": "Lukáši",
@@ -90,6 +107,9 @@ _OVERRIDES_FEM: dict[str, str] = {
 }
 
 
+_VOWELS = set("aeiouyáéíóúůýě")
+
+
 def _heuristic_male(name: str) -> str:
     """Generic male vocative pravidla podle koncovky."""
     if not name:
@@ -98,21 +118,31 @@ def _heuristic_male(name: str) -> str:
     # Soft consonants → -i
     if lower.endswith(("š", "č", "ž", "j", "ť", "ď", "ň", "c")):
         return name + "i"
-    # Velar -k/-g → -u (palatalizace by dala -če/-že, ale v moderní
-    # češtině je -u standard).
+    # -něk pattern (Zdeněk, hypoteticky Doněk…) — drop -ěk, palatalizace
+    # n → ň + -ku. Bez tohohle by heuristika dala Zdeněku, což je špatně.
+    if lower.endswith("něk") and len(name) > 3:
+        return name[:-3] + "ňku"
+    # Velar -k/-g/-ch → -u (palatalizace by dala -če/-že, ale v moderní
+    # češtině je -u standard). U -ek mužských jmen většinou drop -e-
+    # (Marek → Marku, Mirek → Mirku) — ale to drží override slovník,
+    # protože ne všechny -ek end-y to dělají (Erik → Eriku, ne Erku).
     if lower.endswith(("k", "g", "ch")):
         return name + "u"
     # -h → -hu (Vojtěch → Vojtěchu už v overrides, ale obecně)
     if lower.endswith("h"):
         return name + "u"
-    # -r → -ře (palatalizace)
-    if lower.endswith("r"):
+    # -r palatalizuje JEN po konsonantu (Petr → Petře, Bratr → Bratře).
+    # Po samohlásce ne (Vladimír → Vladimíre, Otakar → Otakare, Igor →
+    # Igore). Bez téhle distinction by heuristika dala chybně
+    # "Vladimíře".
+    if lower.endswith("r") and len(name) >= 2:
+        prev = lower[-2]
+        if prev in _VOWELS:
+            return name + "e"
         return name[:-1] + "ře"
     # -l → -le
     if lower.endswith("l"):
         return name + "e"
-    # -el → drop -e- + -le, ale tohle už řeší override; tady jen
-    # safety fallback.
     # Tvrdé/měkké konsonanty -d/-t/-n/-m/-b/-p/-v/-s/-z → -e
     if lower.endswith(("d", "t", "n", "m", "b", "p", "v", "s", "z", "f")):
         return name + "e"
