@@ -61,6 +61,13 @@
   {% endif %}
 
   <p style="margin:20px 0 0;font-size:13px;color:#737373;">
-    Pokud to nakonec nevyjde, dej nám prosím vědět — místo se uvolní pro dalšího z waitlistu.
+    Pokud to nakonec nevyjde, dej prosím vědět co nejdřív — místo se uvolní pro dalšího z waitlistu.
   </p>
+
+  {% if cancel_url %}
+    <p style="margin:14px 0 0;font-size:13px;color:#737373;">
+      <a href="{{ cancel_url }}" style="color:#dc2626;text-decoration:underline;">Zrušit registraci</a>
+      <span style="color:#a3a3a3;">(odkaz funguje bez přihlášení — drž ho jen pro sebe).</span>
+    </p>
+  {% endif %}
 {% endblock %}

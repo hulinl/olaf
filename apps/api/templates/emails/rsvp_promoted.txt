@@ -19,6 +19,9 @@ Splatnost: {% if payment_due_str %}{{ payment_due_str }}{% else %}{{ workspace.p
 
 QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.{% endif %}
 
-Pokud to nakonec nevyjde, dej nám prosím vědět na stránce akce — místo se uvolní pro dalšího z waitlistu.
+Pokud to nakonec nevyjde, dej prosím vědět co nejdřív — místo se uvolní pro dalšího z waitlistu.{% if cancel_url %}
+
+Zrušit registraci: {{ cancel_url }}
+(Odkaz funguje bez přihlášení — drž ho jen pro sebe.){% endif %}
 
 — Aplikace olaf
