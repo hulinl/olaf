@@ -172,3 +172,49 @@ export function ensureMapyFrameParam(url: string): string {
     return url;
   }
 }
+
+/**
+ * Rozbalí krátký share-link `mapy.com/s/<code>` (a jeho `mapy.cz` /
+ * locale varianty) na finální dlouhou URL.
+ *
+ * Mapy.com krátké odkazy vrací HTTP 404 + body s celým mapy.com SPA;
+ * SPA si pak uvnitř iframe-u dělá JS redirect na koncovou URL, což
+ * způsobí reflow a browser scrollne parent stránku k iframe-u (user
+ * reportoval: "za sekundu mi to skočí na blok s mapou"). Server-side
+ * sáhneme po `og:url` meta tagu, který obsahuje rovnou final URL —
+ * iframe pak dostane long URL bez interního redirectu.
+ *
+ * Next.js fetch cache na 24 h — krátké odkazy se nemění.
+ */
+export async function resolveMapyEmbedUrl(url: string): Promise<string> {
+  if (!/^https?:\/\/(?:[a-z]+\.)?mapy\.(?:com|cz)\/s\/[A-Za-z0-9_-]+/.test(url)) {
+    return url;
+  }
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 olaf.events-link-resolver" },
+      next: { revalidate: 60 * 60 * 24 },
+    });
+    const body = await res.text();
+    // Preferujeme og:url — obsahuje skutečnou koncovou URL i s param-y.
+    // Body taky obsahuje `<a href="https://mapy.com/screenshoter?...">`
+    // (OG image), který bychom omylem chytili širším regexem; proto
+    // jdeme přímo na og:url.
+    const og = body.match(
+      /property=["']og:url["'][^>]*content=["']([^"']+mapy\.(?:com|cz)[^"']+)/i,
+    );
+    if (og && og[1]) {
+      // HTML entity &amp; → &
+      return og[1].replace(/&amp;/g, "&");
+    }
+    // Fallback: twitter:url
+    const tw = body.match(
+      /name=["']twitter:url["'][^>]*content=["']([^"']+mapy\.(?:com|cz)[^"']+)/i,
+    );
+    if (tw && tw[1]) return tw[1].replace(/&amp;/g, "&");
+  } catch {
+    /* síťová chyba / unreachable → vrátíme původní URL, iframe to zkusí jak umí */
+  }
+  return url;
+}
