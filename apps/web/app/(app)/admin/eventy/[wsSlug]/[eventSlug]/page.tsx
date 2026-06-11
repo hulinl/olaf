@@ -494,25 +494,43 @@ function RsvpRow({
     }
   }
 
+  async function handleDismissDuplicate() {
+    try {
+      const updated = await events.dismissDuplicateHint(
+        wsSlug,
+        eventSlug,
+        rsvp.id,
+      );
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    }
+  }
+
   return (
     <tr className="group hover:bg-brand/10">
       <td className="px-4 py-3">
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          className="flex flex-col items-start gap-0.5 rounded text-left transition-colors focus-ring hover:text-brand"
-        >
-          <span className="flex items-center gap-2 font-medium text-ink-900 group-hover:underline">
-            {rsvp.user_full_name || "—"}
-            {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
-              <DuplicateBadge hints={rsvp.duplicate_hints} />
-            )}
-          </span>
-          <span className="text-xs text-ink-500">{rsvp.user_email}</span>
+        <div className="flex items-start gap-2">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex min-w-0 flex-col items-start gap-0.5 rounded text-left transition-colors focus-ring hover:text-brand"
+          >
+            <span className="font-medium text-ink-900 group-hover:underline">
+              {rsvp.user_full_name || "—"}
+            </span>
+            <span className="text-xs text-ink-500">{rsvp.user_email}</span>
           {rsvp.user_phone && (
             <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
           )}
-        </button>
+          </button>
+          {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
+            <DuplicateBadge
+              hints={rsvp.duplicate_hints}
+              onDismiss={handleDismissDuplicate}
+            />
+          )}
+        </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <div className="flex flex-col gap-1.5">
@@ -648,8 +666,12 @@ function RsvpRow({
 
 function DuplicateBadge({
   hints,
+  onDismiss,
 }: {
   hints: ("same_phone" | "same_name")[];
+  /** Owner-side dismiss — když je otec se synem, klik ✕ to schová.
+   *  Když není předán, badge je read-only (např. v starých surfaces). */
+  onDismiss?: () => void;
 }) {
   const tooltipParts: string[] = [];
   if (hints.includes("same_phone")) {
@@ -661,9 +683,24 @@ function DuplicateBadge({
   return (
     <span
       title={`Možný duplikát: ${tooltipParts.join(" + ")}`}
-      className="inline-flex items-center rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"
+      className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"
     >
       ⚠ Duplikát?
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDismiss();
+          }}
+          title="Není to duplikát"
+          aria-label="Není to duplikát"
+          className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-warning/70 hover:bg-warning/30 hover:text-warning focus-ring"
+        >
+          <span aria-hidden className="text-[10px] leading-none">×</span>
+        </button>
+      )}
     </span>
   );
 }
@@ -855,25 +892,43 @@ function RsvpCard({
     }
   }
 
+  async function handleDismissDuplicate() {
+    try {
+      const updated = await events.dismissDuplicateHint(
+        wsSlug,
+        eventSlug,
+        rsvp.id,
+      );
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          className="flex flex-col items-start gap-0.5 text-left focus-ring"
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+        <div className="flex min-w-0 flex-col items-start gap-1">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex flex-col items-start gap-0.5 text-left focus-ring"
+          >
+          <span className="text-sm font-semibold text-ink-900">
             {rsvp.user_full_name || "—"}
-            {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
-              <DuplicateBadge hints={rsvp.duplicate_hints} />
-            )}
           </span>
           <span className="text-xs text-ink-500">{rsvp.user_email}</span>
           {rsvp.user_phone && (
             <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
           )}
-        </button>
+          </button>
+          {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
+            <DuplicateBadge
+              hints={rsvp.duplicate_hints}
+              onDismiss={handleDismissDuplicate}
+            />
+          )}
+        </div>
         {rsvp.is_organizer ? (
           <span className="inline-flex shrink-0 rounded bg-brand/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
             Organizátor

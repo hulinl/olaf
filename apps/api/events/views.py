@@ -1490,6 +1490,32 @@ def remove_rsvp(
     return Response(RSVPSerializer(rsvp).data)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def dismiss_duplicate_hint(
+    request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
+) -> Response:
+    """Owner ručně zruší "Možný duplikát" badge na konkrétním RSVP.
+
+    Užití: otec + syn registrovaní pod stejným jménem; nebo automatika
+    triggered false-positive (např. dva lidé sdílí firemní telefon).
+    Owner klikne ✕ na badgi → tady se uloží `duplicate_dismissed=True`
+    a detekce dál RSVP přeskakuje. Per-event, idempotentní.
+    """
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        rsvp = RSVP.objects.select_related("user").get(pk=rsvp_id, event=event)
+    except RSVP.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not rsvp.duplicate_dismissed:
+        rsvp.duplicate_dismissed = True
+        rsvp.save(update_fields=["duplicate_dismissed", "updated_at"])
+    return Response(RSVPSerializer(rsvp).data)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def participant_profile(

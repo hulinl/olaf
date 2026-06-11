@@ -56,12 +56,26 @@ def detect_duplicates(rsvps) -> dict[int, list[str]]:
     non-cancelled RSVPs on one event. RSVPs without a phone (anonymous
     flow where phone wasn't required) are skipped from the phone pass
     but still matched on name. RSVPs without a user are skipped
-    entirely (defensive — shouldn't happen in practice)."""
+    entirely (defensive — shouldn't happen in practice).
+
+    **Vyloučeni z detekce:**
+      - Organizátoři (`is_organizer=True`) — owner se obvykle přidává s
+        kontakty workspace-u (sdílený telefon, generic jméno) a falešný
+        duplicate hint na vlastní řádku usera mate ("já mám taky příznak,
+        to nechápu" — user report 2026-06-11). Organizátoři nepatří k
+        participants-bucket, kde duplicate detection má sense.
+      - RSVPs s `duplicate_dismissed=True` — owner explicitně klikl
+        "ne, není to duplikát" (otec-syn případ).
+    """
     phone_groups: dict[str, list[int]] = defaultdict(list)
     name_groups: dict[str, list[int]] = defaultdict(list)
 
     for r in rsvps:
         if r.user_id is None:
+            continue
+        if getattr(r, "is_organizer", False):
+            continue
+        if getattr(r, "duplicate_dismissed", False):
             continue
         user = r.user
         phone_key = _normalize_phone(user.phone or "")

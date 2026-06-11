@@ -134,6 +134,11 @@ urlpatterns = [
         name="rsvp-remove",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/duplicate-dismiss/",
+        views.dismiss_duplicate_hint,
+        name="rsvp-duplicate-dismiss",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvp/payment/",
         views.my_rsvp_payment,
         name="rsvp-payment",

@@ -39,8 +39,20 @@ def _user_stub(uid: int, *, first="", last="", phone="") -> SimpleNamespace:
     )
 
 
-def _rsvp_stub(rid: int, user) -> SimpleNamespace:
-    return SimpleNamespace(id=rid, user=user, user_id=user.id)
+def _rsvp_stub(
+    rid: int,
+    user,
+    *,
+    is_organizer: bool = False,
+    duplicate_dismissed: bool = False,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=rid,
+        user=user,
+        user_id=user.id,
+        is_organizer=is_organizer,
+        duplicate_dismissed=duplicate_dismissed,
+    )
 
 
 class NormalizationTests(TestCase):
@@ -105,6 +117,54 @@ class DetectDuplicatesTests(TestCase):
         result = detect_duplicates(rsvps)
         self.assertEqual(result[10], [HINT_SAME_PHONE, HINT_SAME_NAME])
         self.assertEqual(result[11], [HINT_SAME_PHONE, HINT_SAME_NAME])
+
+    def test_organizer_excluded_from_detection(self) -> None:
+        # User report 2026-06-11: organizátor s vlastní RSVP měl badge
+        # "Možný duplikát" i když jméno + telefon zjevně neměl shodný.
+        # Pravá příčina: workspace owner běžně mívá generic/sdílené
+        # kontakty (workspace tel., generic "Olaf Adventures" jméno),
+        # což detekce false-positive-uje. Organizátoři teď z detekce
+        # vyloučeni — jejich RSVP nemá v duplicate-bucketu místo.
+        u_org = _user_stub(1, first="Olaf", last="Hulin", phone="777111222")
+        u_part = _user_stub(2, first="Petr", last="Mahdal", phone="777111222")
+        rsvps = [
+            _rsvp_stub(10, u_org, is_organizer=True),
+            _rsvp_stub(11, u_part),
+        ]
+        result = detect_duplicates(rsvps)
+        # Organizátor není v result vůbec; ani participant, protože
+        # jeho "kolize" zmizela s organizátorem.
+        self.assertEqual(result, {})
+
+    def test_organizer_doesnt_protect_other_duplicates(self) -> None:
+        # Když organizer nemá relevantní kolizi, ale jiní dva
+        # participanti ano, detekce funguje normálně.
+        u_org = _user_stub(1, first="Olaf", last="Hulin", phone="111111111")
+        u_p1 = _user_stub(2, first="Petr", last="A", phone="999")
+        u_p2 = _user_stub(3, first="Petr", last="A", phone="888")
+        rsvps = [
+            _rsvp_stub(10, u_org, is_organizer=True),
+            _rsvp_stub(11, u_p1),
+            _rsvp_stub(12, u_p2),
+        ]
+        result = detect_duplicates(rsvps)
+        self.assertEqual(result[11], [HINT_SAME_NAME])
+        self.assertEqual(result[12], [HINT_SAME_NAME])
+        self.assertNotIn(10, result)
+
+    def test_dismissed_rsvp_excluded(self) -> None:
+        # Otec a syn se jmenují stejně. Owner klikl na ✕ jednoho z nich.
+        # Detekce ho dál ignoruje; ostatní RSVPs neutrpí.
+        u1 = _user_stub(1, first="Karel", last="Novák")
+        u2 = _user_stub(2, first="Karel", last="Novák")
+        rsvps = [
+            _rsvp_stub(10, u1, duplicate_dismissed=True),
+            _rsvp_stub(11, u2),
+        ]
+        result = detect_duplicates(rsvps)
+        # 10 je dismissed → vůbec do groupu nepřijde → 11 nemá s kým
+        # matchnout → žádné hinty.
+        self.assertEqual(result, {})
 
     def test_empty_phone_does_not_match_other_empty(self) -> None:
         # Two users without phones MUST NOT cross-match — false-positive

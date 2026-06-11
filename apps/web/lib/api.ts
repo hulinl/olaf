@@ -1410,6 +1410,17 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/remove/`,
       { method: "POST" },
     ),
+  /** Skryje "Možný duplikát" badge na konkrétním RSVP — owner explicitně
+   *  potvrdil "není to duplikát" (otec a syn). Per-event, idempotentní. */
+  dismissDuplicateHint: (
+    workspaceSlug: string,
+    eventSlug: string,
+    rsvpId: number,
+  ) =>
+    apiFetch<RSVPRecord>(
+      `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/duplicate-dismiss/`,
+      { method: "POST" },
+    ),
   paymentInstructions: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<RSVPPaymentInstructions>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvp/payment/`,

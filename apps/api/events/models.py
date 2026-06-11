@@ -469,6 +469,12 @@ class RSVP(models.Model):
         default="",
     )
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    # Soft-dismiss "Možný duplikát" badge — owner explicitně řekl "ne,
+    # není to duplikát" (typický případ: otec a syn se stejným jménem).
+    # `True` = detekce ho v tomhle eventu už ignoruje. Per-event, per-
+    # RSVP. Nepřenáší se do dalších eventů — duplicates se počítají
+    # vždy fresh z aktuálního eventu.
+    duplicate_dismissed = models.BooleanField(default=False)
     questionnaire_answers = models.JSONField(default=dict, blank=True)
     waitlist_position = models.PositiveIntegerField(null=True, blank=True)
     attended = models.BooleanField(
