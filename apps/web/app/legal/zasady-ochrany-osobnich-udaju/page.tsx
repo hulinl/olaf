@@ -54,8 +54,9 @@ export default function PrivacyPolicyPage() {
               </Link>
               ) a správcem osobních údajů ve smyslu nařízení (EU)
               2016/679 (GDPR) a zákona č. 110/2019 Sb. je{" "}
-              <strong>BIfactory s.r.o.</strong>, se sídlem v České
-              republice. Kontakt:{" "}
+              <strong>BIfactory s.r.o.</strong>, IČO:{" "}
+              <strong>01999923</strong>, se sídlem v České republice,
+              zapsaná v obchodním rejstříku. Kontakt:{" "}
               <a
                 href="mailto:hulin@bifactory.cz"
                 className="underline hover:text-ink-900"
@@ -63,6 +64,13 @@ export default function PrivacyPolicyPage() {
                 hulin@bifactory.cz
               </a>
               .
+            </p>
+            <p className="mt-3">
+              <strong>Pověřenec pro ochranu osobních údajů (DPO):</strong>{" "}
+              Vzhledem k povaze a rozsahu zpracování nejsme dle čl. 37
+              GDPR povinni jmenovat DPO. Veškeré dotazy ohledně osobních
+              údajů směřuj na výše uvedený e-mail správce — odpovídáme do
+              30 dnů od doručení žádosti.
             </p>
             <p className="mt-3">
               olaf vystupuje jako jednotný správce pro veškeré osobní údaje
@@ -236,7 +244,15 @@ export default function PrivacyPolicyPage() {
               (přihlašovací session, CSRF token, jazyk). Tyto cookies nejsou
               určeny pro marketingové sledování a nepřenášíme je třetím
               stranám. Nepoužíváme Google Analytics ani jiné third-party
-              tracking pixely.
+              tracking pixely. Podrobný seznam cookies a jejich účel najdeš
+              v{" "}
+              <Link
+                href="/legal/cookies"
+                className="underline hover:text-ink-900"
+              >
+                Informacích o cookies →
+              </Link>
+              .
             </p>
           </section>
 

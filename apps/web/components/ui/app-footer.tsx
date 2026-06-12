@@ -38,6 +38,18 @@ export function AppFooter({
           <Link href="/manual" className="text-ink-700 hover:text-ink-900">
             Návody
           </Link>
+          <Link
+            href="/legal/zasady-ochrany-osobnich-udaju"
+            className="text-ink-700 hover:text-ink-900"
+          >
+            Zásady OÚ
+          </Link>
+          <Link
+            href="/legal/cookies"
+            className="text-ink-700 hover:text-ink-900"
+          >
+            Cookies
+          </Link>
         </nav>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
           <span className="whitespace-nowrap">
