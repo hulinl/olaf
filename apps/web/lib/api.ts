@@ -562,6 +562,10 @@ export interface RSVPRecord extends MyRSVP {
    *  workspacu (chráněn), už cancelled. Backend kontroluje při POST
    *  znovu — tohle je jen UI hint. */
   can_be_removed: boolean;
+  /** Backend signal pro skrytí "Označit/Odebrat organizátora" toggle —
+   *  zakladatel workspace musí zůstat organizátorem akce, nelze ho
+   *  demote-nout na běžného účastníka. */
+  can_toggle_organizer: boolean;
   updated_at: string;
 }
 

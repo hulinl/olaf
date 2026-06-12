@@ -1113,6 +1113,31 @@ class ConfigurableQuestionnaireTests(TestCase):
         owner_rsvp.refresh_from_db()
         self.assertEqual(owner_rsvp.status, RSVP.STATUS_YES)
 
+    def test_workspace_owner_cannot_be_demoted_from_organizer(self) -> None:
+        # User report: "pořád si sám sobě mohu odebrat organizátora,
+        # což je blbost". Zakladatel workspace musí zůstat organizátorem
+        # akce, nelze ho převést na účastníka (kapacita by si ho začala
+        # počítat).
+        owner, _ = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=owner, questionnaire_answers={}
+        )
+        rsvp.is_organizer = True
+        rsvp.save(update_fields=["is_organizer"])
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-toggle-organizer",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url, {"is_organizer": False}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        rsvp.refresh_from_db()
+        self.assertTrue(rsvp.is_organizer)
+
     def test_can_be_removed_signal_for_owner_viewer(self) -> None:
         # Serializer signál do frontendu: owner vidí True u participantu,
         # ale False u svého vlastního RSVP a u jiného super-admina.

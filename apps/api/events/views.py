@@ -1823,6 +1823,25 @@ def toggle_rsvp_organizer(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     is_organizer = bool(request.data.get("is_organizer"))
+
+    # Workspace zakladatel (super-admin) musí zůstat organizátorem —
+    # je vlastníkem akce, nemá smysl, aby ho někdo (ani on sám)
+    # převedl na běžného účastníka a začal se počítat do kapacity.
+    # User report: "pořád si sám sobě mohu odebrat organizátora, což
+    # je blbost".
+    if (
+        not is_organizer
+        and rsvp.user_id
+        and is_workspace_super_admin(rsvp.user, rsvp.event.workspace)
+    ):
+        return Response(
+            {
+                "detail": (
+                    "Zakladatel workspace musí zůstat organizátorem akce."
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
     rsvp.is_organizer = is_organizer
 
     if is_organizer:

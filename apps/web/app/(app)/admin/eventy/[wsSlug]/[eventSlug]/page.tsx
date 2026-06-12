@@ -581,7 +581,7 @@ function RsvpRow({
               organizer toggle mizí, jinak by tam zůstaly klikatelné
               kontroly nad zrušenou registrací. Remove (popelnice) je
               v dedikovaném sloupci na konci řádku. */}
-          {rsvp.status !== "cancelled" && (
+          {rsvp.can_toggle_organizer && (
             <button
               type="button"
               onClick={handleToggleOrganizer}

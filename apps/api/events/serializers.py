@@ -411,6 +411,7 @@ class RSVPSerializer(serializers.ModelSerializer):
     invoice_id = serializers.SerializerMethodField()
     duplicate_hints = serializers.SerializerMethodField()
     can_be_removed = serializers.SerializerMethodField()
+    can_toggle_organizer = serializers.SerializerMethodField()
 
     class Meta:
         model = RSVP
@@ -418,6 +419,7 @@ class RSVPSerializer(serializers.ModelSerializer):
             "id",
             "status",
             "is_organizer",
+            "can_toggle_organizer",
             "user_email",
             "user_full_name",
             "user_phone",
@@ -440,6 +442,20 @@ class RSVPSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_can_toggle_organizer(self, obj: RSVP) -> bool:
+        """Frontend signal — skrýt "Označit/Odebrat organizátora" toggle
+        u zakladatele workspace (super-admin musí zůstat organizátorem).
+        Backend kontroluje při POST znovu.
+        """
+        if obj.status == RSVP.STATUS_CANCELLED:
+            return False
+        from .permissions import is_workspace_super_admin
+
+        return not (
+            obj.user_id
+            and is_workspace_super_admin(obj.user, obj.event.workspace)
+        )
 
     def get_can_be_removed(self, obj: RSVP) -> bool:
         """Frontend signál pro zobrazení popelnice. Backend pak při
