@@ -557,6 +557,11 @@ export interface RSVPRecord extends MyRSVP {
    *  ("Sám zrušil" / "Mailem" / "Zrušil pořadatel"). */
   cancellation_reason: "" | "self" | "by_token" | "owner";
   cancelled_at: string | null;
+  /** Backend signal pro skrytí popelnice u řádků, kde remove nemá
+   *  smysl: viewer sám sebe (k tomu cancel_my_rsvp), super-admin
+   *  workspacu (chráněn), už cancelled. Backend kontroluje při POST
+   *  znovu — tohle je jen UI hint. */
+  can_be_removed: boolean;
   updated_at: string;
 }
 

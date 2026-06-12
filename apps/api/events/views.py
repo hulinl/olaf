@@ -19,7 +19,11 @@ from communities.models import Community
 from workspaces.models import Workspace
 
 from .models import RSVP, Event, EventImage
-from .permissions import can_manage_event, is_workspace_owner
+from .permissions import (
+    can_manage_event,
+    is_workspace_owner,
+    is_workspace_super_admin,
+)
 from .serializers import (
     EventImageSerializer,
     EventPublicSerializer,
@@ -276,7 +280,7 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
     send_rsvp_confirmation_task.delay(rsvp.pk)
 
     return Response(
-        MyRSVPSerializer(rsvp).data,
+        MyRSVPSerializer(rsvp, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
     )
 
@@ -318,7 +322,7 @@ def cancel_my_rsvp(request: Request, workspace_slug: str, event_slug: str) -> Re
 
         send_rsvp_cancellation(rsvp, cancelled_by_owner=False)
 
-    return Response(MyRSVPSerializer(rsvp).data)
+    return Response(MyRSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["GET", "POST"])
@@ -1395,7 +1399,7 @@ def approve_rsvp(
         },
     )
 
-    return Response(RSVPSerializer(rsvp).data)
+    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["POST"])
@@ -1442,7 +1446,7 @@ def reject_rsvp(
         payload={"event_slug": event.slug, "reason": reason},
     )
 
-    return Response(RSVPSerializer(rsvp).data)
+    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["POST"])
@@ -1468,6 +1472,36 @@ def remove_rsvp(
         rsvp = RSVP.objects.select_related("user").get(pk=rsvp_id, event=event)
     except RSVP.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Self-protection: nikdo nesmí odebrat sám sebe přes tenhle
+    # endpoint — k tomu slouží `cancel_my_rsvp` (oznámí mu cancellation
+    # mail, audit log v jeho jméně). Bez tohohle gate by collaborator
+    # mohl v jedné akci kliknout "remove" na svoji RSVP a vypadnout
+    # bez záznamu "odebrán pořadatelem".
+    if rsvp.user_id == request.user.id:
+        return Response(
+            {
+                "detail": (
+                    "Sám sebe odebrat takhle nemůžeš. Použij \"Zrušit "
+                    "moji registraci\" v tvojí registraci."
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # Super-admin (zakladatel workspace) je chráněn — collaborator /
+    # admin ho nesmí odebrat z žádné akce. Jediný kdo to může je on
+    # sám (přes vlastní cancel_my_rsvp výš). Bez tohohle by sub-
+    # collaborator mohl smazat vlastníka, kterého workspace odvozuje
+    # od jeho User row.
+    if rsvp.user_id and is_workspace_super_admin(rsvp.user, event.workspace):
+        return Response(
+            {
+                "detail": (
+                    "Zakladatel workspace nemůže být odebrán z akce."
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     if rsvp.status != RSVP.STATUS_CANCELLED:
         rsvp.cancel(reason=RSVP.CANCELLATION_OWNER)
@@ -1500,7 +1534,7 @@ def remove_rsvp(
 
             send_rsvp_cancellation(rsvp, cancelled_by_owner=True)
 
-    return Response(RSVPSerializer(rsvp).data)
+    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["POST"])
@@ -1526,7 +1560,7 @@ def dismiss_duplicate_hint(
     if not rsvp.duplicate_dismissed:
         rsvp.duplicate_dismissed = True
         rsvp.save(update_fields=["duplicate_dismissed", "updated_at"])
-    return Response(RSVPSerializer(rsvp).data)
+    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["GET"])
@@ -1606,7 +1640,10 @@ def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Respo
         RSVPSerializer(
             rsvps,
             many=True,
-            context={"duplicate_hints_map": duplicate_hints_map},
+            context={
+                "duplicate_hints_map": duplicate_hints_map,
+                "request": request,
+            },
         ).data
     )
 
@@ -1724,7 +1761,7 @@ def mark_rsvp_paid(
         return Response(status=status.HTTP_403_FORBIDDEN)
 
     if rsvp.payment_status == RSVP.PAYMENT_PAID:
-        return Response(RSVPSerializer(rsvp).data)
+        return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
     rsvp.payment_status = RSVP.PAYMENT_PAID
     rsvp.paid_at = timezone.now()
@@ -1759,7 +1796,7 @@ def mark_rsvp_paid(
     with contextlib.suppress(Exception):
         generate_invoice_for_rsvp(rsvp)
 
-    return Response(RSVPSerializer(rsvp).data)
+    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["POST"])
@@ -1827,7 +1864,7 @@ def toggle_rsvp_organizer(
         ),
         payload={"is_organizer": is_organizer},
     )
-    return Response(RSVPSerializer(rsvp).data)
+    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
 
 
 @api_view(["PATCH"])

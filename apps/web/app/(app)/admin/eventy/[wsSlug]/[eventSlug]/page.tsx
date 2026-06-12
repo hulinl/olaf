@@ -643,7 +643,7 @@ function RsvpRow({
         })}
       </td>
       <td className="whitespace-nowrap px-2 py-3 text-right">
-        {rsvp.status !== "cancelled" && (
+        {rsvp.can_be_removed && (
           <button
             type="button"
             onClick={handleRemove}
@@ -995,7 +995,7 @@ function RsvpCard({
           )}
         </div>
       )}
-      {rsvp.status !== "cancelled" && (
+      {rsvp.can_be_removed && (
         <button
           type="button"
           onClick={handleRemove}

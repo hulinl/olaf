@@ -391,8 +391,10 @@ export default function RSVPPage({ params }: Props) {
                     Tvoje kontaktní údaje
                   </h2>
                   <p className="mt-1 text-sm text-ink-500">
-                    Účet ti vytvoříme automaticky a pošleme ti potvrzení na
-                    e-mail.
+                    Nikam tě teď neregistrujeme — jen pošleme potvrzovací
+                    e-mail s odkazem na zrušení. Pokud si později vytvoříš
+                    účet se stejným e-mailem, všechny tvoje registrace
+                    automaticky uvidíš pohromadě.
                   </p>
                   <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field label="Jméno" htmlFor="first_name">

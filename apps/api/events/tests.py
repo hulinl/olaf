@@ -1058,6 +1058,87 @@ class ConfigurableQuestionnaireTests(TestCase):
         self.assertTrue(cancel_mails, "Cancellation email not sent for owner-remove")
         self.assertIn("Zrušení udělal pořadatel", cancel_mails[0].body)
 
+    def test_cannot_remove_self_through_endpoint(self) -> None:
+        # User report: organizátor mohl kliknout popelnici sám na
+        # sebe, což je nesmysl — k tomu má cancel_my_rsvp (self-cancel,
+        # generuje vlastní audit + mail). Endpoint odpoví 400.
+        owner, _ = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=owner, questionnaire_answers={}
+        )
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        rsvp.refresh_from_db()
+        self.assertEqual(rsvp.status, RSVP.STATUS_YES)
+
+    def test_collaborator_cannot_remove_workspace_owner(self) -> None:
+        # User report: druhý organizátor / spolutvůrce nesmí smazat
+        # zakladatele (super-admina). Super-admin je chráněn.
+        from .models import EventCollaborator
+
+        owner, _ = self._make_owner_and_applicant()
+        collaborator = User.objects.create_user(
+            email="collab@example.com",
+            password="alpine-hike-2026",
+            first_name="Co",
+            last_name="Llab",
+            email_verified=True,
+        )
+        EventCollaborator.objects.create(
+            event=self.event, user=collaborator, added_by=owner
+        )
+        owner_rsvp = RSVP.create_for_event(
+            event=self.event, user=owner, questionnaire_answers={}
+        )
+        self.client.force_authenticate(collaborator)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": owner_rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        owner_rsvp.refresh_from_db()
+        self.assertEqual(owner_rsvp.status, RSVP.STATUS_YES)
+
+    def test_can_be_removed_signal_for_owner_viewer(self) -> None:
+        # Serializer signál do frontendu: owner vidí True u participantu,
+        # ale False u svého vlastního RSVP a u jiného super-admina.
+        owner, applicant = self._make_owner_and_applicant()
+        applicant_rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        owner_rsvp = RSVP.create_for_event(
+            event=self.event, user=owner, questionnaire_answers={}
+        )
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvps",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+            },
+        )
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        by_id = {row["id"]: row for row in resp.json()}
+        # Participant lze odebrat.
+        self.assertTrue(by_id[applicant_rsvp.pk]["can_be_removed"])
+        # Owner sám sebe ne.
+        self.assertFalse(by_id[owner_rsvp.pk]["can_be_removed"])
+
     def test_remove_is_idempotent(self) -> None:
         owner, applicant = self._make_owner_and_applicant()
         rsvp = RSVP.create_for_event(

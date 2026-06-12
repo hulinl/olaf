@@ -410,6 +410,7 @@ class RSVPSerializer(serializers.ModelSerializer):
     verified_doc_keys = serializers.SerializerMethodField()
     invoice_id = serializers.SerializerMethodField()
     duplicate_hints = serializers.SerializerMethodField()
+    can_be_removed = serializers.SerializerMethodField()
 
     class Meta:
         model = RSVP
@@ -432,12 +433,37 @@ class RSVPSerializer(serializers.ModelSerializer):
             "verified_doc_keys",
             "invoice_id",
             "duplicate_hints",
+            "can_be_removed",
             "cancellation_reason",
             "cancelled_at",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_can_be_removed(self, obj: RSVP) -> bool:
+        """Frontend signál pro zobrazení popelnice. Backend pak při
+        skutečném POST kontroluje znovu — tohle je jen UI hint, ne
+        autorita.
+
+        Skrýváme když:
+          - cancelled (nemá smysl odebrat už zrušené)
+          - cílem je sám viewer (k tomu slouží cancel_my_rsvp)
+          - cílem je zakladatel workspace (super-admin chráněn)
+        """
+        if obj.status == RSVP.STATUS_CANCELLED:
+            return False
+        request = (self.context or {}).get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        if obj.user_id == request.user.id:
+            return False
+        from .permissions import is_workspace_super_admin
+
+        return not (
+            obj.user_id
+            and is_workspace_super_admin(obj.user, obj.event.workspace)
+        )
 
     def get_uploaded_doc_keys(self, obj: RSVP) -> list[str]:
         return list(obj.documents.values_list("key", flat=True).distinct())
