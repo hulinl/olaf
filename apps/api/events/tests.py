@@ -680,7 +680,7 @@ class RsvpCancelByTokenTests(TestCase):
             {"token": str(self.rsvp.cancel_token)},
             format="json",
         )
-        # Některé maily mohou zařadit waitlist promote – chytíme jen
+        # Některé maily mohou zařadit waitlist promote - chytíme jen
         # ten náš subjekt.
         cancel_mails = [m for m in djmail.outbox if "Registrace zrušena" in m.subject]
         self.assertTrue(cancel_mails, f"Cancellation email not sent: {djmail.outbox}")

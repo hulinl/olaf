@@ -77,7 +77,6 @@ _OVERRIDES_MASC: dict[str, str] = {
     "Radim": "Radime",
     "Robert": "Roberte",
     "Richard": "Richarde",
-    "Pavel": "Pavle",
     "Štefan": "Štefane",
     "Michael": "Michaele",
 }
