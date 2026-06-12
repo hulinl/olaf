@@ -214,6 +214,10 @@ export interface Event extends EventSummary {
   location_url: string;
   waitlist_enabled: boolean;
   requires_approval: boolean;
+  /** Per-event toggle pro povinnost telefonu při registraci. Default
+   *  True kvůli emergencies; owner si u casual akcí (komunita, BBQ)
+   *  odznačí. */
+  require_phone_on_rsvp: boolean;
   blocks: EventBlock[];
   /** Inline payload for every `gear` block on this event's landing.
    *  Map of slug → PublicGearList. Private lists are omitted. */
@@ -1199,6 +1203,7 @@ export interface EventWritePayload {
   location_url?: string;
   capacity?: number | null;
   waitlist_enabled?: boolean;
+  require_phone_on_rsvp?: boolean;
   visibility?: "public" | "invite_only";
   status?: "draft" | "published" | "closed" | "cancelled" | "completed";
   requires_approval?: boolean;

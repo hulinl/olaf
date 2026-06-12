@@ -29,6 +29,10 @@ def _build_event(workspace, **overrides) -> Event:
         "waitlist_enabled": True,
         "status": Event.STATUS_PUBLISHED,
         "visibility": Event.VISIBILITY_PUBLIC,
+        # Default test event nepožaduje telefon, aby existující testy
+        # bez phone v payloadu prošly. Specifické testy pro phone
+        # requirement si tohle přepíšou.
+        "require_phone_on_rsvp": False,
     }
     defaults.update(overrides)
     return Event.objects.create(**defaults)
@@ -251,6 +255,46 @@ class RSVPEndpointTests(TestCase):
         # Real user se nezměnil.
         real = User.objects.get(email="real@example.com")
         self.assertEqual(real.first_name, "Real")
+
+    def test_anon_rsvp_requires_phone_when_event_demands(self) -> None:
+        # Default `require_phone_on_rsvp=True` (product default), test
+        # event si nastavíme explicitně True a chybný (bez phone) RSVP
+        # musí vrátit 400.
+        self.event.require_phone_on_rsvp = True
+        self.event.save()
+        resp = self.client.post(
+            self.url,
+            {
+                "answers": _valid_answers(),
+                "account": {
+                    "email": "no-phone@example.com",
+                    "first_name": "No",
+                    "last_name": "Phone",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.json().get("code"), "phone_required")
+
+    def test_anon_rsvp_phone_optional_when_event_does_not_demand(self) -> None:
+        # Když owner odsouhlasí "telefon volitelný" (typ. casual akce),
+        # phone-empty payload musí projít.
+        self.event.require_phone_on_rsvp = False
+        self.event.save()
+        resp = self.client.post(
+            self.url,
+            {
+                "answers": _valid_answers(),
+                "account": {
+                    "email": "no-phone-ok@example.com",
+                    "first_name": "No",
+                    "last_name": "Phone",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
 
     def test_anonymous_rsvp_missing_account_rejected(self) -> None:
         resp = self.client.post(

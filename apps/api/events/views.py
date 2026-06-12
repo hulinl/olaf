@@ -215,6 +215,19 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
     user = request.user if request.user.is_authenticated else None
     if user is None:
         account = data.get("account") or {}
+        # Per-event toggle: pokud `require_phone_on_rsvp=True`, anon
+        # registrant musí vyplnit telefon. Default je True (emergencies);
+        # owner odsetě u casual akcí.
+        if event.require_phone_on_rsvp and not (account.get("phone") or "").strip():
+            return Response(
+                {
+                    "account": {
+                        "phone": "Telefon je u této akce povinný.",
+                    },
+                    "code": "phone_required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             user = _create_light_user(account)
         except _ExistingVerifiedUser:

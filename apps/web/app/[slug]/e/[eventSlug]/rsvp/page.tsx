@@ -85,6 +85,10 @@ export default function RSVPPage({ params }: Props) {
   const [emName, setEmName] = useState("");
   const [emPhone, setEmPhone] = useState("");
   const [photoConsent, setPhotoConsent] = useState(false);
+  // GDPR special-category checkbox. Vyžadujeme jen u sekcí, které
+  // sbírají údaje o zdraví (dieta, fitness, health_notes). Bez
+  // explicitního souhlasu nesmíme tyto údaje zpracovat (čl. 9 GDPR).
+  const [healthDataConsent, setHealthDataConsent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -420,7 +424,11 @@ export default function RSVPPage({ params }: Props) {
                       />
                     </Field>
                     <Field
-                      label="Telefon"
+                      label={
+                        event.require_phone_on_rsvp
+                          ? "Telefon"
+                          : "Telefon (volitelné)"
+                      }
                       htmlFor="phone"
                       hint="Pro případ nouze nebo rychlou komunikaci."
                     >
@@ -428,6 +436,7 @@ export default function RSVPPage({ params }: Props) {
                         id="phone"
                         type="tel"
                         autoComplete="tel"
+                        required={event.require_phone_on_rsvp}
                         value={acctPhone}
                         onChange={(e) => setAcctPhone(e.target.value)}
                       />
@@ -672,6 +681,28 @@ export default function RSVPPage({ params }: Props) {
               </Card>
             )}
 
+            {/* GDPR special category — jen když je zapnutá sekce s
+                údaji o zdraví. Bez zaškrtnutí submit nepustíme. */}
+            {(sectionEnabled("diet") ||
+              sectionEnabled("fitness") ||
+              sectionEnabled("health_notes")) && (
+              <label className="flex items-start gap-3 rounded-md border border-border bg-surface-muted/40 p-3 text-sm text-ink-700">
+                <input
+                  type="checkbox"
+                  required
+                  checked={healthDataConsent}
+                  onChange={(e) => setHealthDataConsent(e.target.checked)}
+                  className="mt-1 size-4 shrink-0 accent-brand"
+                />
+                <span>
+                  Souhlasím se zpracováním <strong>údajů o zdraví</strong>{" "}
+                  (dieta, alergie, kondice, zdravotní poznámky) výhradně
+                  pro organizaci této akce. Souhlas mohu kdykoli odvolat
+                  zrušením registrace.
+                </span>
+              </label>
+            )}
+
             {error && <Alert variant="danger">{error}</Alert>}
 
             <Button
@@ -683,6 +714,25 @@ export default function RSVPPage({ params }: Props) {
             >
               {submitting ? "Odesílám…" : "Odeslat přihlášku"}
             </Button>
+
+            {/* GDPR info-block — informace při sběru dle čl. 13 GDPR.
+                Olaf je správce dat (controller); na všech tenantech je
+                politika jednotná, není možné si dělat each-workspace
+                vlastní pravidla. */}
+            <p className="text-xs text-ink-500">
+              Odesláním uložíme tvé jméno, e-mail{acctPhone && ", telefon"} a
+              vyplněné odpovědi pro organizaci této akce a komunikaci s tebou.
+              Správcem osobních údajů je platforma olaf. Tvá práva (přístup,
+              oprava, výmaz, přenositelnost) a kompletní pravidla najdeš v{" "}
+              <Link
+                href="/legal/zasady-ochrany-osobnich-udaju"
+                target="_blank"
+                className="underline hover:text-ink-900"
+              >
+                Zásadách ochrany osobních údajů ↗
+              </Link>
+              . Registraci můžeš kdykoli zrušit z potvrzovacího e-mailu.
+            </p>
           </form>
         </section>
       </main>

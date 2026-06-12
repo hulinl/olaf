@@ -131,6 +131,9 @@ export function EventForm({
   const [capacity, setCapacity] = useState<string>(
     initial?.capacity != null ? String(initial.capacity) : "",
   );
+  const [requirePhoneOnRsvp, setRequirePhoneOnRsvp] = useState(
+    initial?.require_phone_on_rsvp ?? true,
+  );
   const [waitlistEnabled, setWaitlistEnabled] = useState(
     initial?.waitlist_enabled ?? true,
   );
@@ -258,6 +261,7 @@ export function EventForm({
         location_url: locationUrl,
         capacity: capacity ? Number(capacity) : null,
         waitlist_enabled: waitlistEnabled,
+        require_phone_on_rsvp: requirePhoneOnRsvp,
         requires_approval: requiresApproval,
         visibility,
         status,
@@ -447,6 +451,22 @@ export function EventForm({
                   className="mt-0.5 size-4 accent-brand"
                 />
                 Vyžadovat moje schválení každé registrace
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-ink-900">
+                <span className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={requirePhoneOnRsvp}
+                    onChange={(e) => setRequirePhoneOnRsvp(e.target.checked)}
+                    className="mt-0.5 size-4 accent-brand"
+                  />
+                  Vyžadovat telefon při registraci
+                </span>
+                <span className="ml-6 text-xs text-ink-500">
+                  Doporučeno pro většinu akcí — telefon je klíčový pro
+                  emergencie. U casual akcí (BBQ, komunitní setkání)
+                  můžeš nechat odznačené.
+                </span>
               </label>
             </div>
           </div>

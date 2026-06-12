@@ -121,6 +121,14 @@ class Event(TenantScopedModel):
         default=True,
         help_text="When capacity is reached, additional RSVPs join a waitlist.",
     )
+    require_phone_on_rsvp = models.BooleanField(
+        default=True,
+        help_text=(
+            "Vyžadovat telefon při registraci. Default True kvůli "
+            "emergencies (pořadatel potřebuje sehnat účastníka v terénu). "
+            "U casual akcí (opékání špekáčků, komunita) si owner odznačí."
+        ),
+    )
 
     visibility = models.CharField(
         max_length=20,
