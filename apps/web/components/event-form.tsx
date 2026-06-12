@@ -452,22 +452,6 @@ export function EventForm({
                 />
                 Vyžadovat moje schválení každé registrace
               </label>
-              <label className="flex flex-col gap-1 text-sm text-ink-900">
-                <span className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={requirePhoneOnRsvp}
-                    onChange={(e) => setRequirePhoneOnRsvp(e.target.checked)}
-                    className="mt-0.5 size-4 accent-brand"
-                  />
-                  Vyžadovat telefon při registraci
-                </span>
-                <span className="ml-6 text-xs text-ink-500">
-                  Doporučeno pro většinu akcí — telefon je klíčový pro
-                  emergencie. U casual akcí (BBQ, komunitní setkání)
-                  můžeš nechat odznačené.
-                </span>
-              </label>
             </div>
           </div>
         </CardSection>
@@ -1007,7 +991,29 @@ export function EventForm({
             zobrazí. Stabilní údaje (kondice, dieta, tričko, emergency
             kontakt) se předvyplní z jejich profilu.
           </p>
-          <div className="mt-4 grid grid-cols-1 gap-2">
+          {/* Telefon je technicky "account" pole (ne questionnaire
+              sekce), ale pro ownera je to UI taky volba "co chcu mít
+              na formuláři". Sourozenec sekcím dotazníku — sjednocené
+              místo, kde rozhoduje co vidí účastník. */}
+          <label className="mt-4 flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand">
+            <input
+              type="checkbox"
+              checked={requirePhoneOnRsvp}
+              onChange={(e) => setRequirePhoneOnRsvp(e.target.checked)}
+              className="mt-0.5 size-4 accent-brand"
+            />
+            <span className="flex flex-col">
+              <span className="font-medium text-ink-900">
+                Telefon
+              </span>
+              <span className="text-xs text-ink-500">
+                Doporučeno pro většinu akcí — telefon je klíčový pro
+                emergencie. U casual akcí (BBQ, komunitní setkání)
+                nech odznačené a pole se vůbec nezobrazí.
+              </span>
+            </span>
+          </label>
+          <div className="mt-2 grid grid-cols-1 gap-2">
             {QUESTIONNAIRE_SECTION_ORDER.map((section) => {
               const checked = enabledSections.includes(section);
               return (
