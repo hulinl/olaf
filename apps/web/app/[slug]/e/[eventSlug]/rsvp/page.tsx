@@ -423,24 +423,27 @@ export default function RSVPPage({ params }: Props) {
                         onChange={(e) => setAcctEmail(e.target.value)}
                       />
                     </Field>
-                    <Field
-                      label={
-                        event.require_phone_on_rsvp
-                          ? "Telefon"
-                          : "Telefon (volitelné)"
-                      }
-                      htmlFor="phone"
-                      hint="Pro případ nouze nebo rychlou komunikaci."
-                    >
-                      <Input
-                        id="phone"
-                        type="tel"
-                        autoComplete="tel"
-                        required={event.require_phone_on_rsvp}
-                        value={acctPhone}
-                        onChange={(e) => setAcctPhone(e.target.value)}
-                      />
-                    </Field>
+                    {/* Když owner odznačil "Vyžadovat telefon" v
+                        Detailech akce, pole vůbec neukážeme — méně
+                        frikce, žádné zbytečné "Telefon (volitelné)".
+                        User k tomu: "když řeknu že ho tam nechci, tak
+                        ať tam to pole ani není". */}
+                    {event.require_phone_on_rsvp && (
+                      <Field
+                        label="Telefon"
+                        htmlFor="phone"
+                        hint="Pro případ nouze nebo rychlou komunikaci."
+                      >
+                        <Input
+                          id="phone"
+                          type="tel"
+                          autoComplete="tel"
+                          required
+                          value={acctPhone}
+                          onChange={(e) => setAcctPhone(e.target.value)}
+                        />
+                      </Field>
+                    )}
                   </div>
                 </CardSection>
               </Card>
