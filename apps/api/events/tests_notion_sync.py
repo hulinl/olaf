@@ -257,3 +257,140 @@ class SyncEndpointTests(TestCase):
         )
         r = self.client.post(url)
         self.assertEqual(r.status_code, 404)
+
+    def test_missing_anthropic_token_returns_400(self) -> None:
+        self.user.anthropic_api_key_encrypted = ""
+        self.user.save()
+        r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json().get("missing"), "anthropic")
+
+    def test_notion_page_deleted_returns_400(self) -> None:
+        """User smazal stránku v Notionu mezi prvním ingestem a syncem.
+        Notion API vrátí 404; náš handler ho přemapuje na 400 s českou
+        radou (page invisible to integration / smazaná)."""
+        import urllib.error
+
+        def boom(*args, **kwargs):
+            raise urllib.error.HTTPError(
+                "https://api.notion.com/v1/pages/abc",
+                404,
+                "Not Found",
+                {},
+                None,
+            )
+
+        with patch(
+            "events.notion_ingest.urllib.request.urlopen", side_effect=boom
+        ):
+            r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 400)
+        # Helpful copy o Connections nastavení.
+        self.assertIn("Connections", r.json().get("detail", ""))
+
+    def test_anthropic_garbage_response_returns_502(self) -> None:
+        """Claude vrátí non-JSON text — ingest mapuje na 502 (transient
+        upstream failure), ne 500 (interní bug)."""
+        # Aspoň 1 char v properties, jinak ingest brečí "prázdná
+        # stránka" před Anthropic voláním.
+        page_resp = {
+            "properties": {
+                "Name": {
+                    "type": "title",
+                    "title": [{"plain_text": "Letní kemp"}],
+                }
+            }
+        }
+        children_resp = {"results": [], "next_cursor": None}
+        anthropic_resp = {
+            "content": [{"type": "text", "text": "definitely not json"}]
+        }
+        payloads = [
+            json.dumps(page_resp).encode(),
+            json.dumps(children_resp).encode(),
+            json.dumps(anthropic_resp).encode(),
+        ]
+        mocks = [
+            type(
+                "Resp",
+                (),
+                {
+                    "read": lambda self, p=p: p,
+                    "__enter__": lambda self: self,
+                    "__exit__": lambda self, *args: None,
+                },
+            )()
+            for p in payloads
+        ]
+        with patch("events.notion_ingest.urllib.request.urlopen") as urlopen:
+            urlopen.side_effect = mocks
+            r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 502, r.content)
+
+    def test_partial_response_preserves_untouched_fields(self) -> None:
+        """Claude vrátí jen title — všechno ostatní (capacity, price,
+        location) zůstává jak bylo. fields_updated obsahuje právě 1
+        položku."""
+        self.event.capacity = 12
+        self.event.location_text = "Beskydy"
+        self.event.save(update_fields=["capacity", "location_text"])
+        draft = {"title": "Pouze title se změnil"}
+        with patch("events.notion_ingest.urllib.request.urlopen") as urlopen:
+            urlopen.side_effect = self._mock_apis(draft=draft)
+            r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 200)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.title, "Pouze title se změnil")
+        self.assertEqual(self.event.capacity, 12)
+        self.assertEqual(self.event.location_text, "Beskydy")
+        body = r.json()
+        self.assertEqual(body["fields_updated"], ["title"])
+
+    def test_unknown_block_type_dropped_by_sanitizer(self) -> None:
+        """Claude občas vyhalucinuje block type — sanitizer ho dropne
+        v _sanitize_blocks. Sync nešílí, ostatní bloky projdou."""
+        draft = {
+            "title": "Updated",
+            "blocks": [
+                {
+                    "id": "hero",
+                    "type": "hero",
+                    "payload": {"eyebrow": "OK"},
+                },
+                {
+                    "id": "weird",
+                    "type": "definitely-not-real",
+                    "payload": {},
+                },
+                {
+                    "id": "prose-1",
+                    "type": "prose",
+                    "payload": {"heading": "Real prose", "body": "Hi"},
+                },
+            ],
+        }
+        with patch("events.notion_ingest.urllib.request.urlopen") as urlopen:
+            urlopen.side_effect = self._mock_apis(draft=draft)
+            r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.event.refresh_from_db()
+        # Sanitizer drops the bogus one; 2 valid blocks persist.
+        types = [b["type"] for b in self.event.blocks]
+        self.assertEqual(types, ["hero", "prose"])
+
+    def test_event_status_pinned_through_sync(self) -> None:
+        """Sync nesmí změnit status. Pokud Claude vrátí "status":
+        "published", sync ten field ignoruje (není v extractable
+        tuple) → event zůstává draft. Bezpečnostní invariant."""
+        # Sanity: před syncem je draft (z fixture).
+        self.assertEqual(self.event.status, Event.STATUS_DRAFT)
+        draft = {
+            "title": "Should still be draft after sync",
+            "status": "published",  # NEEXTRACTUJE se — view to ignoruje
+        }
+        with patch("events.notion_ingest.urllib.request.urlopen") as urlopen:
+            urlopen.side_effect = self._mock_apis(draft=draft)
+            r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 200)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, Event.STATUS_DRAFT)
