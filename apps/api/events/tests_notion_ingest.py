@@ -214,6 +214,9 @@ class IngestEndpointTests(TestCase):
     def test_happy_path_returns_draft(self) -> None:
         self._connect_both()
 
+        # /pages/<id> — properties first (database columns). Empty
+        # here, but the pipeline always fetches them now.
+        notion_page_resp = {"properties": {}}
         notion_resp = {
             "results": [
                 {
@@ -262,14 +265,15 @@ class IngestEndpointTests(TestCase):
             ]
         }
 
-        # Two separate urlopen calls (Notion fetch, then Anthropic).
-        # Use side_effect to return them in order.
+        # Three urlopen calls now: /pages/<id> (properties),
+        # /blocks/<id>/children (body), then Anthropic.
+        page_payload = json.dumps(notion_page_resp).encode("utf-8")
         notion_payload = json.dumps(notion_resp).encode("utf-8")
         anthropic_payload = json.dumps(anthropic_resp).encode("utf-8")
 
         with patch("events.notion_ingest.urllib.request.urlopen") as urlopen:
             mock_responses = []
-            for payload in [notion_payload, anthropic_payload]:
+            for payload in [page_payload, notion_payload, anthropic_payload]:
                 mock = type(
                     "Resp",
                     (),

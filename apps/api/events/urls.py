@@ -49,6 +49,11 @@ urlpatterns = [
         name="update",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/sync-from-source/",
+        views.sync_event_from_source,
+        name="sync-from-source",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/cover/",
         views.event_cover,
         name="cover",

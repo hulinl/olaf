@@ -264,6 +264,11 @@ export interface Event extends EventSummary {
   risk_checklist: RiskChecklistItem[];
   my_rsvp?: MyRSVP | null;
   i_am_owner?: boolean;
+  /** Source pointer for ingest pipelines. `notion:<page_id>` when the
+   *  event was ingested from a Notion page (and can be re-synced via
+   *  the "Aktualizovat z Notion" button). Empty for hand-created
+   *  events. */
+  external_ref: string;
 }
 
 export interface RiskChecklistItem {
@@ -1330,6 +1335,21 @@ export const events = {
       method: "POST",
       body: JSON.stringify({ url }),
     }),
+  /** Re-read the Notion page bound to this event (via external_ref =
+   *  "notion:<page_id>") and apply the new content. Only callable when
+   *  the event already has a notion: ref — fresh ingests still go
+   *  through ingestFromSource. */
+  syncFromSource: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<{
+      event_id: number;
+      event_slug: string;
+      workspace_slug: string;
+      fields_updated: string[];
+      notes: string[];
+    }>(
+      `/api/events/${workspaceSlug}/${eventSlug}/sync-from-source/`,
+      { method: "POST" },
+    ),
   update: (
     workspaceSlug: string,
     eventSlug: string,

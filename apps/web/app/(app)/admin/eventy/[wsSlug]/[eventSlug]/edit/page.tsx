@@ -233,6 +233,31 @@ export default function EventEditCockpitPage({ params }: Props) {
         </div>
       </section>
 
+      {event.external_ref?.startsWith("notion:") && (
+        <section>
+          <h2 className="text-lg font-semibold text-ink-900">
+            Synchronizace z Notion
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Akce je svázaná s Notion stránkou (
+            <code className="rounded bg-surface-muted px-1 font-mono text-xs">
+              {event.external_ref}
+            </code>
+            ). Stiskni „Aktualizovat z Notion" a Claude znovu načte
+            stránku, přepíše pole akce (datum, místo, cena, kapacita)
+            a bloky landing-page. Slug, status, registrace a faktury
+            zůstanou.
+          </p>
+          <div className="mt-3">
+            <NotionSyncButton
+              wsSlug={wsSlug}
+              eventSlug={eventSlug}
+              onSynced={(updated) => setEvent(updated)}
+            />
+          </div>
+        </section>
+      )}
+
       <CollaboratorsSection wsSlug={wsSlug} eventSlug={eventSlug} />
 
       <section>
@@ -254,6 +279,93 @@ export default function EventEditCockpitPage({ params }: Props) {
         />
       </div>
     </div>
+  );
+}
+
+function NotionSyncButton({
+  wsSlug,
+  eventSlug,
+  onSynced,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+  onSynced: (event: OlafEvent) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  async function handle() {
+    if (
+      !confirm(
+        "Načíst z Notion stránku znovu a aktualizovat tuto akci? " +
+          "Bloky landing-page se přepíšou tím, co Claude extrahuje. " +
+          "Slug, status, RSVPs a faktury zůstanou.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    setOkMsg(null);
+    try {
+      const result = await events.syncFromSource(wsSlug, eventSlug);
+      // Refetch event to get the now-updated fields + blocks. Faster
+      // than rebuilding from the response: same code path as initial
+      // load, no chance of drift.
+      const fresh = await events.publicEvent(wsSlug, eventSlug);
+      onSynced(fresh);
+      const count = result.fields_updated.length;
+      setOkMsg(
+        count > 0
+          ? `Aktualizováno ${count} pol${
+              count === 1 ? "e" : count < 5 ? "e" : "í"
+            }: ${result.fields_updated.join(", ")}.`
+          : "Notion stránka nepřinesla žádné nové údaje.",
+      );
+    } catch (e) {
+      if (e instanceof ApiError) {
+        const missing = e.data?.missing;
+        if (missing === "notion" || missing === "anthropic") {
+          setErr(
+            `${
+              typeof e.data?.detail === "string" ? e.data.detail : e.message
+            } Otevři /settings/integrace.`,
+          );
+        } else {
+          setErr(
+            typeof e.data?.detail === "string"
+              ? e.data.detail
+              : e.message,
+          );
+        }
+      } else {
+        setErr("Sync selhal.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handle}
+        disabled={busy}
+        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring disabled:opacity-50"
+      >
+        {busy ? "Synchronizuji…" : "Aktualizovat z Notion"}
+      </button>
+      {okMsg && (
+        <p className="mt-2 text-sm text-success">{okMsg}</p>
+      )}
+      {err && (
+        <p className="mt-2 whitespace-pre-line text-sm text-danger">
+          {err}
+        </p>
+      )}
+    </>
   );
 }
 

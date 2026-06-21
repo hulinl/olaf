@@ -132,6 +132,7 @@ class IngestExistingEventDetectionTests(TestCase):
     def _mock_apis(self, *, title: str = "Letní kemp 2026"):
         """Patch urlopen so Notion + Anthropic calls return canned data
         — matches the pattern in tests_notion_ingest.py."""
+        notion_page_resp = {"properties": {}}
         notion_resp = {
             "results": [
                 {
@@ -174,6 +175,7 @@ class IngestExistingEventDetectionTests(TestCase):
             ]
         }
         payloads = [
+            json.dumps(notion_page_resp).encode("utf-8"),
             json.dumps(notion_resp).encode("utf-8"),
             json.dumps(anthropic_resp).encode("utf-8"),
         ]

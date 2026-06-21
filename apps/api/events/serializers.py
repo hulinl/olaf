@@ -234,6 +234,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "payment_in_cash",
             "billing_profile",
             "required_documents",
+            "external_ref",
             "created_at",
         )
         read_only_fields = fields
