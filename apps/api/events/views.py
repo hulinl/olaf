@@ -513,6 +513,44 @@ def ingest_event_from_source(request: Request) -> Response:
             {"detail": str(e)},
             status=e.status_code,
         )
+
+    # Idempotency: if this Notion page already produced an event in any
+    # workspace the caller owns/admins, return a pointer so the frontend
+    # can offer "update existing" vs "create new". The external_ref
+    # convention here is `notion:<32-hex>`. Sites that import via the
+    # /import/ endpoint use other prefixes (mountain-guide → no prefix
+    # for now), so we don't collide.
+    page_id = draft.get("notion_page_id") or ""
+    existing: dict | None = None
+    if page_id:
+        from workspaces.models import WorkspaceMember
+
+        managed_ws_ids = list(
+            WorkspaceMember.objects.filter(
+                user=request.user,
+                role__in=[
+                    WorkspaceMember.ROLE_OWNER,
+                    WorkspaceMember.ROLE_ADMIN,
+                ],
+            ).values_list("workspace_id", flat=True)
+        )
+        existing_event = (
+            Event.objects.filter(
+                external_ref=f"notion:{page_id}",
+                workspace_id__in=managed_ws_ids,
+            )
+            .select_related("workspace")
+            .first()
+        )
+        if existing_event is not None:
+            existing = {
+                "id": existing_event.pk,
+                "slug": existing_event.slug,
+                "title": existing_event.title,
+                "status": existing_event.status,
+                "workspace_slug": existing_event.workspace.slug,
+            }
+    draft["existing_event"] = existing
     return Response(draft)
 
 

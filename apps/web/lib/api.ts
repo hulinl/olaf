@@ -300,6 +300,25 @@ export interface EventDraftFromSource {
   price_note: string | null;
   notes: string[] | null;
   source_url: string;
+  /** 32-hex Notion page id extracted from the URL. Stamp on the
+   *  resulting Event as `external_ref = "notion:<page_id>"` so a
+   *  second ingest of the same page hits the upsert path. */
+  notion_page_id: string;
+  /** Claude-extracted landing-page blocks. Empty list when the
+   *  source page didn't have rich structured content. Sanitized
+   *  server-side — unknown block types get dropped, but the rest
+   *  may still fail strict blocks.py validation at save time. */
+  blocks: EventBlock[];
+  /** When set, this Notion page already produced an event in one of
+   *  the caller's workspaces — frontend offers an "update existing"
+   *  toggle alongside the default "create new". */
+  existing_event: {
+    id: number;
+    slug: string;
+    title: string;
+    status: string;
+    workspace_slug: string;
+  } | null;
 }
 
 export interface RequiredDocumentSpec {
