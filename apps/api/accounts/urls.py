@@ -49,6 +49,16 @@ urlpatterns = [
         views.creator_person_detail,
         name="creator-person-detail",
     ),
+    path(
+        "me/api-tokens/",
+        views.api_tokens,
+        name="api-tokens",
+    ),
+    path(
+        "me/api-tokens/<int:token_id>/",
+        views.api_token_detail,
+        name="api-token-detail",
+    ),
     path("password/reset/request/", views.password_reset_request, name="password-reset-request"),
     path("password/reset/confirm/", views.password_reset_confirm, name="password-reset-confirm"),
 ]

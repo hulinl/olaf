@@ -179,6 +179,12 @@ if TESTING:
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "olaf.authentication.SessionAuthenticationWith401",
+        # Bearer-token auth for external clients (mountain-guide skill,
+        # CLI scripts, CI). Tokens are issued from /settings/integrations/
+        # and stored in accounts.APIToken. Session auth wins when both are
+        # present (cookie precedence is fine — the browser flow is the
+        # common case).
+        "olaf.authentication.APITokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

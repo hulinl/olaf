@@ -24,9 +24,19 @@ urlpatterns = [
         name="from-source",
     ),
     path(
+        "import-schema/",
+        views.import_schema,
+        name="import-schema",
+    ),
+    path(
         "<slug:workspace_slug>/create/",
         views.create_event,
         name="create",
+    ),
+    path(
+        "<slug:workspace_slug>/import/",
+        views.import_event,
+        name="import",
     ),
     path(
         "<slug:workspace_slug>/<slug:event_slug>/",

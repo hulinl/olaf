@@ -88,6 +88,22 @@ export interface User {
   };
 }
 
+export interface APITokenInfo {
+  id: number;
+  label: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  is_active: boolean;
+}
+
+export interface APITokenCreated extends APITokenInfo {
+  /** Plaintext token. Returned exactly once on creation; subsequent
+   *  GETs never include this field. */
+  key: string;
+}
+
 export interface BillingProfile {
   id: number;
   label: string;
@@ -1809,6 +1825,15 @@ export const auth = {
       "/api/auth/me/integrations/anthropic/",
       { method: "DELETE" },
     ),
+  listApiTokens: () =>
+    apiFetch<APITokenInfo[]>("/api/auth/me/api-tokens/"),
+  createApiToken: (label: string) =>
+    apiFetch<APITokenCreated>("/api/auth/me/api-tokens/", {
+      method: "POST",
+      body: JSON.stringify({ label }),
+    }),
+  revokeApiToken: (id: number) =>
+    apiFetch<void>(`/api/auth/me/api-tokens/${id}/`, { method: "DELETE" }),
   billingProfiles: () =>
     apiFetch<BillingProfile[]>("/api/auth/me/billing-profiles/"),
   createBillingProfile: (payload: BillingProfileWritePayload) =>

@@ -365,6 +365,75 @@ class BillingProfile(models.Model):
 
 
 
+class APIToken(models.Model):
+    """Personal access token for the OLAF JSON API.
+
+    Issued from /settings/integrations/ for use by external clients —
+    notably the mountain-guide Claude Code skill that publishes a
+    pre-built event landing into OLAF without touching the browser.
+    Multiple tokens per user (separate notebook / CI / per-skill
+    tokens) so revoking one doesn't kick the rest. Plaintext token is
+    returned exactly once on creation; afterwards only the prefix
+    (first 8 chars) is shown for identification.
+
+    Stored as plaintext (DRF authtoken pattern, not hashed) because we
+    look up by key on every authenticated request. DB compromise =
+    other bigger problems, so the entropy budget goes into the token
+    itself (256 bits via secrets.token_urlsafe).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="api_tokens",
+    )
+    label = models.CharField(
+        max_length=80,
+        help_text='User-picked nickname, e.g. "mountain-guide laptop".',
+    )
+    key = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        default=_generate_token,
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "accounts_apitoken"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "revoked_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.user_id})"
+
+    @property
+    def prefix(self) -> str:
+        return self.key[:8] if self.key else ""
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
+
+    def revoke(self) -> None:
+        if self.revoked_at is None:
+            self.revoked_at = timezone.now()
+            self.save(update_fields=["revoked_at"])
+
+    def touch(self) -> None:
+        """Bump last_used_at on auth. Debounced to ~1/minute so a busy
+        skript doesn't write to this row on every request."""
+        now = timezone.now()
+        if (
+            self.last_used_at is None
+            or (now - self.last_used_at) > timedelta(minutes=1)
+        ):
+            self.last_used_at = now
+            self.save(update_fields=["last_used_at"])
+
+
 class PushSubscription(models.Model):
     """A browser Web Push subscription belonging to a user + device.
 
