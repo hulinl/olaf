@@ -174,6 +174,99 @@ def _block_to_text(block: dict[str, Any]) -> str:
     return line
 
 
+def _property_to_lines(name: str, prop: dict[str, Any]) -> list[str]:
+    """Flatten one Notion property to plain-text lines the LLM can read.
+
+    Notion database items put canonical fields (date, price, capacity,
+    tags) as *properties*, not as page-body blocks. Without this the
+    ingest only sees free-text the organiser dropped into the page
+    body — date/price columns are invisible. We surface every common
+    property type as a `Name: value` line so Claude has both surfaces.
+    """
+    ptype = prop.get("type")
+    if not ptype:
+        return []
+    value = prop.get(ptype)
+    if value is None or value == "":
+        return []
+    if ptype == "title":
+        text = "".join(
+            rt.get("plain_text", "")
+            for rt in value
+            if isinstance(rt, dict)
+        ).strip()
+        return [f"# {text}"] if text else []
+    if ptype == "rich_text":
+        text = "".join(
+            rt.get("plain_text", "")
+            for rt in value
+            if isinstance(rt, dict)
+        ).strip()
+        return [f"{name}: {text}"] if text else []
+    if ptype == "date":
+        start = value.get("start")
+        end = value.get("end")
+        if start and end and start != end:
+            return [f"{name}: {start} – {end}"]  # noqa: RUF001 — en-dash je intentional v Czech datovém range
+        if start:
+            return [f"{name}: {start}"]
+        return []
+    if ptype == "number":
+        return [f"{name}: {value}"]
+    if ptype in ("url", "email", "phone_number"):
+        return [f"{name}: {value}"]
+    if ptype == "checkbox":
+        return [f"{name}: {'ano' if value else 'ne'}"]
+    if ptype in ("select", "status"):
+        n = value.get("name") if isinstance(value, dict) else None
+        return [f"{name}: {n}"] if n else []
+    if ptype == "multi_select":
+        names = [
+            opt.get("name", "")
+            for opt in value
+            if isinstance(opt, dict) and opt.get("name")
+        ]
+        return [f"{name}: {', '.join(names)}"] if names else []
+    if ptype == "people":
+        names = [
+            p.get("name", "")
+            for p in value
+            if isinstance(p, dict) and p.get("name")
+        ]
+        return [f"{name}: {', '.join(names)}"] if names else []
+    if ptype == "files":
+        urls: list[str] = []
+        for f in value if isinstance(value, list) else []:
+            if not isinstance(f, dict):
+                continue
+            url = ""
+            if "external" in f and isinstance(f["external"], dict):
+                url = f["external"].get("url", "")
+            elif "file" in f and isinstance(f["file"], dict):
+                url = f["file"].get("url", "")
+            if url:
+                urls.append(url)
+        return [f"{name}: {', '.join(urls)}"] if urls else []
+    # Skip relation / rollup / formula / created_by / created_time /
+    # last_edited_* — either too noisy or unrelated to event content.
+    return []
+
+
+def fetch_notion_page_properties(page_id: str, token: str) -> str:
+    """Flatten the page's database properties to plain text. For
+    database items, most canonical fields (date, price, capacity, tags)
+    live here, not in the block tree, so without this the LLM gets
+    only the body and misses everything in the columns."""
+    page = _notion_request(f"/pages/{page_id}", token)
+    properties = page.get("properties") or {}
+    lines: list[str] = []
+    for name, prop in properties.items():
+        if not isinstance(prop, dict):
+            continue
+        lines.extend(_property_to_lines(name, prop))
+    return "\n".join(lines).strip()
+
+
 def fetch_notion_page_text(page_id: str, token: str) -> str:
     """Returns a single flattened text representation of the page.
 
@@ -469,6 +562,33 @@ def extract_event_draft(page_text: str, anthropic_api_key: str) -> dict[str, Any
 # ---------------------------------------------------------------------------
 
 
+def ingest_event_from_page_id(
+    page_id: str,
+    notion_token: str,
+    anthropic_api_key: str,
+) -> dict[str, Any]:
+    """Same end-to-end pipeline as ingest_event_from_notion_url, but
+    starts from a known 32-hex page id. Used by the sync endpoint that
+    re-reads an event's bound Notion page without round-tripping
+    through the URL."""
+    # Pull both surfaces — properties (database columns) live on the
+    # page object, body content lives in the block tree. Most organiser
+    # databases stash date/price/capacity as columns; without the
+    # properties stretch we'd only see whatever they typed into the
+    # page body underneath the database row.
+    props = fetch_notion_page_properties(page_id, notion_token)
+    body = fetch_notion_page_text(page_id, notion_token)
+    combined = "\n\n".join(part for part in (props, body) if part).strip()
+    if not combined:
+        raise IngestError(
+            "Notion stránka je prázdná nebo neobsahuje text.",
+            status_code=400,
+        )
+    draft = extract_event_draft(combined, anthropic_api_key)
+    draft["notion_page_id"] = page_id
+    return draft
+
+
 def ingest_event_from_notion_url(
     url: str,
     notion_token: str,
@@ -484,13 +604,6 @@ def ingest_event_from_notion_url(
             "Z URL se nepodařilo vytáhnout Notion page ID.",
             status_code=400,
         )
-    page_text = fetch_notion_page_text(page_id, notion_token)
-    if not page_text:
-        raise IngestError(
-            "Notion stránka je prázdná nebo neobsahuje text.",
-            status_code=400,
-        )
-    draft = extract_event_draft(page_text, anthropic_api_key)
+    draft = ingest_event_from_page_id(page_id, notion_token, anthropic_api_key)
     draft["source_url"] = url
-    draft["notion_page_id"] = page_id
     return draft

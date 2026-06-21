@@ -818,6 +818,158 @@ def _set_event_shared_workspaces(
     event.shared_workspaces.set(matches)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def sync_event_from_source(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Re-read the bound Notion page and apply the new content to an
+    existing event. One-click counterpart to the create-from-source
+    flow — the user pressed "Aktualizovat z Notion" on the event edit
+    page, we look up the source page id stored in `external_ref`, run
+    the same ingest pipeline, and PATCH the event in place.
+
+    Idempotent. Keeps slug, status, RSVPs, payments, communities, and
+    every field the ingest doesn't extract (capacity overrides typed
+    by the organiser stay; only fields Claude actually returns get
+    overwritten).
+
+    Errors:
+      400 — event has no `notion:<page_id>` ref / Notion or Anthropic
+            token missing / Notion page empty / Claude JSON malformed
+      403 — caller can't manage this event
+      404 — event not found
+      502 — upstream Notion or Anthropic transient failure
+    """
+    from accounts.integrations import safe_decrypt_token
+
+    from .notion_ingest import IngestError, ingest_event_from_page_id
+
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    ref = event.external_ref or ""
+    if not ref.startswith("notion:"):
+        return Response(
+            {
+                "detail": (
+                    "Tato akce nemá vázanou Notion stránku. "
+                    "Otevři „Vytvořit z odkazu“, paste URL a sync ji "
+                    "tímhle tlačítkem napříště."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    page_id = ref[len("notion:") :].strip()
+    if not page_id:
+        return Response(
+            {"detail": "external_ref má prefix 'notion:' ale prázdné ID."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    notion_token = safe_decrypt_token(
+        request.user.notion_integration_token_encrypted
+    )
+    anthropic_key = safe_decrypt_token(
+        request.user.anthropic_api_key_encrypted
+    )
+    if not notion_token:
+        return Response(
+            {
+                "detail": (
+                    "Nemáš připojený Notion. Otevři /settings/integrace "
+                    "a vlož svůj Notion integration token."
+                ),
+                "missing": "notion",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not anthropic_key:
+        return Response(
+            {
+                "detail": (
+                    "Nemáš připojený Anthropic API key. Otevři "
+                    "/settings/integrace a vlož svůj klíč."
+                ),
+                "missing": "anthropic",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        draft = ingest_event_from_page_id(
+            page_id, notion_token, anthropic_key
+        )
+    except IngestError as e:
+        return Response({"detail": str(e)}, status=e.status_code)
+
+    # Apply only what Claude actually returned (drop None values so we
+    # don't blank out fields the user already filled). Keep slug pinned
+    # — sync must never break the public URL.
+    extractable = (
+        "title",
+        "description",
+        "starts_at",
+        "ends_at",
+        "location_text",
+        "meeting_point_text",
+        "location_url",
+        "capacity",
+        "price_amount",
+        "price_currency",
+        "price_note",
+        "blocks",
+    )
+    patch: dict = {}
+    for key in extractable:
+        if key in draft and draft[key] not in (None, ""):
+            patch[key] = draft[key]
+    # Blocks: even empty list overwrites — that's the right behavior when
+    # the organiser stripped the page and wants to start fresh. But we
+    # don't blank to empty IF Claude returned [] AND we already have
+    # blocks — sync should never silently destroy a hand-built landing.
+    if "blocks" in patch and patch["blocks"] == [] and event.blocks:
+        patch.pop("blocks")
+
+    serializer = EventWriteSerializer(event, data=patch, partial=True)
+    serializer.is_valid(raise_exception=True)
+    updated_event = serializer.save()
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_UPDATE,
+        workspace=event.workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=f'Sync „{event.title}” z Notion',
+        payload={
+            "event_slug": event.slug,
+            "source": "notion_sync",
+            "fields_updated": sorted(patch.keys()),
+        },
+    )
+
+    return Response(
+        {
+            "event_id": updated_event.pk,
+            "event_slug": updated_event.slug,
+            "workspace_slug": updated_event.workspace.slug,
+            "fields_updated": sorted(patch.keys()),
+            "notes": draft.get("notes") or [],
+        }
+    )
+
+
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def update_event(request: Request, workspace_slug: str, event_slug: str) -> Response:
