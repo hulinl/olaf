@@ -686,3 +686,77 @@ def creator_person_detail(request: Request, user_id: int) -> Response:
             ],
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Personal access tokens — used by external clients (mountain-guide skill,
+# CLI scripts) to call the JSON API with `Authorization: Bearer <token>`.
+# ---------------------------------------------------------------------------
+
+
+def _serialize_api_token(token, *, include_key: bool = False) -> dict:
+    """Token metadata for the settings UI. Plaintext key is included
+    exactly once on creation; subsequent GETs never expose it (only
+    prefix for identification)."""
+    data = {
+        "id": token.id,
+        "label": token.label,
+        "prefix": token.prefix,
+        "created_at": token.created_at,
+        "last_used_at": token.last_used_at,
+        "revoked_at": token.revoked_at,
+        "is_active": token.is_active,
+    }
+    if include_key:
+        data["key"] = token.key
+    return data
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def api_tokens(request: Request) -> Response:
+    """List the current user's API tokens (GET) or issue a new one (POST).
+
+    POST body: {"label": "mountain-guide laptop"} — short nickname so
+    the user can tell tokens apart in /settings/integrations/.
+    Response includes the plaintext key once; afterwards GET only
+    returns the prefix.
+    """
+    from .models import APIToken
+
+    if request.method == "GET":
+        qs = APIToken.objects.filter(user=request.user)
+        return Response([_serialize_api_token(t) for t in qs])
+
+    label = (request.data.get("label") or "").strip()
+    if not label:
+        return Response(
+            {"label": "Vyplň prosím název tokenu."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if len(label) > 80:
+        return Response(
+            {"label": "Název je moc dlouhý (max 80 znaků)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    token = APIToken.objects.create(user=request.user, label=label)
+    return Response(
+        _serialize_api_token(token, include_key=True),
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def api_token_detail(request: Request, token_id: int) -> Response:
+    """Revoke a token. Soft delete — sets revoked_at so the audit
+    trail of which tokens existed survives, but the token stops
+    authenticating immediately."""
+    from .models import APIToken
+
+    try:
+        token = APIToken.objects.get(pk=token_id, user=request.user)
+    except APIToken.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    token.revoke()
+    return Response(status=status.HTTP_204_NO_CONTENT)

@@ -1,0 +1,166 @@
+{
+  "external_ref": "beskydy-spring-camp-2026",
+  "slug": "beskydy-spring-camp",
+  "title": "Beskydy Spring Camp 2026",
+  "description": "Tři dny ve znamení jara v Beskydech. Hřebenovka z Pusteven přes Radhošť na Lysou horu, dvě noci na chatách, žádné ferraty.",
+  "starts_at": "2026-05-16T08:00:00+02:00",
+  "ends_at": "2026-05-19T18:00:00+02:00",
+  "tz": "Europe/Prague",
+  "location_text": "Beskydy, Pustevny",
+  "meeting_point_text": "Parkoviště Pustevny, 9:00 v pátek",
+  "capacity": 24,
+  "waitlist_enabled": true,
+  "require_phone_on_rsvp": true,
+  "visibility": "public",
+  "price_amount": "5500",
+  "price_currency": "CZK",
+  "price_note": "V ceně průvodce, ubytování a snídaně",
+  "payment_in_cash": false,
+  "blocks": [
+    {
+      "id": "hero",
+      "type": "hero",
+      "payload": {
+        "cover_url": "https://images.unsplash.com/photo-beskydy.jpg",
+        "eyebrow": "● Beskydy · Květen 2026",
+        "title_override": "Beskydy Spring Camp 2026",
+        "subtitle": "Tři dny hřebenovkou s východem slunce nad Lysou.",
+        "cta_label": "Chci jet",
+        "cta_href": "#prihlaska",
+        "meta": [
+          {"k": "Délka", "v": "3 dny"},
+          {"k": "Vzdálenost", "v": "~38 km"},
+          {"k": "Převýšení", "v": "+1 850 m"},
+          {"k": "Nejvyšší bod", "v": "Lysá hora 1 323 m"},
+          {"k": "Náročnost", "v": "2 / 5"}
+        ]
+      }
+    },
+    {
+      "id": "about",
+      "type": "prose",
+      "payload": {
+        "eyebrow": "O výpravě",
+        "heading": "Tři dny na beskydském hřebeni",
+        "body": "Vyrazíme z Pustevny po hřebenovce přes Radhošť, přespíme na Bumbálce, druhý den hřeben přes Smrk až na Lysou horu, závěrečný den sestup k Ostravici a domů.\n\nTrasy jsou značené, terén pohodlný, tempo poklidné — ideální pro lidi, kteří si chtějí zkusit hřebenovku bez stresu.",
+        "image_url": "https://images.unsplash.com/photo-radhost.jpg",
+        "image_side": "right"
+      }
+    },
+    {
+      "id": "stats",
+      "type": "stats",
+      "payload": {
+        "dark": true,
+        "tiles": [
+          {"label": "Dny / noci", "value": "3 / 2"},
+          {"label": "Vzdálenost", "value": "38 km"},
+          {"label": "Převýšení", "value": "+1 850 m"},
+          {"label": "Nejvyšší bod", "value": "1 323 m"}
+        ]
+      }
+    },
+    {
+      "id": "days",
+      "type": "days",
+      "payload": {
+        "lead": "Tři dny, dvě noci na horských chatách, jeden východ slunce na hřebeni — žádné ferraty, žádný zmatek.",
+        "days": [
+          {
+            "label": "Den 1 / Pátek",
+            "num": "01",
+            "title": "Pustevny → Radhošť → Bumbálka",
+            "route": "1 018 m → 1 129 m → 870 m",
+            "body": "Sraz 9:00 na parkovišti v Pusteven. Krátký rozcvik k Radegastově soše, výstup na Radhošť, hřebenovkou na Bumbálku, kde přespíme.",
+            "time": "5 h",
+            "distance": "13 km",
+            "ascent": "380 m",
+            "descent": "520 m",
+            "image_url": "https://images.unsplash.com/photo-radhost.jpg",
+            "map_url": "https://mapy.cz/turisticka?planovani-trasy&rc=..."
+          },
+          {
+            "label": "Den 2 / Sobota",
+            "num": "02",
+            "title": "Bumbálka → Smrk → Lysá hora",
+            "route": "870 m → 1 276 m → 1 323 m",
+            "body": "Nejdelší den. Brzký start, výstup na Smrk, dlouhá hřebenovka, na Lysou horu přijdeme večer na západ slunce. Spaní na chatě Lysá hora.",
+            "time": "7 h",
+            "distance": "16 km",
+            "ascent": "980 m",
+            "descent": "480 m"
+          },
+          {
+            "label": "Den 3 / Neděle",
+            "num": "03",
+            "title": "Lysá hora → Ostravice",
+            "route": "1 323 m → 380 m",
+            "body": "Sestup k Ostravici. Domů odjedeme cca v 15:00 (vlak nebo spolujízda — domluvíme na místě).",
+            "time": "4 h",
+            "distance": "9 km",
+            "descent": "950 m"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pricing",
+      "type": "included_split",
+      "payload": {
+        "price_value": "5 500",
+        "price_unit": "Kč",
+        "price_note": "Při minimálně 6 účastnících",
+        "included": [
+          {"label": "Certifikovaný horský průvodce", "desc": "Po celou dobu, plánování trasy, bezpečnostní zázemí"},
+          {"label": "Předjednané ubytování na chatách", "desc": "Bumbálka + Lysá hora"},
+          {"label": "Snídaně na obou chatách", "desc": "Sytá horská snídaně"},
+          {"label": "Fotodokumentace", "desc": "Sdílený album z výpravy"}
+        ],
+        "not_included": [
+          {"label": "Doprava na Pustevny a zpět", "desc": "Doporučujeme spolujízdu"},
+          {"label": "Obědy a večeře", "desc": "Cca 1 200 Kč na celou výpravu"},
+          {"label": "Cestovní pojištění", "desc": "Doporučujeme s asistencí v horách"}
+        ]
+      }
+    },
+    {
+      "id": "faq",
+      "type": "faq",
+      "payload": {
+        "eyebrow": "Praktické informace",
+        "title": "Časté otázky",
+        "items": [
+          {
+            "question": "Pro koho je výprava určená?",
+            "answer": "Sportovně založení turisté, kondice na 5–7 hodin chůze denně se zátěží batohu. Bez technických pasáží — jdeme po značených cestách."
+          },
+          {
+            "question": "Co s sebou?",
+            "answer": "Boty na turistiku, batoh 30–40 l, pláštěnka, tři sady oblečení, spacák (povinné na chatách), čelovka, lékárnička. Detailní seznam pošleme po registraci."
+          },
+          {
+            "question": "Jak je to s počasím?",
+            "answer": "V květnu může být sníh na hřebeni — máme záložní sestup pokud by počasí bylo nebezpečné. Konečné rozhodnutí dělá průvodce."
+          },
+          {
+            "question": "Kolik si vzít hotovosti?",
+            "answer": "Cca 1 500 Kč na chatách (obědy, večeře, pivo). Karty často nefungují."
+          }
+        ]
+      }
+    },
+    {
+      "id": "practical",
+      "type": "practical",
+      "payload": {
+        "eyebrow": "Praktické info",
+        "title": "Co potřebuješ vědět",
+        "transport": "Vlak do Frenštátu p. R. + bus na Pustevny. Nebo auto na parkoviště Pustevny (poplatek 200 Kč/den).",
+        "accommodation": "Horská chata Bumbálka (Pá), Chata Lysá hora (So). Vícelůžky.",
+        "gear": "30–40l batoh, boty, spacák, čelovka, hůlky volitelné.",
+        "difficulty_level": 2,
+        "difficulty_note": "Dlouhé denní úseky, ale žádné technické pasáže."
+      }
+    }
+  ]
+}

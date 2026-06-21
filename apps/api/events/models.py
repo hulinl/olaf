@@ -279,6 +279,23 @@ class Event(TenantScopedModel):
         ),
     )
 
+    # External identifier for idempotent imports (e.g. Claude Code skill in
+    # a separate planning project re-runs the same publish). Owner picks
+    # a stable string per event source — when an import POST carries the
+    # same external_ref under the same workspace, we update in place
+    # instead of creating a duplicate. Blank = legacy / hand-created
+    # event, never collapsed by the importer.
+    external_ref = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text=(
+            "Stable identifier from the external system that produced this "
+            "event (e.g. 'beskydy-spring-camp-2026'). Used by the import "
+            "endpoint to upsert instead of duplicate."
+        ),
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -313,6 +330,16 @@ class Event(TenantScopedModel):
         unique_together = [("workspace", "slug")]
         indexes = [
             models.Index(fields=["workspace", "status", "starts_at"]),
+        ]
+        constraints = [
+            # Idempotency for the import endpoint — one external_ref per
+            # workspace. Blank refs are excluded so hand-created events
+            # don't collide.
+            models.UniqueConstraint(
+                fields=["workspace", "external_ref"],
+                condition=models.Q(external_ref__gt=""),
+                name="unique_workspace_external_ref",
+            ),
         ]
 
     def __str__(self) -> str:

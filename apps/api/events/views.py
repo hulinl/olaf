@@ -573,6 +573,173 @@ def create_event(request: Request, workspace_slug: str) -> Response:
     )
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def import_schema(request: Request) -> Response:
+    """JSON Schema document describing the import payload + block types.
+
+    Public so external clients (Claude Code skills, CLI tools) can fetch
+    it at build time without provisioning a token first. Read-only and
+    cheap — no need for auth here.
+    """
+    from .import_schema import EVENT_IMPORT_SCHEMA
+
+    return Response(EVENT_IMPORT_SCHEMA)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def import_event(request: Request, workspace_slug: str) -> Response:
+    """Idempotent JSON import from an external source.
+
+    Designed for power-users who prepare an event in a sibling project
+    (e.g. the "mountain-guide" Claude Code project) and want to publish
+    it into OLAF with a single curl. The payload looks like a full
+    EventWriteSerializer body — title, slug, dates, location, capacity,
+    pricing, and the `blocks` list rendered on the landing page.
+
+    Behaviour:
+      * Always lands as status=draft. The endpoint never publishes
+        directly; the owner reviews and flips the status in
+        /admin/events/<slug>/edit. Keeps the public site safe from a
+        misconfigured skript.
+      * Idempotent on `external_ref`: a stable string picked by the
+        caller per event source (e.g. "beskydy-spring-camp-2026"). A
+        re-import with the same ref under the same workspace updates
+        the existing event in place. Omitted ref → always create.
+      * Auth via session OR Bearer token (accounts.APIToken). Permission
+        is workspace owner/admin — same as the standard create endpoint.
+
+    Response:
+      201 created (or 200 updated) →
+        {event_id, workspace_slug, event_slug, external_ref, status,
+         created: bool, edit_url, public_url}
+      400 — bad payload (slug/block validation messages).
+      403 — caller isn't an owner/admin of this workspace.
+      404 — workspace slug doesn't exist.
+    """
+    from django.conf import settings as dj_settings
+
+    try:
+        workspace = Workspace.objects.get(slug=workspace_slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    # Copy payload so we can pop our idempotency key + force draft status
+    # without mutating request.data (which DRF sometimes treats as
+    # immutable depending on the parser).
+    data = dict(request.data.items())
+    raw_ref = data.pop("external_ref", "")
+    if raw_ref is None:
+        raw_ref = ""
+    if not isinstance(raw_ref, str):
+        return Response(
+            {"external_ref": "Musí být řetězec."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    external_ref = raw_ref.strip()
+    if len(external_ref) > 120:
+        return Response(
+            {"external_ref": "Max 120 znaků."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # Importer must NEVER publish. Owner flips the gate in the UI.
+    data["status"] = Event.STATUS_DRAFT
+
+    existing = None
+    if external_ref:
+        existing = Event.objects.filter(
+            workspace=workspace, external_ref=external_ref
+        ).first()
+
+    if existing is not None:
+        serializer = EventWriteSerializer(
+            existing, data=data, partial=True, context={"request": request}
+        )
+    else:
+        serializer = EventWriteSerializer(
+            data=data, context={"request": request}
+        )
+    serializer.is_valid(raise_exception=True)
+
+    # Slug collision check — only relevant on create. An update keeps
+    # the existing event row, which already owns its slug.
+    if existing is None:
+        new_slug = serializer.validated_data.get("slug")
+        if new_slug and Event.objects.filter(
+            workspace=workspace, slug=new_slug
+        ).exists():
+            return Response(
+                {"slug": "Event s tímto slug už ve workspace existuje."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    community_slugs = serializer.validated_data.pop("community_slugs", None)
+    shared_workspace_slugs = serializer.validated_data.pop(
+        "shared_workspace_slugs", None
+    )
+
+    if existing is not None:
+        event = serializer.save()
+    else:
+        event = serializer.save(
+            workspace=workspace, external_ref=external_ref
+        )
+
+    if community_slugs is not None:
+        _set_event_communities(event, community_slugs)
+    if shared_workspace_slugs is not None:
+        _set_event_shared_workspaces(
+            event, shared_workspace_slugs, requesting_user=request.user
+        )
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    was_created = existing is None
+    audit_log(
+        actor=request.user,
+        action=(
+            AuditLog.ACTION_EVENT_CREATE
+            if was_created
+            else AuditLog.ACTION_EVENT_UPDATE
+        ),
+        workspace=workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=(
+            f'Import: vytvořil akci „{event.title}” z externího zdroje'
+            if was_created
+            else f'Import: aktualizoval akci „{event.title}” z externího zdroje'
+        ),
+        payload={
+            "event_slug": event.slug,
+            "external_ref": external_ref,
+            "source": "import_endpoint",
+        },
+    )
+
+    frontend_url = dj_settings.FRONTEND_URL.rstrip("/")
+    return Response(
+        {
+            "event_id": event.pk,
+            "workspace_slug": workspace.slug,
+            "event_slug": event.slug,
+            "external_ref": external_ref,
+            "status": event.status,
+            "created": was_created,
+            "edit_url": f"{frontend_url}/admin/events/{event.slug}/edit",
+            "public_url": f"{frontend_url}/{workspace.slug}/e/{event.slug}",
+        },
+        status=(
+            status.HTTP_201_CREATED if was_created else status.HTTP_200_OK
+        ),
+    )
+
+
 def _set_event_communities(event: Event, community_slugs: list[str]) -> None:
     """Set the event's communities m2m to exactly the matching communities
     in the event's workspace. Silently drops slugs that don't match a
