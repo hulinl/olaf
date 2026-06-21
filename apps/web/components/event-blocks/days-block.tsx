@@ -5,6 +5,7 @@ import {
   type DaysBlockPayload,
   ensureMapyFrameParam,
   isMapyEmbedUrl,
+  resolveMapyEmbedUrl,
 } from "@/lib/event-blocks";
 
 interface Props {
@@ -12,10 +13,31 @@ interface Props {
   tone?: BlockTone;
 }
 
-export function DaysBlock({ payload, tone = "canvas" }: Props) {
+export async function DaysBlock({ payload, tone = "canvas" }: Props) {
   if (!payload.days || payload.days.length === 0) return null;
 
   const dark = tone === "ink";
+
+  // Day-level map_url-y bývají Mapy.com krátké share-linky
+  // (`mapy.com/s/<code>`). Ty v iframe-u nerenderuje — vracejí HTTP 404
+  // s SPA body, browser hlási „embedded mapa nelze správně načíst".
+  // Server-side rozbalíme přes `resolveMapyEmbedUrl` (vytáhne og:url
+  // meta tag → koncovou long URL) a teprve do iframe-u jde
+  // `ensureMapyFrameParam(<long URL>)`. Resolve běží paralelně přes
+  // Promise.all — den s 4 mapami se neserializuje za sebou.
+  const dayMapSrcs = await Promise.all(
+    payload.days.map(async (d) => {
+      if (!d.map_url || !isMapyEmbedUrl(d.map_url)) return null;
+      try {
+        const resolved = await resolveMapyEmbedUrl(d.map_url);
+        return ensureMapyFrameParam(resolved);
+      } catch {
+        // Síťová chyba při resolve → fallback na původní URL +
+        // frame=1. Lepší fragile embed než žádný embed.
+        return ensureMapyFrameParam(d.map_url);
+      }
+    }),
+  );
 
   return (
     <section
@@ -37,7 +59,8 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
         <div className="space-y-6">
           {payload.days.map((d, i) => {
             const image = assetUrl(d.image_url);
-            const mapEmbeddable = isMapyEmbedUrl(d.map_url);
+            const mapSrc = dayMapSrcs[i];
+            const mapEmbeddable = mapSrc !== null;
             const num = d.num || String(i + 1).padStart(2, "0");
             return (
               <article
@@ -153,7 +176,7 @@ export function DaysBlock({ payload, tone = "canvas" }: Props) {
                             >
                               <iframe
                                 loading="lazy"
-                                src={ensureMapyFrameParam(d.map_url)}
+                                src={mapSrc ?? ""}
                                 title={`Mapa ${d.title ?? `den ${i + 1}`}`}
                                 className="absolute inset-0 h-full w-full border-0"
                               />
