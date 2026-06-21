@@ -229,7 +229,8 @@ def fetch_notion_page_text(page_id: str, token: str) -> str:
 
 
 EXTRACTION_SYSTEM_PROMPT = """\
-You extract event metadata from organiser notes (Czech or English).
+You extract event metadata AND landing-page blocks from organiser notes
+(Czech or English).
 
 Return STRICT JSON matching this schema — no commentary, no markdown
 code fences, no trailing text. Unknown fields → null. Dates as ISO 8601
@@ -249,15 +250,128 @@ round-trips a DecimalField).
   "price_amount": string | null,            // numeric string, e.g. "1850.00"
   "price_currency": "CZK" | "EUR" | null,
   "price_note": string | null,              // "Včetně ubytování a večeří"
-  "notes": [string]                         // anything that didn't map to a field; max 10 items
+  "notes": [string],                        // anything that didn't map to a field; max 10 items
+  "blocks": [block]                         // ordered landing-page sections; [] when notes are too thin
 }
 
-Rules:
+Block shapes (each block is {id, type, payload}). `id` is a short
+hyphenated string unique within the event; pick one from the section
+header (e.g. "hero", "program", "v-cene", "pro-koho", "team", "faq").
+
+{ "id": "hero", "type": "hero", "payload": {
+    "cover_url": "",                     // leave empty — owner uploads later
+    "eyebrow": "LETNÍ KEMP · BESKYDY · 2026",   // short label
+    "title_override": string,                   // = title above
+    "subtitle": string,                          // 1-2 sentences, sells the camp
+    "cta_label": "Přihlásit se",
+    "cta_href": "#registrace",
+    "meta": [{"k": "TERMÍN", "v": "..."}, ...]  // 3-5 tiles
+}}
+
+{ "id": "about", "type": "prose", "payload": {
+    "eyebrow": "O AKCI",
+    "heading": "...",
+    "body": "Multi-paragraph. \\n\\n splits paragraphs.",
+    "image_url": "",
+    "image_side": "right" | "left"
+}}
+
+{ "id": "stats", "type": "stats", "payload": {
+    "dark": true,
+    "tiles": [{"label": "DNY", "value": "4"}, ...]
+}}
+
+{ "id": "days", "type": "days", "payload": {
+    "lead": "Tempo posouváme dle skupiny, kostra drží.",
+    "days": [{
+      "label": "ČTVRTEK", "num": "01", "title": "Příjezd, baseline",
+      "route": "...", "body": "...", "time": "19:00-22:00",
+      "distance": "3 km", "ascent": "+50 m", "descent": "",
+      "image_url": "", "map_url": ""
+    }, ...]
+}}
+
+{ "id": "pricing", "type": "included_split", "payload": {
+    "price_value": "4 490", "price_unit": "Kč / osoba",
+    "price_note": "Po naplnění registrace zavřeme.",
+    "included":     [{"label": "Ubytování", "desc": "3 noci"}, ...],
+    "not_included": [{"label": "Doprava",   "desc": "Spolujízdu pomůžeme zorganizovat"}, ...]
+}}
+
+{ "id": "audience", "type": "prose", "payload": {
+    "eyebrow": "PRO KOHO", "heading": "...",
+    "body": "Kemp je pro tebe, pokud:\\n\\n- ...",
+    "image_url": "", "image_side": "right"
+}}
+
+{ "id": "team", "type": "prose", "payload": {
+    "eyebrow": "TÝM", "heading": "Kdo tě bude provázet",
+    "body": "**Olaf** — vede kemp...\\n\\n**Lachim** — kouč...",
+    "image_url": "", "image_side": "left"
+}}
+
+{ "id": "faq", "type": "faq", "payload": {
+    "eyebrow": "Praktické informace", "title": "Časté otázky",
+    "items": [{"question": "...", "answer": "..."}, ...]
+}}
+
+Block rules:
+- Pick block types that match the source content. If the notes only have
+  basic fields (date, price, no program), return blocks: [].
+- Always start blocks with "hero" when you produce any blocks at all.
+- For multi-day programs, map each day-heading in the source to one
+  entry in days[]. Don't merge days. `num` is a two-digit string ("01").
+- For "Co je v ceně" / "Co není v ceně" sections, use included_split.
+- For FAQ-style Q/A sections, use faq.
+- For "Pro koho je akce" or "Kdo to vede", use prose with eyebrow
+  "PRO KOHO" / "TÝM".
+- Empty strings for image_url / map_url / cover_url — owner uploads
+  later. Never invent URLs.
+- Block bodies preserve the source's Czech voice (ty-form, no marketing
+  fluff). Do NOT translate to English.
+
+Field rules:
 - If a single date is mentioned, treat it as the start; ends_at = same day 18:00.
 - If the page uses 24-hour clock without explicit timezone, assume CEST/CET (Europe/Prague).
 - Prefer the most prominent / first-mentioned values when in doubt.
 - Never invent fields. If the text says nothing about price, return null.
 """
+
+
+def _sanitize_blocks(blocks: Any) -> list[dict[str, Any]]:
+    """Drop any block whose shape Claude got wrong instead of failing
+    the whole ingest. The frontend renders what came back; the
+    block-builder is open for the owner to add/fix missing ones.
+
+    We do a soft validity check (matching block.id pattern + known type),
+    not full payload validation — the user will hit blocks.py validators
+    at save time, which gives them a precise error per block.
+    """
+    if not isinstance(blocks, list):
+        return []
+    out: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        block_id = block.get("id")
+        payload = block.get("payload")
+        if not isinstance(block_type, str) or not isinstance(block_id, str):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if not block_id.strip() or block_id in seen_ids:
+            continue
+        # Reject unknown types up front so frontend doesn't render
+        # something the builder can't edit.
+        from .blocks import KNOWN_BLOCK_TYPES
+
+        if block_type not in KNOWN_BLOCK_TYPES:
+            continue
+        seen_ids.add(block_id)
+        out.append({"id": block_id, "type": block_type, "payload": payload})
+    return out
 
 
 def extract_event_draft(page_text: str, anthropic_api_key: str) -> dict[str, Any]:
@@ -344,6 +458,9 @@ def extract_event_draft(page_text: str, anthropic_api_key: str) -> dict[str, Any
             "Claude vrátil JSON, ale ne objekt.",
             status_code=502,
         )
+    # Sanitize blocks in-place: drop malformed entries instead of failing
+    # the whole ingest. Owner can fix gaps in the block builder.
+    parsed["blocks"] = _sanitize_blocks(parsed.get("blocks"))
     return parsed
 
 
@@ -375,4 +492,5 @@ def ingest_event_from_notion_url(
         )
     draft = extract_event_draft(page_text, anthropic_api_key)
     draft["source_url"] = url
+    draft["notion_page_id"] = page_id
     return draft

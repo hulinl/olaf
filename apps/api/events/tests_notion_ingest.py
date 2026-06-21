@@ -124,7 +124,12 @@ class ExtractEventDraftTests(TestCase):
                 json.dumps(canned).encode("utf-8")
             )
             out = extract_event_draft("notes", "sk-ant-fake")
-        self.assertEqual(out, {"title": "Letni kemp", "capacity": 12})
+        # extract_event_draft normalises `blocks` to an empty list when
+        # Claude doesn't return any — sanitizer-driven side effect since
+        # PR #203 (Notion ingest + landing blocks).
+        self.assertEqual(
+            out, {"title": "Letni kemp", "capacity": 12, "blocks": []}
+        )
 
     def test_strips_markdown_code_fence(self) -> None:
         # Models occasionally wrap JSON in ```json ... ``` despite the

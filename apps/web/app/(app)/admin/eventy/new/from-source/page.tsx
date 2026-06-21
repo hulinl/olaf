@@ -9,6 +9,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
+import type { EventBlock } from "@/lib/event-blocks";
 import {
   ApiError,
   type Event as OlafEvent,
@@ -116,49 +117,15 @@ export default function NewEventFromSourcePage() {
   // draft mounted as initial. The form is full-featured, so the owner
   // can fill anything the AI missed (or correct it) before saving.
   if (draft) {
-    const initial = draftToOlafEvent(draft);
     return (
-      <div className="flex flex-col gap-6">
-        <Breadcrumbs items={crumbs} />
-
-        <header>
-          <p className="text-sm font-medium text-brand">
-            Nová akce z odkazu
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
-            Zkontroluj a uprav
-          </h1>
-          <p className="mt-2 max-w-2xl text-ink-500">
-            Claude vytáhl pole z {draft.source_url || "tvého odkazu"}.
-            Projdi je, doplň, co AI minula, a klikni „Vytvořit akci".
-          </p>
-        </header>
-
-        {draft.notes && draft.notes.length > 0 && (
-          <Card>
-            <CardSection>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-                Co Claude zaznamenala, ale nepřiřadila k poli
-              </p>
-              <ul className="mt-2 ml-4 list-disc space-y-1 text-sm text-ink-700">
-                {draft.notes.map((n, i) => (
-                  <li key={i}>{n}</li>
-                ))}
-              </ul>
-            </CardSection>
-          </Card>
-        )}
-
-        <EventForm
-          workspaceSlug={home.slug}
-          initial={initial}
-          onSubmit={(payload) => events.create(home.slug, payload)}
-          onSuccess={(event) =>
-            router.push(`/admin/eventy/${home.slug}/${event.slug}/edit`)
-          }
-          submitLabel="Vytvořit akci"
-        />
-      </div>
+      <DraftReview
+        draft={draft}
+        homeSlug={home.slug}
+        crumbs={crumbs}
+        onCreated={(workspaceSlug, eventSlug) =>
+          router.push(`/admin/eventy/${workspaceSlug}/${eventSlug}/edit`)
+        }
+      />
     );
   }
 
@@ -240,13 +207,180 @@ export default function NewEventFromSourcePage() {
 }
 
 /**
+ * Step 2 of the ingest flow. Owns the "update existing vs create new"
+ * decision when the same Notion page was already ingested previously,
+ * then mounts EventForm with the AI-extracted draft. On submit it
+ * routes to either PATCH /update/ (preserves slug + RSVPs) or POST
+ * /create/ (stamps the page_id on a fresh event).
+ */
+function DraftReview({
+  draft,
+  homeSlug,
+  crumbs,
+  onCreated,
+}: {
+  draft: EventDraftFromSource;
+  homeSlug: string;
+  crumbs: { label: string; href?: string }[];
+  onCreated: (workspaceSlug: string, eventSlug: string) => void;
+}) {
+  const existing = draft.existing_event;
+  // Default to "update" when there's a match — that's the common case
+  // (organiser edits the same Notion page and re-ingests). Owner can
+  // override if the page truly describes a new event instance.
+  const [mode, setMode] = useState<"update" | "create">(
+    existing ? "update" : "create",
+  );
+
+  const blocksFromDraft: EventBlock[] = draft.blocks ?? [];
+  const initial = draftToOlafEvent(draft, blocksFromDraft);
+  // When updating, target the workspace that owns the existing event,
+  // not the user's "home" workspace, so a personal-workspace owner
+  // who later moved the event into a community still updates the
+  // right row.
+  const targetWorkspaceSlug =
+    mode === "update" && existing ? existing.workspace_slug : homeSlug;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Breadcrumbs items={crumbs} />
+
+      <header>
+        <p className="text-sm font-medium text-brand">
+          {mode === "update" ? "Aktualizace z odkazu" : "Nová akce z odkazu"}
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
+          Zkontroluj a uprav
+        </h1>
+        <p className="mt-2 max-w-2xl text-ink-500">
+          Claude vytáhl pole + bloky landing-page z{" "}
+          {draft.source_url || "tvého odkazu"}. Projdi je, doplň, co AI
+          minula, a klikni{" "}
+          {mode === "update"
+            ? "„Aktualizovat akci“"
+            : "„Vytvořit akci“"}
+          .
+        </p>
+      </header>
+
+      {existing && (
+        <Card>
+          <CardSection>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
+              Tato Notion stránka už eviduje akci
+            </p>
+            <p className="mt-2 text-sm text-ink-700">
+              <strong>{existing.title}</strong>{" "}
+              <span className="text-ink-500">
+                ({existing.workspace_slug}/{existing.slug} · {existing.status})
+              </span>
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm hover:border-border-strong sm:flex-1">
+                <input
+                  type="radio"
+                  name="ingest-mode"
+                  value="update"
+                  checked={mode === "update"}
+                  onChange={() => setMode("update")}
+                  className="mt-0.5"
+                />
+                <span>
+                  <strong className="block">Aktualizovat existující</strong>
+                  <span className="text-xs text-ink-500">
+                    Zachová slug, registrace, faktury. Doporučeno.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm hover:border-border-strong sm:flex-1">
+                <input
+                  type="radio"
+                  name="ingest-mode"
+                  value="create"
+                  checked={mode === "create"}
+                  onChange={() => setMode("create")}
+                  className="mt-0.5"
+                />
+                <span>
+                  <strong className="block">Vytvořit nový event</strong>
+                  <span className="text-xs text-ink-500">
+                    Pro případ, kdy stránka popisuje nový běh akce. Starý
+                    event zůstane spojený se stránkou.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </CardSection>
+        </Card>
+      )}
+
+      {draft.notes && draft.notes.length > 0 && (
+        <Card>
+          <CardSection>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              Co Claude zaznamenala, ale nepřiřadila k poli
+            </p>
+            <ul className="mt-2 ml-4 list-disc space-y-1 text-sm text-ink-700">
+              {draft.notes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </CardSection>
+        </Card>
+      )}
+
+      <EventForm
+        // Force a remount when the user flips the mode so EventForm's
+        // internal state (e.g. blocks editor) resets to the right
+        // initial. Without this the form keeps the previous mode's
+        // hydrated state.
+        key={mode + (existing?.id ?? "")}
+        workspaceSlug={targetWorkspaceSlug}
+        initial={initial}
+        onSubmit={(payload) => {
+          if (mode === "update" && existing) {
+            // PATCH — preserve external_ref (already set on the
+            // existing row), don't echo it back in the payload to
+            // avoid the rare case where the user edited it.
+            return events.update(
+              existing.workspace_slug,
+              existing.slug,
+              payload,
+            );
+          }
+          // Create — stamp external_ref so the next ingest hits the
+          // upsert path. If the user explicitly chose "create new"
+          // when an existing event was offered, this overwrites the
+          // pointer (the old event is now orphaned from this Notion
+          // page, which matches user intent).
+          const payloadWithRef = {
+            ...payload,
+            external_ref: `notion:${draft.notion_page_id}`,
+          };
+          return events.create(targetWorkspaceSlug, payloadWithRef);
+        }}
+        onSuccess={(event) =>
+          onCreated(targetWorkspaceSlug, event.slug)
+        }
+        submitLabel={
+          mode === "update" ? "Aktualizovat akci" : "Vytvořit akci"
+        }
+      />
+    </div>
+  );
+}
+
+/**
  * Shape the slim ingest payload as an OlafEvent so EventForm can
  * read it via its `initial` prop. Most of the OlafEvent surface is
  * uninteresting at this stage — fill the few fields Claude extracts,
  * leave the rest as empty/null defaults. Cast through `unknown`
  * because Partial<OlafEvent> isn't structurally compatible.
  */
-function draftToOlafEvent(draft: EventDraftFromSource): OlafEvent {
+function draftToOlafEvent(
+  draft: EventDraftFromSource,
+  blocks: EventBlock[],
+): OlafEvent {
   const base: Partial<OlafEvent> = {
     title: draft.title ?? "",
     slug: "",
@@ -267,7 +401,7 @@ function draftToOlafEvent(draft: EventDraftFromSource): OlafEvent {
     price_note: draft.price_note ?? "",
     payment_in_cash: false,
     billing_profile: null,
-    blocks: [],
+    blocks,
     enabled_questionnaire_sections: [],
     community_slugs: [],
     shared_workspace_slugs: [],

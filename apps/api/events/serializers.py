@@ -578,7 +578,22 @@ class EventWriteSerializer(serializers.ModelSerializer):
             "required_documents",
             "recommended_gear_list",
             "risk_checklist",
+            "external_ref",
         )
+
+    def validate_external_ref(self, value):
+        """Stable identifier per workspace (e.g. 'notion:<page_id>').
+        Backend's UniqueConstraint(workspace, external_ref) gates
+        duplicates; serializer just enforces the length cap so a runaway
+        client doesn't try to stuff multi-KB strings."""
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise serializers.ValidationError("Musí být řetězec.")
+        value = value.strip()
+        if len(value) > 120:
+            raise serializers.ValidationError("Max 120 znaků.")
+        return value
 
     def validate_risk_checklist(self, value):
         """Owner-managed list. Each item must be a dict with key,
