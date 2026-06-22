@@ -368,17 +368,26 @@ header (e.g. "hero", "program", "v-cene", "pro-koho", "team", "faq").
 { "id": "hero", "type": "hero", "payload": {
     "cover_url": "",                     // leave empty — owner uploads later
     "eyebrow": "LETNÍ KEMP · BESKYDY · 2026",   // short label
-    "title_override": string,                   // = title above
-    "subtitle": string,                          // 1-2 sentences, sells the camp
-    "cta_label": "Přihlásit se",
-    "cta_href": "#registrace",
-    "meta": [{"k": "TERMÍN", "v": "..."}, ...]  // 3-5 tiles
+    "title_override": "",                       // empty → falls back to event.title; only set when source page has a distinctly different headline
+    "subtitle": "",                              // 1-2 sentences from the page's lead text. NEVER include logistics (date/price/capacity) — those belong in `meta` below
+    "cta_label": "Přihlásit se",                // ALWAYS this exact string — never invent or translate
+    "cta_href": "#registrace",                  // ALWAYS this exact string
+    "meta": [                                    // EXACTLY 4 tiles, in this order, all 4 mandatory when data is in the page
+      {"k": "TERMÍN",   "v": "13.–16. 8. 2026"},
+      {"k": "MÍSTO",    "v": "Beskydy"},
+      {"k": "KAPACITA", "v": "8 účastníků"},
+      {"k": "CENA",     "v": "4 490 Kč"}
+    ]
 }}
 
 { "id": "about", "type": "prose", "payload": {
     "eyebrow": "O AKCI",
     "heading": "...",
-    "body": "Multi-paragraph. \\n\\n splits paragraphs.",
+    // Multi-paragraph. \\n\\n splits paragraphs. Bulleted list lines
+    // (each starting with "- ") render as <ul> on the frontend — use
+    // them when the source has bullets; never inline them as a long
+    // comma-separated sentence.
+    "body": "První odstavec.\\n\\nDruhý odstavec.\\n\\n- první bod\\n- druhý bod",
     "image_url": "",
     "image_side": "right" | "left"
 }}
@@ -423,17 +432,46 @@ header (e.g. "hero", "program", "v-cene", "pro-koho", "team", "faq").
 }}
 
 Block rules:
-- Pick block types that match the source content. If the notes only have
-  basic fields (date, price, no program), return blocks: [].
-- Always start blocks with "hero" when you produce any blocks at all.
-- For multi-day programs, map each day-heading in the source to one
-  entry in days[]. Don't merge days. `num` is a two-digit string ("01").
-- For "Co je v ceně" / "Co není v ceně" sections, use included_split.
-- For FAQ-style Q/A sections, use faq.
-- For "Pro koho je akce" or "Kdo to vede", use prose with eyebrow
-  "PRO KOHO" / "TÝM".
+
+Routing — match section heading to block type:
+- "## Program" / "## Co tě čeká během dnů" / day-by-day list → days
+- "## Co je v ceně" + "## Co v ceně není" → ONE included_split (combine both)
+- "## Pro koho" → prose, eyebrow "PRO KOHO"
+- "## Co tě čeká" (bullet list of activities) → prose, eyebrow "CO TĚ ČEKÁ"
+- "## O co jde" / "## O akci" → prose, eyebrow "O AKCI"
+- "## Kdo to vede" / "## Tým" → prose, eyebrow "TÝM"
+- FAQ-style Q/A → faq
+- Hero is FIRST when you produce any blocks at all. Its subtitle comes
+  from the first 1-2 lines of intro text on the page (e.g. "Technika
+  běhu v terénu. Komunita, která tě potáhne dál."), NOT from logistics.
+
+Hero meta (strict):
+- EXACTLY the 4 tiles: TERMÍN / MÍSTO / KAPACITA / CENA, in that order.
+- Skip a tile only when the source has no data for it (e.g. místo
+  marked `?`). Never add other tiles (registration deadline, organiser
+  name, contact, etc. — those go in `notes` if anywhere).
+
+Prose body rules:
+- When the source section is a bullet list, emit the body AS bullets:
+  one line per item, each starting with "- ". Frontend renders them
+  as <ul>. Do NOT flatten to one comma-separated sentence.
+- When the source is paragraphs, emit paragraphs separated by \\n\\n.
+- Mix is fine: paragraph, blank line, bullet block.
+- Body length: prose blocks are reading-time content, not blurbs.
+  Don't pad — if the source has 2 sentences, emit 2 sentences.
+
+Multi-day programs:
+- Each day-heading in the source → one entry in days[]. Don't merge.
+- `num` is a two-digit string ("01", "02", …).
+- Day `body` can contain bullets the same way as prose body.
+
+Anti-bloat / anti-hallucination:
 - Empty strings for image_url / map_url / cover_url — owner uploads
-  later. Never invent URLs.
+  later. NEVER invent URLs or use placeholder URLs from the prompt.
+- Never invent CTAs, deadlines, sponsors, or contact info that's not
+  in the source.
+- If a section in the source has no usable content (e.g. "*(doplnit)*"),
+  skip the block rather than inventing filler.
 - Block bodies preserve the source's Czech voice (ty-form, no marketing
   fluff). Do NOT translate to English.
 

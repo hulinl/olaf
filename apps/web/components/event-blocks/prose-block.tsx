@@ -7,12 +7,42 @@ interface Props {
   tone?: BlockTone;
 }
 
+/**
+ * Parse a free-form body into renderable chunks. We're not running a
+ * full markdown engine here — that's overkill for prose blocks. Just
+ * enough to (a) keep blank-line-separated paragraphs as paragraphs and
+ * (b) treat consecutive bullet lines (- foo / * foo) inside a chunk
+ * as a single <ul>. Notion ingest emits "- " bullets via `_block_to_text`,
+ * so this is the canonical shape Claude sees and re-emits.
+ */
+type ProseChunk =
+  | { kind: "p"; lines: string[] }
+  | { kind: "ul"; items: string[] };
+
+function chunkProse(body: string): ProseChunk[] {
+  const blocks = body.split(/\n\n+/).map((s) => s.trim()).filter(Boolean);
+  const out: ProseChunk[] = [];
+  for (const block of blocks) {
+    const lines = block.split("\n");
+    const allBullets = lines.every((l) => /^[-*]\s+/.test(l.trim()));
+    if (allBullets && lines.length > 0) {
+      out.push({
+        kind: "ul",
+        items: lines.map((l) => l.trim().replace(/^[-*]\s+/, "")),
+      });
+    } else {
+      out.push({ kind: "p", lines });
+    }
+  }
+  return out;
+}
+
 export function ProseBlock({ payload, tone = "canvas" }: Props) {
   const image = assetUrl(payload.image_url);
   const side = payload.image_side ?? "right";
-  const paragraphs = (payload.body ?? "").split(/\n\n+/).filter(Boolean);
+  const chunks = chunkProse(payload.body ?? "");
 
-  if (!payload.eyebrow && !payload.heading && paragraphs.length === 0 && !image) {
+  if (!payload.eyebrow && !payload.heading && chunks.length === 0 && !image) {
     return null;
   }
 
@@ -55,9 +85,26 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
             )}
             style={{ fontSize: 16, lineHeight: 1.6 }}
           >
-            {paragraphs.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
+            {chunks.map((c, i) =>
+              c.kind === "ul" ? (
+                <ul
+                  key={i}
+                  className="ml-5 list-disc space-y-1.5 marker:text-brand"
+                >
+                  {c.items.map((it, j) => (
+                    <li key={j}>{it}</li>
+                  ))}
+                </ul>
+              ) : (
+                // Preserve single line breaks inside a paragraph block —
+                // Notion bullet lists already got chunked into <ul> above,
+                // so a multi-line "p" is a paragraph with intentional
+                // line breaks (e.g. an address).
+                <p key={i} className="whitespace-pre-line">
+                  {c.lines.join("\n")}
+                </p>
+              ),
+            )}
           </div>
         </div>
         {image && side === "right" && (
