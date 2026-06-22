@@ -7,6 +7,7 @@ import {
   isMapyEmbedUrl,
   resolveMapyEmbedUrl,
 } from "@/lib/event-blocks";
+import { FormattedBody } from "@/lib/prose-format";
 
 interface Props {
   payload: DaysBlockPayload;
@@ -128,15 +129,15 @@ export async function DaysBlock({ payload, tone = "canvas" }: Props) {
                       </p>
                     )}
                     {d.body && (
-                      <p
+                      <div
                         className={[
-                          "mt-4 whitespace-pre-line",
+                          "mt-4 space-y-3",
                           dark ? "text-white/80" : "text-ink-700",
                         ].join(" ")}
                         style={{ fontSize: 16, lineHeight: 1.6 }}
                       >
-                        {d.body}
-                      </p>
+                        <FormattedBody body={d.body} />
+                      </div>
                     )}
                     {(d.time || d.distance || d.ascent || d.descent) && (
                       <dl

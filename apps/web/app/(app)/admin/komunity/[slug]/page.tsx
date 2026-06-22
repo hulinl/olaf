@@ -200,56 +200,43 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
 
           <section className="flex flex-col gap-3">
             <h2 className="text-xl font-semibold text-ink-900">
-              Akce této komunity
+              Nadcházející akce
             </h2>
-            {eventList.length === 0 ? (
+            {upcoming.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
                 <h3 className="text-base font-semibold text-ink-900">
-                  Žádné akce
+                  {past.length > 0
+                    ? "Žádné nadcházející akce"
+                    : "Žádné akce"}
                 </h3>
                 <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                  Vytvoř první akci v této komunitě.
+                  {past.length > 0
+                    ? "Vytvoř další akci pro tuto komunitu, nebo si rozklikni minulé akce níže."
+                    : "Vytvoř první akci v této komunitě."}
                 </p>
               </div>
             ) : (
-              <>
-                {/* Mobile: card list — mirror the /admin/eventy
-                    pattern so a 4-column event table doesn't force
-                    horizontal scroll on small screens. */}
-                <div className="flex flex-col gap-2 sm:hidden">
-                  {eventList.map((e) => (
-                    <EventMobileCard
-                      key={e.slug}
-                      event={e}
-                      wsSlug={workspace.slug}
-                    />
-                  ))}
-                </div>
-                {/* sm+: full table. */}
-                <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
-                  <table className="w-full text-sm">
-                    <thead className="bg-surface-muted/60">
-                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                        <th className="px-4 py-3">Akce</th>
-                        <th className="px-4 py-3">Termín</th>
-                        <th className="px-4 py-3 text-right">Přihlášeno</th>
-                        <th className="px-4 py-3 text-right">Waitlist</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {eventList.map((e) => (
-                        <EventRow
-                          key={e.slug}
-                          event={e}
-                          wsSlug={workspace.slug}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <EventTable events={upcoming} wsSlug={workspace.slug} />
             )}
           </section>
+
+          {past.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <details className="group">
+                <summary className="cursor-pointer list-none">
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-500 hover:text-ink-900">
+                    <span className="transition-transform group-open:rotate-90">
+                      ▸
+                    </span>
+                    Minulé akce ({past.length})
+                  </span>
+                </summary>
+                <div className="mt-4">
+                  <EventTable events={past} wsSlug={workspace.slug} />
+                </div>
+              </details>
+            </section>
+          )}
         </>
       )}
 
@@ -305,6 +292,41 @@ function StatTile({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-2 text-3xl font-semibold text-ink-900">{value}</p>
     </div>
+  );
+}
+
+function EventTable({
+  events,
+  wsSlug,
+}: {
+  events: EventSummary[];
+  wsSlug: string;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-2 sm:hidden">
+        {events.map((e) => (
+          <EventMobileCard key={e.slug} event={e} wsSlug={wsSlug} />
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-muted/60">
+            <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+              <th className="px-4 py-3">Akce</th>
+              <th className="px-4 py-3">Termín</th>
+              <th className="px-4 py-3 text-right">Přihlášeno</th>
+              <th className="px-4 py-3 text-right">Waitlist</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {events.map((e) => (
+              <EventRow key={e.slug} event={e} wsSlug={wsSlug} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

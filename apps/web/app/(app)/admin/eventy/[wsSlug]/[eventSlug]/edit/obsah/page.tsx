@@ -144,6 +144,7 @@ export default function EventBlocksPage({ params }: Props) {
             href={`/${wsSlug}/e/${eventSlug}`}
             variant="secondary"
             size="md"
+            target="_blank"
           >
             Náhled
           </LinkButton>

@@ -249,11 +249,16 @@ export default function EventEditCockpitPage({ params }: Props) {
               a bloky landing-page. Slug, status, registrace a faktury
               zůstanou.
             </p>
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-start gap-3">
               <NotionSyncButton
                 wsSlug={wsSlug}
                 eventSlug={eventSlug}
                 onSynced={(updated) => setEvent(updated)}
+              />
+              <NotionReplaceButton
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+                onLinked={(updated) => setEvent(updated)}
               />
             </div>
           </>
@@ -384,6 +389,122 @@ function NotionSyncButton({
         </p>
       )}
     </>
+  );
+}
+
+function NotionReplaceButton({
+  wsSlug,
+  eventSlug,
+  onLinked,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+  onLinked: (event: OlafEvent) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle(e: FormEvent) {
+    e.preventDefault();
+    if (!url.trim()) return;
+    if (
+      !confirm(
+        "Změnit Notion propojení akce? Při příštím „Aktualizovat z " +
+          "Notion" +
+          "“ bude Claude číst z této nové stránky.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const updated = await events.linkNotion(
+        wsSlug,
+        eventSlug,
+        url.trim(),
+        { replace: true },
+      );
+      onLinked(updated);
+      setEditing(false);
+      setUrl("");
+    } catch (e2) {
+      if (e2 instanceof ApiError) {
+        const data = e2.data ?? {};
+        const msg =
+          (typeof data.detail === "string" && data.detail) ||
+          (typeof data.url === "string" && data.url) ||
+          e2.message;
+        setErr(msg);
+      } else {
+        setErr("Změna propojení selhala.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 focus-ring"
+      >
+        Změnit propojení
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handle}
+      className="flex w-full flex-col gap-3 sm:max-w-xl"
+    >
+      <Field
+        label="Nová Notion URL"
+        htmlFor="replace-notion-url"
+        hint="Stará stránka přestane být zdrojem; sync bude tahat z nové. Slug, status, RSVPs a faktury zůstanou."
+      >
+        <Input
+          id="replace-notion-url"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://www.notion.so/myws/Letni-kemp-2026-..."
+          required
+        />
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="submit"
+          variant="secondary"
+          size="md"
+          loading={busy}
+          disabled={!url.trim() || busy}
+        >
+          {busy ? "Měním propojení…" : "Uložit nové propojení"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="md"
+          onClick={() => {
+            setEditing(false);
+            setUrl("");
+            setErr(null);
+          }}
+          disabled={busy}
+        >
+          Zrušit
+        </Button>
+      </div>
+      {err && (
+        <p className="whitespace-pre-line text-sm text-danger">{err}</p>
+      )}
+    </form>
   );
 }
 

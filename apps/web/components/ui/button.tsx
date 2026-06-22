@@ -74,6 +74,10 @@ interface LinkButtonProps extends BaseProps {
   href: string;
   children: ReactNode;
   className?: string;
+  /** When set, the link opens in a new tab. We also stamp the matching
+   *  `rel` to avoid window.opener leakage. Use for previews / external
+   *  links the user shouldn't have to navigate back from. */
+  target?: "_blank" | "_self";
 }
 
 export function LinkButton({
@@ -83,10 +87,14 @@ export function LinkButton({
   size = "md",
   fullWidth = false,
   className,
+  target,
 }: LinkButtonProps) {
+  const isBlank = target === "_blank";
   return (
     <Link
       href={href}
+      target={target}
+      rel={isBlank ? "noopener noreferrer" : undefined}
       className={base(variant, size, fullWidth, className)}
     >
       {children}

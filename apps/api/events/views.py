@@ -853,12 +853,20 @@ def link_event_to_notion(
     if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-    if (event.external_ref or "").startswith("notion:"):
+    # Re-linking is allowed when the caller explicitly opts in. UI
+    # surface: a "Změnit propojení" button next to "Aktualizovat z Notion"
+    # opens the same input form with `replace=true` so the owner can
+    # point at a different Notion page (the source moved, organiser
+    # forked the canonical doc, etc.). Without the flag we keep the
+    # safety net so a stray POST can't silently overwrite the ref.
+    allow_replace = bool(request.data.get("replace"))
+    if (event.external_ref or "").startswith("notion:") and not allow_replace:
         return Response(
             {
                 "detail": (
                     "Akce už je propojená s Notion stránkou. "
-                    "Použij „Aktualizovat z Notion“."
+                    "Použij „Aktualizovat z Notion“, nebo přidej "
+                    "{\"replace\": true} pro výměnu odkazu."
                 )
             },
             status=status.HTTP_400_BAD_REQUEST,
@@ -901,20 +909,30 @@ def link_event_to_notion(
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    previous_ref = event.external_ref or ""
     event.external_ref = ref
     event.save(update_fields=["external_ref"])
 
     from audit.models import AuditLog
     from audit.services import log as audit_log
 
+    is_replace = previous_ref.startswith("notion:") and previous_ref != ref
     audit_log(
         actor=request.user,
         action=AuditLog.ACTION_EVENT_UPDATE,
         workspace=event.workspace,
         target_type="event",
         target_id=event.pk,
-        summary=f'Propojil akci „{event.title}” s Notion stránkou',
-        payload={"event_slug": event.slug, "external_ref": ref},
+        summary=(
+            f'Změnil Notion propojení akce „{event.title}”'
+            if is_replace
+            else f'Propojil akci „{event.title}” s Notion stránkou'
+        ),
+        payload={
+            "event_slug": event.slug,
+            "external_ref": ref,
+            "previous_external_ref": previous_ref or None,
+        },
     )
 
     return Response(
