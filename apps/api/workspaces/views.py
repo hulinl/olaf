@@ -352,16 +352,25 @@ def workspace_events(request: Request, slug: str) -> Response:
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def workspace_members(request: Request, slug: str) -> Response:
-    """List participants who have at least one RSVP in this workspace's events.
+    """List explicit, active WorkspaceMembers for the community roster.
 
-    "Member" in V1 = anyone who's registered for an event the workspace
-    owns (or shares — Slice 3). Owner-only because it includes email + phone.
+    V2: members are an explicit relationship, not RSVP-derived. A row
+    here means the owner deliberately added the person (or the V1
+    backfill carried them over from a non-cancelled RSVP). RSVPers who
+    are not members go through the /participants/ endpoint and can be
+    promoted to members via /members/add/.
+
+    Each row is enriched with RSVP stats (total / upcoming / past) so
+    the CRM table can show "what they've registered for" alongside
+    their membership status, but the canonical filter is the member
+    row, not the RSVP.
+
+    Owner-only because it includes contact info.
     """
     from django.db.models import Count, Max
     from django.db.models import Q as DQ
     from django.utils import timezone
 
-    from accounts.models import User
     from events.models import RSVP, Event
 
     try:
@@ -381,51 +390,44 @@ def workspace_members(request: Request, slug: str) -> Response:
     )
 
     now = timezone.now()
-    # Roster = people who have RSVPed OR who hold an explicit role
-    # (owner / admin). The role-only case matters now that the owner
-    # can promote anyone to admin — their roster row needs to render
-    # even before they RSVP to anything.
-    role_user_ids = list(
-        WorkspaceMember.objects.filter(workspace=workspace).values_list(
-            "user_id", flat=True
+    memberships = (
+        WorkspaceMember.objects.filter(
+            workspace=workspace,
+            status=WorkspaceMember.STATUS_ACTIVE,
         )
-    )
-    users = (
-        User.objects.filter(
-            DQ(rsvps__event_id__in=event_ids) | DQ(id__in=role_user_ids)
-        )
-        .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
+        .select_related("user")
         .annotate(
-            total_rsvps=Count("rsvps", filter=DQ(rsvps__event_id__in=event_ids)),
+            total_rsvps=Count(
+                "user__rsvps",
+                filter=DQ(user__rsvps__event_id__in=event_ids)
+                & ~DQ(user__rsvps__status=RSVP.STATUS_CANCELLED),
+                distinct=True,
+            ),
             upcoming_rsvps=Count(
-                "rsvps",
+                "user__rsvps",
                 filter=DQ(
-                    rsvps__event_id__in=event_ids,
-                    rsvps__event__ends_at__gte=now,
+                    user__rsvps__event_id__in=event_ids,
+                    user__rsvps__event__ends_at__gte=now,
                 )
-                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+                & ~DQ(user__rsvps__status=RSVP.STATUS_CANCELLED),
+                distinct=True,
             ),
             past_rsvps=Count(
-                "rsvps",
+                "user__rsvps",
                 filter=DQ(
-                    rsvps__event_id__in=event_ids,
-                    rsvps__event__ends_at__lt=now,
+                    user__rsvps__event_id__in=event_ids,
+                    user__rsvps__event__ends_at__lt=now,
                 )
-                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+                & ~DQ(user__rsvps__status=RSVP.STATUS_CANCELLED),
+                distinct=True,
             ),
-            last_rsvp_at=Max("rsvps__created_at"),
+            last_rsvp_at=Max(
+                "user__rsvps__created_at",
+                filter=DQ(user__rsvps__event_id__in=event_ids)
+                & ~DQ(user__rsvps__status=RSVP.STATUS_CANCELLED),
+            ),
         )
-        .distinct()
-        .order_by("-last_rsvp_at")
-    )
-
-    # Bolt the workspace role onto each row so the UI can render
-    # owner / admin badges + the right action buttons. None = plain
-    # RSVPing participant with no explicit membership.
-    member_roles = dict(
-        WorkspaceMember.objects.filter(workspace=workspace).values_list(
-            "user_id", "role"
-        )
+        .order_by("-joined_at", "user_id")
     )
 
     # Pull profile (note + tag ids) per user in one query — keeps the
@@ -441,29 +443,30 @@ def workspace_members(request: Request, slug: str) -> Response:
     return Response(
         [
             {
-                "id": u.id,
-                "email": u.email,
-                "first_name": u.first_name,
-                "last_name": u.last_name,
-                "full_name": u.get_full_name(),
-                "phone": u.phone,
-                "total_rsvps": u.total_rsvps,
-                "upcoming_rsvps": u.upcoming_rsvps,
-                "past_rsvps": u.past_rsvps,
-                "last_rsvp_at": u.last_rsvp_at,
-                "role": member_roles.get(u.id),
+                "id": m.user.id,
+                "email": m.user.email,
+                "first_name": m.user.first_name,
+                "last_name": m.user.last_name,
+                "full_name": m.user.get_full_name(),
+                "phone": m.user.phone,
+                "total_rsvps": m.total_rsvps,
+                "upcoming_rsvps": m.upcoming_rsvps,
+                "past_rsvps": m.past_rsvps,
+                "last_rsvp_at": m.last_rsvp_at,
+                "role": m.role,
+                "joined_at": m.joined_at,
                 "note": (
-                    profiles_by_user[u.id].note
-                    if u.id in profiles_by_user
+                    profiles_by_user[m.user_id].note
+                    if m.user_id in profiles_by_user
                     else ""
                 ),
                 "tag_ids": (
-                    [t.id for t in profiles_by_user[u.id].tags.all()]
-                    if u.id in profiles_by_user
+                    [t.id for t in profiles_by_user[m.user_id].tags.all()]
+                    if m.user_id in profiles_by_user
                     else []
                 ),
             }
-            for u in users
+            for m in memberships
         ]
     )
 
@@ -533,6 +536,207 @@ def workspace_member_detail(
             ],
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# V2 explicit membership — add / remove / participants
+# ---------------------------------------------------------------------------
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_member_remove(
+    request: Request, slug: str, user_id: int
+) -> Response:
+    """Remove a member from the community (status → removed).
+
+    Idempotent: removing an already-removed row is a no-op (returns
+    200). RSVPs and PersonProfile are NOT touched — the person can
+    still appear in /participants/ if they have RSVPs, and the owner
+    can add them back any time.
+
+    Guards (mirror promote/demote logic to avoid surprises):
+      - 400 if target is OWNER (must hand over first)
+      - 400 if target is ADMIN (must demote first — keeps the audit
+        trail of "lost admin" separate from "removed from community")
+      - 400 if caller is removing themselves (use /members/handover/
+        to leave the workspace cleanly)
+      - 403 if caller is not workspace owner/admin
+    """
+    from events.permissions import is_workspace_super_admin
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_super_admin(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if request.user.id == user_id:
+        return Response(
+            {"detail": "Sebe nemůžeš odebrat. Pokud chceš opustit komunitu, předej nejdřív vlastnictví."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        member = WorkspaceMember.objects.get(
+            workspace=workspace, user_id=user_id
+        )
+    except WorkspaceMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if member.role == WorkspaceMember.ROLE_OWNER:
+        return Response(
+            {"detail": "Ownera nelze odebrat — předej nejdřív vlastnictví."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if member.role == WorkspaceMember.ROLE_ADMIN:
+        return Response(
+            {"detail": "Admina nejdřív degraduj na člena, pak ho odeber."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if member.status == WorkspaceMember.STATUS_ACTIVE:
+        member.status = WorkspaceMember.STATUS_REMOVED
+        member.save(update_fields=["status"])
+        _audit_membership_change(
+            actor=request.user,
+            workspace=workspace,
+            action="remove",
+            removed_user_id=user_id,
+        )
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_participants(request: Request, slug: str) -> Response:
+    """List users who have RSVPed to workspace events but are NOT
+    active community members.
+
+    Owner workflow: see the "Účastníci" sub-view, pick rows that
+    deserve to be members, hit "Přidat do komunity" → POST
+    /members/add/ with the selected user_ids. The reverse direction
+    (an active member who hasn't RSVPed) doesn't surface here — that's
+    just an explicitly added member with no event history yet.
+    """
+    from django.db.models import Count, Max
+    from django.db.models import Q as DQ
+    from django.utils import timezone
+
+    from accounts.models import User
+    from events.models import RSVP, Event
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not _can_view_workspace_people(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    event_ids = list(
+        Event.objects.filter(
+            DQ(workspace=workspace) | DQ(shared_workspaces=workspace)
+        )
+        .values_list("id", flat=True)
+        .distinct()
+    )
+
+    active_member_ids = set(
+        WorkspaceMember.objects.filter(
+            workspace=workspace,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        ).values_list("user_id", flat=True)
+    )
+
+    now = timezone.now()
+    users = (
+        User.objects.filter(rsvps__event_id__in=event_ids)
+        .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
+        .exclude(id__in=active_member_ids)
+        .annotate(
+            total_rsvps=Count(
+                "rsvps",
+                filter=DQ(rsvps__event_id__in=event_ids)
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+                distinct=True,
+            ),
+            upcoming_rsvps=Count(
+                "rsvps",
+                filter=DQ(
+                    rsvps__event_id__in=event_ids,
+                    rsvps__event__ends_at__gte=now,
+                )
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+                distinct=True,
+            ),
+            last_rsvp_at=Max(
+                "rsvps__created_at",
+                filter=DQ(rsvps__event_id__in=event_ids)
+                & ~DQ(rsvps__status=RSVP.STATUS_CANCELLED),
+            ),
+        )
+        .distinct()
+        .order_by("-last_rsvp_at")
+    )
+
+    return Response(
+        [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": u.get_full_name(),
+                "phone": u.phone,
+                "total_rsvps": u.total_rsvps,
+                "upcoming_rsvps": u.upcoming_rsvps,
+                "last_rsvp_at": u.last_rsvp_at,
+            }
+            for u in users
+        ]
+    )
+
+
+def _audit_membership_change(
+    *,
+    actor,
+    workspace,
+    action: str,
+    added_user_ids: list[int] | None = None,
+    removed_user_id: int | None = None,
+) -> None:
+    """Audit log for explicit add / remove. Promote / demote keep
+    using `_audit_role_change` — those are role transitions, this is
+    membership presence."""
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    if action == "add" and added_user_ids:
+        summary = (
+            f"Přidal {len(added_user_ids)} členů do komunity"
+            if len(added_user_ids) != 1
+            else "Přidal člena do komunity"
+        )
+        audit_log(
+            actor=actor,
+            action=AuditLog.ACTION_MEMBER_ADD,
+            workspace=workspace,
+            target_type="workspace_member",
+            target_id=workspace.pk,
+            summary=summary,
+            payload={"added_user_ids": added_user_ids},
+        )
+    elif action == "remove" and removed_user_id is not None:
+        audit_log(
+            actor=actor,
+            action=AuditLog.ACTION_MEMBER_REMOVE,
+            workspace=workspace,
+            target_type="workspace_member",
+            target_id=removed_user_id,
+            summary="Odebral člena z komunity",
+            payload={"removed_user_id": removed_user_id},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1263,8 +1467,24 @@ def _send_workspace_invitation_email(invitation):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def workspace_add_existing_member(request: Request, slug: str) -> Response:
-    """Path 3 — owner picks an existing user (typically from Lidé) and
-    adds them as a regular member. Body: {user_id: int}."""
+    """Owner picks one or more existing users and adds them as members.
+
+    Body:
+      - `{user_id: int}` — single add (legacy single-row flow)
+      - `{user_ids: [int]}` — bulk add (V2 "Přidat do komunity" multi-select)
+      - both can carry `role` ("member" | "admin"); default is member.
+
+    Idempotent per user:
+      - missing row → create WorkspaceMember(role=<asked>, status=active)
+      - active row with member role + asked admin → promote (member → admin)
+      - removed row → reactivate (status=active, joined_at=now)
+      - owner row → untouched
+    Owner-only.
+    """
+    from django.utils import timezone
+
+    from accounts.models import User
+
     try:
         workspace = Workspace.objects.get(slug=slug)
     except Workspace.DoesNotExist:
@@ -1272,42 +1492,114 @@ def workspace_add_existing_member(request: Request, slug: str) -> Response:
     if not _is_owner(request.user, workspace):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-    from accounts.models import User
-
-    user_id = request.data.get("user_id")
-    if not user_id:
+    # Accept single or bulk id list. We never silently mix: caller
+    # sends one shape or the other.
+    raw_single = request.data.get("user_id")
+    raw_bulk = request.data.get("user_ids")
+    if raw_single is None and not raw_bulk:
         return Response(
-            {"user_id": "Vyber uživatele."},
+            {"user_ids": "Pošli user_id nebo neprázdné user_ids."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    raw_ids = raw_bulk if raw_bulk else [raw_single]
     try:
-        target = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+        user_ids = [int(x) for x in raw_ids]
+    except (TypeError, ValueError):
+        return Response(
+            {"user_ids": "Hodnoty musí být celá čísla."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    # Caller can choose admin or member. Owner role is never assignable
-    # via this path — that's the hand-over endpoint's job.
     requested_role = (request.data.get("role") or "").strip().lower()
     role = (
         WorkspaceMember.ROLE_ADMIN
         if requested_role == WorkspaceMember.ROLE_ADMIN
         else WorkspaceMember.ROLE_MEMBER
     )
-    membership, created = WorkspaceMember.objects.get_or_create(
-        workspace=workspace, user=target, defaults={"role": role}
-    )
-    # If they already exist with a different role, allow upgrade from
-    # member → admin (but never touch owner).
-    if not created and membership.role == WorkspaceMember.ROLE_MEMBER and role == WorkspaceMember.ROLE_ADMIN:
-        membership.role = role
-        membership.save(update_fields=["role"])
+
+    users_by_id = {u.id: u for u in User.objects.filter(id__in=user_ids)}
+    not_found = [uid for uid in user_ids if uid not in users_by_id]
+
+    now = timezone.now()
+    added: list[int] = []
+    reactivated: list[int] = []
+    promoted: list[int] = []
+    already_active: list[int] = []
+
+    for uid, user in users_by_id.items():
+        membership, created = WorkspaceMember.objects.get_or_create(
+            workspace=workspace,
+            user=user,
+            defaults={
+                "role": role,
+                "status": WorkspaceMember.STATUS_ACTIVE,
+                "joined_at": now,
+            },
+        )
+        if created:
+            added.append(uid)
+            continue
+        # Never demote owner via this path.
+        if membership.role == WorkspaceMember.ROLE_OWNER:
+            already_active.append(uid)
+            continue
+        changed_fields: list[str] = []
+        if membership.status == WorkspaceMember.STATUS_REMOVED:
+            membership.status = WorkspaceMember.STATUS_ACTIVE
+            membership.joined_at = now
+            changed_fields.extend(["status", "joined_at"])
+            reactivated.append(uid)
+        # Allow upgrade from member → admin (legacy promote-via-add flow).
+        if (
+            membership.role == WorkspaceMember.ROLE_MEMBER
+            and role == WorkspaceMember.ROLE_ADMIN
+        ):
+            membership.role = WorkspaceMember.ROLE_ADMIN
+            changed_fields.append("role")
+            promoted.append(uid)
+        if changed_fields:
+            membership.save(update_fields=changed_fields)
+        elif uid not in reactivated:
+            already_active.append(uid)
+
+    if added or reactivated:
+        _audit_membership_change(
+            actor=request.user,
+            workspace=workspace,
+            action="add",
+            added_user_ids=added + reactivated,
+        )
+
+    # Legacy single-user shape: keep the original response when the
+    # caller used `user_id` so existing frontend code doesn't break.
+    if raw_single is not None and raw_bulk is None:
+        if not_found:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        target_id = user_ids[0]
+        membership = WorkspaceMember.objects.get(
+            workspace=workspace, user_id=target_id
+        )
+        return Response(
+            {
+                "user_id": target_id,
+                "role": membership.role,
+                "created": target_id in added,
+            },
+            status=(
+                status.HTTP_201_CREATED
+                if target_id in added
+                else status.HTTP_200_OK
+            ),
+        )
+
     return Response(
         {
-            "user_id": target.id,
-            "role": membership.role,
-            "created": created,
-        },
-        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+            "added": added,
+            "reactivated": reactivated,
+            "promoted": promoted,
+            "already_active": already_active,
+            "not_found": not_found,
+        }
     )
 
 

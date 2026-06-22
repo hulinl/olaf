@@ -869,9 +869,24 @@ export interface WorkspaceMemberSummary {
   past_rsvps: number;
   last_rsvp_at: string | null;
   role: WorkspaceRole;
+  /** V2 — když byla osoba přidána do komunity. Null pro starší rows
+   *  (po backfill = created_at). */
+  joined_at?: string | null;
   /** CRM annotations — empty when no profile row exists yet. */
   note?: string;
   tag_ids?: number[];
+}
+
+/** V2 — RSVPer, který NENÍ aktivní member komunity. Slim shape pro
+ *  "Účastníci (kandidáti na členství)" sub-view. */
+export interface WorkspaceParticipantSummary {
+  id: number;
+  email: string;
+  full_name: string;
+  phone: string;
+  total_rsvps: number;
+  upcoming_rsvps: number;
+  last_rsvp_at: string | null;
 }
 
 export interface PersonTag {
@@ -994,6 +1009,38 @@ export const workspaces = {
         method: "POST",
         body: JSON.stringify({ user_id: userId, role }),
       },
+    ),
+  /** V2 — bulk add participants as members. Used by "Přidat do komunity"
+   *  multi-select. Server is idempotent: already-active rows are no-op,
+   *  removed rows get reactivated. */
+  addMembers: (
+    slug: string,
+    userIds: number[],
+    role: "member" | "admin" = "member",
+  ) =>
+    apiFetch<{
+      added: number[];
+      reactivated: number[];
+      promoted: number[];
+      already_active: number[];
+      not_found: number[];
+    }>(`/api/workspaces/${slug}/members/add/`, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: userIds, role }),
+    }),
+  /** V2 — flip member.status to removed. Member row stays for audit;
+   *  RSVPs are unaffected. Owner / admin must be demoted to member
+   *  before they can be removed. */
+  removeMember: (slug: string, userId: number) =>
+    apiFetch<void>(
+      `/api/workspaces/${slug}/members/${userId}/remove/`,
+      { method: "POST" },
+    ),
+  /** V2 — list RSVPers who are NOT active members. UI "Účastníci"
+   *  sub-section uses this; multi-select + addMembers promotes them. */
+  participants: (slug: string) =>
+    apiFetch<WorkspaceParticipantSummary[]>(
+      `/api/workspaces/${slug}/participants/`,
     ),
   listInvitations: (slug: string) =>
     apiFetch<WorkspaceInvitationSummary[]>(
