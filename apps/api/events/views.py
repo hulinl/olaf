@@ -931,11 +931,12 @@ def sync_event_from_source(
     for key in extractable:
         if key in draft and draft[key] not in (None, ""):
             patch[key] = draft[key]
-    # Blocks: even empty list overwrites — that's the right behavior when
-    # the organiser stripped the page and wants to start fresh. But we
-    # don't blank to empty IF Claude returned [] AND we already have
-    # blocks — sync should never silently destroy a hand-built landing.
-    if "blocks" in patch and patch["blocks"] == [] and event.blocks:
+    # Blocks: never patch to empty. Claude returning blocks=[] means
+    # "I didn't manage to extract any" — not "wipe the landing". Owner
+    # can clear blocks themselves in the builder if that's really what
+    # they want. Also avoids fields_updated noise when Claude returned
+    # empty blocks against an event that also had empty blocks.
+    if "blocks" in patch and not patch["blocks"]:
         patch.pop("blocks")
 
     serializer = EventWriteSerializer(event, data=patch, partial=True)
