@@ -267,10 +267,12 @@ def fetch_notion_page_properties(page_id: str, token: str) -> str:
     return "\n".join(lines).strip()
 
 
-def fetch_notion_page_text(page_id: str, token: str) -> str:
-    """Returns a single flattened text representation of the page.
-
-    Walks the block tree recursively. Caps the result at
+def fetch_notion_page_text(
+    page_id: str, token: str
+) -> tuple[str, dict[str, Any]]:
+    """Returns flattened text + diagnostic dict (blocks_seen, blocks_with_text,
+    block_type_counts) so the caller can show the operator why an ingest
+    came back thin. Walks the block tree recursively. Caps the result at
     MAX_INGEST_TEXT_CHARS so an enormous page can't trigger an LLM
     bill spike — if the page exceeds the cap we keep the head + drop
     the rest, since events usually have the important stuff at the
@@ -279,6 +281,24 @@ def fetch_notion_page_text(page_id: str, token: str) -> str:
     lines: list[str] = []
     stack: list[str] = [page_id]
     seen: set[str] = set()
+    blocks_seen = 0
+    blocks_with_text = 0
+    type_counts: dict[str, int] = {}
+
+    def _consume(block: dict[str, Any]) -> None:
+        nonlocal blocks_seen, blocks_with_text
+        blocks_seen += 1
+        btype = block.get("type") or "unknown"
+        type_counts[btype] = type_counts.get(btype, 0) + 1
+        text = _block_to_text(block)
+        if text:
+            blocks_with_text += 1
+            lines.append(text)
+        if block.get("has_children"):
+            child_id = block.get("id")
+            if child_id:
+                stack.append(child_id)
+
     while stack:
         current = stack.pop()
         if current in seen:
@@ -286,13 +306,7 @@ def fetch_notion_page_text(page_id: str, token: str) -> str:
         seen.add(current)
         resp = _notion_request(f"/blocks/{current}/children?page_size=100", token)
         for block in resp.get("results", []):
-            text = _block_to_text(block)
-            if text:
-                lines.append(text)
-            if block.get("has_children"):
-                child_id = block.get("id")
-                if child_id:
-                    stack.append(child_id)
+            _consume(block)
         # Pagination — Notion returns `next_cursor` for long pages.
         cursor = resp.get("next_cursor")
         while cursor and len("\n".join(lines)) < MAX_INGEST_TEXT_CHARS:
@@ -301,19 +315,19 @@ def fetch_notion_page_text(page_id: str, token: str) -> str:
                 token,
             )
             for block in page.get("results", []):
-                text = _block_to_text(block)
-                if text:
-                    lines.append(text)
-                if block.get("has_children"):
-                    child_id = block.get("id")
-                    if child_id:
-                        stack.append(child_id)
+                _consume(block)
             cursor = page.get("next_cursor")
 
     flat = "\n".join(lines).strip()
     if len(flat) > MAX_INGEST_TEXT_CHARS:
         flat = flat[:MAX_INGEST_TEXT_CHARS] + "\n…[…]…\n"
-    return flat
+    diagnostics = {
+        "blocks_seen": blocks_seen,
+        "blocks_with_text": blocks_with_text,
+        "body_chars": len(flat),
+        "block_type_counts": type_counts,
+    }
+    return flat, diagnostics
 
 
 # ---------------------------------------------------------------------------
@@ -577,7 +591,7 @@ def ingest_event_from_page_id(
     # properties stretch we'd only see whatever they typed into the
     # page body underneath the database row.
     props = fetch_notion_page_properties(page_id, notion_token)
-    body = fetch_notion_page_text(page_id, notion_token)
+    body, body_diag = fetch_notion_page_text(page_id, notion_token)
     combined = "\n\n".join(part for part in (props, body) if part).strip()
     if not combined:
         raise IngestError(
@@ -586,6 +600,18 @@ def ingest_event_from_page_id(
         )
     draft = extract_event_draft(combined, anthropic_api_key)
     draft["notion_page_id"] = page_id
+    # Surface what we extracted FROM Notion (separately from what Claude
+    # extracted FROM that). Lets the operator see when "blocks=[]" is
+    # caused by an empty page body vs. Claude being conservative.
+    draft["_diagnostics"] = {
+        **body_diag,
+        "properties_chars": len(props),
+        "blocks_returned": len(draft.get("blocks") or []),
+        # The exact text we handed to Claude. Smoking gun when blocks=[]:
+        # if this preview shows rich content, the prompt/model dropped
+        # the ball; if it's near-empty, the Notion fetch did.
+        "combined_preview": combined[:1500],
+    }
     return draft
 
 

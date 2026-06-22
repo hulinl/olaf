@@ -54,6 +54,11 @@ urlpatterns = [
         name="sync-from-source",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/link-notion/",
+        views.link_event_to_notion,
+        name="link-notion",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/cover/",
         views.event_cover,
         name="cover",

@@ -329,6 +329,9 @@ function DraftReview({
         </Card>
       )}
 
+      <IngestDiagnostics draft={draft} />
+
+
       <EventForm
         // Force a remount when the user flips the mode so EventForm's
         // internal state (e.g. blocks editor) resets to the right
@@ -377,13 +380,95 @@ function DraftReview({
  * leave the rest as empty/null defaults. Cast through `unknown`
  * because Partial<OlafEvent> isn't structurally compatible.
  */
+/**
+ * Render a diagnostics card when the ingest came back thin (no blocks)
+ * or when the operator just wants to know what we pulled out of Notion
+ * before Claude saw it. Helps distinguish "Notion page is empty" from
+ * "Claude judged it too thin to template blocks".
+ */
+function IngestDiagnostics({ draft }: { draft: EventDraftFromSource }) {
+  const d = draft._diagnostics;
+  if (!d) return null;
+  // Always render when blocks=[]; otherwise tuck behind a disclosure so
+  // the standard happy-path flow stays quiet.
+  const hasBlocks = (draft.blocks?.length ?? 0) > 0;
+  const summary = `${d.blocks_seen} Notion bloků (${d.blocks_with_text} s textem), ${d.body_chars} znaků body, ${d.properties_chars} znaků properties → Claude vrátila ${d.blocks_returned} landing bloků.`;
+  const counts = Object.entries(d.block_type_counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `${t}: ${n}`)
+    .join(", ");
+  return (
+    <Card>
+      <CardSection>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Diagnostika importu
+        </p>
+        {hasBlocks ? (
+          <details className="mt-2 text-sm text-ink-700">
+            <summary className="cursor-pointer text-ink-500">
+              Co se vytáhlo z Notion stránky
+            </summary>
+            <p className="mt-2">{summary}</p>
+            {counts && (
+              <p className="mt-2 text-xs text-ink-500">
+                Typy bloků: {counts}
+              </p>
+            )}
+          </details>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-ink-700">{summary}</p>
+            <p className="mt-2 text-sm text-ink-500">
+              Bloky landing-page nepřišly. Pokud má stránka v Notion
+              hodně obsahu, ale tady vidíš málo body znaků, obsah je
+              nejspíš schovaný v sub-stránkách, ke kterým integrace
+              nemá přístup — připoj ji v Notion: ⋯ → Connections →
+              vyber svoji integraci na každé sub-stránce.
+            </p>
+            {counts && (
+              <p className="mt-2 text-xs text-ink-500">
+                Typy bloků: {counts}
+              </p>
+            )}
+            {d.combined_preview && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-ink-500">
+                  Náhled toho, co dostala Claude (prvních {d.combined_preview.length} znaků)
+                </summary>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-muted p-3 font-mono text-xs text-ink-700">
+                  {d.combined_preview}
+                </pre>
+              </details>
+            )}
+          </>
+        )}
+      </CardSection>
+    </Card>
+  );
+}
+
+function slugifyTitle(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
 function draftToOlafEvent(
   draft: EventDraftFromSource,
   blocks: EventBlock[],
 ): OlafEvent {
+  const title = draft.title ?? "";
   const base: Partial<OlafEvent> = {
-    title: draft.title ?? "",
-    slug: "",
+    title,
+    // EventForm auto-slug only fires on user typing into the title
+    // field. When EventForm hydrates from `initial`, that handler
+    // never runs, so we have to seed slug ourselves — otherwise the
+    // owner clicks "Vytvořit akci" and gets a "slug required" error.
+    slug: slugifyTitle(title),
     description: draft.description ?? "",
     starts_at: draft.starts_at ?? "",
     ends_at: draft.ends_at ?? "",

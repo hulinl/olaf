@@ -820,6 +820,110 @@ def _set_event_shared_workspaces(
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def link_event_to_notion(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Bind a manually-created event to a Notion page so the standard
+    sync flow can take over.
+
+    Sister endpoint to `sync_event_from_source` — that one re-reads an
+    already-bound page; this one is what you call once when the event
+    was typed up by hand and the owner now wants to fold in a Notion
+    page as the source of truth. Stores `external_ref="notion:<id>"`,
+    after which the UI exposes the "Aktualizovat z Notion" button on
+    the same edit page.
+
+    Body: `{ "url": "<notion page URL or bare page id>" }`.
+
+    Errors:
+      400 — missing/unparseable URL, event already bound to a Notion
+            page, page id in use by another event in this workspace
+      403 — caller can't manage this event
+      404 — event not found
+    """
+    from .notion_ingest import extract_notion_page_id
+
+    try:
+        event = Event.objects.select_related("workspace").get(
+            workspace__slug=workspace_slug, slug=event_slug
+        )
+    except Event.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    if (event.external_ref or "").startswith("notion:"):
+        return Response(
+            {
+                "detail": (
+                    "Akce už je propojená s Notion stránkou. "
+                    "Použij „Aktualizovat z Notion“."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    url = (request.data.get("url") or "").strip()
+    if not url:
+        return Response(
+            {"url": "Vlož URL Notion stránky."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    page_id = extract_notion_page_id(url)
+    if not page_id:
+        return Response(
+            {
+                "url": (
+                    "Nepoznal jsem v URL Notion page id. "
+                    "Otevři stránku v Notion → ⋯ → Copy link."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    ref = f"notion:{page_id}"
+    collision = (
+        Event.objects.filter(
+            workspace=event.workspace, external_ref=ref
+        )
+        .exclude(pk=event.pk)
+        .first()
+    )
+    if collision is not None:
+        return Response(
+            {
+                "detail": (
+                    f"Tahle Notion stránka už je propojená s akcí "
+                    f"„{collision.title}“ ({collision.slug})."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    event.external_ref = ref
+    event.save(update_fields=["external_ref"])
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_UPDATE,
+        workspace=event.workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=f'Propojil akci „{event.title}” s Notion stránkou',
+        payload={"event_slug": event.slug, "external_ref": ref},
+    )
+
+    return Response(
+        EventPublicSerializer(event, context={"request": request}).data
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def sync_event_from_source(
     request: Request, workspace_slug: str, event_slug: str
 ) -> Response:

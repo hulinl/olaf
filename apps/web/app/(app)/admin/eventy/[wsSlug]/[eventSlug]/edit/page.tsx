@@ -233,30 +233,48 @@ export default function EventEditCockpitPage({ params }: Props) {
         </div>
       </section>
 
-      {event.external_ref?.startsWith("notion:") && (
-        <section>
-          <h2 className="text-lg font-semibold text-ink-900">
-            Synchronizace z Notion
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Akce je svázaná s Notion stránkou (
-            <code className="rounded bg-surface-muted px-1 font-mono text-xs">
-              {event.external_ref}
-            </code>
-            ). Stiskni „Aktualizovat z Notion" a Claude znovu načte
-            stránku, přepíše pole akce (datum, místo, cena, kapacita)
-            a bloky landing-page. Slug, status, registrace a faktury
-            zůstanou.
-          </p>
-          <div className="mt-3">
-            <NotionSyncButton
-              wsSlug={wsSlug}
-              eventSlug={eventSlug}
-              onSynced={(updated) => setEvent(updated)}
-            />
-          </div>
-        </section>
-      )}
+      <section>
+        <h2 className="text-lg font-semibold text-ink-900">
+          Synchronizace z Notion
+        </h2>
+        {event.external_ref?.startsWith("notion:") ? (
+          <>
+            <p className="mt-1 text-sm text-ink-500">
+              Akce je svázaná s Notion stránkou (
+              <code className="rounded bg-surface-muted px-1 font-mono text-xs">
+                {event.external_ref}
+              </code>
+              ). Stiskni „Aktualizovat z Notion" a Claude znovu načte
+              stránku, přepíše pole akce (datum, místo, cena, kapacita)
+              a bloky landing-page. Slug, status, registrace a faktury
+              zůstanou.
+            </p>
+            <div className="mt-3">
+              <NotionSyncButton
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+                onSynced={(updated) => setEvent(updated)}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-sm text-ink-500">
+              Tahle akce zatím není napojená na Notion stránku. Když ji
+              propojíš, můžeš příště kliknout „Aktualizovat z Notion"
+              a Claude přepíše pole akce + landing bloky z Notion textu.
+              Slug, status, registrace a faktury zůstanou.
+            </p>
+            <div className="mt-3">
+              <NotionLinkForm
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+                onLinked={(updated) => setEvent(updated)}
+              />
+            </div>
+          </>
+        )}
+      </section>
 
       <CollaboratorsSection wsSlug={wsSlug} eventSlug={eventSlug} />
 
@@ -366,6 +384,77 @@ function NotionSyncButton({
         </p>
       )}
     </>
+  );
+}
+
+function NotionLinkForm({
+  wsSlug,
+  eventSlug,
+  onLinked,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+  onLinked: (event: OlafEvent) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle(e: FormEvent) {
+    e.preventDefault();
+    if (!url.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const updated = await events.linkNotion(wsSlug, eventSlug, url.trim());
+      onLinked(updated);
+    } catch (e2) {
+      if (e2 instanceof ApiError) {
+        const data = e2.data ?? {};
+        const msg =
+          (typeof data.detail === "string" && data.detail) ||
+          (typeof data.url === "string" && data.url) ||
+          e2.message;
+        setErr(msg);
+      } else {
+        setErr("Propojení selhalo.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handle} className="flex flex-col gap-3 sm:max-w-xl">
+      <Field
+        label="Notion URL"
+        htmlFor="link-notion-url"
+        hint="Otevři stránku v Notion → ⋯ → Copy link. Před prvním použitím připoj integraci přes ⋯ → Connections."
+      >
+        <Input
+          id="link-notion-url"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://www.notion.so/myws/Letni-kemp-2026-..."
+          required
+        />
+      </Field>
+      <div>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="md"
+          loading={busy}
+          disabled={!url.trim() || busy}
+        >
+          {busy ? "Propojuji…" : "Propojit s Notion"}
+        </Button>
+      </div>
+      {err && (
+        <p className="whitespace-pre-line text-sm text-danger">{err}</p>
+      )}
+    </form>
   );
 }
 

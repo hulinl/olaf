@@ -324,6 +324,21 @@ export interface EventDraftFromSource {
     status: string;
     workspace_slug: string;
   } | null;
+  /** Optional ingest diagnostics — how much we managed to extract from
+   *  the Notion page before handing it to Claude. Lets the operator see
+   *  whether an empty `blocks` came from a thin source page vs Claude
+   *  being conservative. */
+  _diagnostics?: {
+    blocks_seen: number;
+    blocks_with_text: number;
+    body_chars: number;
+    properties_chars: number;
+    blocks_returned: number;
+    block_type_counts: Record<string, number>;
+    /** First ~1500 chars of the exact text we handed to Claude
+     *  (properties + body). Diagnostic only — never persisted. */
+    combined_preview?: string;
+  };
 }
 
 export interface RequiredDocumentSpec {
@@ -1349,6 +1364,14 @@ export const events = {
     }>(
       `/api/events/${workspaceSlug}/${eventSlug}/sync-from-source/`,
       { method: "POST" },
+    ),
+  /** Bind a manually-created event to a Notion page so the standard
+   *  sync flow can take over. After this, the edit page exposes
+   *  syncFromSource via the existing "Aktualizovat z Notion" section. */
+  linkNotion: (workspaceSlug: string, eventSlug: string, url: string) =>
+    apiFetch<Event>(
+      `/api/events/${workspaceSlug}/${eventSlug}/link-notion/`,
+      { method: "POST", body: JSON.stringify({ url }) },
     ),
   update: (
     workspaceSlug: string,
