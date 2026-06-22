@@ -983,61 +983,10 @@ function MemberRow({
               )}
             </div>
             <span className="text-xs text-ink-500">{member.email}</span>
-            {iAmSuperAdmin && member.role !== "owner" && (
-              <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
-                {member.role === "admin" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleHandover();
-                      }}
-                      disabled={busy}
-                      className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
-                    >
-                      {busy ? "..." : "Předat vlastnictví"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDemote();
-                      }}
-                      disabled={busy}
-                      className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
-                    >
-                      {busy ? "..." : "Snížit"}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePromote();
-                      }}
-                      disabled={busy}
-                      className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
-                    >
-                      {busy ? "..." : "Povýšit na admina"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleRemove();
-                      }}
-                      disabled={busy}
-                      className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
-                    >
-                      {busy ? "..." : "Odebrat z komunity"}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            {/* Role action buttons (Povýšit / Odebrat / Předat / Snížit)
+                jsou schválně schované — najdeš je v expand panelu
+                (klik na "+" v posledním sloupci). Plochá tlačítka na
+                každém řádku sváděla k chybnému kliknutí. */}
           </Link>
         </td>
         <td className="whitespace-nowrap px-4 py-3 text-ink-700">
@@ -1100,6 +1049,12 @@ function MemberRow({
               wsSlug={wsSlug}
               tags={tags}
               onPatch={onPatch}
+              iAmSuperAdmin={iAmSuperAdmin}
+              onPromote={handlePromote}
+              onDemote={handleDemote}
+              onRemove={handleRemove}
+              onHandover={handleHandover}
+              roleBusy={busy}
             />
           </td>
         </tr>
@@ -1117,11 +1072,25 @@ function MemberCrmEditor({
   wsSlug,
   tags,
   onPatch,
+  iAmSuperAdmin,
+  onPromote,
+  onDemote,
+  onRemove,
+  onHandover,
+  roleBusy,
 }: {
   member: WorkspaceMemberSummary;
   wsSlug: string;
   tags: PersonTag[];
   onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  /** Když nedostaneme role props, panel "Správa role" se nevykreslí
+   *  (mobilní karta tu nemá místo, takže to nechává prázdné). */
+  iAmSuperAdmin?: boolean;
+  onPromote?: () => void;
+  onDemote?: () => void;
+  onRemove?: () => void;
+  onHandover?: () => void;
+  roleBusy?: boolean;
 }) {
   const [note, setNote] = useState(member.note ?? "");
   const [busy, setBusy] = useState(false);
@@ -1216,7 +1185,95 @@ function MemberCrmEditor({
           )}
         </div>
       </div>
+      {iAmSuperAdmin &&
+        member.role !== "owner" &&
+        onPromote &&
+        onDemote &&
+        onRemove &&
+        onHandover && (
+          <div className="flex flex-1 flex-col gap-2 sm:max-w-[200px]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              Správa role
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {member.role === "admin" ? (
+                <>
+                  <RoleActionButton
+                    icon="↑"
+                    label="Předat vlastnictví"
+                    onClick={onHandover}
+                    disabled={!!roleBusy}
+                    variant="primary"
+                  />
+                  <RoleActionButton
+                    icon="↓"
+                    label="Snížit na člena"
+                    onClick={onDemote}
+                    disabled={!!roleBusy}
+                    variant="neutral"
+                  />
+                </>
+              ) : (
+                <>
+                  <RoleActionButton
+                    icon="★"
+                    label="Povýšit na admina"
+                    onClick={onPromote}
+                    disabled={!!roleBusy}
+                    variant="primary"
+                  />
+                  <RoleActionButton
+                    icon="✕"
+                    label="Odebrat z komunity"
+                    onClick={onRemove}
+                    disabled={!!roleBusy}
+                    variant="danger"
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        )}
     </div>
+  );
+}
+
+function RoleActionButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+  variant,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  variant: "primary" | "neutral" | "danger";
+}) {
+  const style = {
+    primary: "border-brand/50 text-brand hover:bg-brand/10",
+    neutral: "border-border text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+    danger: "border-danger/40 text-danger hover:bg-danger-soft",
+  }[variant];
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+      disabled={disabled}
+      className={[
+        "inline-flex items-center gap-2 rounded-md border bg-surface px-3 py-1.5 text-xs font-medium transition-colors focus-ring disabled:opacity-50",
+        style,
+      ].join(" ")}
+    >
+      <span aria-hidden className="text-sm">
+        {icon}
+      </span>
+      {label}
+    </button>
   );
 }
 
