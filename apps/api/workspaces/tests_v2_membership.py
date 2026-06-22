@@ -166,9 +166,11 @@ class ParticipantsListTests(TestCase):
         ids = {row["id"] for row in r.json()}
         self.assertNotIn(user.id, ids)
 
-    def test_includes_removed_member_with_rsvp(self) -> None:
-        """User měl membership ale byl odebrán → ukáže se znovu mezi
-        participants (kandidáti k re-add)."""
+    def test_excludes_removed_member_with_rsvp(self) -> None:
+        """Removed members nesmí přijít v participants — jsou v separátní
+        /removed-members/ sekci. Owner je explicitně odebral; zařadit
+        je do "Přidat do komunity" kandidátů by mátlo (vypadalo by to
+        jako "nikdy nebyli členové")."""
         ev = _make_event(self.ws, slug="ev3")
         user = _make_user("comeback@v2.test")
         WorkspaceMember.objects.create(
@@ -180,7 +182,35 @@ class ParticipantsListTests(TestCase):
         RSVP.objects.create(event=ev, user=user, status=RSVP.STATUS_YES)
         r = self.client.get(self.url)
         ids = {row["id"] for row in r.json()}
-        self.assertIn(user.id, ids)
+        self.assertNotIn(user.id, ids)
+
+    def test_removed_members_endpoint_lists_removed(self) -> None:
+        """Separátní /removed-members/ endpoint vrací explicitně
+        odebrané členy — pro "Odebraní členové" collapsible sekci v UI
+        (undo flow)."""
+        user = _make_user("undo@v2.test", first_name="Bývalý")
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=user,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_REMOVED,
+        )
+        # Active member nesmí mít v této sekci místo.
+        active = _make_user("active@v2.test")
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=active,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+
+        url = reverse(
+            "workspaces:removed-members", kwargs={"slug": self.ws.slug}
+        )
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200, r.content)
+        ids = {row["id"] for row in r.json()}
+        self.assertEqual(ids, {user.id})
 
 
 class AddMemberTests(TestCase):
