@@ -17,6 +17,7 @@ import {
   type Workspace,
   type WorkspaceMemberSummary,
   type WorkspaceParticipantSummary,
+  type WorkspaceRemovedMemberSummary,
   type WorkspaceRole,
   workspaces,
 } from "@/lib/api";
@@ -57,6 +58,9 @@ export function MembersCrmView({ slug }: { slug: string }) {
   const [participants, setParticipants] = useState<
     WorkspaceParticipantSummary[] | null
   >(null);
+  const [removedMembers, setRemovedMembers] = useState<
+    WorkspaceRemovedMemberSummary[] | null
+  >(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tags, setTags] = useState<PersonTag[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,13 +87,17 @@ export function MembersCrmView({ slug }: { slug: string }) {
       workspaces.detail(slug),
       workspaces.listTags(slug).catch(() => []),
       workspaces.participants(slug).catch(() => [] as WorkspaceParticipantSummary[]),
+      workspaces
+        .removedMembers(slug)
+        .catch(() => [] as WorkspaceRemovedMemberSummary[]),
     ])
-      .then(([list, ws, t, parts]) => {
+      .then(([list, ws, t, parts, removed]) => {
         if (cancelled) return;
         setMembers(list);
         setWorkspace(ws);
         setTags(t);
         setParticipants(parts);
+        setRemovedMembers(removed);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -145,6 +153,13 @@ export function MembersCrmView({ slug }: { slug: string }) {
       .participants(slug)
       .catch(() => null);
     if (list) setParticipants(list);
+  }
+
+  async function refreshRemovedMembers() {
+    const list = await workspaces
+      .removedMembers(slug)
+      .catch(() => null);
+    if (list) setRemovedMembers(list);
   }
 
   return (
@@ -392,6 +407,7 @@ export function MembersCrmView({ slug }: { slug: string }) {
                       member={m}
                       wsSlug={slug}
                       tags={tags}
+                      iAmSuperAdmin={isOwner}
                       expanded={expandedRowId === m.id}
                       onToggleExpand={() =>
                         setExpandedRowId(
@@ -399,6 +415,13 @@ export function MembersCrmView({ slug }: { slug: string }) {
                         )
                       }
                       onPatch={(patch) => patchMember(m.id, patch)}
+                      onRemoved={async () => {
+                        await Promise.all([
+                          refreshMembers(),
+                          refreshParticipants(),
+                          refreshRemovedMembers(),
+                        ]);
+                      }}
                       selected={selectedIds.has(m.id)}
                       onToggleSelected={() =>
                         setSelectedIds((prev) => {
@@ -466,6 +489,7 @@ export function MembersCrmView({ slug }: { slug: string }) {
                             await Promise.all([
                               refreshMembers(),
                               refreshParticipants(),
+                              refreshRemovedMembers(),
                             ]);
                           }}
                           selected={selectedIds.has(m.id)}
@@ -525,7 +549,11 @@ export function MembersCrmView({ slug }: { slug: string }) {
                 Array.from(participantSelected),
               );
               setParticipantSelected(new Set());
-              await Promise.all([refreshMembers(), refreshParticipants()]);
+              await Promise.all([
+                refreshMembers(),
+                refreshParticipants(),
+                refreshRemovedMembers(),
+              ]);
             } catch {
               // Network/permission errors surface as alert on row.
             } finally {
@@ -536,7 +564,40 @@ export function MembersCrmView({ slug }: { slug: string }) {
             setParticipantBusy(true);
             try {
               await workspaces.addMembers(slug, [userId]);
-              await Promise.all([refreshMembers(), refreshParticipants()]);
+              await Promise.all([
+                refreshMembers(),
+                refreshParticipants(),
+                refreshRemovedMembers(),
+              ]);
+            } catch {
+              // ignore
+            } finally {
+              setParticipantBusy(false);
+            }
+          }}
+        />
+      )}
+
+      {isOwnerOrAdmin && removedMembers && removedMembers.length > 0 && (
+        <RemovedMembersSection
+          removed={removedMembers}
+          busy={participantBusy}
+          onRestore={async (userId) => {
+            if (
+              !confirm(
+                "Vrátit tohoto člověka zpátky do komunity?",
+              )
+            ) {
+              return;
+            }
+            setParticipantBusy(true);
+            try {
+              await workspaces.addMembers(slug, [userId]);
+              await Promise.all([
+                refreshMembers(),
+                refreshParticipants(),
+                refreshRemovedMembers(),
+              ]);
             } catch {
               // ignore
             } finally {
@@ -572,9 +633,159 @@ export function MembersCrmView({ slug }: { slug: string }) {
   );
 }
 
+/**
+ * Shared role-action handlers for MemberRow + MemberMobileCard. Both
+ * render MemberCrmEditor and need the same Promote / Demote / Remove /
+ * Handover semantics; keeping them in a hook means the two row variants
+ * stay in lockstep instead of slowly drifting.
+ */
+function useMemberRoleActions({
+  member,
+  wsSlug,
+  onPatch,
+  onRemoved,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  onRemoved: () => void | Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function handlePromote() {
+    setBusy(true);
+    try {
+      const r = await workspaces.promoteMember(wsSlug, member.id);
+      onPatch({ role: r.role });
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleDemote() {
+    if (
+      !confirm(`Snížit ${member.full_name || member.email} na běžného člena?`)
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await workspaces.demoteMember(wsSlug, member.id);
+      onPatch({ role: r.role });
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleRemove() {
+    const ok = confirm(
+      `Odebrat ${member.full_name || member.email} z komunity?\n\n` +
+        "Jeho RSVPs a faktury zůstanou; přestane být v seznamu " +
+        "členů. Žádná notifikace ani e-mail mu o tom nepřijde.",
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await workspaces.removeMember(wsSlug, member.id);
+      await onRemoved();
+    } catch {
+      /* keep silent — visible via list refresh */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleHandover() {
+    const ok = confirm(
+      `Předat vlastnictví komunity uživateli ${member.full_name || member.email}?\n\n` +
+        "Ty se staneš adminem a ztratíš právo mazat komunitu nebo měnit role. " +
+        "Nový vlastník ti to může vrátit, ale nemusí.",
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await workspaces.handoverOwnership(wsSlug, member.id);
+      window.location.reload();
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  return {
+    busy,
+    handlePromote,
+    handleDemote,
+    handleRemove,
+    handleHandover,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Účastníci sub-section — V2 "Přidat do komunity" workflow
 // ---------------------------------------------------------------------------
+
+function RemovedMembersSection({
+  removed,
+  busy,
+  onRestore,
+}: {
+  removed: WorkspaceRemovedMemberSummary[];
+  busy: boolean;
+  onRestore: (userId: number) => Promise<void> | void;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-500 hover:text-ink-900">
+            <span className="transition-transform group-open:rotate-90">
+              ▸
+            </span>
+            Odebraní členové ({removed.length})
+          </span>
+        </summary>
+        <p className="mt-2 max-w-2xl text-sm text-ink-500">
+          Lidé, které jsi z komunity odebral. Kdyby šlo o překlep nebo
+          si někoho chceš pozvat zpátky, klikni „Vrátit".
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-muted/60">
+              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                <th className="px-4 py-3">Jméno</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3 text-right">Akce</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {removed.map((m) => (
+                <tr key={m.id}>
+                  <td className="px-4 py-3 font-medium text-ink-900">
+                    {m.full_name || "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+                    {m.email}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRestore(m.id)}
+                      disabled={busy}
+                      className="text-[12px] font-medium text-brand hover:underline disabled:opacity-50"
+                    >
+                      Vrátit do komunity
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  );
+}
 
 function ParticipantsSection({
   wsSlug,
@@ -727,18 +938,22 @@ function MemberMobileCard({
   member,
   wsSlug,
   tags,
+  iAmSuperAdmin,
   expanded,
   onToggleExpand,
   onPatch,
+  onRemoved,
   selected,
   onToggleSelected,
 }: {
   member: WorkspaceMemberSummary;
   wsSlug: string;
   tags: PersonTag[];
+  iAmSuperAdmin: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
   onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  onRemoved: () => void | Promise<void>;
   selected: boolean;
   onToggleSelected: () => void;
 }) {
@@ -747,6 +962,13 @@ function MemberMobileCard({
   const memberTagIds = new Set(member.tag_ids ?? []);
   const memberTags = tags.filter((t) => memberTagIds.has(t.id));
   const hasNote = Boolean((member.note ?? "").trim());
+  const {
+    busy: roleBusy,
+    handlePromote,
+    handleDemote,
+    handleRemove,
+    handleHandover,
+  } = useMemberRoleActions({ member, wsSlug, onPatch, onRemoved });
 
   return (
     <div
@@ -843,6 +1065,12 @@ function MemberMobileCard({
             wsSlug={wsSlug}
             tags={tags}
             onPatch={onPatch}
+            iAmSuperAdmin={iAmSuperAdmin}
+            onPromote={handlePromote}
+            onDemote={handleDemote}
+            onRemove={handleRemove}
+            onHandover={handleHandover}
+            roleBusy={roleBusy}
           />
         </div>
       )}
@@ -874,12 +1102,18 @@ function MemberRow({
   onToggleSelected: () => void;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
   const profileHref = `/admin/komunity/${wsSlug}/clenove/${member.id}`;
   const lastAt = member.last_rsvp_at ? new Date(member.last_rsvp_at) : null;
   const memberTagIds = new Set(member.tag_ids ?? []);
   const memberTags = tags.filter((t) => memberTagIds.has(t.id));
   const hasNote = Boolean((member.note ?? "").trim());
+  const {
+    busy,
+    handlePromote,
+    handleDemote,
+    handleRemove,
+    handleHandover,
+  } = useMemberRoleActions({ member, wsSlug, onPatch, onRemoved });
 
   function openProfileFromRowClick(e: ReactMouseEvent<HTMLTableRowElement>) {
     const target = e.target as HTMLElement;
@@ -887,64 +1121,6 @@ function MemberRow({
     // controls (tag chips, expand toggle, role buttons).
     if (target.closest("a, button, input, label, select, textarea")) return;
     router.push(profileHref);
-  }
-
-  async function handlePromote() {
-    setBusy(true);
-    try {
-      const r = await workspaces.promoteMember(wsSlug, member.id);
-      onPatch({ role: r.role });
-    } catch {
-      /* keep silent */
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function handleDemote() {
-    if (!confirm(`Snížit ${member.full_name || member.email} na běžného člena?`))
-      return;
-    setBusy(true);
-    try {
-      const r = await workspaces.demoteMember(wsSlug, member.id);
-      onPatch({ role: r.role });
-    } catch {
-      /* keep silent */
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function handleRemove() {
-    const ok = confirm(
-      `Odebrat ${member.full_name || member.email} z komunity?\n\n` +
-        "Jeho RSVPs a faktury zůstanou; přestane být v seznamu " +
-        "členů. Pokud měl/a explicit roli (admin), musíš ho/ji " +
-        "nejdřív degradovat na běžného člena.",
-    );
-    if (!ok) return;
-    setBusy(true);
-    try {
-      await workspaces.removeMember(wsSlug, member.id);
-      await onRemoved();
-    } catch {
-      /* keep silent — visible via list refresh */
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function handleHandover() {
-    const ok = confirm(
-      `Předat vlastnictví komunity uživateli ${member.full_name || member.email}?\n\n` +
-        "Ty se staneš adminem a ztratíš právo mazat komunitu nebo měnit role. " +
-        "Nový vlastník ti to může vrátit, ale nemusí.",
-    );
-    if (!ok) return;
-    setBusy(true);
-    try {
-      await workspaces.handoverOwnership(wsSlug, member.id);
-      window.location.reload();
-    } catch {
-      setBusy(false);
-    }
   }
 
   return (
@@ -1121,6 +1297,7 @@ function MemberCrmEditor({
   }
 
   return (
+    <div className="flex flex-col gap-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
       <div className="flex flex-1 flex-col gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
@@ -1185,17 +1362,18 @@ function MemberCrmEditor({
           )}
         </div>
       </div>
+    </div>
       {iAmSuperAdmin &&
         member.role !== "owner" &&
         onPromote &&
         onDemote &&
         onRemove &&
         onHandover && (
-          <div className="flex flex-1 flex-col gap-2 sm:max-w-[200px]">
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
               Správa role
             </p>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {member.role === "admin" ? (
                 <>
                   <RoleActionButton

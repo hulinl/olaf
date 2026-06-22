@@ -889,6 +889,15 @@ export interface WorkspaceParticipantSummary {
   last_rsvp_at: string | null;
 }
 
+/** V2 — explicitně odebraný člen. Pro "Odebraní členové" sbalovací
+ *  sekci s undo button. */
+export interface WorkspaceRemovedMemberSummary {
+  id: number;
+  email: string;
+  full_name: string;
+  removed_at: string | null;
+}
+
 export interface PersonTag {
   id: number;
   name: string;
@@ -1037,10 +1046,17 @@ export const workspaces = {
       { method: "POST" },
     ),
   /** V2 — list RSVPers who are NOT active members. UI "Účastníci"
-   *  sub-section uses this; multi-select + addMembers promotes them. */
+   *  sub-section uses this; multi-select + addMembers promotes them.
+   *  Removed members are NOT included (they're in /removed-members/). */
   participants: (slug: string) =>
     apiFetch<WorkspaceParticipantSummary[]>(
       `/api/workspaces/${slug}/participants/`,
+    ),
+  /** V2 — list explicit removed members. UI "Odebraní členové"
+   *  collapsible section uses this for undo (re-add via addMembers). */
+  removedMembers: (slug: string) =>
+    apiFetch<WorkspaceRemovedMemberSummary[]>(
+      `/api/workspaces/${slug}/removed-members/`,
     ),
   listInvitations: (slug: string) =>
     apiFetch<WorkspaceInvitationSummary[]>(

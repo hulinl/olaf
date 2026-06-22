@@ -644,18 +644,21 @@ def workspace_participants(request: Request, slug: str) -> Response:
         .distinct()
     )
 
-    active_member_ids = set(
-        WorkspaceMember.objects.filter(
-            workspace=workspace,
-            status=WorkspaceMember.STATUS_ACTIVE,
-        ).values_list("user_id", flat=True)
+    # Exclude both active AND removed members. Removed = owner explicitly
+    # kicked them out — they don't belong in the "Přidat do komunity"
+    # candidate list (would be confusing). They're surfaced separately
+    # via /removed-members/ for undo.
+    any_member_ids = set(
+        WorkspaceMember.objects.filter(workspace=workspace).values_list(
+            "user_id", flat=True
+        )
     )
 
     now = timezone.now()
     users = (
         User.objects.filter(rsvps__event_id__in=event_ids)
         .exclude(rsvps__status=RSVP.STATUS_CANCELLED)
-        .exclude(id__in=active_member_ids)
+        .exclude(id__in=any_member_ids)
         .annotate(
             total_rsvps=Count(
                 "rsvps",
@@ -694,6 +697,47 @@ def workspace_participants(request: Request, slug: str) -> Response:
                 "last_rsvp_at": u.last_rsvp_at,
             }
             for u in users
+        ]
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_removed_members(
+    request: Request, slug: str
+) -> Response:
+    """List members the owner explicitly removed.
+
+    Surfaces them as a collapsed "Odebraní členové" section in the UI
+    — useful for undo (re-add via standard /members/add/ flow). Doesn't
+    include RSVP stats; if owner wants those they'll re-add and see
+    them in the regular member roster.
+    """
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not _can_view_workspace_people(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    rows = (
+        WorkspaceMember.objects.filter(
+            workspace=workspace,
+            status=WorkspaceMember.STATUS_REMOVED,
+        )
+        .select_related("user")
+        .order_by("-joined_at", "user_id")
+    )
+    return Response(
+        [
+            {
+                "id": m.user_id,
+                "email": m.user.email,
+                "full_name": m.user.get_full_name(),
+                "removed_at": m.joined_at,
+            }
+            for m in rows
         ]
     )
 

@@ -43,6 +43,11 @@ urlpatterns = [
         name="participants",
     ),
     path(
+        "<slug:slug>/removed-members/",
+        views.workspace_removed_members,
+        name="removed-members",
+    ),
+    path(
         "<slug:slug>/members/<int:user_id>/",
         views.workspace_member_detail,
         name="member-detail",
