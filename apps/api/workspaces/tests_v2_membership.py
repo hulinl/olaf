@@ -345,3 +345,81 @@ class RemoveMemberTests(TestCase):
     def test_unknown_user_404(self) -> None:
         r = self.client.post(self._url(999999))
         self.assertEqual(r.status_code, 404)
+
+
+class CrossTenantIsolationTests(TestCase):
+    """Multi-tenant safety — žádný RSVP, membership ani role z workspace A
+    nesmí ovlivnit workspace B's roster. Tyhle invarianty by mělo držet
+    nezávisle na V2 modelu, ale je dobré mít explicit testy proti
+    regresi (kdykoli refactor `workspace_members` view → potřebujeme
+    chytit cross-tenant leak)."""
+
+    def setUp(self) -> None:
+        self.alice = _make_user("alice@iso.test")
+        self.bob = _make_user("bob@iso.test")
+        self.ws_a = _make_workspace(self.alice, slug="iso-a")
+        self.ws_b = _make_workspace(self.bob, slug="iso-b")
+        # Common user — má membership v A i v B
+        self.shared = _make_user("shared@iso.test")
+        WorkspaceMember.objects.create(
+            workspace=self.ws_a,
+            user=self.shared,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        # NE-member z A, ale member v B
+        self.b_only = _make_user("bonly@iso.test")
+        WorkspaceMember.objects.create(
+            workspace=self.ws_b,
+            user=self.b_only,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+
+    def test_members_listing_isolated(self) -> None:
+        """Alice vidí ve své komunitě jen sebe + shared, ne b_only."""
+        client = APIClient()
+        client.force_authenticate(self.alice)
+        r = client.get(
+            reverse("workspaces:members", kwargs={"slug": self.ws_a.slug})
+        )
+        self.assertEqual(r.status_code, 200)
+        ids = {row["id"] for row in r.json()}
+        self.assertEqual(ids, {self.alice.id, self.shared.id})
+
+    def test_bob_cannot_remove_alice_member(self) -> None:
+        """Bob (owner B) NESMÍ smazat člena z workspace A — return 403
+        nebo 404 (záleží na implementaci, oboje je bezpečné)."""
+        client = APIClient()
+        client.force_authenticate(self.bob)
+        r = client.post(
+            reverse(
+                "workspaces:member-remove",
+                kwargs={"slug": self.ws_a.slug, "user_id": self.shared.id},
+            )
+        )
+        self.assertIn(r.status_code, (403, 404))
+        self.shared.refresh_from_db()
+        membership = WorkspaceMember.objects.get(
+            workspace=self.ws_a, user=self.shared
+        )
+        self.assertEqual(membership.status, WorkspaceMember.STATUS_ACTIVE)
+
+    def test_participants_endpoint_isolated_to_calling_workspace(self) -> None:
+        """workspace_participants pro WS A nesmí zahrnovat RSVPers
+        z WS B (i kdyby ti tam měli aktivní RSVP)."""
+        ev_b = _make_event(self.ws_b, slug="bobs-event")
+        outsider = _make_user("outsider@iso.test")
+        RSVP.objects.create(event=ev_b, user=outsider, status=RSVP.STATUS_YES)
+
+        client = APIClient()
+        client.force_authenticate(self.alice)
+        r = client.get(
+            reverse(
+                "workspaces:participants",
+                kwargs={"slug": self.ws_a.slug},
+            )
+        )
+        self.assertEqual(r.status_code, 200)
+        ids = {row["id"] for row in r.json()}
+        self.assertNotIn(outsider.id, ids)
