@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { ApiError, type PersonDetail, events } from "@/lib/api";
+import {
+  ApiError,
+  type PersonDetail,
+  type PersonMembershipEntry,
+  events,
+  workspaces,
+} from "@/lib/api";
 
 interface Props {
   userId: number | null;
@@ -206,6 +212,13 @@ export function PersonProfileDialog({ userId, onClose }: Props) {
                 )}
               </section>
 
+              {(person.memberships?.length ?? 0) > 0 && (
+                <MembershipsSection
+                  person={person}
+                  onChange={(updated) => setPerson(updated)}
+                />
+              )}
+
               <section>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
                   Historie registrací ({person.events.length})
@@ -254,5 +267,152 @@ export function PersonProfileDialog({ userId, onClose }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  owner: "Vlastník",
+  admin: "Admin",
+  member: "Člen",
+};
+
+const ROLE_TONE: Record<string, string> = {
+  owner: "bg-brand/15 text-brand",
+  admin: "bg-warning/15 text-warning",
+  member: "bg-surface-muted text-ink-700",
+};
+
+/**
+ * Membership section — listuje workspace(y) přihlášené uživatele,
+ * které vlastní caller, a u každého ukáže roli + (pro non-owner non-admin
+ * členy) tlačítko "Odebrat". Aktivní + odebrané rows ukazujeme oba,
+ * ať owner vidí historii; "odebrané" jsou ztlumené a nabízí "Vrátit".
+ */
+function MembershipsSection({
+  person,
+  onChange,
+}: {
+  person: PersonDetail;
+  onChange: (next: PersonDetail) => void;
+}) {
+  const [busyWs, setBusyWs] = useState<string | null>(null);
+  const memberships = person.memberships ?? [];
+
+  async function handleRemove(m: PersonMembershipEntry) {
+    if (
+      !confirm(
+        `Odebrat ${person.full_name} z komunity ${m.workspace_name}? RSVPs zůstanou, žádný e-mail nepřijde.`,
+      )
+    ) {
+      return;
+    }
+    setBusyWs(m.workspace_slug);
+    try {
+      await workspaces.removeMember(m.workspace_slug, person.user_id);
+      onChange({
+        ...person,
+        memberships: memberships.map((mm) =>
+          mm.workspace_slug === m.workspace_slug
+            ? { ...mm, status: "removed" }
+            : mm,
+        ),
+      });
+    } catch {
+      // keep silent
+    } finally {
+      setBusyWs(null);
+    }
+  }
+  async function handleRestore(m: PersonMembershipEntry) {
+    setBusyWs(m.workspace_slug);
+    try {
+      await workspaces.addMembers(m.workspace_slug, [person.user_id]);
+      onChange({
+        ...person,
+        memberships: memberships.map((mm) =>
+          mm.workspace_slug === m.workspace_slug
+            ? { ...mm, status: "active" }
+            : mm,
+        ),
+      });
+    } catch {
+      // keep silent
+    } finally {
+      setBusyWs(null);
+    }
+  }
+
+  return (
+    <section>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+        Členství v komunitách ({memberships.length})
+      </p>
+      <ul className="mt-2 flex flex-col gap-2">
+        {memberships.map((m) => {
+          const busy = busyWs === m.workspace_slug;
+          const isRemoved = m.status === "removed";
+          const canRemove =
+            !isRemoved &&
+            m.role !== "owner" &&
+            m.role !== "admin";
+          return (
+            <li
+              key={m.workspace_slug}
+              className={[
+                "flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm",
+                isRemoved ? "opacity-60" : "",
+              ].join(" ")}
+            >
+              <div className="flex min-w-0 flex-col">
+                <span className="font-medium text-ink-900">
+                  {m.workspace_name}
+                </span>
+                <span className="flex items-baseline gap-2 text-xs text-ink-500">
+                  <span
+                    className={[
+                      "inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                      (m.role && ROLE_TONE[m.role]) ?? "bg-surface-muted text-ink-500",
+                    ].join(" ")}
+                  >
+                    {(m.role && ROLE_LABEL[m.role]) ?? "—"}
+                  </span>
+                  {isRemoved && (
+                    <span className="text-danger">Odebrán</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                {canRemove && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(m)}
+                    disabled={busy}
+                    className="text-[11px] font-medium text-danger hover:underline disabled:opacity-50"
+                  >
+                    {busy ? "..." : "Odebrat"}
+                  </button>
+                )}
+                {isRemoved && (
+                  <button
+                    type="button"
+                    onClick={() => handleRestore(m)}
+                    disabled={busy}
+                    className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+                  >
+                    {busy ? "..." : "Vrátit"}
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {memberships.some((m) => m.role === "admin") && (
+        <p className="mt-2 text-xs text-ink-500">
+          Admina musíš nejdřív degradovat na člena z dashboardu komunity,
+          pak ho jde odebrat.
+        </p>
+      )}
+    </section>
   );
 }

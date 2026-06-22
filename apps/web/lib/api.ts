@@ -662,6 +662,18 @@ export interface PersonDetail {
     relationship: string;
   };
   events: PersonEventEntry[];
+  /** V2 — per-workspace membership tied to the caller's owned
+   *  workspaces. UI in Lidé dialog shows a row per workspace with
+   *  remove + role badges. */
+  memberships?: PersonMembershipEntry[];
+}
+
+export interface PersonMembershipEntry {
+  workspace_slug: string;
+  workspace_name: string;
+  role: WorkspaceRole;
+  status: "active" | "removed";
+  joined_at: string | null;
 }
 
 export interface EventCollaborator {

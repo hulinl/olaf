@@ -85,11 +85,17 @@ export default function AdminLayout({
             </div>
           </aside>
 
-          {/* MAIN — overflow-x-clip is a defensive net so a wide
-              child (large image preview, long URL, table) can't push
-              the whole viewport wide. min-w-0 is what lets the
-              flex child actually shrink below its content width. */}
-          <main className="min-w-0 flex-1 overflow-x-clip">{children}</main>
+          {/* MAIN — `min-w-0` keeps the flex child shrinkable below
+              its content width (kills horizontal scrollbar from a wide
+              table or long URL). We DON'T set `overflow-x: clip` here:
+              per CSS spec, `overflow-x: clip` with `overflow-y: visible`
+              forces overflow-y to compute to `auto`, which turns this
+              box into a scroll container — and sticky descendants then
+              stick to THIS box instead of the viewport, so the tab nav
+              in /admin/komunity/<slug>/ silently scrolls away. The
+              body-level `overflow-x: clip` in globals.css still acts
+              as the safety net against viewport-widening children. */}
+          <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
     </div>

@@ -649,8 +649,21 @@ def creator_person_detail(request: Request, user_id: int) -> Response:
         .select_related("event", "event__workspace")
         .order_by("-created_at")
     )
-    if not shared_rsvps.exists():
-        # Not someone the caller has actually met.
+    # V2 — also surface this person's memberships in the caller's
+    # workspaces, so the Lidé dialog can show per-workspace role +
+    # remove button. Include removed members so the owner sees a
+    # complete picture.
+    memberships = (
+        WorkspaceMember.objects.filter(
+            user=person, workspace_id__in=owned_ws_ids
+        )
+        .select_related("workspace")
+        .order_by("workspace__name")
+    )
+
+    # Access check: caller must have either an RSVP OR a membership
+    # row for this person in one of their workspaces.
+    if not shared_rsvps.exists() and not memberships.exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     return Response(
@@ -683,6 +696,16 @@ def creator_person_detail(request: Request, user_id: int) -> Response:
                     "rsvp_created_at": r.created_at,
                 }
                 for r in shared_rsvps
+            ],
+            "memberships": [
+                {
+                    "workspace_slug": m.workspace.slug,
+                    "workspace_name": m.workspace.name,
+                    "role": m.role,
+                    "status": m.status,
+                    "joined_at": m.joined_at,
+                }
+                for m in memberships
             ],
         }
     )

@@ -165,3 +165,63 @@ class CreatorPersonDetailTests(TestCase):
     def test_anon_blocked(self) -> None:
         r = self.client.get(self._url())
         self.assertIn(r.status_code, (401, 403))
+
+    def test_memberships_field_shows_caller_owned_workspaces_only(self) -> None:
+        """V2 — endpoint vrací memberships array. Ukazují se jen
+        WorkspaceMember rows ve workspaces, které caller VLASTNÍ.
+        Membership v cizí workspace (kde caller není owner) se NESMÍ
+        zobrazit, jinak by Lidé view leakovala napříč tenants."""
+        from workspaces.models import Workspace, WorkspaceMember
+
+        # Foreign workspace s membership pro participanta — ale caller
+        # není její vlastník, takže by se ve výpisu zobrazit NESMĚLA.
+        foreign_owner = _make_user("foreign@cpd.com")
+        foreign_ws = Workspace.objects.create(
+            slug="foreign-ws", name="Foreign WS"
+        )
+        WorkspaceMember.objects.create(
+            workspace=foreign_ws,
+            user=foreign_owner,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+        WorkspaceMember.objects.create(
+            workspace=foreign_ws,
+            user=self.participant,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        # Active membership v owner-ově workspace, aby tam byla aspoň
+        # jedna položka pro pozitivní check.
+        own_ws = self.event.workspace
+        WorkspaceMember.objects.create(
+            workspace=own_ws,
+            user=self.participant,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+
+        self.client.force_authenticate(self.owner)
+        r = self.client.get(self._url())
+        self.assertEqual(r.status_code, 200, r.content)
+        memberships = r.json().get("memberships", [])
+        slugs = {m["workspace_slug"] for m in memberships}
+        self.assertIn(own_ws.slug, slugs)
+        self.assertNotIn(foreign_ws.slug, slugs)
+
+    def test_404_for_membership_only_person(self) -> None:
+        """Person bez RSVPs ale s membership row by se měl dát najít
+        (jinak owner nemůže odebrat membera který nikdy nic neRSVPnul,
+        např. propagated z bulk invite)."""
+        from workspaces.models import WorkspaceMember
+
+        non_rsvper = _make_user("nonrsvp@cpd.com")
+        WorkspaceMember.objects.create(
+            workspace=self.event.workspace,
+            user=non_rsvper,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        self.client.force_authenticate(self.owner)
+        r = self.client.get(self._url(pk=non_rsvper.pk))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["email"], "nonrsvp@cpd.com")
