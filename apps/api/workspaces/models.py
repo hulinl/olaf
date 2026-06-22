@@ -112,6 +112,18 @@ class WorkspaceMember(models.Model):
         (ROLE_MEMBER, "Member"),
     ]
 
+    # V2 community membership (PR #212): explicit membership opt-in.
+    # `active` = part of the community; `removed` = owner explicitly
+    # removed them. Removed rows are kept (not deleted) so RSVPs and
+    # audit trail stay intact, and re-adding the same person is a
+    # status flip rather than a fresh row.
+    STATUS_ACTIVE = "active"
+    STATUS_REMOVED = "removed"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_REMOVED, "Removed"),
+    ]
+
     workspace = models.ForeignKey(
         Workspace, on_delete=models.CASCADE, related_name="members"
     )
@@ -123,7 +135,16 @@ class WorkspaceMember(models.Model):
     role = models.CharField(
         max_length=20, choices=ROLE_CHOICES, default=ROLE_OWNER
     )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+    )
     created_at = models.DateTimeField(default=timezone.now)
+    # Timestamp of the last status transition (added or re-activated).
+    # Used in the CRM listing and the audit payload. Backfill sets it
+    # equal to created_at; new joins stamp `now()`.
+    joined_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         db_table = "workspaces_workspace_member"

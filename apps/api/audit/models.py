@@ -36,6 +36,8 @@ class AuditLog(models.Model):
     ACTION_RSVP_MARK_PAID = "rsvp.mark_paid"
     ACTION_RSVP_TOGGLE_ORGANIZER = "rsvp.toggle_organizer"
     ACTION_MEMBER_ROLE_CHANGE = "workspace_member.role_change"
+    ACTION_MEMBER_ADD = "workspace_member.add"
+    ACTION_MEMBER_REMOVE = "workspace_member.remove"
     ACTION_COMMUNITY_MEMBER_ROLE_CHANGE = "community_member.role_change"
     ACTION_TOPIC_DELETE = "discussion.topic.delete"
     ACTION_COMMENT_DELETE = "discussion.comment.delete"

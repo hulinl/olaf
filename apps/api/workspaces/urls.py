@@ -38,9 +38,19 @@ urlpatterns = [
     path("<slug:slug>/cover/", views.workspace_cover, name="cover"),
     path("<slug:slug>/members/", views.workspace_members, name="members"),
     path(
+        "<slug:slug>/participants/",
+        views.workspace_participants,
+        name="participants",
+    ),
+    path(
         "<slug:slug>/members/<int:user_id>/",
         views.workspace_member_detail,
         name="member-detail",
+    ),
+    path(
+        "<slug:slug>/members/<int:user_id>/remove/",
+        views.workspace_member_remove,
+        name="member-remove",
     ),
     path(
         "<slug:slug>/members/<int:user_id>/promote/",

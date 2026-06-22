@@ -16,6 +16,7 @@ import {
   type PersonTag,
   type Workspace,
   type WorkspaceMemberSummary,
+  type WorkspaceParticipantSummary,
   type WorkspaceRole,
   workspaces,
 } from "@/lib/api";
@@ -53,6 +54,9 @@ export default function KomunityMembersPage({ params }: Props) {
 export function MembersCrmView({ slug }: { slug: string }) {
   const router = useRouter();
   const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
+  const [participants, setParticipants] = useState<
+    WorkspaceParticipantSummary[] | null
+  >(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tags, setTags] = useState<PersonTag[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +69,12 @@ export function MembersCrmView({ slug }: { slug: string }) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+  // V2 — Účastníci sub-section: separate selection set, independent of
+  // member-level multi-select used for bulk email/tagging.
+  const [participantSelected, setParticipantSelected] = useState<Set<number>>(
+    new Set(),
+  );
+  const [participantBusy, setParticipantBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,12 +82,14 @@ export function MembersCrmView({ slug }: { slug: string }) {
       workspaces.members(slug),
       workspaces.detail(slug),
       workspaces.listTags(slug).catch(() => []),
+      workspaces.participants(slug).catch(() => [] as WorkspaceParticipantSummary[]),
     ])
-      .then(([list, ws, t]) => {
+      .then(([list, ws, t, parts]) => {
         if (cancelled) return;
         setMembers(list);
         setWorkspace(ws);
         setTags(t);
+        setParticipants(parts);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -128,6 +140,13 @@ export function MembersCrmView({ slug }: { slug: string }) {
     if (list) setMembers(list);
   }
 
+  async function refreshParticipants() {
+    const list = await workspaces
+      .participants(slug)
+      .catch(() => null);
+    if (list) setParticipants(list);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-4">
@@ -137,9 +156,10 @@ export function MembersCrmView({ slug }: { slug: string }) {
             Členové komunity
           </h1>
           <p className="mt-2 max-w-2xl text-ink-500">
-            Lidi, kteří se přihlásili na alespoň jednu akci této komunity.
-            Klikni na řádek pro profil + historii registrací; pravým
-            sloupcem můžeš přiřadit tagy a napsat si poznámku.
+            Členové, které jsi do komunity přidal — buď ručně, nebo
+            povýšením z účastníků akcí. Klikni na řádek pro profil +
+            historii registrací; pravým sloupcem můžeš přiřadit tagy
+            a napsat si poznámku.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -442,6 +462,12 @@ export function MembersCrmView({ slug }: { slug: string }) {
                             )
                           }
                           onPatch={(patch) => patchMember(m.id, patch)}
+                          onRemoved={async () => {
+                            await Promise.all([
+                              refreshMembers(),
+                              refreshParticipants(),
+                            ]);
+                          }}
                           selected={selectedIds.has(m.id)}
                           onToggleSelected={() =>
                             setSelectedIds((prev) => {
@@ -461,6 +487,64 @@ export function MembersCrmView({ slug }: { slug: string }) {
           </>
         );
       })()}
+
+      {isOwnerOrAdmin && participants && participants.length > 0 && (
+        <ParticipantsSection
+          wsSlug={slug}
+          participants={participants}
+          selectedIds={participantSelected}
+          onToggle={(id) => {
+            setParticipantSelected((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) {
+                next.delete(id);
+              } else {
+                next.add(id);
+              }
+              return next;
+            });
+          }}
+          onSelectAll={() => {
+            setParticipantSelected(new Set(participants.map((p) => p.id)));
+          }}
+          onClearSelection={() => setParticipantSelected(new Set())}
+          busy={participantBusy}
+          onAddSelected={async () => {
+            if (participantSelected.size === 0) return;
+            if (
+              !confirm(
+                `Přidat vybraných ${participantSelected.size} účastníků jako členy komunity?`,
+              )
+            ) {
+              return;
+            }
+            setParticipantBusy(true);
+            try {
+              await workspaces.addMembers(
+                slug,
+                Array.from(participantSelected),
+              );
+              setParticipantSelected(new Set());
+              await Promise.all([refreshMembers(), refreshParticipants()]);
+            } catch {
+              // Network/permission errors surface as alert on row.
+            } finally {
+              setParticipantBusy(false);
+            }
+          }}
+          onAddOne={async (userId) => {
+            setParticipantBusy(true);
+            try {
+              await workspaces.addMembers(slug, [userId]);
+              await Promise.all([refreshMembers(), refreshParticipants()]);
+            } catch {
+              // ignore
+            } finally {
+              setParticipantBusy(false);
+            }
+          }}
+        />
+      )}
 
       {tagManagerOpen && (
         <TagManageDialog
@@ -485,6 +569,153 @@ export function MembersCrmView({ slug }: { slug: string }) {
         />
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Účastníci sub-section — V2 "Přidat do komunity" workflow
+// ---------------------------------------------------------------------------
+
+function ParticipantsSection({
+  wsSlug,
+  participants,
+  selectedIds,
+  onToggle,
+  onSelectAll,
+  onClearSelection,
+  busy,
+  onAddSelected,
+  onAddOne,
+}: {
+  wsSlug: string;
+  participants: WorkspaceParticipantSummary[];
+  selectedIds: Set<number>;
+  onToggle: (id: number) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  busy: boolean;
+  onAddSelected: () => Promise<void> | void;
+  onAddOne: (userId: number) => Promise<void> | void;
+}) {
+  const allSelected =
+    participants.length > 0 && participants.every((p) => selectedIds.has(p.id));
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-ink-900">
+            Účastníci akcí ({participants.length})
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-ink-500">
+            Lidé, kteří se přihlásili na některou z akcí, ale nejsou
+            zatím členové komunity. Vyber je a klikni „Přidat vybrané"
+            — nebo nech být, pokud šlo o casual one-time účast.
+          </p>
+        </div>
+      </div>
+      {selectedIds.size > 0 && (
+        <div className="sticky top-14 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
+          <span className="text-sm font-medium text-brand">
+            Vybráno {selectedIds.size}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={onClearSelection}
+            disabled={busy}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring disabled:opacity-50"
+          >
+            Zrušit výběr
+          </button>
+          <button
+            type="button"
+            onClick={onAddSelected}
+            disabled={busy}
+            className="rounded-md border border-brand bg-brand px-3 py-1.5 text-sm font-semibold text-brand-ink hover:opacity-90 focus-ring disabled:opacity-50"
+          >
+            {busy ? "Přidávám…" : "Přidat vybrané do komunity"}
+          </button>
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-muted/60">
+            <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Vybrat všechny účastníky"
+                  checked={allSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      onSelectAll();
+                    } else {
+                      onClearSelection();
+                    }
+                  }}
+                />
+              </th>
+              <th className="px-4 py-3">Jméno</th>
+              <th className="px-4 py-3">Kontakt</th>
+              <th className="px-4 py-3 text-right">RSVPs</th>
+              <th className="px-4 py-3 text-right">Akce</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {participants.map((p) => {
+              const selected = selectedIds.has(p.id);
+              return (
+                <tr key={p.id} className={selected ? "bg-brand/5" : ""}>
+                  <td className="px-3 py-3 align-top">
+                    <input
+                      type="checkbox"
+                      aria-label={`Vybrat ${p.full_name || p.email}`}
+                      checked={selected}
+                      onChange={() => onToggle(p.id)}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-ink-900">
+                        {p.full_name || "—"}
+                      </span>
+                      {p.upcoming_rsvps > 0 && (
+                        <span className="mt-0.5 text-[11px] uppercase tracking-wide text-brand">
+                          {p.upcoming_rsvps} nadcházející
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+                    <div className="flex flex-col">
+                      <span>{p.email}</span>
+                      {p.phone && (
+                        <span className="text-xs text-ink-500">
+                          {p.phone}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+                    {p.total_rsvps}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onAddOne(p.id)}
+                      disabled={busy}
+                      className="text-[12px] font-medium text-brand hover:underline disabled:opacity-50"
+                    >
+                      Přidat do komunity
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -627,6 +858,7 @@ function MemberRow({
   expanded,
   onToggleExpand,
   onPatch,
+  onRemoved,
   selected,
   onToggleSelected,
 }: {
@@ -637,6 +869,7 @@ function MemberRow({
   expanded: boolean;
   onToggleExpand: () => void;
   onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  onRemoved: () => void | Promise<void>;
   selected: boolean;
   onToggleSelected: () => void;
 }) {
@@ -676,6 +909,24 @@ function MemberRow({
       onPatch({ role: r.role });
     } catch {
       /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleRemove() {
+    const ok = confirm(
+      `Odebrat ${member.full_name || member.email} z komunity?\n\n` +
+        "Jeho RSVPs a faktury zůstanou; přestane být v seznamu " +
+        "členů. Pokud měl/a explicit roli (admin), musíš ho/ji " +
+        "nejdřív degradovat na běžného člena.",
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await workspaces.removeMember(wsSlug, member.id);
+      await onRemoved();
+    } catch {
+      /* keep silent — visible via list refresh */
     } finally {
       setBusy(false);
     }
@@ -760,17 +1011,30 @@ function MemberRow({
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePromote();
-                    }}
-                    disabled={busy}
-                    className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
-                  >
-                    {busy ? "..." : "Povýšit na admina"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePromote();
+                      }}
+                      disabled={busy}
+                      className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+                    >
+                      {busy ? "..." : "Povýšit na admina"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleRemove();
+                      }}
+                      disabled={busy}
+                      className="text-[11px] font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+                    >
+                      {busy ? "..." : "Odebrat z komunity"}
+                    </button>
+                  </>
                 )}
               </div>
             )}
