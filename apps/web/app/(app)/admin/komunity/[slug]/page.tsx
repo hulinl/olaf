@@ -174,7 +174,7 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
       <nav
         role="tablist"
         aria-label="Sekce komunity"
-        className="sticky top-16 z-10 -mx-4 flex gap-1 overflow-x-auto border-y border-border bg-canvas/85 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-md sm:border"
+        className="sticky top-14 z-10 -mx-4 flex gap-1 overflow-x-auto border-y border-border bg-canvas/85 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-md sm:border"
       >
         <TabBtn active={tab === "dashboard"} onClick={() => setTab("dashboard")}>
           Dashboard
@@ -220,23 +220,11 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
             )}
           </section>
 
-          {past.length > 0 && (
-            <section className="flex flex-col gap-3">
-              <details className="group">
-                <summary className="cursor-pointer list-none">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-500 hover:text-ink-900">
-                    <span className="transition-transform group-open:rotate-90">
-                      ▸
-                    </span>
-                    Minulé akce ({past.length})
-                  </span>
-                </summary>
-                <div className="mt-4">
-                  <EventTable events={past} wsSlug={workspace.slug} />
-                </div>
-              </details>
-            </section>
-          )}
+          {/* Past events záměrně NEzobrazujeme na komunitním
+              dashboardu — komunita = nadcházející aktivita.
+              Owner pro past eventy má /admin/eventy globální listing
+              s filtrem; statistika "Minulé akce" v stat tile výše
+              dál ukazuje countu, kdyby chtěl celkový přehled. */}
         </>
       )}
 

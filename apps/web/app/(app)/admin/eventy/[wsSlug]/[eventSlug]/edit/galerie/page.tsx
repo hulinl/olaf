@@ -187,7 +187,7 @@ export default function EventGalleryPage({ params }: Props) {
           POST queue takes a while; without persistent feedback users
           assume the page is dead and won't dare navigate. */}
       {uploading && (
-        <div className="sticky top-16 z-20 flex flex-col gap-2 rounded-md border border-brand/40 bg-canvas/95 p-3 shadow-md backdrop-blur">
+        <div className="sticky top-14 z-20 flex flex-col gap-2 rounded-md border border-brand/40 bg-canvas/95 p-3 shadow-md backdrop-blur">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-sm font-medium text-ink-900">
               Nahrávám obrázky…
