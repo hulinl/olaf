@@ -373,7 +373,7 @@ header (e.g. "hero", "program", "v-cene", "pro-koho", "team", "faq").
     "cta_label": "Přihlásit se",                // ALWAYS this exact string — never invent or translate
     "cta_href": "#registrace",                  // ALWAYS this exact string
     "meta": [                                    // EXACTLY 4 tiles, in this order, all 4 mandatory when data is in the page
-      {"k": "TERMÍN",   "v": "13.–16. 8. 2026"},
+      {"k": "TERMÍN",   "v": "13.-16. 8. 2026"},
       {"k": "MÍSTO",    "v": "Beskydy"},
       {"k": "KAPACITA", "v": "8 účastníků"},
       {"k": "CENA",     "v": "4 490 Kč"}
