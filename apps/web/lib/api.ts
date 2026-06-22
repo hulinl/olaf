@@ -1367,11 +1367,25 @@ export const events = {
     ),
   /** Bind a manually-created event to a Notion page so the standard
    *  sync flow can take over. After this, the edit page exposes
-   *  syncFromSource via the existing "Aktualizovat z Notion" section. */
-  linkNotion: (workspaceSlug: string, eventSlug: string, url: string) =>
+   *  syncFromSource via the existing "Aktualizovat z Notion" section.
+   *
+   *  Pass `replace: true` to swap the link on an already-bound event
+   *  (e.g. the Notion source moved to a new page). */
+  linkNotion: (
+    workspaceSlug: string,
+    eventSlug: string,
+    url: string,
+    options?: { replace?: boolean },
+  ) =>
     apiFetch<Event>(
       `/api/events/${workspaceSlug}/${eventSlug}/link-notion/`,
-      { method: "POST", body: JSON.stringify({ url }) },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          url,
+          ...(options?.replace ? { replace: true } : {}),
+        }),
+      },
     ),
   update: (
     workspaceSlug: string,

@@ -425,6 +425,42 @@ class SyncEndpointTests(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("už je propojená", r.json().get("detail", ""))
 
+    def test_link_endpoint_replaces_when_flag_set(self) -> None:
+        """Owner zdrojem proházel Notion stránku za jinou → potřebuje
+        přepnout external_ref bez ručního smazání. {replace: true}
+        zruší safety net + audit log to označí jako Změna propojení."""
+        new_page_id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        notion_url = (
+            f"https://www.notion.so/myws/Novy-zdroj-{new_page_id}"
+        )
+        url = reverse(
+            "events:link-notion",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": self.event.slug,
+            },
+        )
+        r = self.client.post(
+            url,
+            {"url": notion_url, "replace": True},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        self.event.refresh_from_db()
+        self.assertEqual(
+            self.event.external_ref, f"notion:{new_page_id}"
+        )
+
+        # Audit log dostal "Změna propojení" hlášku + previous_external_ref
+        from audit.models import AuditLog
+
+        last = AuditLog.objects.filter(target_id=self.event.pk).latest("created_at")
+        self.assertIn("Změnil Notion propojení", last.summary)
+        self.assertEqual(
+            last.payload.get("previous_external_ref"),
+            f"notion:{self.NOTION_PAGE_ID}",
+        )
+
     def test_link_endpoint_rejects_duplicate_page_in_workspace(self) -> None:
         """Druhá akce ve stejném workspace nemůže ukázat na tu samou
         Notion stránku — sync by jinak přepisoval dva eventy ze

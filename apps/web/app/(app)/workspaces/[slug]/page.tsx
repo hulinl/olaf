@@ -287,19 +287,26 @@ function WorkspaceTabs({
 
           {past.length > 0 && (
             <section className="mt-10">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-ink-500">
-                Minulé akce
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {past.map((e) => (
-                  <EventCard
-                    key={e.slug}
-                    event={e}
-                    workspaceSlug={workspace.slug}
-                    showStatus={isOwner}
-                  />
-                ))}
-              </div>
+              <details className="group">
+                <summary className="cursor-pointer list-none">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink-500 hover:text-ink-900">
+                    <span className="transition-transform group-open:rotate-90">
+                      ▸
+                    </span>
+                    Minulé akce ({past.length})
+                  </span>
+                </summary>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {past.map((e) => (
+                    <EventCard
+                      key={e.slug}
+                      event={e}
+                      workspaceSlug={workspace.slug}
+                      showStatus={isOwner}
+                    />
+                  ))}
+                </div>
+              </details>
             </section>
           )}
         </>
