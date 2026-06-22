@@ -370,8 +370,8 @@ header (e.g. "hero", "program", "v-cene", "pro-koho", "team", "faq").
     "eyebrow": "LETNÍ KEMP · BESKYDY · 2026",   // short label
     "title_override": "",                       // empty → falls back to event.title; only set when source page has a distinctly different headline
     "subtitle": "",                              // 1-2 sentences from the page's lead text. NEVER include logistics (date/price/capacity) — those belong in `meta` below
-    "cta_label": "Přihlásit se",                // ALWAYS this exact string — never invent or translate
-    "cta_href": "#registrace",                  // ALWAYS this exact string
+    "cta_label": "",                            // ALWAYS empty — renderer si vezme default ("Přihlásit na akci")
+    "cta_href": "",                             // ALWAYS empty — renderer si vezme fallback (přímý link na registrační form)
     "meta": [                                    // EXACTLY 4 tiles, in this order, all 4 mandatory when data is in the page
       {"k": "TERMÍN",   "v": "13.-16. 8. 2026"},
       {"k": "MÍSTO",    "v": "Beskydy"},

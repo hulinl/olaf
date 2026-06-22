@@ -305,7 +305,7 @@ export function MembersCrmView({ slug }: { slug: string }) {
         return (
           <>
             {selectedIds.size > 0 && (
-              <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
+              <div className="sticky top-14 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
                 <span className="text-xs font-medium text-brand">
                   {selectedIds.size} vybráno
                 </span>
