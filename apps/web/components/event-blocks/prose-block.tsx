@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { assetUrl } from "@/lib/api";
 import type { BlockTone, ProseBlockPayload } from "@/lib/event-blocks";
 import { SectionHead } from "@/components/ui/section-head";
@@ -18,6 +20,52 @@ interface Props {
 type ProseChunk =
   | { kind: "p"; lines: string[] }
   | { kind: "ul"; items: string[] };
+
+/**
+ * Inline markdown: bold (**foo**) → <strong>, italic (*foo* / _foo_)
+ * → <em>. Notion's `_block_to_text` strips formatting annotations, but
+ * Claude's prose body emits markdown syntax (per the system prompt
+ * example "**Olaf** — vede kemp..."). Without this, asterisks render
+ * as literal text.
+ *
+ * Kept deliberately small — no links, no code spans, no headings. If
+ * we need a real markdown subset later, swap for react-markdown.
+ */
+function renderInline(text: string): ReactNode[] {
+  // Split on bold first (greedy markers win over italic). Each odd
+  // index in the split result is the captured group → render <strong>.
+  const boldParts = text.split(/\*\*([^*]+?)\*\*/g);
+  const out: ReactNode[] = [];
+  boldParts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      out.push(
+        <strong key={`b${i}`} className="font-semibold text-current">
+          {renderItalic(part)}
+        </strong>,
+      );
+    } else {
+      out.push(...renderItalic(part, `t${i}`));
+    }
+  });
+  return out;
+}
+
+function renderItalic(text: string, keyPrefix = ""): ReactNode[] {
+  // Match *foo* or _foo_ but require a non-asterisk/underscore around
+  // it so we don't eat e.g. `5*7` math or list bullets ("- foo"). Bold
+  // is already handled upstream so any remaining `**` here is an edge
+  // case we leave literal.
+  const parts = text.split(/(?:^|(?<=\s))[*_]([^\s*_][^*_]*[^\s*_]|[^\s*_])[*_](?=\s|$|[.,;:!?])/g);
+  const out: ReactNode[] = [];
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      out.push(<em key={`${keyPrefix}i${i}`}>{part}</em>);
+    } else if (part) {
+      out.push(part);
+    }
+  });
+  return out;
+}
 
 function chunkProse(body: string): ProseChunk[] {
   const blocks = body.split(/\n\n+/).map((s) => s.trim()).filter(Boolean);
@@ -92,7 +140,7 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
                   className="ml-5 list-disc space-y-1.5 marker:text-brand"
                 >
                   {c.items.map((it, j) => (
-                    <li key={j}>{it}</li>
+                    <li key={j}>{renderInline(it)}</li>
                   ))}
                 </ul>
               ) : (
@@ -101,7 +149,7 @@ export function ProseBlock({ payload, tone = "canvas" }: Props) {
                 // so a multi-line "p" is a paragraph with intentional
                 // line breaks (e.g. an address).
                 <p key={i} className="whitespace-pre-line">
-                  {c.lines.join("\n")}
+                  {renderInline(c.lines.join("\n"))}
                 </p>
               ),
             )}
