@@ -378,6 +378,112 @@ class SyncEndpointTests(TestCase):
         types = [b["type"] for b in self.event.blocks]
         self.assertEqual(types, ["hero", "prose"])
 
+    def test_link_endpoint_attaches_notion_url(self) -> None:
+        """Owner manually-created event → propojí Notion URL → endpoint
+        uloží external_ref="notion:<id>" a vrátí updated event."""
+        manual_event = _make_event(
+            self.ws,
+            slug="manual-kemp",
+            title="Ručně vytvořený kemp",
+            external_ref="",
+        )
+        url = reverse(
+            "events:link-notion",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": manual_event.slug,
+            },
+        )
+        fresh_page_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        notion_url = (
+            f"https://www.notion.so/myws/Bezecky-kemp-{fresh_page_id}"
+        )
+        r = self.client.post(url, {"url": notion_url}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        manual_event.refresh_from_db()
+        self.assertEqual(
+            manual_event.external_ref, f"notion:{fresh_page_id}"
+        )
+        # Response je full event payload → frontend si ho rovnou
+        # mountne přes setEvent a UI se přepne na sync sekci bez
+        # samostatného refetch.
+        self.assertEqual(r.json()["slug"], "manual-kemp")
+
+    def test_link_endpoint_rejects_already_bound(self) -> None:
+        """self.event už má `notion:` ref → endpoint vrátí 400 (nic
+        nepřepisuje). Owner má použít „Aktualizovat z Notion“."""
+        url = reverse(
+            "events:link-notion",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": self.event.slug,
+            },
+        )
+        r = self.client.post(
+            url, {"url": f"notion-page-{self.NOTION_PAGE_ID}"}, format="json"
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("už je propojená", r.json().get("detail", ""))
+
+    def test_link_endpoint_rejects_duplicate_page_in_workspace(self) -> None:
+        """Druhá akce ve stejném workspace nemůže ukázat na tu samou
+        Notion stránku — sync by jinak přepisoval dva eventy ze
+        stejného zdroje a oba by se rvaly o slug/landing."""
+        other = _make_event(
+            self.ws,
+            slug="dupe-target",
+            title="Druhá akce",
+            external_ref="",
+        )
+        url = reverse(
+            "events:link-notion",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": other.slug,
+            },
+        )
+        r = self.client.post(
+            url, {"url": self.NOTION_PAGE_ID}, format="json"
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("propojená s akcí", r.json().get("detail", ""))
+
+    def test_link_endpoint_rejects_unparseable_url(self) -> None:
+        manual_event = _make_event(
+            self.ws, slug="manual2", external_ref=""
+        )
+        url = reverse(
+            "events:link-notion",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": manual_event.slug,
+            },
+        )
+        r = self.client.post(
+            url, {"url": "https://example.com/whatever"}, format="json"
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("page id", r.json().get("url", ""))
+
+    def test_link_endpoint_non_owner_403(self) -> None:
+        manual_event = _make_event(
+            self.ws, slug="manual3", external_ref=""
+        )
+        outsider = _make_user("outsider@link.test")
+        client = APIClient()
+        client.force_authenticate(outsider)
+        url = reverse(
+            "events:link-notion",
+            kwargs={
+                "workspace_slug": self.ws.slug,
+                "event_slug": manual_event.slug,
+            },
+        )
+        r = client.post(
+            url, {"url": self.NOTION_PAGE_ID}, format="json"
+        )
+        self.assertEqual(r.status_code, 403)
+
     def test_event_status_pinned_through_sync(self) -> None:
         """Sync nesmí změnit status. Pokud Claude vrátí "status":
         "published", sync ten field ignoruje (není v extractable
