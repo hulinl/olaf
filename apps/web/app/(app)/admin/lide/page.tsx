@@ -25,6 +25,7 @@ export default function LidePage() {
   const [error, setError] = useState<string | null>(null);
   const [openUserId, setOpenUserId] = useState<number | null>(null);
   const [restoreBusy, setRestoreBusy] = useState<number | null>(null);
+  const [purgeBusy, setPurgeBusy] = useState<number | null>(null);
 
   async function refreshPeople() {
     const list = await events.people().catch(() => null);
@@ -68,6 +69,30 @@ export default function LidePage() {
       // keep silent
     } finally {
       setRestoreBusy(null);
+    }
+  }
+
+  async function handlePurge(userId: number, fullName: string) {
+    if (
+      !confirm(
+        `Trvale odstranit ${fullName} z tvého přehledu?\n\n` +
+          "Provede:\n" +
+          "• zruší jejich RSVPs na tvých akcích (stornují se)\n" +
+          "• smaže tvoje poznámky a tagy o této osobě\n" +
+          "• odebere je z tvých komunit (kde nejsou admin)\n\n" +
+          "Účet osoby v Olafu zůstává nedotčený. Tuto akci NEJDE vrátit.",
+      )
+    ) {
+      return;
+    }
+    setPurgeBusy(userId);
+    try {
+      await events.purgePerson(userId);
+      await refreshHidden();
+    } catch {
+      // keep silent
+    } finally {
+      setPurgeBusy(null);
     }
   }
 
@@ -203,26 +228,47 @@ export default function LidePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {hidden.map((h) => (
-                    <tr key={h.user_id}>
-                      <td className="px-4 py-3 font-medium text-ink-900">
-                        {h.full_name}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-ink-700">
-                        {h.email}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleRestore(h.user_id)}
-                          disabled={restoreBusy === h.user_id}
-                          className="text-[12px] font-medium text-brand hover:underline disabled:opacity-50"
-                        >
-                          {restoreBusy === h.user_id ? "..." : "Vrátit"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {hidden.map((h) => {
+                    const restoring = restoreBusy === h.user_id;
+                    const purging = purgeBusy === h.user_id;
+                    const anyBusy = restoring || purging;
+                    return (
+                      <tr key={h.user_id}>
+                        <td className="px-4 py-3 font-medium text-ink-900">
+                          {h.full_name}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+                          {h.email}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleRestore(h.user_id)}
+                              disabled={anyBusy}
+                              title="Vrátit do hlavního seznamu"
+                              aria-label="Vrátit"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand hover:bg-brand/10 focus-ring disabled:opacity-50"
+                            >
+                              <span aria-hidden>↺</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handlePurge(h.user_id, h.full_name)
+                              }
+                              disabled={anyBusy}
+                              title="Trvale odstranit (zruší RSVPs, smaže poznámky)"
+                              aria-label="Trvale odstranit"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 hover:bg-danger-soft hover:text-danger focus-ring disabled:opacity-50"
+                            >
+                              <span aria-hidden>🗑</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

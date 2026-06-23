@@ -761,6 +761,86 @@ def creator_person_hide(request: Request, user_id: int) -> Response:
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def creator_person_purge(request: Request, user_id: int) -> Response:
+    """Permanently scrub this person from the caller's Olaf universe.
+
+    Heavier hammer than hide(): removes every caller-scoped trace of
+    the target so they can't pop back into Lidé via a stray RSVP. The
+    target's User account itself stays intact — they may be active in
+    other creators' workspaces, and we're not in the business of
+    deleting accounts we don't own.
+
+    Cascades, all scoped to caller-owned workspaces:
+      - cancel non-cancelled RSVPs on caller's events (status → cancelled,
+        cancellation_reason='owner_purge'). Past RSVPs / payments stay
+        for audit but the row no longer counts as "active".
+      - delete PersonProfile rows (notes + tag links the caller wrote).
+      - delete WorkspaceMember rows of any status (member of caller's
+        workspace? gone).
+      - delete the OwnerHiddenPerson row (no longer needed — they
+        won't re-appear in creator_people without RSVPs).
+
+    Returns 204 on success. Idempotent — re-running yields a clean 204
+    even if there's nothing left to delete. Owner can't purge
+    themselves.
+    """
+    from django.db import transaction
+
+    from events.models import RSVP
+    from workspaces.models import PersonProfile, WorkspaceMember
+
+    try:
+        target = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if target.id == request.user.id:
+        return Response(
+            {"detail": "Sebe nemůžeš trvale odstranit."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    owned_ws_ids = list(
+        WorkspaceMember.objects.filter(
+            user=request.user, role=WorkspaceMember.ROLE_OWNER
+        ).values_list("workspace_id", flat=True)
+    )
+
+    with transaction.atomic():
+        # 1. Cancel target's non-cancelled RSVPs on caller's events.
+        active_rsvps = RSVP.objects.filter(
+            user=target, event__workspace_id__in=owned_ws_ids
+        ).exclude(status=RSVP.STATUS_CANCELLED)
+        for rsvp in active_rsvps:
+            rsvp.cancel(reason=RSVP.CANCELLATION_OWNER)
+
+        # 2. Drop CRM annotations (notes + tag links) the caller wrote.
+        PersonProfile.objects.filter(
+            user=target, workspace_id__in=owned_ws_ids
+        ).delete()
+
+        # 3. Drop membership rows in caller's workspaces.
+        WorkspaceMember.objects.filter(
+            user=target,
+            workspace_id__in=owned_ws_ids,
+        ).exclude(
+            # Never auto-purge an admin/owner — guards against an
+            # accidental nuke of an explicit role. If user wants to
+            # remove an admin, they go through demote → remove flow.
+            role__in=[WorkspaceMember.ROLE_ADMIN, WorkspaceMember.ROLE_OWNER]
+        ).delete()
+
+        # 4. Drop the hidden marker — they won't show up in
+        # creator_people anyway (RSVPs cancelled + membership gone).
+        OwnerHiddenPerson.objects.filter(
+            owner=request.user, target=target
+        ).delete()
+
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def creator_hidden_people(request: Request) -> Response:

@@ -300,6 +300,130 @@ class CreatorPersonDetailTests(TestCase):
         r = self.client.post(url)
         self.assertEqual(r.status_code, 400)
 
+    def test_purge_cascades_caller_scoped_data(self) -> None:
+        """POST /purge/ cascades:
+        - non-cancelled RSVPs na caller's eventech se zruší
+        - PersonProfile (workspace-scoped, caller's) zmizí
+        - WorkspaceMember rows v caller's workspaces zmizí (non-admin)
+        - OwnerHiddenPerson row zmizí
+        Účet samotný + jiných ownerů data zůstávají nedotčená."""
+        from workspaces.models import PersonProfile, WorkspaceMember
+
+        from .models import OwnerHiddenPerson
+
+        own_ws = self.event.workspace
+        # Setup: RSVP, profile, membership, hidden marker
+        profile = PersonProfile.objects.create(
+            workspace=own_ws,
+            user=self.participant,
+            note="ujasnit dietu před akcí",
+        )
+        WorkspaceMember.objects.create(
+            workspace=own_ws,
+            user=self.participant,
+            role=WorkspaceMember.ROLE_MEMBER,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        OwnerHiddenPerson.objects.create(
+            owner=self.owner, target=self.participant
+        )
+        rsvp_id = (
+            RSVP.objects.filter(user=self.participant).first().id
+        )
+
+        # Foreign workspace dat (jiný owner) — nesmí být dotčená
+        from workspaces.models import Workspace
+
+        foreign_owner = _make_user("foreign-purge@cpd.com")
+        foreign_ws = Workspace.objects.create(
+            slug="fp-purge", name="FP"
+        )
+        WorkspaceMember.objects.create(
+            workspace=foreign_ws,
+            user=foreign_owner,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+        foreign_ev = _make_workspace_and_event(
+            foreign_owner, slug="fpws"
+        )
+        foreign_rsvp = RSVP.objects.create(
+            event=foreign_ev,
+            user=self.participant,
+            status=RSVP.STATUS_YES,
+        )
+
+        # Purge
+        self.client.force_authenticate(self.owner)
+        purge_url = reverse(
+            "accounts:creator-person-purge",
+            kwargs={"user_id": self.participant.pk},
+        )
+        r = self.client.post(purge_url)
+        self.assertEqual(r.status_code, 204, r.content)
+
+        # Caller's data: scrubbed
+        self.assertFalse(
+            PersonProfile.objects.filter(pk=profile.pk).exists()
+        )
+        self.assertFalse(
+            WorkspaceMember.objects.filter(
+                workspace=own_ws, user=self.participant
+            ).exists()
+        )
+        self.assertFalse(
+            OwnerHiddenPerson.objects.filter(
+                owner=self.owner, target=self.participant
+            ).exists()
+        )
+        own_rsvp = RSVP.objects.get(pk=rsvp_id)
+        self.assertEqual(own_rsvp.status, RSVP.STATUS_CANCELLED)
+
+        # Foreign owner's data: nedotčená
+        foreign_rsvp.refresh_from_db()
+        self.assertEqual(foreign_rsvp.status, RSVP.STATUS_YES)
+
+        # Account stále existuje
+        self.assertTrue(
+            User.objects.filter(pk=self.participant.pk).exists()
+        )
+
+    def test_purge_protects_admin_membership(self) -> None:
+        """Admin nesmí být auto-purgnut — owner musí nejdřív demote.
+        Guard proti accidental nuke explicit role."""
+        from workspaces.models import WorkspaceMember
+
+        own_ws = self.event.workspace
+        WorkspaceMember.objects.create(
+            workspace=own_ws,
+            user=self.participant,
+            role=WorkspaceMember.ROLE_ADMIN,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        self.client.force_authenticate(self.owner)
+        purge_url = reverse(
+            "accounts:creator-person-purge",
+            kwargs={"user_id": self.participant.pk},
+        )
+        r = self.client.post(purge_url)
+        self.assertEqual(r.status_code, 204)
+        # Admin membership zůstal — guard zafungoval.
+        self.assertTrue(
+            WorkspaceMember.objects.filter(
+                workspace=own_ws,
+                user=self.participant,
+                role=WorkspaceMember.ROLE_ADMIN,
+            ).exists()
+        )
+
+    def test_cannot_purge_self(self) -> None:
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "accounts:creator-person-purge",
+            kwargs={"user_id": self.owner.pk},
+        )
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 400)
+
     def test_hide_unknown_user_404(self) -> None:
         self.client.force_authenticate(self.owner)
         url = reverse(

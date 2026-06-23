@@ -1580,6 +1580,14 @@ export const events = {
    *  collapsible "Skrytí lidé" section with restore button. */
   hiddenPeople: () =>
     apiFetch<HiddenPersonSummary[]>("/api/auth/me/people/hidden/"),
+  /** V2 Lidé — heavy purge. Cancels caller-owned RSVPs by this user,
+   *  removes PersonProfile (notes/tags), removes WorkspaceMember rows
+   *  in caller's workspaces (non-admin), removes the hidden marker.
+   *  Target user account itself stays intact. */
+  purgePerson: (userId: number) =>
+    apiFetch<void>(`/api/auth/me/people/${userId}/purge/`, {
+      method: "POST",
+    }),
   listCollaborators: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<EventCollaborator[]>(
       `/api/events/${workspaceSlug}/${eventSlug}/collaborators/`,
