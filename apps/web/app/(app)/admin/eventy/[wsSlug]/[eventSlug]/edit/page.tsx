@@ -8,6 +8,7 @@ import { EventDangerZone } from "@/components/event-danger-zone";
 import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type Event as OlafEvent,
@@ -317,17 +318,16 @@ function NotionSyncButton({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function handle() {
-    if (
-      !confirm(
-        "Načíst z Notion stránku znovu a aktualizovat tuto akci? " +
-          "Bloky landing-page se přepíšou tím, co Claude extrahuje. " +
-          "Slug, status, RSVPs a faktury zůstanou.",
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: "Aktualizovat z Notion?",
+      description:
+        "Bloky landing-page se přepíšou tím, co Claude extrahuje. Slug, status, RSVPs a faktury zůstanou.",
+      confirmLabel: "Aktualizovat",
+    });
+    if (!ok) return;
     setBusy(true);
     setErr(null);
     setOkMsg(null);
@@ -405,19 +405,18 @@ function NotionReplaceButton({
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function handle(e: FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
-    if (
-      !confirm(
-        "Změnit Notion propojení akce? Při příštím „Aktualizovat z " +
-          "Notion" +
-          "“ bude Claude číst z této nové stránky.",
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: "Změnit Notion propojení?",
+      description:
+        'Při příštím „Aktualizovat z Notion" bude Claude číst z této nové stránky.',
+      confirmLabel: "Změnit",
+    });
+    if (!ok) return;
     setBusy(true);
     setErr(null);
     try {
@@ -589,9 +588,15 @@ function DuplicateButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function handle() {
-    if (!confirm("Vytvořit kopii této akce? Skončí jako Draft.")) return;
+    const ok = await confirmDialog({
+      title: "Vytvořit kopii akce?",
+      description: "Skončí jako Draft. Můžeš ji pak nezávisle upravit.",
+      confirmLabel: "Vytvořit kopii",
+    });
+    if (!ok) return;
     setBusy(true);
     setErr(null);
     try {
@@ -691,6 +696,7 @@ function CollaboratorsSection({
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const confirmDialog = useConfirm();
 
   async function reload() {
     try {
@@ -778,7 +784,13 @@ function CollaboratorsSection({
   }
 
   async function handleRemove(c: EventCollaborator) {
-    if (!confirm(`Odebrat ${c.full_name} ze spolutvůrců?`)) return;
+    const ok = await confirmDialog({
+      title: `Odebrat ${c.full_name} ze spolutvůrců?`,
+      description: "Ztratí přístup k editaci a managementu této akce.",
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await events.removeCollaborator(wsSlug, eventSlug, c.user_id);
       await reload();

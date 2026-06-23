@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type PersonDetail,
@@ -312,18 +313,16 @@ function HidePersonAction({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function handle() {
-    if (
-      !confirm(
-        `Skrýt ${fullName} z přehledu Lidé?\n\n` +
-          "Jejich účet, RSVPs a vše ostatní v aplikaci Olaf zůstává " +
-          "nedotčené — schováváš si je jen z tvého seznamu. Můžeš je " +
-          'kdykoli vrátit přes sekci „Skrytí lidé" dole.',
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: `Skrýt ${fullName} z přehledu Lidé?`,
+      description:
+        'Jejich účet, RSVPs a vše ostatní v aplikaci Olaf zůstává nedotčené — schováváš si je jen z tvého seznamu. Můžeš je kdykoli vrátit přes sekci „Skrytí lidé" dole.',
+      confirmLabel: "Skrýt",
+    });
+    if (!ok) return;
     setBusy(true);
     setErr(null);
     try {
@@ -385,15 +384,16 @@ function MembershipsSection({
 }) {
   const [busyWs, setBusyWs] = useState<string | null>(null);
   const memberships = person.memberships ?? [];
+  const confirmDialog = useConfirm();
 
   async function handleRemove(m: PersonMembershipEntry) {
-    if (
-      !confirm(
-        `Odebrat ${person.full_name} z komunity ${m.workspace_name}? RSVPs zůstanou, žádný e-mail nepřijde.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: `Odebrat ${person.full_name} z ${m.workspace_name}?`,
+      description: "RSVPs zůstanou, žádný e-mail mu nepřijde.",
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusyWs(m.workspace_slug);
     try {
       await workspaces.removeMember(m.workspace_slug, person.user_id);

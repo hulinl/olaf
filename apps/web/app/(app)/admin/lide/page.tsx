@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { PersonProfileDialog } from "@/components/person-profile-dialog";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type HiddenPersonSummary,
@@ -20,6 +21,7 @@ import {
  */
 export default function LidePage() {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [people, setPeople] = useState<PersonSummary[] | null>(null);
   const [hidden, setHidden] = useState<HiddenPersonSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,18 +75,15 @@ export default function LidePage() {
   }
 
   async function handlePurge(userId: number, fullName: string) {
-    if (
-      !confirm(
-        `Trvale odstranit ${fullName} z tvého přehledu?\n\n` +
-          "Provede:\n" +
-          "• zruší jejich RSVPs na tvých akcích (stornují se)\n" +
-          "• smaže tvoje poznámky a tagy o této osobě\n" +
-          "• odebere je z tvých komunit (kde nejsou admin)\n\n" +
-          "Účet osoby v Olafu zůstává nedotčený. Tuto akci NEJDE vrátit.",
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: `Trvale odstranit ${fullName}?`,
+      description:
+        "Zruší jejich RSVPs na tvých akcích, smaže tvoje poznámky a tagy o této osobě a odebere je z tvých komunit (kromě adminů).\n\n" +
+        "Účet osoby v Olafu zůstává nedotčený. Tuto akci NEJDE vrátit.",
+      confirmLabel: "Trvale odstranit",
+      variant: "danger",
+    });
+    if (!ok) return;
     setPurgeBusy(userId);
     try {
       await events.purgePerson(userId);

@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { WorkspaceInviteSection } from "@/components/workspace-invite-section";
 import {
   ApiError,
@@ -54,6 +55,7 @@ export default function KomunityMembersPage({ params }: Props) {
  */
 export function MembersCrmView({ slug }: { slug: string }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
   const [participants, setParticipants] = useState<
     WorkspaceParticipantSummary[] | null
@@ -535,13 +537,13 @@ export function MembersCrmView({ slug }: { slug: string }) {
           busy={participantBusy}
           onAddSelected={async () => {
             if (participantSelected.size === 0) return;
-            if (
-              !confirm(
-                `Přidat vybraných ${participantSelected.size} účastníků jako členy komunity?`,
-              )
-            ) {
-              return;
-            }
+            const ok = await confirmDialog({
+              title: `Přidat ${participantSelected.size} účastníků?`,
+              description:
+                "Stanou se členy komunity. Jejich RSVPs zůstávají; nedostanou e-mailovou notifikaci.",
+              confirmLabel: "Přidat do komunity",
+            });
+            if (!ok) return;
             setParticipantBusy(true);
             try {
               await workspaces.addMembers(
@@ -583,13 +585,12 @@ export function MembersCrmView({ slug }: { slug: string }) {
           removed={removedMembers}
           busy={participantBusy}
           onRestore={async (userId) => {
-            if (
-              !confirm(
-                "Vrátit tohoto člověka zpátky do komunity?",
-              )
-            ) {
-              return;
-            }
+            const ok = await confirmDialog({
+              title: "Vrátit zpátky do komunity?",
+              description: "Bude opět v seznamu členů.",
+              confirmLabel: "Vrátit",
+            });
+            if (!ok) return;
             setParticipantBusy(true);
             try {
               await workspaces.addMembers(slug, [userId]);
@@ -651,6 +652,8 @@ function useMemberRoleActions({
   onRemoved: () => void | Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const confirmDialog = useConfirm();
+  const name = member.full_name || member.email;
 
   async function handlePromote() {
     setBusy(true);
@@ -664,11 +667,12 @@ function useMemberRoleActions({
     }
   }
   async function handleDemote() {
-    if (
-      !confirm(`Snížit ${member.full_name || member.email} na běžného člena?`)
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: `Snížit ${name} na člena?`,
+      description: "Ztratí admin práva. Pak ho můžeš odebrat z komunity.",
+      confirmLabel: "Snížit",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const r = await workspaces.demoteMember(wsSlug, member.id);
@@ -680,11 +684,14 @@ function useMemberRoleActions({
     }
   }
   async function handleRemove() {
-    const ok = confirm(
-      `Odebrat ${member.full_name || member.email} z komunity?\n\n` +
-        "Jeho RSVPs a faktury zůstanou; přestane být v seznamu " +
-        "členů. Žádná notifikace ani e-mail mu o tom nepřijde.",
-    );
+    const ok = await confirmDialog({
+      title: `Odebrat ${name} z komunity?`,
+      description:
+        "RSVPs a faktury zůstanou; přestane být v seznamu členů. " +
+        "Žádná notifikace ani e-mail mu o tom nepřijde.",
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
     if (!ok) return;
     setBusy(true);
     try {
@@ -697,11 +704,14 @@ function useMemberRoleActions({
     }
   }
   async function handleHandover() {
-    const ok = confirm(
-      `Předat vlastnictví komunity uživateli ${member.full_name || member.email}?\n\n` +
-        "Ty se staneš adminem a ztratíš právo mazat komunitu nebo měnit role. " +
+    const ok = await confirmDialog({
+      title: `Předat vlastnictví ${name}?`,
+      description:
+        "Ty se staneš adminem a ztratíš právo mazat komunitu nebo měnit role.\n\n" +
         "Nový vlastník ti to může vrátit, ale nemusí.",
-    );
+      confirmLabel: "Předat vlastnictví",
+      variant: "danger",
+    });
     if (!ok) return;
     setBusy(true);
     try {
