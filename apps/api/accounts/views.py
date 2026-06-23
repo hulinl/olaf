@@ -7,7 +7,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .emails import send_password_reset_email, send_verification_email
-from .models import EmailVerificationToken, PasswordResetToken, User
+from .models import (
+    EmailVerificationToken,
+    OwnerHiddenPerson,
+    PasswordResetToken,
+    User,
+)
 from .serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
@@ -600,8 +605,15 @@ def creator_people(request: Request) -> Response:
     scope = Q(rsvps__event__workspace_id__in=owned_ws_ids) & ~Q(
         rsvps__status=RSVP.STATUS_CANCELLED
     )
+    # Owner can hide individual people from their Lidé view via the
+    # /people/<uid>/hide/ endpoint. We exclude those here. The hidden
+    # list is surfaced separately via /people/hidden/ for restore.
+    hidden_ids = OwnerHiddenPerson.objects.filter(
+        owner=request.user
+    ).values_list("target_id", flat=True)
     qs = (
         User.objects.filter(scope)
+        .exclude(id__in=hidden_ids)
         .distinct()
         .annotate(
             event_count=Count("rsvps", distinct=True, filter=scope),
@@ -708,6 +720,71 @@ def creator_person_detail(request: Request, user_id: int) -> Response:
                 for m in memberships
             ],
         }
+    )
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def creator_person_hide(request: Request, user_id: int) -> Response:
+    """Hide / unhide a person from the caller's Lidé view.
+
+    POST → upsert OwnerHiddenPerson(owner=caller, target=user_id).
+    DELETE → remove that row (restore visibility).
+
+    Idempotent both directions. We don't access-check beyond "user_id
+    refers to a real User" — hiding someone you've never seen is
+    harmless and might prevent them from appearing later if they
+    register for one of your events. (Think of it as a permanent
+    block on your own Lidé view.)
+    """
+    try:
+        target = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if target.id == request.user.id:
+        return Response(
+            {"detail": "Sebe nemůžeš skrýt — Lidé tě stejně neukazují."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if request.method == "POST":
+        OwnerHiddenPerson.objects.get_or_create(
+            owner=request.user, target=target
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # DELETE — unhide
+    OwnerHiddenPerson.objects.filter(
+        owner=request.user, target=target
+    ).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def creator_hidden_people(request: Request) -> Response:
+    """List people the caller has hidden from their Lidé view.
+
+    Surfaced as a collapsible "Skrytí lidé (N)" section in the UI with
+    a per-row "Vrátit" button. Slim payload — full detail still goes
+    through /people/<uid>/.
+    """
+    rows = (
+        OwnerHiddenPerson.objects.filter(owner=request.user)
+        .select_related("target")
+        .order_by("-hidden_at")
+    )
+    return Response(
+        [
+            {
+                "user_id": h.target.id,
+                "full_name": h.target.get_full_name() or h.target.email,
+                "email": h.target.email,
+                "hidden_at": h.hidden_at,
+            }
+            for h in rows
+        ]
     )
 
 

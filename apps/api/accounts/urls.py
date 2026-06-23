@@ -45,9 +45,19 @@ urlpatterns = [
     ),
     path("me/people/", views.creator_people, name="creator-people"),
     path(
+        "me/people/hidden/",
+        views.creator_hidden_people,
+        name="creator-hidden-people",
+    ),
+    path(
         "me/people/<int:user_id>/",
         views.creator_person_detail,
         name="creator-person-detail",
+    ),
+    path(
+        "me/people/<int:user_id>/hide/",
+        views.creator_person_hide,
+        name="creator-person-hide",
     ),
     path(
         "me/api-tokens/",
