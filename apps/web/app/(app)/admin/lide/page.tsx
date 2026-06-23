@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 
 import { PersonProfileDialog } from "@/components/person-profile-dialog";
 import { Alert } from "@/components/ui/card";
-import { ApiError, type PersonSummary, events } from "@/lib/api";
+import {
+  ApiError,
+  type HiddenPersonSummary,
+  type PersonSummary,
+  events,
+} from "@/lib/api";
 
 /**
  * Lidé — proto-CRM list of everyone who's had an RSVP on any event
@@ -16,15 +21,30 @@ import { ApiError, type PersonSummary, events } from "@/lib/api";
 export default function LidePage() {
   const router = useRouter();
   const [people, setPeople] = useState<PersonSummary[] | null>(null);
+  const [hidden, setHidden] = useState<HiddenPersonSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openUserId, setOpenUserId] = useState<number | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState<number | null>(null);
+
+  async function refreshPeople() {
+    const list = await events.people().catch(() => null);
+    if (list) setPeople(list);
+  }
+  async function refreshHidden() {
+    const list = await events.hiddenPeople().catch(() => null);
+    if (list) setHidden(list);
+  }
 
   useEffect(() => {
     let cancelled = false;
-    events
-      .people()
-      .then((p) => {
-        if (!cancelled) setPeople(p);
+    Promise.all([
+      events.people(),
+      events.hiddenPeople().catch(() => [] as HiddenPersonSummary[]),
+    ])
+      .then(([p, h]) => {
+        if (cancelled) return;
+        setPeople(p);
+        setHidden(h);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -38,6 +58,18 @@ export default function LidePage() {
       cancelled = true;
     };
   }, [router]);
+
+  async function handleRestore(userId: number) {
+    setRestoreBusy(userId);
+    try {
+      await events.unhidePerson(userId);
+      await Promise.all([refreshPeople(), refreshHidden()]);
+    } catch {
+      // keep silent
+    } finally {
+      setRestoreBusy(null);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -145,9 +177,70 @@ export default function LidePage() {
         </>
       )}
 
+      {hidden && hidden.length > 0 && (
+        <section>
+          <details className="group">
+            <summary className="cursor-pointer list-none">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-500 hover:text-ink-900">
+                <span className="transition-transform group-open:rotate-90">
+                  ▸
+                </span>
+                Skrytí lidé ({hidden.length})
+              </span>
+            </summary>
+            <p className="mt-2 max-w-2xl text-sm text-ink-500">
+              Lidé, které jsi skryl z přehledu. Jejich účet v Olafu
+              zůstává nedotčený — pouze ti je neukazujeme v hlavním
+              seznamu. „Vrátit" je tam dá zpět.
+            </p>
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-muted/60">
+                  <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                    <th className="px-4 py-3">Jméno</th>
+                    <th className="px-4 py-3">E-mail</th>
+                    <th className="px-4 py-3 text-right">Akce</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {hidden.map((h) => (
+                    <tr key={h.user_id}>
+                      <td className="px-4 py-3 font-medium text-ink-900">
+                        {h.full_name}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+                        {h.email}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRestore(h.user_id)}
+                          disabled={restoreBusy === h.user_id}
+                          className="text-[12px] font-medium text-brand hover:underline disabled:opacity-50"
+                        >
+                          {restoreBusy === h.user_id ? "..." : "Vrátit"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      )}
+
       <PersonProfileDialog
         userId={openUserId}
         onClose={() => setOpenUserId(null)}
+        onHidden={async (userId) => {
+          // Optimistic UI — okamžitě odstraň řádek z hlavní tabulky;
+          // refetch obou seznamů ho překlopí do "Skrytí lidé".
+          setPeople((prev) =>
+            prev ? prev.filter((p) => p.user_id !== userId) : prev,
+          );
+          await refreshHidden();
+        }}
       />
     </div>
   );

@@ -14,6 +14,10 @@ import {
 interface Props {
   userId: number | null;
   onClose: () => void;
+  /** Called after the caller hides this person — parent typically
+   *  refreshes the Lidé list. Optional: if omitted, the dialog just
+   *  closes. */
+  onHidden?: (userId: number) => void;
 }
 
 const RSVP_LABEL: Record<string, string> = {
@@ -38,7 +42,7 @@ const RSVP_TONE: Record<string, string> = {
  * Lidé detail — extends the participant-profile shape with an event
  * history list (every RSVP this person has on creator's events).
  */
-export function PersonProfileDialog({ userId, onClose }: Props) {
+export function PersonProfileDialog({ userId, onClose, onHidden }: Props) {
   const [person, setPerson] = useState<PersonDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -262,11 +266,73 @@ export function PersonProfileDialog({ userId, onClose }: Props) {
                   ))}
                 </ul>
               </section>
+
+              <HidePersonAction
+                userId={person.user_id}
+                fullName={person.full_name}
+                onHidden={() => {
+                  if (onHidden) onHidden(person.user_id);
+                  onClose();
+                }}
+              />
             </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function HidePersonAction({
+  userId,
+  fullName,
+  onHidden,
+}: {
+  userId: number;
+  fullName: string;
+  onHidden: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle() {
+    if (
+      !confirm(
+        `Skrýt ${fullName} z přehledu Lidé?\n\n` +
+          "Jejich účet, RSVPs a vše ostatní v aplikaci Olaf zůstává " +
+          "nedotčené — schováváš si je jen z tvého seznamu. Můžeš je " +
+          'kdykoli vrátit přes sekci „Skrytí lidé" dole.',
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await events.hidePerson(userId);
+      onHidden();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Skrytí selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="border-t border-border pt-4">
+      <button
+        type="button"
+        onClick={handle}
+        disabled={busy}
+        className="inline-flex items-center gap-2 text-xs font-medium text-ink-500 hover:text-danger disabled:opacity-50"
+      >
+        <span aria-hidden>✕</span>
+        {busy ? "Skrývám…" : "Skrýt z přehledu Lidé"}
+      </button>
+      {err && (
+        <p className="mt-2 text-xs text-danger">{err}</p>
+      )}
+    </section>
   );
 }
 
@@ -342,77 +408,120 @@ function MembershipsSection({
     }
   }
 
+  const active = memberships.filter((m) => m.status === "active");
+  const removed = memberships.filter((m) => m.status === "removed");
+
   return (
-    <section>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-        Členství v komunitách ({memberships.length})
-      </p>
-      <ul className="mt-2 flex flex-col gap-2">
-        {memberships.map((m) => {
-          const busy = busyWs === m.workspace_slug;
-          const isRemoved = m.status === "removed";
-          const canRemove =
-            !isRemoved &&
-            m.role !== "owner" &&
-            m.role !== "admin";
-          return (
-            <li
-              key={m.workspace_slug}
-              className={[
-                "flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm",
-                isRemoved ? "opacity-60" : "",
-              ].join(" ")}
-            >
-              <div className="flex min-w-0 flex-col">
-                <span className="font-medium text-ink-900">
-                  {m.workspace_name}
-                </span>
-                <span className="flex items-baseline gap-2 text-xs text-ink-500">
-                  <span
-                    className={[
-                      "inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                      (m.role && ROLE_TONE[m.role]) ?? "bg-surface-muted text-ink-500",
-                    ].join(" ")}
-                  >
-                    {(m.role && ROLE_LABEL[m.role]) ?? "—"}
-                  </span>
-                  {isRemoved && (
-                    <span className="text-danger">Odebrán</span>
-                  )}
-                </span>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                {canRemove && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(m)}
-                    disabled={busy}
-                    className="text-[11px] font-medium text-danger hover:underline disabled:opacity-50"
-                  >
-                    {busy ? "..." : "Odebrat"}
-                  </button>
-                )}
-                {isRemoved && (
-                  <button
-                    type="button"
-                    onClick={() => handleRestore(m)}
-                    disabled={busy}
-                    className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
-                  >
-                    {busy ? "..." : "Vrátit"}
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {memberships.some((m) => m.role === "admin") && (
-        <p className="mt-2 text-xs text-ink-500">
-          Admina musíš nejdřív degradovat na člena z dashboardu komunity,
-          pak ho jde odebrat.
-        </p>
+    <section className="flex flex-col gap-4">
+      {active.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Aktivní členství ({active.length})
+          </p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {active.map((m) => (
+              <MembershipRow
+                key={m.workspace_slug}
+                m={m}
+                busy={busyWs === m.workspace_slug}
+                onRemove={() => handleRemove(m)}
+                onRestore={() => handleRestore(m)}
+              />
+            ))}
+          </ul>
+          {active.some((m) => m.role === "admin") && (
+            <p className="mt-2 text-xs text-ink-500">
+              Admina musíš nejdřív degradovat na člena z dashboardu
+              komunity, pak ho jde odebrat.
+            </p>
+          )}
+        </div>
+      )}
+      {removed.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer list-none">
+            <span className="inline-flex items-center gap-2 text-xs text-ink-500 hover:text-ink-900">
+              <span className="transition-transform group-open:rotate-90">
+                ▸
+              </span>
+              Bývalá členství ({removed.length})
+            </span>
+          </summary>
+          <ul className="mt-2 flex flex-col gap-2">
+            {removed.map((m) => (
+              <MembershipRow
+                key={m.workspace_slug}
+                m={m}
+                busy={busyWs === m.workspace_slug}
+                onRemove={() => handleRemove(m)}
+                onRestore={() => handleRestore(m)}
+              />
+            ))}
+          </ul>
+        </details>
       )}
     </section>
+  );
+}
+
+function MembershipRow({
+  m,
+  busy,
+  onRemove,
+  onRestore,
+}: {
+  m: PersonMembershipEntry;
+  busy: boolean;
+  onRemove: () => void;
+  onRestore: () => void;
+}) {
+  const isRemoved = m.status === "removed";
+  const canRemove =
+    !isRemoved && m.role !== "owner" && m.role !== "admin";
+  return (
+    <li
+      className={[
+        "flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm",
+        isRemoved ? "opacity-60" : "",
+      ].join(" ")}
+    >
+      <div className="flex min-w-0 flex-col">
+        <span className="font-medium text-ink-900">
+          {m.workspace_name}
+        </span>
+        <span className="flex items-baseline gap-2 text-xs text-ink-500">
+          <span
+            className={[
+              "inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+              (m.role && ROLE_TONE[m.role]) ?? "bg-surface-muted text-ink-500",
+            ].join(" ")}
+          >
+            {(m.role && ROLE_LABEL[m.role]) ?? "—"}
+          </span>
+        </span>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={busy}
+            className="text-[11px] font-medium text-danger hover:underline disabled:opacity-50"
+          >
+            {busy ? "..." : "Odebrat"}
+          </button>
+        )}
+        {isRemoved && (
+          <button
+            type="button"
+            onClick={onRestore}
+            disabled={busy}
+            className="text-[11px] font-medium text-brand hover:underline disabled:opacity-50"
+          >
+            {busy ? "..." : "Vrátit"}
+          </button>
+        )}
+      </div>
+    </li>
   );
 }

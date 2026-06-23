@@ -478,3 +478,43 @@ class PushSubscription(models.Model):
 
     def __str__(self) -> str:
         return f"PushSubscription #{self.pk} for {self.user_id}"
+
+
+class OwnerHiddenPerson(models.Model):
+    """An owner has explicitly hidden a person from their /admin/lide/
+    view.
+
+    Lidé is the cross-workspace CRM view — every user who's RSVPed to
+    one of the caller's events appears there by default. After the
+    V2 community-membership rebuild the owner can already remove
+    individual users from individual workspaces, but Lidé is workspace-
+    agnostic; if the user has no RSVPs on any of the owner's events
+    they still linger in Lidé as long as they've ever interacted.
+
+    This row says "owner doesn't want to see this person here anymore."
+    The target User's account, RSVPs, and memberships are untouched —
+    only the owner's own Lidé view filters them out. Undo via DELETE.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lide_hidden_people",
+        help_text="The creator who clicked 'Skrýt z přehledu'.",
+    )
+    target = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="hidden_by_owners",
+        help_text="The user being hidden from the owner's Lidé view.",
+    )
+    hidden_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "accounts_owner_hidden_person"
+        unique_together = [("owner", "target")]
+        ordering = ["-hidden_at"]
+        indexes = [models.Index(fields=["owner", "-hidden_at"])]
+
+    def __str__(self) -> str:
+        return f"OwnerHiddenPerson(owner={self.owner_id}, target={self.target_id})"

@@ -208,6 +208,107 @@ class CreatorPersonDetailTests(TestCase):
         self.assertIn(own_ws.slug, slugs)
         self.assertNotIn(foreign_ws.slug, slugs)
 
+    def test_hide_excludes_from_creator_people(self) -> None:
+        """POST /hide/ → user zmizí z creator_people. DELETE /hide/ ho
+        vrátí. Hidden je per-caller — jiný owner vidí osobu dál."""
+        from .models import OwnerHiddenPerson
+
+        self.client.force_authenticate(self.owner)
+        list_url = reverse("accounts:creator-people")
+        hide_url = reverse(
+            "accounts:creator-person-hide",
+            kwargs={"user_id": self.participant.pk},
+        )
+
+        # Před skrytím se osoba v listě objeví
+        before = {p["user_id"] for p in self.client.get(list_url).json()}
+        self.assertIn(self.participant.id, before)
+
+        # Skrytí
+        r = self.client.post(hide_url)
+        self.assertEqual(r.status_code, 204)
+        self.assertTrue(
+            OwnerHiddenPerson.objects.filter(
+                owner=self.owner, target=self.participant
+            ).exists()
+        )
+
+        after = {p["user_id"] for p in self.client.get(list_url).json()}
+        self.assertNotIn(self.participant.id, after)
+
+        # Hidden endpoint je vidí
+        hidden_url = reverse("accounts:creator-hidden-people")
+        hidden = self.client.get(hidden_url).json()
+        self.assertEqual(len(hidden), 1)
+        self.assertEqual(hidden[0]["user_id"], self.participant.id)
+
+        # Unhide vrátí
+        r = self.client.delete(hide_url)
+        self.assertEqual(r.status_code, 204)
+        restored = {p["user_id"] for p in self.client.get(list_url).json()}
+        self.assertIn(self.participant.id, restored)
+
+    def test_hide_is_per_caller(self) -> None:
+        """Hide owner-em A neovlivní co vidí owner B."""
+        from workspaces.models import Workspace, WorkspaceMember
+
+        other_owner = _make_user("o2@cpd.com")
+        ws_b = Workspace.objects.create(slug="cpd-b", name="B")
+        WorkspaceMember.objects.create(
+            workspace=ws_b,
+            user=other_owner,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+        # Sdílím participanta s druhým ownerem skrz RSVP
+        from datetime import timedelta as _td
+
+        from events.models import RSVP as _R
+        from events.models import Event as _E
+
+        starts = timezone.now() + _td(days=30)
+        ev_b = _E.objects.create(
+            workspace=ws_b,
+            slug="b-ev",
+            title="B ev",
+            starts_at=starts,
+            ends_at=starts + _td(hours=4),
+            status=_E.STATUS_PUBLISHED,
+        )
+        _R.objects.create(event=ev_b, user=self.participant, status=_R.STATUS_YES)
+
+        # Owner A skryje participanta
+        self.client.force_authenticate(self.owner)
+        hide_url = reverse(
+            "accounts:creator-person-hide",
+            kwargs={"user_id": self.participant.pk},
+        )
+        self.client.post(hide_url)
+
+        # Owner B pořád vidí participanta (jeho hide list je prázdný)
+        list_url = reverse("accounts:creator-people")
+        client_b = APIClient()
+        client_b.force_authenticate(other_owner)
+        ids_b = {p["user_id"] for p in client_b.get(list_url).json()}
+        self.assertIn(self.participant.id, ids_b)
+
+    def test_cannot_hide_self(self) -> None:
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "accounts:creator-person-hide",
+            kwargs={"user_id": self.owner.pk},
+        )
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 400)
+
+    def test_hide_unknown_user_404(self) -> None:
+        self.client.force_authenticate(self.owner)
+        url = reverse(
+            "accounts:creator-person-hide",
+            kwargs={"user_id": 999999},
+        )
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 404)
+
     def test_404_for_membership_only_person(self) -> None:
         """Person bez RSVPs ale s membership row by se měl dát najít
         (jinak owner nemůže odebrat membera který nikdy nic neRSVPnul,

@@ -676,6 +676,15 @@ export interface PersonMembershipEntry {
   joined_at: string | null;
 }
 
+/** Slim payload pro "Skrytí lidé (N)" sekci. Plný profil přes
+ *  events.person(userId). */
+export interface HiddenPersonSummary {
+  user_id: number;
+  full_name: string;
+  email: string;
+  hidden_at: string | null;
+}
+
 export interface EventCollaborator {
   id: number;
   user_id: number;
@@ -1556,6 +1565,21 @@ export const events = {
   people: () => apiFetch<PersonSummary[]>("/api/auth/me/people/"),
   person: (userId: number) =>
     apiFetch<PersonDetail>(`/api/auth/me/people/${userId}/`),
+  /** V2 Lidé — hide a person from caller's roster. Their account +
+   *  RSVPs are untouched, but creator_people filters them out. Undo
+   *  via unhidePerson. */
+  hidePerson: (userId: number) =>
+    apiFetch<void>(`/api/auth/me/people/${userId}/hide/`, {
+      method: "POST",
+    }),
+  unhidePerson: (userId: number) =>
+    apiFetch<void>(`/api/auth/me/people/${userId}/hide/`, {
+      method: "DELETE",
+    }),
+  /** V2 Lidé — list of users this creator has hidden, for the
+   *  collapsible "Skrytí lidé" section with restore button. */
+  hiddenPeople: () =>
+    apiFetch<HiddenPersonSummary[]>("/api/auth/me/people/hidden/"),
   listCollaborators: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<EventCollaborator[]>(
       `/api/events/${workspaceSlug}/${eventSlug}/collaborators/`,
