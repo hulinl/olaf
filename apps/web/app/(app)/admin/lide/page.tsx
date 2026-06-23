@@ -260,9 +260,9 @@ export default function LidePage() {
                               disabled={anyBusy}
                               title="Trvale odstranit (zruší RSVPs, smaže poznámky)"
                               aria-label="Trvale odstranit"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 hover:bg-danger-soft hover:text-danger focus-ring disabled:opacity-50"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-900 hover:bg-danger-soft hover:text-danger focus-ring disabled:opacity-50"
                             >
-                              <span aria-hidden>🗑</span>
+                              <TrashIcon />
                             </button>
                           </div>
                         </td>
@@ -289,6 +289,28 @@ export default function LidePage() {
         }}
       />
     </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6 17 20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
   );
 }
 
