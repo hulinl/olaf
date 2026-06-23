@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AppFooter } from "@/components/ui/app-footer";
 import { AppHeader } from "@/components/ui/app-header";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { ApiError, User, auth } from "@/lib/api";
 import { UserContext } from "@/lib/user-context";
 
@@ -67,13 +68,15 @@ export default function AppLayout({
 
   return (
     <UserContext.Provider value={user}>
-      <AppHeader
-        user={user}
-        onSignOut={handleSignOut}
-        signingOut={signingOut}
-      />
-      {children}
-      <AppFooter />
+      <ConfirmProvider>
+        <AppHeader
+          user={user}
+          onSignOut={handleSignOut}
+          signingOut={signingOut}
+        />
+        {children}
+        <AppFooter />
+      </ConfirmProvider>
     </UserContext.Provider>
   );
 }
