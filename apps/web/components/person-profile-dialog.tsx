@@ -216,9 +216,12 @@ export function PersonProfileDialog({ userId, onClose, onHidden }: Props) {
                 )}
               </section>
 
-              {(person.memberships?.length ?? 0) > 0 && (
+              {(person.memberships ?? []).some(
+                (m) => m.status === "active",
+              ) && (
                 <MembershipsSection
                   person={person}
+                  variant="active"
                   onChange={(updated) => setPerson(updated)}
                 />
               )}
@@ -275,6 +278,21 @@ export function PersonProfileDialog({ userId, onClose, onHidden }: Props) {
                   onClose();
                 }}
               />
+
+              {/* Bývalá členství pod čarou, oddělená od aktivních
+                  informací — když jich je hodně, sbalená a vizuálně
+                  ztlumená, aby nezabírala kognitivní prostor. */}
+              {(person.memberships ?? []).some(
+                (m) => m.status === "removed",
+              ) && (
+                <div className="border-t border-border pt-4">
+                  <MembershipsSection
+                    person={person}
+                    variant="removed"
+                    onChange={(updated) => setPerson(updated)}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -357,9 +375,13 @@ const ROLE_TONE: Record<string, string> = {
 function MembershipsSection({
   person,
   onChange,
+  variant,
 }: {
   person: PersonDetail;
   onChange: (next: PersonDetail) => void;
+  /** "active" renderuje jen aktivní členství jako prominent sekci,
+   *  "removed" jen bývalá pod čarou jako collapsible. */
+  variant: "active" | "removed";
 }) {
   const [busyWs, setBusyWs] = useState<string | null>(null);
   const memberships = person.memberships ?? [];
@@ -408,58 +430,63 @@ function MembershipsSection({
     }
   }
 
-  const active = memberships.filter((m) => m.status === "active");
-  const removed = memberships.filter((m) => m.status === "removed");
+  const rows = memberships.filter((m) =>
+    variant === "active" ? m.status === "active" : m.status === "removed",
+  );
 
-  return (
-    <section className="flex flex-col gap-4">
-      {active.length > 0 && (
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-            Aktivní členství ({active.length})
+  if (rows.length === 0) return null;
+
+  if (variant === "active") {
+    return (
+      <section>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Aktivní členství ({rows.length})
+        </p>
+        <ul className="mt-2 flex flex-col gap-2">
+          {rows.map((m) => (
+            <MembershipRow
+              key={m.workspace_slug}
+              m={m}
+              busy={busyWs === m.workspace_slug}
+              onRemove={() => handleRemove(m)}
+              onRestore={() => handleRestore(m)}
+            />
+          ))}
+        </ul>
+        {rows.some((m) => m.role === "admin") && (
+          <p className="mt-2 text-xs text-ink-500">
+            Admina musíš nejdřív degradovat na člena z dashboardu
+            komunity, pak ho jde odebrat.
           </p>
-          <ul className="mt-2 flex flex-col gap-2">
-            {active.map((m) => (
-              <MembershipRow
-                key={m.workspace_slug}
-                m={m}
-                busy={busyWs === m.workspace_slug}
-                onRemove={() => handleRemove(m)}
-                onRestore={() => handleRestore(m)}
-              />
-            ))}
-          </ul>
-          {active.some((m) => m.role === "admin") && (
-            <p className="mt-2 text-xs text-ink-500">
-              Admina musíš nejdřív degradovat na člena z dashboardu
-              komunity, pak ho jde odebrat.
-            </p>
-          )}
-        </div>
-      )}
-      {removed.length > 0 && (
-        <details className="group">
-          <summary className="cursor-pointer list-none">
-            <span className="inline-flex items-center gap-2 text-xs text-ink-500 hover:text-ink-900">
-              <span className="transition-transform group-open:rotate-90">
-                ▸
-              </span>
-              Bývalá členství ({removed.length})
+        )}
+      </section>
+    );
+  }
+
+  // variant === "removed"
+  return (
+    <section>
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <span className="inline-flex items-center gap-2 text-xs text-ink-500 hover:text-ink-900">
+            <span className="transition-transform group-open:rotate-90">
+              ▸
             </span>
-          </summary>
-          <ul className="mt-2 flex flex-col gap-2">
-            {removed.map((m) => (
-              <MembershipRow
-                key={m.workspace_slug}
-                m={m}
-                busy={busyWs === m.workspace_slug}
-                onRemove={() => handleRemove(m)}
-                onRestore={() => handleRestore(m)}
-              />
-            ))}
-          </ul>
-        </details>
-      )}
+            Bývalá členství ({rows.length})
+          </span>
+        </summary>
+        <ul className="mt-2 flex flex-col gap-2">
+          {rows.map((m) => (
+            <MembershipRow
+              key={m.workspace_slug}
+              m={m}
+              busy={busyWs === m.workspace_slug}
+              onRemove={() => handleRemove(m)}
+              onRestore={() => handleRestore(m)}
+            />
+          ))}
+        </ul>
+      </details>
     </section>
   );
 }

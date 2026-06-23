@@ -60,6 +60,11 @@ urlpatterns = [
         name="creator-person-hide",
     ),
     path(
+        "me/people/<int:user_id>/purge/",
+        views.creator_person_purge,
+        name="creator-person-purge",
+    ),
+    path(
         "me/api-tokens/",
         views.api_tokens,
         name="api-tokens",
