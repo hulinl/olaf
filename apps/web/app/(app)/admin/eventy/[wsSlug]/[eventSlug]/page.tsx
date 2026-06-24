@@ -8,6 +8,7 @@ import { EventChecklist } from "@/components/event-checklist";
 import { ParticipantProfileDialog } from "@/components/participant-profile-dialog";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ShareButton } from "@/components/ui/share-button";
 import {
   ApiError,
@@ -276,6 +277,11 @@ function AdminEventDetail({ params }: Props) {
                       : prev,
                   )
                 }
+                onRemove={(removedId) =>
+                  setRsvps((prev) =>
+                    prev ? prev.filter((x) => x.id !== removedId) : prev,
+                  )
+                }
                 onOpenProfile={() => setProfileRsvpId(r.id)}
               />
             ))}
@@ -313,6 +319,13 @@ function AdminEventDetail({ params }: Props) {
                           ? prev.map((x) =>
                               x.id === updated.id ? updated : x,
                             )
+                          : prev,
+                      )
+                    }
+                    onRemove={(removedId) =>
+                      setRsvps((prev) =>
+                        prev
+                          ? prev.filter((x) => x.id !== removedId)
                           : prev,
                       )
                     }
@@ -383,6 +396,7 @@ function RsvpRow({
   eventSlug,
   requiredDocs,
   onUpdate,
+  onRemove,
   onOpenProfile,
 }: {
   rsvp: RSVPRecord;
@@ -390,11 +404,13 @@ function RsvpRow({
   eventSlug: string;
   requiredDocs: { key: string; label: string; required: boolean }[];
   onUpdate: (updated: RSVPRecord) => void;
+  onRemove: (removedId: number) => void;
   onOpenProfile: () => void;
 }) {
   const [busy, setBusy] = useState<
     "paid" | "approve" | "reject" | "organizer" | "remove" | null
   >(null);
+  const confirmDialog = useConfirm();
   const created = new Date(rsvp.created_at);
   const requiredKeys = new Set(requiredDocs.map((d) => d.key));
   const uploadedKeys = new Set(rsvp.uploaded_doc_keys);
@@ -477,16 +493,18 @@ function RsvpRow({
   async function handleRemove() {
     if (busy) return;
     const who = rsvp.user_full_name || rsvp.user_email;
-    if (
-      !confirm(
-        `Odebrat ${who} z akce?\n\nRegistraci přepneme na "cancelled"; pokud byla potvrzená, posune se další z waitlistu. Akci nesmaže — historie se zachová v auditu.`,
-      )
-    )
-      return;
+    const ok = await confirmDialog({
+      title: `Odebrat ${who} z akce?`,
+      description:
+        'Účastníka i případnou roli organizátora smažeme. Pokud se znovu přihlásí, půjde jako úplně nová registrace (projde schvalováním, pokud je nastavené). Historie zůstane v auditu.',
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy("remove");
     try {
-      const updated = await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
-      onUpdate(updated);
+      await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
+      onRemove(rsvp.id);
     } catch {
       /* keep quiet */
     } finally {
@@ -826,17 +844,20 @@ function RsvpCard({
   wsSlug,
   eventSlug,
   onUpdate,
+  onRemove,
   onOpenProfile,
 }: {
   rsvp: RSVPRecord;
   wsSlug: string;
   eventSlug: string;
   onUpdate: (updated: RSVPRecord) => void;
+  onRemove: (removedId: number) => void;
   onOpenProfile: () => void;
 }) {
   const [busy, setBusy] = useState<
     "paid" | "approve" | "reject" | "remove" | null
   >(null);
+  const confirmDialog = useConfirm();
 
   async function handleApprove() {
     setBusy("approve");
@@ -875,16 +896,18 @@ function RsvpCard({
   }
   async function handleRemove() {
     const who = rsvp.user_full_name || rsvp.user_email;
-    if (
-      !confirm(
-        `Odebrat ${who} z akce?\n\nRegistraci přepneme na "cancelled"; pokud byla potvrzená, posune se další z waitlistu.`,
-      )
-    )
-      return;
+    const ok = await confirmDialog({
+      title: `Odebrat ${who} z akce?`,
+      description:
+        'Účastníka i případnou roli organizátora smažeme. Pokud se znovu přihlásí, půjde jako úplně nová registrace. Historie zůstane v auditu.',
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy("remove");
     try {
-      const updated = await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
-      onUpdate(updated);
+      await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
+      onRemove(rsvp.id);
     } catch {
       /* keep quiet */
     } finally {

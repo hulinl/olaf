@@ -16,6 +16,7 @@ import { GearForm } from "./forms/gear-form";
 import { HeroForm } from "./forms/hero-form";
 import { IncludedSplitForm } from "./forms/included-split-form";
 import { MapForm } from "./forms/map-form";
+import { OrganizersForm } from "./forms/organizers-form";
 import { PracticalForm } from "./forms/practical-form";
 import { ProseForm } from "./forms/prose-form";
 import { StatsForm } from "./forms/stats-form";
@@ -53,6 +54,7 @@ const ADD_OPTIONS: BlockType[] = [
   "faq",
   "practical",
   "gear",
+  "organizers",
 ];
 
 export function Builder({
@@ -300,6 +302,15 @@ function BlockForm({
       return <PracticalForm payload={block.payload} onChange={onChange} />;
     case "gear":
       return <GearForm payload={block.payload} onChange={onChange} />;
+    case "organizers":
+      return (
+        <OrganizersForm
+          payload={block.payload}
+          onChange={onChange}
+          workspaceSlug={workspaceSlug}
+          eventSlug={eventSlug}
+        />
+      );
     default:
       return null;
   }
@@ -342,5 +353,7 @@ function makeBlock(
       return { id, type, payload: {} };
     case "gear":
       return { id, type, payload: { list_slug: "" } };
+    case "organizers":
+      return { id, type, payload: { user_ids: [] } };
   }
 }

@@ -1934,16 +1934,19 @@ def reject_rsvp(
 def remove_rsvp(
     request: Request, workspace_slug: str, event_slug: str, rsvp_id: int
 ) -> Response:
-    """Owner-side cancel libovolného RSVP.
+    """Owner-side hard-remove libovolného RSVP.
 
     `reject_rsvp` funguje jen na `pending_approval` (zamítnutí žádosti).
     Když ale ownerovi vznikne duplicitní účastník (přihláška dvakrát ze
     stejného telefonu / jména, badge `⚠ Duplikát?`), potřebuje ho jít
-    smazat z rosteru. Tady force-cancel přes `rsvp.cancel()` — FIFO
-    promote z waitlistu se vyřeší automaticky uvnitř `cancel()`.
+    smazat z rosteru. Tady fyzicky smažeme RSVP + EventCollaborator —
+    re-přihlášení pak projde standardně schvalováním. FIFO promote
+    z waitlistu se vyřeší uvnitř `delete_by_owner()`.
 
-    Idempotentní: pokud je RSVP už cancelled, vrátíme 200 s aktuálním
-    stavem (frontend si stejně refreshne).
+    User report (2026-06-24): odebrání organizátora ho přepnulo na
+    cancelled, ale EventCollaborator zůstal viset → po re-přihlášce
+    `get_or_create` revivnul starou RSVP s `is_organizer=True` a user
+    sedl v pending_approval s edit-právy. Hard-delete tu loop láme.
     """
     event, err = _owner_event_or_403(request, workspace_slug, event_slug)
     if err:
@@ -1983,38 +1986,52 @@ def remove_rsvp(
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    if rsvp.status != RSVP.STATUS_CANCELLED:
-        rsvp.cancel(reason=RSVP.CANCELLATION_OWNER)
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
 
-        from audit.models import AuditLog
-        from audit.services import log as audit_log
+    participant_name = (
+        rsvp.user.get_full_name() if rsvp.user else "(neznámý)"
+    )
+    participant_email = rsvp.user.email if rsvp.user else ""
+    was_organizer = rsvp.is_organizer
+    rsvp_pk_before_delete = rsvp.pk
 
-        participant_name = (
-            rsvp.user.get_full_name() if rsvp.user else "(neznámý)"
-        )
-        audit_log(
-            actor=request.user,
-            action=AuditLog.ACTION_RSVP_REJECT,
-            workspace=event.workspace,
-            target_type="rsvp",
-            target_id=rsvp.pk,
-            summary=(
-                f'Odebral účastníka „{participant_name}” z akce '
-                f'„{event.title}”'
-            ),
-            payload={
-                "event_slug": event.slug,
-                "rsvp_id": rsvp.pk,
-                "removed_by_owner": True,
-            },
-        )
+    # Audit + email PŘED delete: snapshot zachycuje stav, mail šablona
+    # potřebuje rsvp.pk pro odkazy, a po `delete_by_owner()` je objekt
+    # bez pk.
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_RSVP_REJECT,
+        workspace=event.workspace,
+        target_type="rsvp",
+        target_id=rsvp_pk_before_delete,
+        summary=(
+            f'Odebral účastníka „{participant_name}” z akce '
+            f'„{event.title}”'
+        ),
+        payload={
+            "event_slug": event.slug,
+            "rsvp_id": rsvp_pk_before_delete,
+            "removed_by_owner": True,
+            "was_organizer": was_organizer,
+            "participant_email": participant_email,
+        },
+    )
 
-        with contextlib.suppress(Exception):
-            from .emails import send_rsvp_cancellation
+    with contextlib.suppress(Exception):
+        from .emails import send_rsvp_cancellation
 
-            send_rsvp_cancellation(rsvp, cancelled_by_owner=True)
+        send_rsvp_cancellation(rsvp, cancelled_by_owner=True)
 
-    return Response(RSVPSerializer(rsvp, context={"request": request}).data)
+    rsvp.delete_by_owner()
+
+    return Response(
+        {
+            "removed": True,
+            "rsvp_id": rsvp_pk_before_delete,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["POST"])
@@ -2981,6 +2998,75 @@ def event_collaborators(
         },
         status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_organizer_pool(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Eligible organizers pro Organizers landing block picker.
+
+    Union {workspace owner + admins} + {EventCollaborators}, deduplikované
+    podle user_id. Vrací slim user payload — display_name + bio + avatar_url
+    + role tag, takže picker v editoru vidí kdo má vyplněné údaje. Owner-only
+    (collaborator stačí), neslouží jako public endpoint.
+    """
+    from workspaces.models import WorkspaceMember
+
+    from .models import EventCollaborator
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+
+    seen: dict[int, dict] = {}
+
+    def _slim_user(u, *, role: str) -> dict:
+        if u.id in seen:
+            # První role vyhrává — workspace owner > admin > collaborator.
+            return seen[u.id]
+        avatar_url = ""
+        if u.avatar:
+            try:
+                avatar_url = request.build_absolute_uri(u.avatar.url)
+            except Exception:
+                avatar_url = u.avatar.url
+        payload = {
+            "user_id": u.id,
+            "display_name": u.display_name or u.get_full_name(),
+            "full_name": u.get_full_name(),
+            "email": u.email,
+            "bio": u.bio,
+            "avatar_url": avatar_url,
+            "role": role,
+        }
+        seen[u.id] = payload
+        return payload
+
+    owners_admins = (
+        WorkspaceMember.objects.filter(
+            workspace=event.workspace,
+            role__in=[WorkspaceMember.ROLE_OWNER, WorkspaceMember.ROLE_ADMIN],
+        )
+        .select_related("user")
+        .order_by("role", "joined_at")
+    )
+    for wm in owners_admins:
+        _slim_user(
+            wm.user,
+            role="owner" if wm.role == WorkspaceMember.ROLE_OWNER else "admin",
+        )
+
+    collabs = (
+        EventCollaborator.objects.filter(event=event)
+        .select_related("user")
+        .order_by("created_at")
+    )
+    for c in collabs:
+        _slim_user(c.user, role="collaborator")
+
+    return Response(list(seen.values()))
 
 
 @api_view(["DELETE"])

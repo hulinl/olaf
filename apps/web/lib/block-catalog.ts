@@ -343,4 +343,34 @@ export const BLOCK_CATALOG: BlockCatalogEntry[] = [
     example: "Curated 8 položek z „High-altitude packing” listu (z 40 total).",
     tip: "Pro mainstream akce vyber TOP 8–10 nejdůležitějších. Plný list 40 položek odradí.",
   },
+  {
+    type: "organizers",
+    title: "Organizátoři",
+    subtitle: "Karty s tváří, kdo akci povede",
+    description:
+      "Vybereš pár lidí ze spolutvůrců (Tvůrce → Spolutvůrci) a stránka " +
+      "ukáže jejich karty — profilová fotka, jméno, krátký popis. Důvěra " +
+      "v lidi za akcí je pro nezkušeného účastníka často důležitější než " +
+      "samotný program.",
+    whenToUse: [
+      "Akce s malou skupinou (do 20 lidí) — kdo povede, ten dělá zážitek.",
+      "Premiérová akce nebo novou cílovku — ukázat tvář dělá rozdíl.",
+      "Když máš mix instruktorů s různou specializací (lezení / běh / vaření).",
+    ],
+    whenNotToUse: [
+      "One-off open akce, kde se účast netýká vedení (BBQ, sraz).",
+      "Když nikdo z teamu nemá vyplněné bio + fotku — pak je karta prázdná.",
+    ],
+    keyFields: [
+      { label: "Eyebrow", hint: 'Např. „Tým” nebo "Kdo to vede".' },
+      { label: "Titulek", hint: "Volitelně — sekce nadpis." },
+      { label: "Úvodní text", hint: "Volitelně — jedna věta nad kartami." },
+      {
+        label: "Vybraní organizátoři",
+        hint: "Checkbox výběr z aktuálních spolutvůrců eventu. Pořadí výběru = pořadí karet.",
+      },
+    ],
+    example: "Tým 3 lidí — vedoucí + kuchař + medik. Každý 2–3 věty bio + fotka.",
+    tip: "Krátké bio (max 2 věty) funguje líp než životopis. Lidé skenují.",
+  },
 ];

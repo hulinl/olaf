@@ -65,6 +65,19 @@ class VerifyEmailSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="get_full_name", read_only=True)
     profile_completion = serializers.ReadOnlyField()
+    # `avatar` ImageField vrací URL přes storage backend — v dev relativní
+    # `/media/avatars/...`, v prod absolutní Azure Blob URL. Read-only —
+    # upload jede přes separátní multipart endpoint `/api/auth/me/avatar/`.
+    avatar_url = serializers.SerializerMethodField()
+
+    def get_avatar_url(self, obj) -> str:
+        if not obj.avatar:
+            return ""
+        request = self.context.get("request")
+        url = obj.avatar.url
+        if request and url.startswith("/"):
+            return request.build_absolute_uri(url)
+        return url
 
     class Meta:
         model = User
@@ -79,6 +92,7 @@ class UserSerializer(serializers.ModelSerializer):
             "profile_completion",
             "dob",
             "avatar_blob_id",
+            "avatar_url",
             "address",
             # Structured address (V1 invoice prep)
             "address_street",

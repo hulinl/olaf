@@ -112,6 +112,16 @@ export interface PracticalBlockPayload {
   difficulty_note?: string;
 }
 
+export interface OrganizersBlockPayload {
+  eyebrow?: string;
+  title?: string;
+  intro?: string;
+  /** User IDs from EventCollaborators na tomhle eventu. Public landing
+   *  payload nese side-lookup `organizers_by_user_id`, takže renderer
+   *  vidí display_name + bio + avatar_url bez druhého fetch-u. */
+  user_ids: number[];
+}
+
 export type EventBlock =
   | { id: string; type: "hero"; payload: HeroBlockPayload }
   | { id: string; type: "prose"; payload: ProseBlockPayload }
@@ -126,7 +136,18 @@ export type EventBlock =
   | { id: string; type: "map"; payload: MapBlockPayload }
   | { id: string; type: "faq"; payload: FaqBlockPayload }
   | { id: string; type: "practical"; payload: PracticalBlockPayload }
-  | { id: string; type: "gear"; payload: GearBlockPayload };
+  | { id: string; type: "gear"; payload: GearBlockPayload }
+  | { id: string; type: "organizers"; payload: OrganizersBlockPayload };
+
+export interface OrganizerLookupEntry {
+  id: number;
+  display_name: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  bio: string;
+  avatar_url: string;
+}
 
 export type BlockType = EventBlock["type"];
 
@@ -149,6 +170,7 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   faq: "FAQ — časté dotazy",
   practical: "Praktické info — doprava, ubytování, výbava, náročnost",
   gear: "Vybavení — odkaz na tvůj gear list",
+  organizers: "Organizátoři — karty s fotkou a popisem vybraných spolutvůrců",
 };
 
 export type MapProvider = "mapy" | "google";

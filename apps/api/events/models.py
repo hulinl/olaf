@@ -711,6 +711,49 @@ class RSVP(models.Model):
                 head.save(update_fields=["status", "waitlist_position", "updated_at"])
                 # Email fan-out lives in the view layer; we return None here.
 
+    @transaction.atomic
+    def delete_by_owner(self) -> None:
+        """Hard-remove RSVP from event (owner action).
+
+        Soft-cancel (`cancel()`) leaves the row plus EventCollaborator
+        link in place, which caused a real bug: owner removed an
+        organizer, the user re-registered, and `get_or_create` in
+        `create_for_event` revived the old row with `is_organizer=True`
+        and the EventCollaborator row still active — so they sat in
+        pending_approval *and* had edit rights, without showing up as
+        approvable in the roster.
+
+        Owner-remove is destructive on purpose: the participant should
+        re-apply from scratch (questionnaire, approval, payment). Self-
+        cancel keeps the soft path so a user can re-join easily.
+
+        Order matters: promote waitlist BEFORE delete to avoid the row
+        being counted as confirmed during capacity recompute. Audit and
+        email are caller responsibility (they have the actor + want
+        snapshots before mutation).
+        """
+        was_confirmed = self.status == self.STATUS_YES
+
+        if was_confirmed and self.event.waitlist_enabled:
+            head = (
+                RSVP.objects.select_for_update()
+                .filter(event=self.event, status=self.STATUS_WAITLIST)
+                .exclude(pk=self.pk)
+                .order_by("waitlist_position")
+                .first()
+            )
+            if head is not None:
+                head.status = self.STATUS_YES
+                head.waitlist_position = None
+                head.save(update_fields=["status", "waitlist_position", "updated_at"])
+
+        if self.user_id is not None:
+            EventCollaborator.objects.filter(
+                event=self.event, user_id=self.user_id
+            ).delete()
+
+        self.delete()
+
 
 class RSVPDocument(models.Model):
     """One uploaded file matching one entry in event.required_documents.

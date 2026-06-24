@@ -35,7 +35,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Contact
     phone = models.CharField(max_length=30, blank=True)
     dob = models.DateField(null=True, blank=True)
+    # Legacy: blob-id pattern jsme nikdy nezapojili. `avatar` (níž)
+    # je skutečný ImageField přes django-storages (FS dev / Azure prod).
     avatar_blob_id = models.CharField(max_length=255, blank=True)
+    avatar = models.ImageField(
+        upload_to="avatars/",
+        blank=True,
+        null=True,
+        help_text=(
+            "Profilová fotka — zobrazí se na landing page eventu, "
+            "pokud je user vybraný jako organizátor."
+        ),
+    )
     # Legacy single-line address — kept so old data doesn't get dropped.
     # New code reads/writes address_street / address_city / ... below.
     address = models.CharField(max_length=500, blank=True)
