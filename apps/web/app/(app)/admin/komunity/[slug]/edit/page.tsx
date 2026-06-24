@@ -6,6 +6,7 @@ import { FormEvent, use, useEffect, useRef, useState } from "react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -73,6 +74,7 @@ export default function WorkspaceEditPage({ params }: Props) {
   const [coverBusy, setCoverBusy] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const confirmDialog = useConfirm();
 
   const [paymentIban, setPaymentIban] = useState("");
   const [paymentBankName, setPaymentBankName] = useState("");
@@ -147,7 +149,13 @@ export default function WorkspaceEditPage({ params }: Props) {
   }
 
   async function handleLogoRemove() {
-    if (!confirm("Smazat logo?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat logo komunity?",
+      description: "Místo loga se zobrazí výchozí placeholder. Můžeš kdykoli nahrát nové.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setLogoBusy(true);
     setError(null);
     try {
@@ -176,7 +184,13 @@ export default function WorkspaceEditPage({ params }: Props) {
   }
 
   async function handleCoverRemove() {
-    if (!confirm("Smazat úvodní fotku?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat úvodní fotku?",
+      description: "Po smazání zůstane karta komunity bez velkého vizuálu, dokud nenahraješ novou.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setCoverBusy(true);
     setError(null);
     try {

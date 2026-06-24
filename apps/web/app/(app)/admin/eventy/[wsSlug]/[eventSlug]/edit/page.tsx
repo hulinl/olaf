@@ -317,6 +317,12 @@ function NotionSyncButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Když backend vrátí 412 + missing=notion/anthropic, ukážeme vedle
+  // textu Link na /settings/integrace — předtím tu byl jen text
+  // "Otevři /settings/integrace.", což user musel ručně přepsat do URL.
+  const [missingIntegration, setMissingIntegration] = useState<
+    "notion" | "anthropic" | null
+  >(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const confirmDialog = useConfirm();
 
@@ -330,6 +336,7 @@ function NotionSyncButton({
     if (!ok) return;
     setBusy(true);
     setErr(null);
+    setMissingIntegration(null);
     setOkMsg(null);
     try {
       const result = await events.syncFromSource(wsSlug, eventSlug);
@@ -350,10 +357,9 @@ function NotionSyncButton({
       if (e instanceof ApiError) {
         const missing = e.data?.missing;
         if (missing === "notion" || missing === "anthropic") {
+          setMissingIntegration(missing);
           setErr(
-            `${
-              typeof e.data?.detail === "string" ? e.data.detail : e.message
-            } Otevři /settings/integrace.`,
+            typeof e.data?.detail === "string" ? e.data.detail : e.message,
           );
         } else {
           setErr(
@@ -384,9 +390,18 @@ function NotionSyncButton({
         <p className="mt-2 text-sm text-success">{okMsg}</p>
       )}
       {err && (
-        <p className="mt-2 whitespace-pre-line text-sm text-danger">
-          {err}
-        </p>
+        <div className="mt-2 flex flex-col gap-2 text-sm text-danger">
+          <p className="whitespace-pre-line">{err}</p>
+          {missingIntegration && (
+            <Link
+              href="/settings/integrace"
+              className="inline-flex w-fit items-center gap-1 rounded-md border border-danger/40 bg-danger-soft px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger/15"
+            >
+              Nastavit integraci{" "}
+              {missingIntegration === "notion" ? "Notion" : "Anthropic"} →
+            </Link>
+          )}
+        </div>
       )}
     </>
   );

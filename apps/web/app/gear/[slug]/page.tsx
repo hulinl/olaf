@@ -121,7 +121,7 @@ export default async function PublicGearListPage({ params }: Props) {
             </div>
             <div className="flex gap-2">
               <Link
-                href="/register"
+                href="/signup"
                 className="inline-flex items-center justify-center rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-brand-ink hover:opacity-90 focus-ring"
               >
                 Začít na olafu

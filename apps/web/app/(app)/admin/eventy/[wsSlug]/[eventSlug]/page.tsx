@@ -418,7 +418,13 @@ function RsvpRow({
 
   async function handleMarkPaid() {
     if (busy) return;
-    if (!confirm("Označit jako zaplaceno?")) return;
+    const ok = await confirmDialog({
+      title: "Označit jako zaplaceno?",
+      description:
+        "Změnu uvidí účastník (přestane mu chodit reminder o platbě). Audit log si pamatuje kdo a kdy označil.",
+      confirmLabel: "Označit zaplaceno",
+    });
+    if (!ok) return;
     setBusy("paid");
     try {
       const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
@@ -433,20 +439,23 @@ function RsvpRow({
   async function handleToggleOrganizer() {
     if (busy) return;
     const next = !rsvp.is_organizer;
-    if (
-      next &&
-      !confirm(
-        `Označit ${rsvp.user_full_name || rsvp.user_email} jako organizátora?\n\nNebude se počítat do kapacity ani se po něm nebude chtít platba.`,
-      )
-    )
-      return;
-    if (
-      !next &&
-      !confirm(
-        "Odebrat organizátorovi tuhle roli? Bude opět účastník (s případnou platbou).",
-      )
-    )
-      return;
+    const ok = next
+      ? await confirmDialog({
+          title: `Označit ${
+            rsvp.user_full_name || rsvp.user_email
+          } jako organizátora?`,
+          description:
+            "Nebude se počítat do kapacity ani se po něm nebude chtít platba.",
+          confirmLabel: "Označit jako organizátora",
+        })
+      : await confirmDialog({
+          title: "Odebrat roli organizátora?",
+          description:
+            "Bude opět účastník — započítá se do kapacity, případně dostane požadavek na platbu.",
+          confirmLabel: "Odebrat roli",
+          variant: "danger",
+        });
+    if (!ok) return;
     setBusy("organizer");
     try {
       const updated = await events.toggleRsvpOrganizer(
@@ -478,7 +487,14 @@ function RsvpRow({
 
   async function handleReject() {
     if (busy) return;
-    if (!confirm("Zamítnout tuto registraci?")) return;
+    const ok = await confirmDialog({
+      title: "Zamítnout tuto registraci?",
+      description:
+        "Účastník dostane e-mail o zamítnutí. Registrace přejde do stavu cancelled — pokud si přihlášku rozmyslíš, můžeš ho znovu přidat ručně.",
+      confirmLabel: "Zamítnout",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy("reject");
     try {
       const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
@@ -871,7 +887,14 @@ function RsvpCard({
     }
   }
   async function handleReject() {
-    if (!confirm("Zamítnout tuto registraci?")) return;
+    const ok = await confirmDialog({
+      title: "Zamítnout tuto registraci?",
+      description:
+        "Účastník dostane e-mail o zamítnutí. Registrace přejde do stavu cancelled.",
+      confirmLabel: "Zamítnout",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy("reject");
     try {
       const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
@@ -883,7 +906,13 @@ function RsvpCard({
     }
   }
   async function handleMarkPaid() {
-    if (!confirm("Označit jako zaplaceno?")) return;
+    const ok = await confirmDialog({
+      title: "Označit jako zaplaceno?",
+      description:
+        "Změnu uvidí účastník (přestane mu chodit reminder o platbě). Audit log si pamatuje kdo a kdy označil.",
+      confirmLabel: "Označit zaplaceno",
+    });
+    if (!ok) return;
     setBusy("paid");
     try {
       const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
