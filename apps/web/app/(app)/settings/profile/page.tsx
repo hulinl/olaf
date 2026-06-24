@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CountryPicker } from "@/components/ui/country-picker";
 import { Field, Input } from "@/components/ui/field";
 import { ApiError, type User, auth } from "@/lib/api";
@@ -33,10 +35,57 @@ export default function ProfileSettingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const confirmDialog = useConfirm();
 
   function update<K extends keyof User>(key: K, value: User[K]) {
     setUser((u) => ({ ...u, [key]: value }));
     setSaved(false);
+  }
+
+  async function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarBusy(true);
+    setError(null);
+    try {
+      const updated = await auth.uploadAvatar(file);
+      setUser(updated);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Nahrání fotky se nepodařilo.",
+      );
+    } finally {
+      setAvatarBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleAvatarDelete() {
+    const ok = await confirmDialog({
+      title: "Smazat profilovou fotku?",
+      description:
+        "Po smazání zase uvidíš jen iniciály. Můžeš kdykoli nahrát novou.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setAvatarBusy(true);
+    try {
+      const updated = await auth.deleteAvatar();
+      setUser(updated);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Smazání fotky se nepodařilo.",
+      );
+    } finally {
+      setAvatarBusy(false);
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -50,6 +99,10 @@ export default function ProfileSettingsPage() {
         last_name: user.last_name,
         display_name: user.display_name,
         phone: user.phone,
+        // Bio se zobrazuje na public landing eventu (Organizers blok),
+        // takže ho ukládáme jako součást běžného profile save — same
+        // multi-line text, same flow.
+        bio: user.bio,
         // Address fields used to be missing here — typing them in
         // and hitting Save looked like it worked because the local
         // state updated, but a refresh re-fetched the empty server
@@ -139,6 +192,79 @@ export default function ProfileSettingsPage() {
                 value={user.email}
                 disabled
                 className="opacity-60"
+              />
+            </Field>
+          </div>
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
+          <h2 className="text-lg font-semibold text-ink-900">
+            O mně (veřejné)
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Profilová fotka a krátké bio. Tvůrce eventu si tě může vybrat
+            do sekce „Organizátoři” na public landing — pak se tu vyplněné
+            údaje objeví na kartě. Pokud tě nikdo nevybere, údaje zůstávají
+            soukromé.
+          </p>
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
+            <div className="flex flex-col items-center gap-3">
+              {user.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatar_url}
+                  alt=""
+                  className="h-24 w-24 rounded-full object-cover"
+                />
+              ) : (
+                <Avatar
+                  firstName={user.first_name}
+                  lastName={user.last_name}
+                  size={96}
+                />
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarBusy}
+                >
+                  {user.avatar_url ? "Vyměnit" : "Nahrát fotku"}
+                </Button>
+                {user.avatar_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleAvatarDelete}
+                    disabled={avatarBusy}
+                  >
+                    Smazat
+                  </Button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarPick}
+              />
+            </div>
+            <Field
+              label="Bio"
+              htmlFor="bio"
+              hint="Krátký popis o tobě — max. 2–3 věty. Co umíš, čím se zabýváš, co tě baví."
+            >
+              <textarea
+                id="bio"
+                value={user.bio}
+                onChange={(e) => update("bio", e.target.value)}
+                rows={4}
+                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+                placeholder="Olaf — průvodce, instruktor, jezdím od mladí po horách. Vedu kempy a víkendovky pro nepříliš zkušený lidi co chtějí poznat hory bez tlaku."
               />
             </Field>
           </div>

@@ -139,6 +139,11 @@ urlpatterns = [
         name="collaborator-detail",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/organizer-pool/",
+        views.event_organizer_pool,
+        name="organizer-pool",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/rsvps/<int:rsvp_id>/approve/",
         views.approve_rsvp,
         name="rsvp-approve",

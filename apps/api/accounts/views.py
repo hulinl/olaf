@@ -1,7 +1,13 @@
 from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import (
+    api_view,
+    parser_classes,
+    permission_classes,
+    throttle_classes,
+)
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -142,12 +148,73 @@ def me(request: Request) -> Response:
     email_verified, date_joined cannot be changed here).
     """
     if request.method == "GET":
-        return Response(UserSerializer(request.user).data)
+        return Response(UserSerializer(request.user, context={"request": request}).data)
 
-    serializer = UserSerializer(request.user, data=request.data, partial=True)
+    serializer = UserSerializer(
+        request.user,
+        data=request.data,
+        partial=True,
+        context={"request": request},
+    )
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
+
+
+# Max 8 MB per upload — kromě toho image_utils.downscale_upload resampluje
+# velké JPEGy z mobilu na rozumnou velikost, takže DB ani Azure Blob
+# nedostanou 12 MP fotku v plné velikosti.
+USER_AVATAR_MAX_BYTES = 8 * 1024 * 1024
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def me_avatar(request: Request) -> Response:
+    """Upload / delete vlastní profilové fotky.
+
+    Stejný pattern jako workspace_logo — multipart POST s polem `avatar`
+    (nebo `image`), v `image_utils.downscale_upload` se ořeže na rozumnou
+    velikost a uloží přes django-storages (FS dev / Azure Blob prod).
+    DELETE smaže soubor + vyprázdní field. Vrací aktuální UserSerializer.
+    """
+    user = request.user
+
+    if request.method == "DELETE":
+        if user.avatar:
+            user.avatar.delete(save=False)
+            user.avatar = None
+            user.save(update_fields=["avatar"])
+        return Response(UserSerializer(user, context={"request": request}).data)
+
+    upload = request.FILES.get("avatar") or request.FILES.get("image")
+    if not upload:
+        return Response(
+            {"detail": "Soubor je povinný."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if upload.size > USER_AVATAR_MAX_BYTES:
+        mb = USER_AVATAR_MAX_BYTES // (1024 * 1024)
+        return Response(
+            {"detail": f"Obrázek je moc velký — maximum je {mb} MB."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from events.image_utils import UnsupportedImageError, downscale_upload
+
+    try:
+        processed = downscale_upload(upload)
+    except UnsupportedImageError as exc:
+        return Response(
+            {"detail": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if user.avatar:
+        user.avatar.delete(save=False)
+    user.avatar = processed
+    user.save(update_fields=["avatar"])
+    return Response(UserSerializer(user, context={"request": request}).data)
 
 
 @api_view(["GET"])

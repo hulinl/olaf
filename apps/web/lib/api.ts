@@ -1,4 +1,4 @@
-import type { EventBlock } from "./event-blocks";
+import type { EventBlock, OrganizerLookupEntry } from "./event-blocks";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -37,6 +37,10 @@ export interface User {
   phone: string;
   dob: string | null;
   avatar_blob_id: string;
+  /** URL aktuálního ImageField avatara — prázdný string když user
+   *  fotku nenahrál. Read-only z UserSerializer; upload jede přes
+   *  multipart POST na /api/auth/me/avatar/. */
+  avatar_url: string;
   address: string;
   // Structured address (Slice 4 — for invoices)
   address_street: string;
@@ -238,6 +242,10 @@ export interface Event extends EventSummary {
   /** Inline payload for every `gear` block on this event's landing.
    *  Map of slug → PublicGearList. Private lists are omitted. */
   gear_lists_by_slug?: Record<string, PublicGearList>;
+  /** Inline payload for every `organizers` block. Map of user_id (as
+   *  string) → slim user with display_name, bio, avatar_url. Missing
+   *  users (deleted collaborator) are dropped server-side. */
+  organizers_by_user_id?: Record<string, OrganizerLookupEntry>;
   /** Slim payload for the event's recommended gear checklist — set
    *  via Event.recommended_gear_list. Strips URLs/weights/notes; just
    *  what a packing checklist needs. */
@@ -691,6 +699,16 @@ export interface EventCollaborator {
   email: string;
   full_name: string;
   created_at: string;
+}
+
+export interface OrganizerPoolEntry {
+  user_id: number;
+  display_name: string;
+  full_name: string;
+  email: string;
+  bio: string;
+  avatar_url: string;
+  role: "owner" | "admin" | "collaborator";
 }
 
 export interface ParticipantProfile {
@@ -1592,6 +1610,14 @@ export const events = {
     apiFetch<EventCollaborator[]>(
       `/api/events/${workspaceSlug}/${eventSlug}/collaborators/`,
     ),
+  /** Picker pool pro Organizers landing block — vrátí union {workspace
+   *  owner + admins} ∪ {EventCollaborators}, dedup-nutý podle user_id,
+   *  s bio + avatar_url + role tagem. Workspace owner se objevuje vždy
+   *  (i bez explicit collaborator řádky). Owner-only. */
+  listOrganizerPool: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<OrganizerPoolEntry[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/organizer-pool/`,
+    ),
   addCollaborator: (
     workspaceSlug: string,
     eventSlug: string,
@@ -1615,11 +1641,12 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/reject/`,
       { method: "POST" },
     ),
-  /** Owner-side hard-remove libovolného RSVP — typicky duplikátní
-   *  registrace, kterou roster přihlásil dvakrát. `rejectRsvp` umí jen
-   *  `pending_approval`; tohle je univerzální. */
+  /** Owner-side hard-remove libovolného RSVP. Smaže RSVP + případný
+   *  EventCollaborator záznam, takže re-přihlášení projde standardním
+   *  schvalováním. `rejectRsvp` umí jen `pending_approval`; tohle je
+   *  univerzální (duplikáty, organizátoři, odhlášení účastníci). */
   removeRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
-    apiFetch<RSVPRecord>(
+    apiFetch<{ removed: true; rsvp_id: number }>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/remove/`,
       { method: "POST" },
     ),
@@ -2041,6 +2068,16 @@ export const auth = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
+  uploadAvatar: async (file: File) => {
+    const fd = new FormData();
+    fd.append("avatar", file);
+    return apiFetch<User>("/api/auth/me/avatar/", {
+      method: "POST",
+      body: fd,
+    });
+  },
+  deleteAvatar: () =>
+    apiFetch<User>("/api/auth/me/avatar/", { method: "DELETE" }),
   requestPasswordReset: (email: string) =>
     apiFetch<{ detail: string }>("/api/auth/password/reset/request/", {
       method: "POST",

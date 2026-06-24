@@ -191,6 +191,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     gear_lists_by_slug = serializers.SerializerMethodField()
     recommended_gear_list = serializers.SerializerMethodField()
     risk_checklist = serializers.SerializerMethodField()
+    organizers_by_user_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -217,6 +218,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "gear_lists_by_slug",
             "recommended_gear_list",
             "risk_checklist",
+            "organizers_by_user_id",
             "enabled_questionnaire_sections",
             "images",
             "workspace_slug",
@@ -296,6 +298,52 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "slug": gl.slug,
             "entries": entries,
         }
+
+    def get_organizers_by_user_id(self, obj: Event) -> dict:
+        """Inline payload pro organizers block — side-lookup user_id →
+        slim user dict s display_name, full_name, bio, avatar_url. Stejný
+        pattern jako `get_gear_lists_by_slug`. Public landing pak vykreslí
+        karty bez druhého fetch-u.
+
+        Drop-uje user_ids co už nemají odpovídajícího Usera — owner mohl
+        smazat collaborator-a po vložení do bloku."""
+        ids: set[int] = set()
+        for block in obj.blocks or []:
+            if not isinstance(block, dict) or block.get("type") != "organizers":
+                continue
+            payload = block.get("payload") or {}
+            for uid in payload.get("user_ids") or []:
+                if isinstance(uid, int):
+                    ids.add(uid)
+        if not ids:
+            return {}
+
+        from accounts.models import User
+
+        request = self.context.get("request")
+        users = User.objects.filter(id__in=ids)
+        result = {}
+        for u in users:
+            avatar_url = ""
+            if u.avatar:
+                try:
+                    avatar_url = (
+                        request.build_absolute_uri(u.avatar.url)
+                        if request
+                        else u.avatar.url
+                    )
+                except Exception:
+                    avatar_url = u.avatar.url
+            result[str(u.id)] = {
+                "id": u.id,
+                "display_name": u.display_name or u.get_full_name(),
+                "full_name": u.get_full_name(),
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "bio": u.bio,
+                "avatar_url": avatar_url,
+            }
+        return result
 
     def get_gear_lists_by_slug(self, obj: Event) -> dict:
         """Inline payload for every gear block on this event's landing.

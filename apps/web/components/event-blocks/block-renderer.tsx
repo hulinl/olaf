@@ -1,5 +1,9 @@
 import type { EventImage, PublicGearList } from "@/lib/api";
-import type { BlockTone, EventBlock } from "@/lib/event-blocks";
+import type {
+  BlockTone,
+  EventBlock,
+  OrganizerLookupEntry,
+} from "@/lib/event-blocks";
 
 import { DaysBlock } from "./days-block";
 import { FaqBlock } from "./faq-block";
@@ -8,6 +12,7 @@ import { GearBlock } from "./gear-block";
 import { HeroBlock } from "./hero-block";
 import { IncludedSplitBlock } from "./included-split-block";
 import { MapBlock } from "./map-block";
+import { OrganizersBlock } from "./organizers-block";
 import { PracticalBlock } from "./practical-block";
 import { ProseBlock } from "./prose-block";
 import { StatsBlock } from "./stats-block";
@@ -32,6 +37,9 @@ interface Props {
   };
   /** Inline gear-list payloads keyed by slug; passed to gear blocks. */
   gearListsBySlug?: Record<string, PublicGearList>;
+  /** Inline organizer side-lookup (event.organizers_by_user_id) for the
+   *  organizers block — server-side joined User data per user_id. */
+  organizersByUserId?: Record<string, OrganizerLookupEntry>;
 }
 
 export function BlockRenderer({
@@ -43,6 +51,7 @@ export function BlockRenderer({
   tone = "canvas",
   eventPrice,
   gearListsBySlug,
+  organizersByUserId,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -84,6 +93,14 @@ export function BlockRenderer({
         <GearBlock
           payload={block.payload}
           list={gearListsBySlug?.[block.payload.list_slug]}
+          tone={tone}
+        />
+      );
+    case "organizers":
+      return (
+        <OrganizersBlock
+          payload={block.payload}
+          lookup={organizersByUserId}
           tone={tone}
         />
       );

@@ -195,6 +195,30 @@ def _validate_gear(payload: dict) -> None:
                 )
 
 
+def _validate_organizers(payload: dict) -> None:
+    """Organizers reference block.
+
+    Carries user_ids selected from event's EventCollaborators (a
+    workspace admin or co-creator). At render time the public event
+    payload joins these IDs against User and exposes display_name +
+    bio + avatar_url through `organizers_by_user_id` side-lookup, so
+    the renderer doesn't need a second fetch.
+
+    Existence of the user is NOT enforced at save — owner can save
+    a block while still picking collaborators, and the renderer
+    gracefully drops user_ids that no longer match a known user.
+    """
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
+    _expect_str(payload.get("intro", ""), "intro")
+    user_ids = _expect_list(payload.get("user_ids", []), "user_ids")
+    for i, x in enumerate(user_ids):
+        if not isinstance(x, int) or x < 0:
+            raise ValueError(
+                f"'user_ids[{i}]' must be a non-negative int"
+            )
+
+
 BLOCK_SCHEMAS: dict[str, Any] = {
     "hero": _validate_hero,
     "prose": _validate_prose,
@@ -206,6 +230,7 @@ BLOCK_SCHEMAS: dict[str, Any] = {
     "faq": _validate_faq,
     "practical": _validate_practical,
     "gear": _validate_gear,
+    "organizers": _validate_organizers,
 }
 
 KNOWN_BLOCK_TYPES = tuple(BLOCK_SCHEMAS.keys())

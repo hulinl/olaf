@@ -1011,12 +1011,14 @@ class ConfigurableQuestionnaireTests(TestCase):
     def test_owner_can_remove_confirmed_rsvp(self) -> None:
         # Použití pro duplicate cleanup — owner odebere potvrzeného
         # účastníka (`reject_rsvp` umí jen pending, tady jde o yes/
-        # waitlist). RSVP přechází na cancelled, NOT delete.
+        # waitlist). RSVP se fyzicky maže — bez toho se po re-přihlášce
+        # revivnula stará cancelled RSVP i s `is_organizer=True`.
         owner, applicant = self._make_owner_and_applicant()
         rsvp = RSVP.create_for_event(
             event=self.event, user=applicant, questionnaire_answers={}
         )
         self.assertEqual(rsvp.status, RSVP.STATUS_YES)
+        rsvp_pk = rsvp.pk
         self.client.force_authenticate(owner)
         url = reverse(
             "events:rsvp-remove",
@@ -1028,10 +1030,10 @@ class ConfigurableQuestionnaireTests(TestCase):
         )
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
-        rsvp.refresh_from_db()
-        self.assertEqual(rsvp.status, RSVP.STATUS_CANCELLED)
-        # cancellation_reason = owner → roster ukáže "Zrušil pořadatel"
-        self.assertEqual(rsvp.cancellation_reason, RSVP.CANCELLATION_OWNER)
+        # Response značí "smazáno" — frontend si RSVP shodí z listu.
+        self.assertEqual(resp.json(), {"removed": True, "rsvp_id": rsvp_pk})
+        # Řádek je fyzicky pryč.
+        self.assertFalse(RSVP.objects.filter(pk=rsvp_pk).exists())
 
     def test_owner_remove_sends_cancellation_email_with_owner_copy(self) -> None:
         # Když owner odebere účastníka z rosteru, informativní mail mu
@@ -1112,6 +1114,143 @@ class ConfigurableQuestionnaireTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
         owner_rsvp.refresh_from_db()
         self.assertEqual(owner_rsvp.status, RSVP.STATUS_YES)
+
+    def test_owner_remove_deletes_event_collaborator_link(self) -> None:
+        # User report 2026-06-24: odebrání organizátora ho přepnulo na
+        # cancelled, ale EventCollaborator visel dál → re-přihláška
+        # revivnula starou RSVP s edit-právy bez schválení. Hard-remove
+        # musí smazat i collaborator záznam.
+        from .models import EventCollaborator
+
+        owner, applicant = self._make_owner_and_applicant()
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        rsvp.is_organizer = True
+        rsvp.save(update_fields=["is_organizer"])
+        EventCollaborator.objects.create(
+            event=self.event, user=applicant, added_by=owner
+        )
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": rsvp.pk,
+            },
+        )
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
+        self.assertFalse(
+            EventCollaborator.objects.filter(
+                event=self.event, user=applicant
+            ).exists()
+        )
+
+    def test_re_registration_after_owner_remove_starts_fresh(self) -> None:
+        # Tohle je jádro bug-fixu: po owner-remove musí re-přihláška
+        # projít jako úplně nová — pending_approval (event vyžaduje
+        # schválení), bez is_organizer, bez collaborator role.
+        from .models import EventCollaborator
+
+        self.event.requires_approval = True
+        self.event.save(update_fields=["requires_approval"])
+        owner, applicant = self._make_owner_and_applicant()
+
+        # Původní stav: schválený organizátor s edit-právy.
+        original = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        original.status = RSVP.STATUS_YES
+        original.is_organizer = True
+        original.save(update_fields=["status", "is_organizer"])
+        EventCollaborator.objects.create(
+            event=self.event, user=applicant, added_by=owner
+        )
+
+        # Owner odebere.
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": original.pk,
+            },
+        )
+        self.client.post(url)
+
+        # Re-přihláška — úplně nová RSVP.
+        revived = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={"k": "v"}
+        )
+        self.assertNotEqual(revived.pk, original.pk)
+        self.assertEqual(revived.status, RSVP.STATUS_PENDING_APPROVAL)
+        self.assertFalse(revived.is_organizer)
+        self.assertFalse(
+            EventCollaborator.objects.filter(
+                event=self.event, user=applicant
+            ).exists()
+        )
+
+    def test_owner_remove_promotes_waitlist_head(self) -> None:
+        # FIFO promotion musí fungovat i s hard-delete — bez tohohle by
+        # odebrání confirmed účastníka zanechalo waitlist trčet.
+        self.event.capacity = 1
+        self.event.waitlist_enabled = True
+        self.event.save(update_fields=["capacity", "waitlist_enabled"])
+        owner, applicant = self._make_owner_and_applicant()
+        waitlisted = User.objects.create_user(
+            email="wait@example.com", password="pass-abcdef-1234",
+            first_name="Wait", last_name="List", email_verified=True,
+        )
+        confirmed = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        self.assertEqual(confirmed.status, RSVP.STATUS_YES)
+        wait_rsvp = RSVP.create_for_event(
+            event=self.event, user=waitlisted, questionnaire_answers={}
+        )
+        self.assertEqual(wait_rsvp.status, RSVP.STATUS_WAITLIST)
+
+        self.client.force_authenticate(owner)
+        url = reverse(
+            "events:rsvp-remove",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+                "rsvp_id": confirmed.pk,
+            },
+        )
+        self.client.post(url)
+
+        wait_rsvp.refresh_from_db()
+        self.assertEqual(wait_rsvp.status, RSVP.STATUS_YES)
+        self.assertIsNone(wait_rsvp.waitlist_position)
+
+    def test_self_cancel_remains_soft_delete(self) -> None:
+        # Sanity check: user-side cancel zůstává soft (status=cancelled,
+        # řádek visí). Jen owner-remove je destruktivní. Tohle bránit
+        # divergenci je důležité — user co se zase rozhodne přijít chce
+        # jen re-otevřít, ne projít celou prvořegistraci znovu.
+        owner, applicant = self._make_owner_and_applicant()  # noqa: F841
+        rsvp = RSVP.create_for_event(
+            event=self.event, user=applicant, questionnaire_answers={}
+        )
+        rsvp_pk = rsvp.pk
+        self.client.force_authenticate(applicant)
+        url = reverse(
+            "events:rsvp-cancel",
+            kwargs={
+                "workspace_slug": "olafadventures",
+                "event_slug": "letni-kemp-2026",
+            },
+        )
+        self.client.post(url)
+        rsvp.refresh_from_db()
+        self.assertEqual(rsvp.pk, rsvp_pk)
+        self.assertEqual(rsvp.status, RSVP.STATUS_CANCELLED)
 
     def test_workspace_owner_cannot_be_demoted_from_organizer(self) -> None:
         # User report: "pořád si sám sobě mohu odebrat organizátora,
@@ -1274,6 +1413,78 @@ class ConfigurableQuestionnaireTests(TestCase):
             validate_blocks(
                 [{"id": "x", "type": "stats", "payload": {"tiles": []}}]
             )
+
+    def test_organizers_block_validator_accepts_empty_and_intish(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        # Prázdný seznam je validní — owner založil block, ještě nevybral.
+        validate_blocks(
+            [{"id": "o1", "type": "organizers", "payload": {"user_ids": []}}]
+        )
+        validate_blocks(
+            [
+                {
+                    "id": "o2",
+                    "type": "organizers",
+                    "payload": {
+                        "title": "Tým",
+                        "user_ids": [1, 2, 3],
+                    },
+                }
+            ]
+        )
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [
+                    {
+                        "id": "o3",
+                        "type": "organizers",
+                        "payload": {"user_ids": ["1"]},
+                    }
+                ]
+            )
+
+    def test_organizers_side_lookup_in_public_payload(self) -> None:
+        # Block payload nese user_ids; veřejný endpoint side-lookup
+        # vyplní bio + display_name + avatar_url, takže renderer
+        # nemusí dělat druhý fetch.
+        organizer = User.objects.create_user(
+            email="org@example.com",
+            password="pass-abcdef-1234",
+            first_name="Or", last_name="Ganizer",
+            email_verified=True,
+        )
+        organizer.bio = "Vede kempy 10 let."
+        organizer.display_name = "Olaf"
+        organizer.save(update_fields=["bio", "display_name"])
+
+        self.event.blocks = [
+            {
+                "id": "team",
+                "type": "organizers",
+                "payload": {
+                    "title": "Tým",
+                    "user_ids": [organizer.id, 999_999],  # 999_999 = neexistuje
+                },
+            }
+        ]
+        self.event.save(update_fields=["blocks"])
+
+        resp = self.client.get(
+            reverse(
+                "events:public",
+                kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+            )
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertIn("organizers_by_user_id", body)
+        lookup = body["organizers_by_user_id"]
+        # Existující user se objevil, neexistující ID se tiše propustí.
+        self.assertIn(str(organizer.id), lookup)
+        self.assertEqual(lookup[str(organizer.id)]["display_name"], "Olaf")
+        self.assertEqual(lookup[str(organizer.id)]["bio"], "Vede kempy 10 let.")
+        self.assertNotIn("999999", lookup)
 
     def test_event_payload_exposes_effective_sections(self) -> None:
         self.event.enabled_questionnaire_sections = ["tshirt_size", "diet"]
