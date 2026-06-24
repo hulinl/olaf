@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, use, useEffect, useState } from "react";
 
+import { InlineLoginDialog } from "@/components/inline-login-dialog";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
@@ -63,6 +64,14 @@ export default function RSVPPage({ params }: Props) {
     "yes" | "waitlist" | "pending_approval" | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+  // Když backend vrátí 409 + code=email_has_account, místo generického
+  // erroru ukážeme dedicated alert s "Přihlásit se" tlačítkem; user se
+  // přihlásí in-place a po loginu doplníme profilová data do formuláře.
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  // Banner po úspěšném inline loginu — jasně řekneme co se stalo,
+  // aby user nečuměl na předvyplněná pole a netušil, kde se to vzalo.
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   // Account fields (only shown if anonymous).
   const [acctEmail, setAcctEmail] = useState("");
@@ -90,6 +99,28 @@ export default function RSVPPage({ params }: Props) {
   // explicitního souhlasu nesmíme tyto údaje zpracovat (čl. 9 GDPR).
   const [healthDataConsent, setHealthDataConsent] = useState(false);
 
+  // Aplikuje profilová data Usera do form-state. Použito jak při
+  // initial loadu (logged-in user co přišel na RSVP), tak po inline
+  // přihlášení dialogem (anon-flow → user objeví "už mám účet").
+  function prefillFromUser(me: User) {
+    setAcctEmail(me.email);
+    setAcctFirstName(me.first_name);
+    setAcctLastName(me.last_name);
+    setAcctPhone(me.phone);
+    if (me.tshirt_size && TSHIRT_SIZES.includes(me.tshirt_size as never)) {
+      setTshirt(me.tshirt_size as NonNullable<RSVPAnswers["tshirt_size"]>);
+    }
+    if (me.diet) setDiet(me.diet);
+    if (me.diet_note) setDietNote(me.diet_note);
+    if (me.fitness_level) setFitness(me.fitness_level);
+    if (me.fitness_note) setFitnessNote(me.fitness_note);
+    if (me.pace_10k) setPace10k(me.pace_10k);
+    if (me.weekly_km != null) setWeeklyKm(String(me.weekly_km));
+    if (me.longest_run) setLongestRun(me.longest_run);
+    if (me.emergency_contact_name) setEmName(me.emergency_contact_name);
+    if (me.emergency_contact_phone) setEmPhone(me.emergency_contact_phone);
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -102,23 +133,7 @@ export default function RSVPPage({ params }: Props) {
         setUser(me);
         setEvent(ev);
         if (me) {
-          setAcctEmail(me.email);
-          setAcctFirstName(me.first_name);
-          setAcctLastName(me.last_name);
-          setAcctPhone(me.phone);
-          // Prefill stable fields from profile.
-          if (me.tshirt_size && TSHIRT_SIZES.includes(me.tshirt_size as never)) {
-            setTshirt(me.tshirt_size as NonNullable<RSVPAnswers["tshirt_size"]>);
-          }
-          if (me.diet) setDiet(me.diet);
-          if (me.diet_note) setDietNote(me.diet_note);
-          if (me.fitness_level) setFitness(me.fitness_level);
-          if (me.fitness_note) setFitnessNote(me.fitness_note);
-          if (me.pace_10k) setPace10k(me.pace_10k);
-          if (me.weekly_km != null) setWeeklyKm(String(me.weekly_km));
-          if (me.longest_run) setLongestRun(me.longest_run);
-          if (me.emergency_contact_name) setEmName(me.emergency_contact_name);
-          if (me.emergency_contact_phone) setEmPhone(me.emergency_contact_phone);
+          prefillFromUser(me);
         }
       } catch (err) {
         if (cancelled) return;
@@ -189,16 +204,17 @@ export default function RSVPPage({ params }: Props) {
       );
     } catch (err) {
       if (err instanceof ApiError) {
-        // Speciální případ: 409 + code=email_has_account znamená, že
-        // ten e-mail už má plnohodnotný (verified) účet. Posíláme
-        // usera na login místo generického "tento e-mail už existuje",
-        // což z hlediska UX líp navádí. Bezpečnostní pojistka: anon
-        // submitter nemůže přepsat / "vetknout se" do session
-        // vlastníka e-mailu.
+        // Speciální případ: 409 + code=email_has_account = ten e-mail
+        // už má plnohodnotný (verified) účet. Místo generického erroru
+        // ukážeme dedicated "Přihlásit se" Alert — user může in-place
+        // otevřít login dialog. Bez tohohle musel manuálně najít
+        // /login, přihlásit se a vrátit zpět vyplňovat formulář
+        // znovu. Bezpečnostní pojistka: anon submitter nemůže přepsat
+        // / "vetknout se" do session vlastníka e-mailu, to backend
+        // pořád garantuje (409 jen indikuje).
         if (err.status === 409 && err.data?.code === "email_has_account") {
-          setError(
-            'Tento e-mail už má účet. Přihlas se prosím a registraci zopakuj.',
-          );
+          setNeedsLogin(true);
+          setError(null);
         } else {
           setError(err.firstFieldError() ?? err.message);
         }
@@ -208,6 +224,15 @@ export default function RSVPPage({ params }: Props) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleLoginSuccess(loggedInUser: User) {
+    setUser(loggedInUser);
+    prefillFromUser(loggedInUser);
+    setNeedsLogin(false);
+    setLoginDialogOpen(false);
+    setJustLoggedIn(true);
+    setError(null);
   }
 
   if (loading) {
@@ -384,6 +409,16 @@ export default function RSVPPage({ params }: Props) {
           </header>
 
           <form onSubmit={onSubmit} className="flex flex-col gap-6">
+            {justLoggedIn && user && (
+              <div className="rounded-md border border-success/40 bg-success-soft px-4 py-3 text-sm text-ink-900">
+                <p>
+                  Přihlášen jako{" "}
+                  <strong>{user.full_name || user.email}</strong>. Údaje
+                  jsme doplnili z profilu — projdi je, případně uprav,
+                  a klikni dole na <strong>Odeslat přihlášku</strong>.
+                </p>
+              </div>
+            )}
             {!user && (
               <Card>
                 <CardSection>
@@ -415,7 +450,21 @@ export default function RSVPPage({ params }: Props) {
                         onChange={(e) => setAcctLastName(e.target.value)}
                       />
                     </Field>
-                    <Field label="E-mail" htmlFor="email">
+                    <Field
+                      label={
+                        <span className="flex items-center justify-between">
+                          <span>E-mail</span>
+                          <button
+                            type="button"
+                            onClick={() => setLoginDialogOpen(true)}
+                            className="text-xs font-normal text-ink-500 underline hover:text-ink-900"
+                          >
+                            Už mám účet, přihlásit
+                          </button>
+                        </span>
+                      }
+                      htmlFor="email"
+                    >
                       <Input
                         id="email"
                         type="email"
@@ -708,6 +757,26 @@ export default function RSVPPage({ params }: Props) {
               </label>
             )}
 
+            {needsLogin && (
+              <div className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink-900">
+                <p>
+                  <strong>Tento e-mail už má účet.</strong> Přihlas se a my
+                  ti doplníme profilová data do formuláře — pak stačí
+                  zkontrolovat a odeslat.
+                </p>
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    onClick={() => setLoginDialogOpen(true)}
+                  >
+                    Přihlásit se
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {error && <Alert variant="danger">{error}</Alert>}
 
             <Button
@@ -741,6 +810,13 @@ export default function RSVPPage({ params }: Props) {
           </form>
         </section>
       </main>
+
+      <InlineLoginDialog
+        open={loginDialogOpen}
+        initialEmail={acctEmail}
+        onClose={() => setLoginDialogOpen(false)}
+        onSuccess={handleLoginSuccess}
+      />
     </>
   );
 }
