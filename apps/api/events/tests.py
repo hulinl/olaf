@@ -1234,7 +1234,7 @@ class ConfigurableQuestionnaireTests(TestCase):
         # řádek visí). Jen owner-remove je destruktivní. Tohle bránit
         # divergenci je důležité — user co se zase rozhodne přijít chce
         # jen re-otevřít, ne projít celou prvořegistraci znovu.
-        owner, applicant = self._make_owner_and_applicant()  # noqa: F841
+        _, applicant = self._make_owner_and_applicant()
         rsvp = RSVP.create_for_event(
             event=self.event, user=applicant, questionnaire_answers={}
         )

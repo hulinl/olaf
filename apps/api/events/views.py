@@ -3007,7 +3007,7 @@ def event_organizer_pool(
 ) -> Response:
     """Eligible organizers pro Organizers landing block picker.
 
-    Union {workspace owner + admins} ∪ {EventCollaborators}, deduplikované
+    Union {workspace owner + admins} + {EventCollaborators}, deduplikované
     podle user_id. Vrací slim user payload — display_name + bio + avatar_url
     + role tag, takže picker v editoru vidí kdo má vyplněné údaje. Owner-only
     (collaborator stačí), neslouží jako public endpoint.
