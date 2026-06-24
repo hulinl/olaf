@@ -5,6 +5,7 @@ import { use, useEffect, useRef, useState } from "react";
 
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type Event as OlafEvent,
@@ -35,6 +36,7 @@ export default function EventGalleryPage({ params }: Props) {
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const confirmDialog = useConfirm();
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +129,14 @@ export default function EventGalleryPage({ params }: Props) {
   }
 
   async function handleDelete(img: EventImage) {
-    if (!confirm("Smazat obrázek?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat obrázek?",
+      description:
+        "Smazání je okamžité a nedá se vrátit. Z public landing zmizí ihned.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(img.id);
     setError(null);
     try {
