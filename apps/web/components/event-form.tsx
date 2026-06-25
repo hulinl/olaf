@@ -183,6 +183,12 @@ export function EventForm({
   const [ownedWorkspaces, setOwnedWorkspaces] = useState<Workspace[] | null>(
     null,
   );
+  // Personal workspace — backend `/mine/` ji excludeuje, ale my ji
+  // potřebujeme jako fallback target když user odebere event z poslední
+  // ne-personal komunity. Tvůrce akce vždycky má aspoň personal.
+  const [personalWorkspace, setPersonalWorkspace] = useState<Workspace | null>(
+    null,
+  );
   const [sharedSlugs, setSharedSlugs] = useState<string[]>(
     initial?.shared_workspace_slugs ?? [],
   );
@@ -239,6 +245,18 @@ export function EventForm({
       .catch(() => {
         // Non-blocking; the picker just stays hidden.
         if (!cancelled) setOwnedWorkspaces([]);
+      });
+    // Personal workspace = vždy fallback target pro „odebrat akci
+    // z poslední komunity". Backend `/mine/` ji exclude-uje, takže
+    // ji taháme separátním endpointem.
+    workspaces
+      .personal()
+      .then((p) => {
+        if (!cancelled) setPersonalWorkspace(p);
+      })
+      .catch(() => {
+        // Bez personal-fallbacku UI prostě blokuje unshare poslední
+        // komunity — alespoň user nepřijde o data.
       });
     contractsApi
       .listTemplates(workspaceSlug)
@@ -716,24 +734,37 @@ export function EventForm({
                       // Odebrat ze seznamu. Pokud je to současný primary,
                       // backend volání move-workspace převede event jinam.
                       if (w.slug === workspaceSlug) {
-                        // Primary workspace — musí zůstat aspoň jedna
-                        // jiná komunita v seznamu, kterou owner umí
-                        // ovládat. Pro V1 odkážeme na move-flow.
-                        if (onMoveToWorkspace) {
-                          const candidate = inCommunities.find(
-                            (c) =>
-                              c.slug !== workspaceSlug &&
-                              (c.my_role === "owner" || c.my_role === "admin"),
+                        if (!onMoveToWorkspace) return;
+                        // Hledáme cílovou komunitu, kam event přesunout.
+                        // Preference:
+                        //   1) Jiná shared komunita v current listu, kde
+                        //      jsi owner/admin (zachová sdílení tam).
+                        //   2) Jakákoli další komunita, kterou vlastníš
+                        //      (mimo current list).
+                        //   3) Tvůj soukromý workspace (personal) jako
+                        //      poslední záchrana — event tam vždycky
+                        //      patří, je to tvůj vlastní prostor.
+                        const inListCandidate = inCommunities.find(
+                          (c) =>
+                            c.slug !== workspaceSlug &&
+                            (c.my_role === "owner" || c.my_role === "admin"),
+                        );
+                        const ownedElsewhere = (ownedWorkspaces ?? []).find(
+                          (c) =>
+                            c.slug !== workspaceSlug &&
+                            !sharedSlugs.includes(c.slug) &&
+                            (c.my_role === "owner" || c.my_role === "admin"),
+                        );
+                        const target =
+                          inListCandidate ?? ownedElsewhere ?? personalWorkspace;
+                        if (!target) {
+                          // eslint-disable-next-line no-alert
+                          alert(
+                            "Tvoji akci momentálně nemám kam přesunout. Zkontroluj si Komunity v Tvůrci.",
                           );
-                          if (!candidate) {
-                            // eslint-disable-next-line no-alert
-                            alert(
-                              'Akci musí někdo „vlastnit". Než ji odebereš odsud, přidej do seznamu komunitu, kde jsi vlastník nebo admin.',
-                            );
-                            return;
-                          }
-                          void onMoveToWorkspace(candidate.slug);
+                          return;
                         }
+                        void onMoveToWorkspace(target.slug);
                         return;
                       }
                       setSharedSlugs((prev) =>
