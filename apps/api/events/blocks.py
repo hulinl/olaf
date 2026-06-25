@@ -86,6 +86,11 @@ def _validate_stats(payload: dict) -> None:
 
 
 def _validate_days(payload: dict) -> None:
+    # Volitelný popisek (eyebrow) + nadpis sekce — bez nich se použijí
+    # defaulty „Program" / „Den po dni" v rendereru. Owner si je může
+    # přepsat na něco vlastního ("Itinerář", "Plán víkendu", apod.).
+    _expect_str(payload.get("eyebrow", ""), "eyebrow")
+    _expect_str(payload.get("title", ""), "title")
     _expect_str(payload.get("lead", ""), "lead")
     days = _expect_list(payload.get("days", []), "days")
     if not days:
@@ -100,10 +105,9 @@ def _validate_days(payload: dict) -> None:
         ):
             v = item.get(k, "")
             _expect_str(v, f"days[{i}].{k}")
-        # At minimum each day should have either a title or body so we don't
-        # render an empty card.
-        if not item.get("title") and not item.get("body"):
-            raise ValueError(f"days[{i}] must have at least 'title' or 'body'")
+        # Body už není povinné — owner často popis dne dotahuje po
+        # ingestu z Notion-u a chce mít rozpracovaný program uložený
+        # i bez textu (jen čísla/title/stats). User report 2026-06-25.
 
 
 def _validate_included_split(payload: dict) -> None:

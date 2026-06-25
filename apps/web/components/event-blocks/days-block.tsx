@@ -51,8 +51,8 @@ export async function DaysBlock({ payload, tone = "canvas" }: Props) {
     >
       <div className="mx-auto max-w-5xl px-4 py-10 sm:py-12">
         <SectionHead
-          eyebrow="Program"
-          title="Den po dni"
+          eyebrow={payload.eyebrow || "Program"}
+          title={payload.title || "Den po dni"}
           lead={payload.lead}
           tone={dark ? "dark" : "light"}
         />

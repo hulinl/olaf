@@ -1414,6 +1414,31 @@ class ConfigurableQuestionnaireTests(TestCase):
                 [{"id": "x", "type": "stats", "payload": {"tiles": []}}]
             )
 
+    def test_days_block_accepts_eyebrow_title_and_empty_body(self) -> None:
+        # User request 2026-06-25: chce přepsat hardcoded „Den po dni"
+        # vlastním nadpisem + uložit den bez vyplněného body (rozpracovaný
+        # itinerář). Validator po úpravě musí to umožnit.
+        from events.blocks import validate_blocks
+
+        # Eyebrow + title volitelné, day bez body je validní pokud má aspoň num/label.
+        validate_blocks(
+            [
+                {
+                    "id": "d1",
+                    "type": "days",
+                    "payload": {
+                        "eyebrow": "Itinerář",
+                        "title": "Plán víkendu",
+                        "lead": "",
+                        "days": [
+                            {"num": "01", "label": "Pátek", "title": "", "body": ""},
+                            {"num": "02", "label": "Sobota", "title": "Vrchol"},
+                        ],
+                    },
+                }
+            ]
+        )
+
     def test_organizers_block_validator_accepts_empty_and_intish(self) -> None:
         from events.blocks import BlockValidationError, validate_blocks
 

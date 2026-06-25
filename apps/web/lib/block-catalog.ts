@@ -159,11 +159,13 @@ export const BLOCK_CATALOG: BlockCatalogEntry[] = [
       "Když ještě program nemáš pevný — radši Prose s obecným popisem.",
     ],
     keyFields: [
+      { label: "Eyebrow", hint: 'Volitelně — výchozí „Program".' },
+      { label: "Nadpis sekce", hint: 'Volitelně — výchozí „Den po dni". Můžeš si nastavit vlastní („Itinerář", „Plán víkendu").' },
       { label: "Lead", hint: "Krátký úvod nad seznamem dnů — kontext celkového itineráře." },
       { label: "Den · label / číslo", hint: 'Např. „Den 1”, "Sobota", "Příjezd".' },
       { label: "Den · nadpis", hint: "Co se ten den děje — „Sraz a aklimatizace”." },
       { label: "Den · trasa", hint: "Stručně „Chata A → Sedlo X → Chata B”." },
-      { label: "Den · popis", hint: "Markdown — 2–4 věty co konkrétně." },
+      { label: "Den · popis", hint: "Markdown — 2–4 věty co konkrétně. Nepovinné — můžeš uložit i prázdné a doplnit později." },
       {
         label: "Den · čas / km / ↑ / ↓",
         hint: 'Čísla v krátké formě — „6 h”, "14 km", "850 m↑", "420 m↓".',
@@ -173,7 +175,7 @@ export const BLOCK_CATALOG: BlockCatalogEntry[] = [
     ],
     example:
       "„Den 2 · Riffelseehütte → Braunschweiger Hütte · 6 h, 14 km, 850 m↑, mapa: Mapy.cz”",
-    tip: "Aspoň 3 z polí (název, čas, km, převýšení) vyplň pro každý den — tabulka pak vypadá vyvážená.",
+    tip: "Body je teď volitelné — můžeš si rozpracovaný itinerář uložit i bez textových popisů a dopsat je až později.",
   },
   {
     type: "included_split",
