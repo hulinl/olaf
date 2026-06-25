@@ -16,18 +16,21 @@ import {
   auth,
   workspaces,
 } from "@/lib/api";
+import { SOCIAL_SERVICES } from "@/lib/social-services";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
-const SOCIAL_KEYS: { key: string; label: string; placeholder: string }[] = [
-  { key: "web", label: "Web", placeholder: "https://olafadventures.com" },
-  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/olafadventures" },
-  { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/olafadventures" },
-  { key: "strava", label: "Strava", placeholder: "https://strava.com/clubs/olafadventures" },
-  { key: "email", label: "Email", placeholder: "ahoj@olafadventures.com" },
-];
+// SOCIAL_KEYS odvozeny z whitelistu v `lib/social-services.tsx` —
+// jeden zdroj pravdy pro editor + renderer. Facebook je z whitelistu
+// pryč (user request 2026-06-25); legacy hodnoty v DB zůstávají, ale
+// už se v editoru ani na public stránce nezobrazí.
+const SOCIAL_KEYS = SOCIAL_SERVICES.map((s) => ({
+  key: s.key,
+  label: s.label,
+  placeholder: s.placeholder,
+}));
 
 const VISIBILITY_OPTIONS: {
   value: Workspace["visibility"];

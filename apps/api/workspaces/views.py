@@ -6,11 +6,13 @@ from rest_framework.decorators import (
     api_view,
     parser_classes,
     permission_classes,
+    throttle_classes,
 )
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 
 from .models import Workspace, WorkspaceMember
 from .serializers import (
@@ -18,6 +20,19 @@ from .serializers import (
     WorkspacePublicSerializer,
     WorkspaceWriteSerializer,
 )
+
+
+class WorkspaceContactThrottle(AnonRateThrottle):
+    """Per-IP rate limit pro kontaktní formulář. 5 / hodinu / IP.
+
+    Bez tohohle by jediný script-kid mohl ownerovi e-mailovou
+    schránku zaplavit přes public formulář. Throttle scope běží
+    napříč všemi workspace-y — útok nelze rozjet roundrobinem přes
+    víc workspace slugů ze stejné IP.
+    """
+
+    scope = "workspace_contact"
+    rate = "5/hour"
 
 
 def _is_owner(user, workspace: Workspace) -> bool:
@@ -342,6 +357,76 @@ def workspace_events(request: Request, slug: str) -> Response:
         qs = qs.exclude(status=Event.STATUS_DRAFT)
     qs = qs.order_by("-starts_at")
     return Response(EventSummarySerializer(qs, many=True).data)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([WorkspaceContactThrottle])
+def workspace_contact(request: Request, slug: str) -> Response:
+    """Public contact form — pošle zprávu na e-mail uložený v
+    `workspace.social_links.email`.
+
+    Owner-ovou e-mail adresu nikdy nevracíme v public response
+    (WorkspacePublicSerializer ji stripe), takže k odeslání musí
+    user projít tímhle endpointem. Throttle 5/h/IP brání spam-loop.
+
+    Vstup: {name, email, message}. Reply-to nastavíme na user-ův
+    e-mail, takže owner odpovídá přímo v mailovém klientu.
+    """
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return Response(
+            {"detail": "Workspace not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if workspace.visibility == Workspace.VISIBILITY_PRIVATE:
+        return Response(
+            {"detail": "Workspace not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    contact_email = (workspace.social_links or {}).get("email")
+    if not contact_email:
+        return Response(
+            {"detail": "Tato komunita zatím nemá vyplněný kontaktní e-mail."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    name = (request.data.get("name") or "").strip()
+    sender_email = (request.data.get("email") or "").strip()
+    message = (request.data.get("message") or "").strip()
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Vyplň prosím tvoje jméno."
+    if not sender_email or "@" not in sender_email:
+        errors["email"] = "Vyplň platný e-mail, kam ti správce odpoví."
+    if not message:
+        errors["message"] = "Napiš krátkou zprávu, na co se ptáš."
+    if len(message) > 5000:
+        errors["message"] = "Zpráva je moc dlouhá (max 5 000 znaků)."
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    with contextlib.suppress(Exception):
+        from notifications.email_sender import send_branded_email
+
+        send_branded_email(
+            subject=f"[{workspace.name}] Zpráva přes kontaktní formulář",
+            template_base="emails/workspace_contact",
+            context={
+                "workspace": workspace,
+                "sender_name": name,
+                "sender_email": sender_email,
+                "message": message,
+            },
+            recipient_list=[contact_email],
+            reply_to=[sender_email],
+        )
+
+    return Response({"sent": True})
 
 
 # ---------------------------------------------------------------------------

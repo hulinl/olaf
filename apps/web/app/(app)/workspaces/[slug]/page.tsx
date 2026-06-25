@@ -9,6 +9,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { WorkspaceMetaLine } from "@/components/ui/workspace-meta-line";
+import { WorkspaceSocialsRow } from "@/components/workspace-socials-row";
 import { useUser } from "@/lib/user-context";
 import {
   ApiError,
@@ -92,17 +93,26 @@ export default function WorkspaceDetailPage({ params }: Props) {
 
   const logo = assetUrl(workspace.logo_url);
   const isOwner = workspace.my_role === "owner";
+  // Stejný filter jako public komunita view + in-app dashboard
+  // (PR #224/#225). Status-only filter dříve nechával proběhlé published
+  // akce v „upcoming" — auto-flip do `completed` běží denně a u akcí
+  // skončených třeba dnes ráno se ještě nestihl projít. Per user
+  // 2026-06-25: dělení podle `starts_at` (ne `ends_at`).
+  const now = new Date();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const upcoming = (eventList ?? []).filter(
     (e) =>
-      e.status === "published" ||
-      e.status === "draft" ||
-      e.status === "closed",
+      e.status === "published" &&
+      new Date(e.starts_at).getTime() >= todayStart,
   );
   const past = (eventList ?? []).filter(
-    (e) => e.status === "completed" || e.status === "cancelled",
-  );
-  const socials = Object.entries(workspace.social_links ?? {}).filter(
-    ([, url]) => Boolean(url),
+    (e) =>
+      (e.status === "published" || e.status === "completed") &&
+      new Date(e.starts_at).getTime() < todayStart,
   );
 
   return (
@@ -151,9 +161,9 @@ export default function WorkspaceDetailPage({ params }: Props) {
             <WorkspaceMetaLine
               location={workspace.location}
               memberCount={workspace.member_count}
-              socials={socials}
               className="mt-1"
             />
+            <WorkspaceSocialsRow workspace={workspace} className="mt-3" />
           </div>
           <a
             href={`/${workspace.slug}`}

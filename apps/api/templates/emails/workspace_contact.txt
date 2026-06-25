@@ -1,0 +1,12 @@
+Ahoj,
+
+máš novou zprávu z kontaktního formuláře na stránce komunity „{{ workspace.name }}".
+
+Od: {{ sender_name }} <{{ sender_email }}>
+
+Zpráva:
+{{ message }}
+
+Pokud chceš odpovědět, stačí použít „Reply" v mailovém klientu — adresa odesílatele je předvyplněná.
+
+— Aplikace olaf

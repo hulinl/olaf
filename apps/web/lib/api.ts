@@ -209,6 +209,10 @@ export interface Workspace {
   bio: string;
   location: string;
   social_links: Record<string, string>;
+  /** Backend signál, že komunita má vyplněný `social_links.email` a
+   *  na public stránce má proto smysl ukázat „Napsat komunitě" CTA.
+   *  Adresu samotnou backend v public response nevrací (anti-spam). */
+  has_contact_form?: boolean;
   accent_color: string;
   logo_url: string | null;
   cover_url: string | null;
@@ -1014,6 +1018,14 @@ export const workspaces = {
     apiFetch<Workspace>(`/api/workspaces/${slug}/detail/`),
   eventsFor: (slug: string) =>
     apiFetch<EventSummary[]>(`/api/workspaces/${slug}/events/`),
+  sendContactMessage: (
+    slug: string,
+    payload: { name: string; email: string; message: string },
+  ) =>
+    apiFetch<{ sent: true }>(`/api/workspaces/${slug}/contact/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   members: (slug: string) =>
     apiFetch<WorkspaceMemberSummary[]>(`/api/workspaces/${slug}/members/`),
   memberDetail: (slug: string, userId: number) =>
