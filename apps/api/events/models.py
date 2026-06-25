@@ -655,9 +655,11 @@ class RSVP(models.Model):
 
             rsvp.variable_symbol = next_variable_symbol(rsvp.id, locked_event.id)
             rsvp.save(update_fields=["variable_symbol", "updated_at"])
+            _maybe_schedule_auto_contract(rsvp)
             return rsvp
 
         rsvp.save()
+        _maybe_schedule_auto_contract(rsvp)
         return rsvp
 
     @staticmethod
@@ -1168,3 +1170,31 @@ class EventCollaborator(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} on {self.event}"
+
+
+def _maybe_schedule_auto_contract(rsvp: "RSVP") -> None:
+    """Po commitu RSVP transakce zaplánuje auto-send Smlouvy přes Celery
+    pokud má event smlouvu s `auto_send_after_rsvp=True`.
+
+    Soft import — když app `contracts` z nějakého důvodu chybí (test
+    fixture, migrations bootstrap), no-op. Když broker není dostupný
+    (dev bez Redis), spadne tiše — Celery EAGER mód v testech zvládne
+    sám sync provedení.
+    """
+    try:
+        from contracts.tasks import auto_send_contract_for_rsvp_task
+    except ImportError:
+        return
+
+    rsvp_id = rsvp.pk
+
+    def _enqueue() -> None:
+        import contextlib as _ctx
+
+        try:
+            auto_send_contract_for_rsvp_task.apply_async(args=[rsvp_id])
+        except Exception:
+            with _ctx.suppress(Exception):
+                auto_send_contract_for_rsvp_task(rsvp_id)
+
+    transaction.on_commit(_enqueue)

@@ -461,6 +461,7 @@ class RSVPSerializer(serializers.ModelSerializer):
     duplicate_hints = serializers.SerializerMethodField()
     can_be_removed = serializers.SerializerMethodField()
     can_toggle_organizer = serializers.SerializerMethodField()
+    contract = serializers.SerializerMethodField()
 
     class Meta:
         model = RSVP
@@ -487,10 +488,33 @@ class RSVPSerializer(serializers.ModelSerializer):
             "can_be_removed",
             "cancellation_reason",
             "cancelled_at",
+            "contract",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_contract(self, obj: RSVP) -> dict | None:
+        """Slim payload o RSVPContract — frontend ho používá pro
+        status badge v rosteru + tlačítko „Poslat k podpisu". None,
+        když event nemá nakonfigurovanou smlouvu vůbec.
+        """
+        try:
+            event_contract = obj.event.contract
+        except Exception:
+            return None
+        if event_contract is None:
+            return None
+        rc = obj.contracts.order_by("-created_at").first()
+        return {
+            "configured": True,
+            "template_name": event_contract.template.name,
+            "rsvp_contract_id": rc.pk if rc else None,
+            "status": rc.status if rc else "not_sent",
+            "signing_url": rc.signing_url if rc else "",
+            "signed_at": rc.signed_at.isoformat() if rc and rc.signed_at else None,
+            "sent_at": rc.sent_at.isoformat() if rc and rc.sent_at else None,
+        }
 
     def get_can_toggle_organizer(self, obj: RSVP) -> bool:
         """Frontend signal — skrýt "Označit/Odebrat organizátora" toggle

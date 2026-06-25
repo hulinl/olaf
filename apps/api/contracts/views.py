@@ -287,6 +287,8 @@ def rsvp_contract_send(
     """Vygeneruje PDF smlouvy + pošle ji na Signi."""
     from events.models import RSVP
 
+    from .services import ContractError, generate_and_send_contract
+
     event, err = _event_or_403(request, workspace_slug, event_slug)
     if err:
         return err
@@ -299,64 +301,14 @@ def rsvp_contract_send(
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     try:
-        ec = event.contract
-    except EventContract.DoesNotExist:
-        return Response(
-            {"detail": "Tento event nemá nastavenou smlouvu."},
-            status=status.HTTP_400_BAD_REQUEST,
+        rc = generate_and_send_contract(rsvp)
+    except ContractError as exc:
+        http_status = (
+            status.HTTP_500_INTERNAL_SERVER_ERROR
+            if exc.code == "pdf_render"
+            else status.HTTP_400_BAD_REQUEST
         )
-
-    if rsvp.user is None or not rsvp.user.email:
-        return Response(
-            {"detail": "Účastník nemá platný e-mail."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    rc, _created = RSVPContract.objects.get_or_create(
-        rsvp=rsvp,
-        event_contract=ec,
-    )
-
-    if rc.status in (RSVPContract.STATUS_SENT, RSVPContract.STATUS_SIGNED):
-        return Response(
-            RSVPContractSerializer(rc, context={"request": request}).data
-        )
-
-    from .pdf_generator import render_contract_pdf
-    from .signi_client import is_configured, send_for_signing
-
-    try:
-        pdf_bytes = render_contract_pdf(rc)
-    except Exception as e:
-        logger.exception("PDF render failed for rsvp_contract %s", rc.pk)
-        return Response(
-            {"detail": f"Generování PDF selhalo: {e!s}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
-    rc.generated_pdf.save(
-        f"contract-{event.slug}-{rsvp.pk}.pdf",
-        ContentFile(pdf_bytes),
-        save=False,
-    )
-
-    document = send_for_signing(
-        pdf_bytes=pdf_bytes,
-        pdf_filename=f"contract-{event.slug}-{rsvp.pk}.pdf",
-        signer_name=rsvp.user.get_full_name() or rsvp.user.email,
-        signer_email=rsvp.user.email,
-        document_title=f"{event.title} — smlouva",
-    )
-
-    rc.signy_document_id = document.document_id
-    rc.signing_url = document.signing_url
-    rc.status = (
-        RSVPContract.STATUS_SENT
-        if is_configured()
-        else RSVPContract.STATUS_PENDING
-    )
-    rc.sent_at = timezone.now()
-    rc.save()
+        return Response({"detail": str(exc), "code": exc.code}, status=http_status)
 
     return Response(
         RSVPContractSerializer(rc, context={"request": request}).data

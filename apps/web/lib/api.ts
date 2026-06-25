@@ -668,6 +668,19 @@ export interface RSVPRecord extends MyRSVP {
    *  zakladatel workspace musí zůstat organizátorem akce, nelze ho
    *  demote-nout na běžného účastníka. */
   can_toggle_organizer: boolean;
+  /** Smlouva — populována pokud event má `EventContract` config.
+   *  `status="not_sent"` = ještě nebyla vytvořena RSVPContract
+   *  pro tento RSVP; jinak status z RSVPContract (pending/sent/
+   *  signed/rejected/expired). */
+  contract: {
+    configured: true;
+    template_name: string;
+    rsvp_contract_id: number | null;
+    status: "not_sent" | "pending" | "sent" | "signed" | "rejected" | "expired";
+    signing_url: string;
+    signed_at: string | null;
+    sent_at: string | null;
+  } | null;
   updated_at: string;
 }
 

@@ -9,7 +9,9 @@ import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
   type BillingProfile,
+  type ContractTemplate,
   type Event as OlafEvent,
+  type EventContractConfig,
   type EventWritePayload,
   type GearList,
   QUESTIONNAIRE_SECTION_HINTS,
@@ -20,6 +22,7 @@ import {
   type RiskChecklistItem,
   type Workspace,
   auth,
+  contracts as contractsApi,
   gear,
   workspaces,
 } from "@/lib/api";
@@ -203,6 +206,22 @@ export function EventForm({
     initial?.risk_checklist ?? [],
   );
 
+  // Smlouva config — lazy load: templates k vidění a aktuální event
+  // contract config. Save sám si pak posílá PUT/DELETE na vlastní
+  // endpoint (mimo standardní event PATCH).
+  const [contractTemplates, setContractTemplates] = useState<
+    ContractTemplate[]
+  >([]);
+  const [eventContract, setEventContract] = useState<
+    EventContractConfig | null
+  >(null);
+  const [contractDirty, setContractDirty] = useState(false);
+  const [contractStatus, setContractStatus] = useState<{
+    template: number | "";
+    auto_send: boolean;
+    require_before_payment: boolean;
+  }>({ template: "", auto_send: false, require_before_payment: false });
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -212,12 +231,43 @@ export function EventForm({
       .mine()
       .then((list) => {
         if (cancelled) return;
-        setOwnedWorkspaces(list.filter((w) => w.my_role === "owner"));
+        // Unified komunity model — bereme všechny komunity, kde má user
+        // permission ke sdílení (owner, admin, nebo member-with-permission).
+        // Frontend si pak v event-formu dropdownu filtruje.
+        setOwnedWorkspaces(list);
       })
       .catch(() => {
         // Non-blocking; the picker just stays hidden.
         if (!cancelled) setOwnedWorkspaces([]);
       });
+    contractsApi
+      .listTemplates(workspaceSlug)
+      .then((list) => {
+        if (cancelled) return;
+        setContractTemplates(list);
+      })
+      .catch(() => {
+        if (!cancelled) setContractTemplates([]);
+      });
+    // Pokud edit-mode, načteme stávající event contract config.
+    if (initial?.slug) {
+      contractsApi
+        .getEventContract(workspaceSlug, initial.slug)
+        .then((cfg) => {
+          if (cancelled) return;
+          if (cfg && (cfg as { configured?: boolean }).configured !== false) {
+            setEventContract(cfg);
+            setContractStatus({
+              template: cfg.template,
+              auto_send: cfg.auto_send_after_rsvp,
+              require_before_payment: cfg.require_before_payment,
+            });
+          }
+        })
+        .catch(() => {
+          /* nakonfigurovaný není */
+        });
+    }
     auth
       .billingProfiles()
       .then((list) => {
@@ -293,6 +343,40 @@ export function EventForm({
         ),
       };
       const event = await onSubmit(payload);
+      // Po úspěšném save eventu propíšeme i smlouvu, pokud user změnil
+      // konfiguraci. Endpoint je workspace-scoped + event-slug-scoped.
+      if (contractDirty) {
+        try {
+          if (contractStatus.template === "") {
+            await contractsApi.removeEventContract(
+              event.workspace_slug,
+              event.slug,
+            );
+            setEventContract(null);
+          } else {
+            const cfg = await contractsApi.setEventContract(
+              event.workspace_slug,
+              event.slug,
+              {
+                template: Number(contractStatus.template),
+                auto_send_after_rsvp: contractStatus.auto_send,
+                require_before_payment: contractStatus.require_before_payment,
+              },
+            );
+            setEventContract(cfg);
+          }
+          setContractDirty(false);
+        } catch (err) {
+          // Save eventu už proběhl — smlouva selhala, ale zbytek je OK.
+          // Ukážeme error, ať user ví, že smlouva neuložila.
+          setError(
+            err instanceof ApiError
+              ? `Akce uložena, ale smlouva selhala: ${err.message}`
+              : "Akce uložena, ale smlouva selhala.",
+          );
+          return;
+        }
+      }
       onSuccess(event);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -718,6 +802,114 @@ export function EventForm({
         </Card>
         );
       })()}
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">Smlouva</h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Volitelně připoj šablonu smlouvy k této akci. Při odeslání
+            (manuálně z rosteru nebo automaticky po RSVP) vygenerujeme
+            PDF s vyplněnými daty účastníka a pošleme přes Signi.cz
+            k digitálnímu podpisu — účastník dostane e-mail od Signi
+            s podpisovým linkem.
+          </p>
+
+          {contractTemplates.length === 0 ? (
+            <div className="mt-4 rounded-md border border-dashed border-border bg-surface-muted/40 px-3 py-3 text-sm text-ink-500">
+              Zatím nemáš žádnou šablonu smlouvy. Vytvoř si ji v sekci{" "}
+              <a
+                href="/admin/smlouvy"
+                className="font-medium text-ink-700 underline hover:text-ink-900"
+              >
+                Smlouvy
+              </a>
+              .
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-3">
+              <Field label="Šablona smlouvy" htmlFor="contract_template">
+                <select
+                  id="contract_template"
+                  value={contractStatus.template}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setContractStatus((prev) => ({
+                      ...prev,
+                      template: v ? Number(v) : "",
+                    }));
+                    setContractDirty(true);
+                  }}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+                >
+                  <option value="">— Bez smlouvy —</option>
+                  {contractTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {contractStatus.template !== "" && (
+                <>
+                  <label className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand">
+                    <input
+                      type="checkbox"
+                      checked={contractStatus.auto_send}
+                      onChange={(e) => {
+                        setContractStatus((prev) => ({
+                          ...prev,
+                          auto_send: e.target.checked,
+                        }));
+                        setContractDirty(true);
+                      }}
+                      className="mt-0.5 size-4 accent-brand"
+                    />
+                    <span className="flex flex-col">
+                      <span className="font-medium text-ink-900">
+                        Posílat automaticky po RSVP
+                      </span>
+                      <span className="text-xs text-ink-500">
+                        Po každém novém přihlášení vygenerujeme PDF a
+                        pošleme účastníkovi přes Signi. Pokud vypnuto,
+                        pošleš ručně z rosteru.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand">
+                    <input
+                      type="checkbox"
+                      checked={contractStatus.require_before_payment}
+                      onChange={(e) => {
+                        setContractStatus((prev) => ({
+                          ...prev,
+                          require_before_payment: e.target.checked,
+                        }));
+                        setContractDirty(true);
+                      }}
+                      className="mt-0.5 size-4 accent-brand"
+                    />
+                    <span className="flex flex-col">
+                      <span className="font-medium text-ink-900">
+                        Vyžadovat podpis před platbou
+                      </span>
+                      <span className="text-xs text-ink-500">
+                        Účastník nemůže být označen zaplacen, dokud
+                        nemá podepsanou smlouvu.
+                      </span>
+                    </span>
+                  </label>
+                </>
+              )}
+              {eventContract && (
+                <p className="text-xs text-ink-500">
+                  Aktuálně připojená šablona:{" "}
+                  <strong>{eventContract.template_name}</strong>
+                </p>
+              )}
+            </div>
+          )}
+        </CardSection>
+      </Card>
 
       <Card>
         <CardSection>
