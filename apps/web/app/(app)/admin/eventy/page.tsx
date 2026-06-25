@@ -97,8 +97,24 @@ export default function AdminEventyTablePage() {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/eventy/kos"
-            className="text-sm text-ink-500 hover:text-ink-900 focus-ring"
+            title="Smazané akce — můžeš je obnovit do 30 dní"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
           >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 4h10M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4M4 4v9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
             Koš
           </Link>
           <LinkButton
