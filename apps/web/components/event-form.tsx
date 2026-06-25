@@ -698,18 +698,15 @@ export function EventForm({
           workspaceSlug,
           ...sharedSlugs.filter((s) => s !== workspaceSlug),
         ];
+        // Personal workspace v listu úmyslně SKRÝVÁME — user s ním
+        // stejně nemůže nic dělat (checkbox by byl disabled), a vizuálně
+        // jen mate. Backend ho vždycky drží jako fallback owner, takže
+        // event je v bezpečí.
         const inCommunities = inCommunitySlugs
           .map((slug) =>
-            // Lookup pořadí:
-            //   1) sharable komunita z /mine/ (owner/admin/member-with-perm)
-            //   2) jiná komunita z /mine/ (kdyby z nějakého důvodu nebyla
-            //      ve sharable subsetu — fallback safety)
-            //   3) personal workspace — /mine/ ho exclude-uje, ale po
-            //      přesunu eventu sem se musí v listu zobrazit, jinak
-            //      uživatel nevidí, kde event teď je.
             shareableCommunities.find((w) => w.slug === slug) ??
             (ownedWorkspaces ?? []).find((w) => w.slug === slug) ??
-            (personalWorkspace?.slug === slug ? personalWorkspace : null),
+            null,
           )
           .filter((w): w is Workspace => w !== null);
         const notYetInCommunitySlugs = new Set(inCommunitySlugs);
@@ -729,91 +726,61 @@ export function EventForm({
             </p>
 
             <ul className="mt-4 flex flex-col gap-2">
-              {inCommunities.map((w) => {
-                const isPersonal =
-                  personalWorkspace?.slug === w.slug;
-                return (
-                  <li
-                    key={w.slug}
-                    className={[
-                      "flex items-center gap-3 rounded-md border px-3 py-2 text-sm",
-                      isPersonal
-                        ? "border-border bg-surface-muted/40"
-                        : "border-brand bg-brand/5",
-                    ].join(" ")}
-                  >
-                    <input
-                      type="checkbox"
-                      checked
-                      disabled={isPersonal}
-                      onChange={() => {
-                        if (isPersonal) return;
-                        // Odebrat ze seznamu. Pokud je to současný primary,
-                        // backend volání move-workspace převede event jinam.
-                        if (w.slug === workspaceSlug) {
-                          if (!onMoveToWorkspace) return;
-                          // Hledáme cílovou komunitu, kam event přesunout.
-                          // Preference: shared v listu → owned mimo list →
-                          // personal jako poslední záchrana.
-                          const inListCandidate = inCommunities.find(
-                            (c) =>
-                              c.slug !== workspaceSlug &&
-                              (c.my_role === "owner" ||
-                                c.my_role === "admin"),
+              {inCommunities.map((w) => (
+                <li
+                  key={w.slug}
+                  className="flex items-center gap-3 rounded-md border border-brand bg-brand/5 px-3 py-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked
+                    onChange={() => {
+                      if (w.slug === workspaceSlug) {
+                        if (!onMoveToWorkspace) return;
+                        const inListCandidate = inCommunities.find(
+                          (c) =>
+                            c.slug !== workspaceSlug &&
+                            (c.my_role === "owner" || c.my_role === "admin"),
+                        );
+                        const ownedElsewhere = (ownedWorkspaces ?? []).find(
+                          (c) =>
+                            c.slug !== workspaceSlug &&
+                            !sharedSlugs.includes(c.slug) &&
+                            (c.my_role === "owner" || c.my_role === "admin"),
+                        );
+                        const target =
+                          inListCandidate ??
+                          ownedElsewhere ??
+                          personalWorkspace;
+                        if (!target) {
+                          // eslint-disable-next-line no-alert
+                          alert(
+                            "Tvoji akci momentálně nemám kam přesunout. Zkontroluj si Komunity v Tvůrci.",
                           );
-                          const ownedElsewhere = (ownedWorkspaces ?? []).find(
-                            (c) =>
-                              c.slug !== workspaceSlug &&
-                              !sharedSlugs.includes(c.slug) &&
-                              (c.my_role === "owner" ||
-                                c.my_role === "admin"),
-                          );
-                          const target =
-                            inListCandidate ??
-                            ownedElsewhere ??
-                            personalWorkspace;
-                          if (!target) {
-                            // eslint-disable-next-line no-alert
-                            alert(
-                              "Tvoji akci momentálně nemám kam přesunout. Zkontroluj si Komunity v Tvůrci.",
-                            );
-                            return;
-                          }
-                          void onMoveToWorkspace(target.slug);
                           return;
                         }
-                        setSharedSlugs((prev) =>
-                          prev.filter((s) => s !== w.slug),
-                        );
-                      }}
-                      className="size-4 accent-brand disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`Odebrat ${w.name}`}
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-medium text-ink-900">
-                        {w.name}
-                        {isPersonal && (
-                          <span className="ml-2 rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-[0.14em] text-ink-500">
-                            Tvůj prostor
-                          </span>
-                        )}
-                      </span>
-                      {isPersonal ? (
-                        <span className="truncate text-xs text-ink-500">
-                          Akce vždycky patří aspoň do tvého soukromého
-                          prostoru. Odebrat ji odsud nelze.
-                        </span>
-                      ) : (
-                        w.location && (
-                          <span className="truncate text-xs text-ink-500">
-                            {w.location}
-                          </span>
-                        )
-                      )}
+                        void onMoveToWorkspace(target.slug);
+                        return;
+                      }
+                      setSharedSlugs((prev) =>
+                        prev.filter((s) => s !== w.slug),
+                      );
+                    }}
+                    className="size-4 accent-brand"
+                    aria-label={`Odebrat ${w.name}`}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium text-ink-900">
+                      {w.name}
                     </span>
-                  </li>
-                );
-              })}
+                    {w.location && (
+                      <span className="truncate text-xs text-ink-500">
+                        {w.location}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
             </ul>
 
             {availableToAdd.length > 0 && (
