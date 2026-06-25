@@ -298,7 +298,11 @@ function WorkspaceTabs({
           {past.length > 0 && (
             <section className="mt-10">
               <details className="group">
-                <summary className="cursor-pointer list-none">
+                {/* `select-none` zruší text-caret-look co se po kliknutí
+                    objevoval uvnitř `<summary>`; user report 2026-06-25:
+                    „bliká tam kurzor". `focus:outline-none` + custom
+                    focus-visible kruh chová se hezky pro keyboard a11y. */}
+                <summary className="cursor-pointer select-none list-none rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand">
                   <span className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-ink-500 hover:text-ink-900">
                     <span className="transition-transform group-open:rotate-90">
                       ▸
