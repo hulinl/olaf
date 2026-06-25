@@ -235,11 +235,23 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
             )}
           </section>
 
-          {/* Past events záměrně NEzobrazujeme na komunitním
-              dashboardu — komunita = nadcházející aktivita.
-              Owner pro past eventy má /admin/eventy globální listing
-              s filtrem; statistika "Minulé akce" v stat tile výše
-              dál ukazuje countu, kdyby chtěl celkový přehled. */}
+          {past.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <details className="group">
+                <summary className="cursor-pointer select-none list-none rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                  <h2 className="inline-flex items-center gap-2 text-xl font-semibold text-ink-900">
+                    <span className="transition-transform group-open:rotate-90">
+                      ▸
+                    </span>
+                    Minulé akce ({past.length})
+                  </h2>
+                </summary>
+                <div className="mt-4">
+                  <EventTable events={past} wsSlug={workspace.slug} />
+                </div>
+              </details>
+            </section>
+          )}
         </>
       )}
 
