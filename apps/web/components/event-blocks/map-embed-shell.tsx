@@ -48,9 +48,19 @@ export function MapEmbedShell({ src, title, dark, needsScrollGuard }: Props) {
     };
   }, [interactive, needsScrollGuard]);
 
+  // Mouseleave je víc spolehlivé než globální wheel handler — cross-
+  // origin iframe nedovolí parentu spolehlivě sledovat wheel události
+  // uvnitř, takže "scrollnu jednou na mapě = zoom místo scroll stránky"
+  // se i tak občas stane. Při mouseleave okamžitě zamykáme zpět, takže
+  // další scroll už je na parent stránce.
+  function handleMouseLeave() {
+    if (interactive && needsScrollGuard) setInteractive(false);
+  }
+
   return (
     <div
       ref={wrapperRef}
+      onMouseLeave={handleMouseLeave}
       className={[
         "relative w-full overflow-hidden rounded-md border",
         dark
