@@ -21,8 +21,8 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/vybaveni", label: "Vybavení" },
   { href: "/admin/platby", label: "Platby" },
   { href: "/admin/audit", label: "Aktivita" },
+  { href: "/admin/smlouvy", label: "Smlouvy" },
   { href: "/admin/dokumenty", label: "Dokumenty", comingSoon: true },
-  { href: "/admin/smlouvy", label: "Smlouvy", comingSoon: true },
 ];
 
 /**
