@@ -726,6 +726,48 @@ export interface HiddenPersonSummary {
   hidden_at: string | null;
 }
 
+export interface ContractTemplate {
+  id: number;
+  workspace_slug: string;
+  name: string;
+  description: string;
+  body_html: string;
+  notion_url: string;
+  last_synced_at: string | null;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventContractConfig {
+  id: number;
+  template: number;
+  template_name: string;
+  auto_send_after_rsvp: boolean;
+  require_before_payment: boolean;
+  created_at: string;
+  updated_at: string;
+  configured?: boolean;
+}
+
+export interface RSVPContract {
+  id: number;
+  rsvp: number;
+  user_full_name: string;
+  user_email: string;
+  status: "pending" | "sent" | "signed" | "rejected" | "expired";
+  generated_pdf_url: string;
+  signed_pdf_url: string;
+  signing_url: string;
+  signy_document_id: string;
+  sent_at: string | null;
+  signed_at: string | null;
+  rejected_at: string | null;
+  expired_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EventDocument {
   id: number;
   rsvp_id: number;
@@ -1029,6 +1071,84 @@ export interface WorkspaceMemberDetail {
   tshirt_size: string;
   rsvps: WorkspaceMemberRSVP[];
 }
+
+export const contracts = {
+  listTemplates: (workspaceSlug: string) =>
+    apiFetch<ContractTemplate[]>(
+      `/api/contracts/${workspaceSlug}/templates/`,
+    ),
+  createTemplate: (
+    workspaceSlug: string,
+    payload: { name: string; description?: string; notion_url?: string; body_html?: string },
+  ) =>
+    apiFetch<ContractTemplate>(
+      `/api/contracts/${workspaceSlug}/templates/`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  templateDetail: (workspaceSlug: string, templateId: number) =>
+    apiFetch<ContractTemplate>(
+      `/api/contracts/${workspaceSlug}/templates/${templateId}/`,
+    ),
+  updateTemplate: (
+    workspaceSlug: string,
+    templateId: number,
+    payload: Partial<{
+      name: string;
+      description: string;
+      body_html: string;
+      notion_url: string;
+    }>,
+  ) =>
+    apiFetch<ContractTemplate>(
+      `/api/contracts/${workspaceSlug}/templates/${templateId}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  deleteTemplate: (workspaceSlug: string, templateId: number) =>
+    apiFetch<void>(
+      `/api/contracts/${workspaceSlug}/templates/${templateId}/`,
+      { method: "DELETE" },
+    ),
+  syncTemplateFromNotion: (workspaceSlug: string, templateId: number) =>
+    apiFetch<ContractTemplate>(
+      `/api/contracts/${workspaceSlug}/templates/${templateId}/sync-notion/`,
+      { method: "POST" },
+    ),
+  getEventContract: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<EventContractConfig>(
+      `/api/contracts/${workspaceSlug}/events/${eventSlug}/contract/`,
+    ),
+  setEventContract: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: {
+      template: number;
+      auto_send_after_rsvp: boolean;
+      require_before_payment: boolean;
+    },
+  ) =>
+    apiFetch<EventContractConfig>(
+      `/api/contracts/${workspaceSlug}/events/${eventSlug}/contract/`,
+      { method: "PUT", body: JSON.stringify(payload) },
+    ),
+  removeEventContract: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<void>(
+      `/api/contracts/${workspaceSlug}/events/${eventSlug}/contract/`,
+      { method: "DELETE" },
+    ),
+  listRsvpContracts: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<RSVPContract[]>(
+      `/api/contracts/${workspaceSlug}/events/${eventSlug}/rsvp-contracts/`,
+    ),
+  sendRsvpContract: (
+    workspaceSlug: string,
+    eventSlug: string,
+    rsvpId: number,
+  ) =>
+    apiFetch<RSVPContract>(
+      `/api/contracts/${workspaceSlug}/events/${eventSlug}/rsvp-contracts/${rsvpId}/send/`,
+      { method: "POST" },
+    ),
+};
 
 export const workspaces = {
   byPublicSlug: (slug: string) =>
