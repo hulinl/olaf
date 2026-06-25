@@ -55,6 +55,27 @@ export function DaysForm({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Eyebrow" hint={'Výchozí „Program".'}>
+          <Input
+            value={payload.eyebrow ?? ""}
+            onChange={(e) =>
+              onChange({ ...payload, eyebrow: e.target.value })
+            }
+            placeholder="Program"
+          />
+        </Field>
+        <Field label="Nadpis sekce" hint={'Výchozí „Den po dni".'}>
+          <Input
+            value={payload.title ?? ""}
+            onChange={(e) =>
+              onChange({ ...payload, title: e.target.value })
+            }
+            placeholder="Den po dni"
+          />
+        </Field>
+      </div>
+
       <Field label="Úvodní věta" hint="Krátký lead nad seznamem dní">
         <textarea
           rows={2}

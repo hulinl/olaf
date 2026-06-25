@@ -53,6 +53,10 @@ export interface StatsBlockPayload {
 }
 
 export interface DaysBlockPayload {
+  /** Volitelný eyebrow nad nadpisem — default "Program". */
+  eyebrow?: string;
+  /** Volitelný nadpis sekce — default "Den po dni". */
+  title?: string;
   lead?: string;
   days: BlockDay[];
 }

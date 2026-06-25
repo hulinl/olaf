@@ -90,18 +90,26 @@ export default async function WorkspaceProfilePage({ params }: Props) {
     ([, url]) => Boolean(url),
   );
 
+  // Public komunita list — zobrazujeme jen `published` (případně auto-
+  // přepnuté na `completed`). Drafty, zrušené a closed schovat. Datum
+  // dělení podle `starts_at` (ne `ends_at`) — user request 2026-06-25:
+  // "ty co mají starší datum začátku jako dnešek tak už mají být
+  // v minulých". Vícedenní akce co teď běží = past, jakmile start prošel.
   const now = new Date();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const upcoming = events.filter(
     (e) =>
       e.status === "published" &&
-      new Date(e.ends_at).getTime() >= now.getTime(),
+      new Date(e.starts_at).getTime() >= todayStart,
   );
   const past = events.filter(
     (e) =>
-      e.status === "completed" ||
-      e.status === "cancelled" ||
-      (e.status === "published" &&
-        new Date(e.ends_at).getTime() < now.getTime()),
+      (e.status === "published" || e.status === "completed") &&
+      new Date(e.starts_at).getTime() < todayStart,
   );
 
   return (
