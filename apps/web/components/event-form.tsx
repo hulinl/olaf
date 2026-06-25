@@ -614,56 +614,55 @@ export function EventForm({
                 </div>
               )}
             </div>
-            <h3 className="mt-5 text-sm font-semibold text-ink-900">
-              Sdílet do dalších komunit
-            </h3>
-            {shareCandidates.length === 0 ? (
-              <p className="mt-2 rounded-md border border-dashed border-border bg-surface-muted/40 px-3 py-3 text-sm text-ink-500">
-                Zatím nemáš další komunitu, do které bys mohl akci nasdílet.
-                Vytvoř si je v sekci{" "}
-                <a
-                  href="/admin/komunity"
-                  className="font-medium text-ink-700 underline hover:text-ink-900"
-                >
-                  Komunity
-                </a>{" "}
-                — pak se ti tady ukáží jako zaškrtávací políčka.
-              </p>
-            ) : (
-              <div className="mt-2 grid grid-cols-1 gap-2">
-                {shareCandidates.map((w) => {
-                  const checked = sharedSlugs.includes(w.slug);
-                  return (
-                    <label
-                      key={w.slug}
-                      className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() =>
-                          setSharedSlugs((prev) =>
-                            prev.includes(w.slug)
-                              ? prev.filter((s) => s !== w.slug)
-                              : [...prev, w.slug],
-                          )
-                        }
-                        className="mt-0.5 size-4 accent-brand"
-                      />
-                      <span className="flex flex-col">
-                        <span className="font-medium text-ink-900">
-                          {w.name}
-                        </span>
-                        {w.location && (
-                          <span className="text-xs text-ink-500">
-                            {w.location}
+            {/* Sub-sekci „Sdílet do dalších" ukazujeme JEN když opravdu
+                jsou kam sdílet. Když má user jen jednu komunitu (= ten
+                event už v ní žije), nemá smysl mu ukazovat „Zatím nemáš
+                kam sdílet" hlášku — působí to jako že feature nefunguje.
+                User report 2026-06-25. */}
+            {shareCandidates.length > 0 && (
+              <>
+                <h3 className="mt-5 text-sm font-semibold text-ink-900">
+                  Sdílet i do dalších komunit
+                </h3>
+                <p className="mt-1 text-xs text-ink-500">
+                  Akce zůstává v domovské komunitě (viz výše). Tady jen
+                  vybereš, kde se má navíc zobrazit.
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  {shareCandidates.map((w) => {
+                    const checked = sharedSlugs.includes(w.slug);
+                    return (
+                      <label
+                        key={w.slug}
+                        className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setSharedSlugs((prev) =>
+                              prev.includes(w.slug)
+                                ? prev.filter((s) => s !== w.slug)
+                                : [...prev, w.slug],
+                            )
+                          }
+                          className="mt-0.5 size-4 accent-brand"
+                        />
+                        <span className="flex flex-col">
+                          <span className="font-medium text-ink-900">
+                            {w.name}
                           </span>
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
+                          {w.location && (
+                            <span className="text-xs text-ink-500">
+                              {w.location}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardSection>
         </Card>
