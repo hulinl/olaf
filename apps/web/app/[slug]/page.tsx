@@ -11,6 +11,7 @@ import {
   assetUrl,
   type EventSummary,
   type Workspace,
+  formatEventDateRange,
   formatEventPrice,
 } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
@@ -51,29 +52,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: cover ? [cover] : undefined,
     },
   };
-}
-
-function formatEventDateRange(starts: string, ends: string): string {
-  const s = new Date(starts);
-  const e = new Date(ends);
-  const fmt: Intl.DateTimeFormatOptions = {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  };
-  const sameMonth =
-    s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth();
-  if (sameMonth) {
-    const monthYear = s.toLocaleDateString("cs-CZ", {
-      month: "long",
-      year: "numeric",
-    });
-    return `${s.getDate()}.–${e.getDate()}. ${monthYear}`;
-  }
-  return `${s.toLocaleDateString("cs-CZ", fmt)} – ${e.toLocaleDateString(
-    "cs-CZ",
-    fmt,
-  )}`;
 }
 
 export default async function WorkspaceProfilePage({ params }: Props) {

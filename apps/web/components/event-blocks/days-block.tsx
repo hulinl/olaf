@@ -9,6 +9,8 @@ import {
 } from "@/lib/event-blocks";
 import { FormattedBody } from "@/lib/prose-format";
 
+import { MapEmbedShell } from "./map-embed-shell";
+
 interface Props {
   payload: DaysBlockPayload;
   tone?: BlockTone;
@@ -94,13 +96,16 @@ export async function DaysBlock({ payload, tone = "canvas" }: Props) {
                     }
                   >
                     {d.label && (
-                      <p className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white/75">
+                      <p className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-white/85">
                         {d.label}
                       </p>
                     )}
+                    {/* Číslo dne dřív bylo text-5xl/6xl — vizuálně
+                        přebíjelo nadpis dne. Decentnější velikost
+                        nechá pozornost na obsahu. */}
                     <p
-                      className="text-5xl font-semibold leading-none sm:text-6xl"
-                      style={{ letterSpacing: "-0.035em" }}
+                      className="text-4xl font-semibold leading-none sm:text-5xl"
+                      style={{ letterSpacing: "-0.03em" }}
                     >
                       {num}
                     </p>
@@ -151,10 +156,20 @@ export async function DaysBlock({ payload, tone = "canvas" }: Props) {
                           <StatPair k="Délka" v={d.distance} dark={dark} />
                         )}
                         {d.ascent && (
-                          <StatPair k="Stoupání" v={d.ascent} dark={dark} />
+                          <StatPair
+                            k="Stoupání"
+                            v={d.ascent}
+                            icon="↑"
+                            dark={dark}
+                          />
                         )}
                         {d.descent && (
-                          <StatPair k="Klesání" v={d.descent} dark={dark} />
+                          <StatPair
+                            k="Klesání"
+                            v={d.descent}
+                            icon="↓"
+                            dark={dark}
+                          />
                         )}
                       </dl>
                     )}
@@ -167,21 +182,17 @@ export async function DaysBlock({ payload, tone = "canvas" }: Props) {
                       >
                         {mapEmbeddable ? (
                           <>
-                            <div
-                              className={[
-                                "relative aspect-[16/9] w-full overflow-hidden rounded-md border",
-                                dark
-                                  ? "border-white/10 bg-white/[0.04]"
-                                  : "border-border bg-surface-muted",
-                              ].join(" ")}
-                            >
-                              <iframe
-                                loading="lazy"
-                                src={mapSrc ?? ""}
-                                title={`Mapa ${d.title ?? `den ${i + 1}`}`}
-                                className="absolute inset-0 h-full w-full border-0"
-                              />
-                            </div>
+                            {/* Day-level mapa = stejný click-to-activate
+                                pattern jako standalone Map block. Bez
+                                MapEmbedShell-u scroll přes mapu zoomoval
+                                místo pohybu po stránce — user report
+                                2026-06-25. */}
+                            <MapEmbedShell
+                              src={mapSrc ?? ""}
+                              title={`Mapa ${d.title ?? `den ${i + 1}`}`}
+                              dark={dark}
+                              needsScrollGuard={true}
+                            />
                             <div
                               className={[
                                 "mt-2 flex justify-between text-xs",
@@ -231,10 +242,15 @@ export async function DaysBlock({ payload, tone = "canvas" }: Props) {
 function StatPair({
   k,
   v,
+  icon,
   dark,
 }: {
   k: string;
   v: string;
+  /** Volitelná ikona vlevo od hodnoty — ↑ pro stoupání, ↓ pro klesání.
+   *  User report 2026-06-25: bez ikony bylo na první pohled těžké
+   *  rozlišit „550 m" stoupání vs klesání. */
+  icon?: string;
   dark: boolean;
 }) {
   return (
@@ -249,11 +265,22 @@ function StatPair({
       </dt>
       <dd
         className={[
-          "mt-0.5 text-base font-semibold",
+          "mt-0.5 inline-flex items-baseline gap-1 text-base font-semibold",
           dark ? "text-ink-inverse" : "text-ink-900",
         ].join(" ")}
         style={{ letterSpacing: "-0.01em" }}
       >
+        {icon && (
+          <span
+            aria-hidden
+            className={[
+              "text-sm font-bold",
+              dark ? "text-brand" : "text-brand",
+            ].join(" ")}
+          >
+            {icon}
+          </span>
+        )}
         {v}
       </dd>
     </div>

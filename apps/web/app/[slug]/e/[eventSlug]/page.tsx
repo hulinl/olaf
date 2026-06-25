@@ -8,7 +8,12 @@ import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { ShareButton } from "@/components/ui/share-button";
-import { assetUrl, type Event, type EventDraftPreview } from "@/lib/api";
+import {
+  assetUrl,
+  type Event,
+  type EventDraftPreview,
+  formatEventDateRange,
+} from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
 interface Props {
@@ -43,14 +48,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  // Cover preferenčně z event-level pole, jinak z hero bloku payload-u
+  // (kde Notion ingest typicky položí fotku), nakonec workspace logo.
+  // Bez hero-block fallback-u dříve OG image padal na logo i když měl
+  // event hero fotku — share card vypadal generický.
+  const heroBlock = (event.blocks ?? []).find((b) => b.type === "hero");
+  const heroCoverUrl =
+    heroBlock?.type === "hero"
+      ? assetUrl(heroBlock.payload.cover_url)
+      : undefined;
   const cover =
-    assetUrl(event.cover_url) ?? assetUrl(event.workspace_logo_url);
-  // Description fallback dřív začínal "${workspace} on olaf — ${title}",
-  // což připíchlo jméno workspace do search snippetů i tehdy, když si
-  // owner workspace pojmenoval generic ("Personal — ...") a nechtěl ho
-  // ve veřejných meta tag-ách. Default je teď čistě event title.
+    assetUrl(event.cover_url) ??
+    heroCoverUrl ??
+    assetUrl(event.workspace_logo_url);
+
+  // Description fallback: dřív padal rovnou na `event.title`, což u
+  // event-ů bez description vedlo k OG card-u s titulem dvakrát (jednou
+  // og:title, jednou og:description). User report 2026-06-25. Místo
+  // duplikace skládáme „termín · místo" — víc kontextu pro share.
+  const firstDescLine = event.description.split("\n")[0]?.slice(0, 180);
+  const dateLabel = formatEventDateRange(event.starts_at, event.ends_at);
+  const fallbackDescParts: string[] = [];
+  if (dateLabel) fallbackDescParts.push(dateLabel);
+  if (event.location_text) fallbackDescParts.push(event.location_text);
   const description =
-    event.description.split("\n")[0]?.slice(0, 180) || event.title;
+    firstDescLine ||
+    (fallbackDescParts.length > 0
+      ? fallbackDescParts.join(" · ")
+      : event.workspace_name);
 
   // Event titul stojí na vlastních nohou — předtím tu byl
   // "${event.title} — ${event.workspace_name}", což user explicitně

@@ -10,6 +10,35 @@ export function assetUrl(path: string | null | undefined): string | undefined {
   return `${API_URL}${path}`;
 }
 
+/** Czech-locale date range pro karty + OG description.
+ *  Inputy jsou ISO datumy z eventu (starts_at, ends_at).
+ *  Stejný den / měsíc kondenzujeme („4.–5. července 2026"). */
+export function formatEventDateRange(starts: string, ends: string): string {
+  const s = new Date(starts);
+  const e = new Date(ends);
+  const fmt: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
+  const sameMonth =
+    s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth();
+  if (sameMonth) {
+    const monthYear = s.toLocaleDateString("cs-CZ", {
+      month: "long",
+      year: "numeric",
+    });
+    if (s.getDate() === e.getDate()) {
+      return s.toLocaleDateString("cs-CZ", fmt);
+    }
+    return `${s.getDate()}.–${e.getDate()}. ${monthYear}`;
+  }
+  return `${s.toLocaleDateString("cs-CZ", fmt)} – ${e.toLocaleDateString(
+    "cs-CZ",
+    fmt,
+  )}`;
+}
+
 /** Format an event price for display, or null if the event is free. */
 export function formatEventPrice(
   amount: string | null | undefined,
