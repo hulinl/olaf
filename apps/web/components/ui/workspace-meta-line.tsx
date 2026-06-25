@@ -3,19 +3,18 @@ import { ReactNode } from "react";
 interface Props {
   location?: string | null;
   memberCount?: number | null;
-  /** Sorted [key, url] entries from workspace.social_links. */
-  socials: [string, string][];
   className?: string;
 }
 
 /**
- * One-line meta — "{location} · {N} členů · web ↗ · instagram ↗ …"
- * Replaces the legacy multi-row treatment with separate chip strip.
+ * Tenká meta line: „{location} · {N} členů". Social linky se dnes
+ * renderují přes `<WorkspaceSocialsRow>` (značkové ikony, contact
+ * form místo mailto) — držet je tady jako text-only odkazy by
+ * vedlo k duplicitě nebo nekonzistenci.
  */
 export function WorkspaceMetaLine({
   location,
   memberCount,
-  socials,
   className = "",
 }: Props) {
   const parts: ReactNode[] = [];
@@ -23,20 +22,6 @@ export function WorkspaceMetaLine({
   if (memberCount != null) {
     parts.push(<span key="mem">{memberCount} členů</span>);
   }
-  socials.forEach(([key, url]) => {
-    parts.push(
-      <a
-        key={`social-${key}`}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-baseline gap-0.5 text-ink-700 underline-offset-2 hover:text-ink-900 hover:underline"
-      >
-        {key}
-        <span aria-hidden="true">↗</span>
-      </a>,
-    );
-  });
   if (parts.length === 0) return null;
   return (
     <p

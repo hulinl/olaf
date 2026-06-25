@@ -7,6 +7,7 @@ import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
 import { ShareButton } from "@/components/ui/share-button";
+import { WorkspaceSocialsRow } from "@/components/workspace-socials-row";
 import {
   assetUrl,
   type EventSummary,
@@ -64,9 +65,6 @@ export default async function WorkspaceProfilePage({ params }: Props) {
 
   const logo = assetUrl(workspace.logo_url);
   const cover = assetUrl(workspace.cover_url);
-  const socials = Object.entries(workspace.social_links ?? {}).filter(
-    ([, url]) => Boolean(url),
-  );
 
   // Public komunita list — zobrazujeme jen `published` (případně auto-
   // přepnuté na `completed`). Drafty, zrušené a closed schovat. Datum
@@ -200,25 +198,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
               >
                 {workspace.bio}
               </p>
-              {socials.length > 0 && (
-                <div className="mt-8 flex flex-wrap gap-3">
-                  {socials.map(([key, url]) => (
-                    <a
-                      key={key}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
-                    >
-                      <span className="font-mono uppercase tracking-[0.14em] text-[11px] text-ink-500">
-                        {key}
-                      </span>
-                      <span className="truncate">{url.replace(/^https?:\/\//, "")}</span>
-                      <span aria-hidden>↗</span>
-                    </a>
-                  ))}
-                </div>
-              )}
+              <WorkspaceSocialsRow workspace={workspace} className="mt-8" />
             </div>
           </section>
         )}

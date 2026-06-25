@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Workspace
+from .models import Workspace, WorkspaceMember
 
 
 class WorkspaceWriteSerializer(serializers.ModelSerializer):
@@ -92,6 +92,11 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
 
     logo_url = serializers.SerializerMethodField()
     cover_url = serializers.SerializerMethodField()
+    # social_links nesmí leak-ovat e-mail adresu — public stránka
+    # používá kontaktní formulář (POST /contact/), e-mail zůstává
+    # serverside. Místo `email` exposujeme jen flag `has_contact_form`.
+    social_links = serializers.SerializerMethodField()
+    has_contact_form = serializers.SerializerMethodField()
 
     class Meta:
         model = Workspace
@@ -101,6 +106,7 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
             "bio",
             "location",
             "social_links",
+            "has_contact_form",
             "accent_color",
             "logo_url",
             "cover_url",
@@ -118,3 +124,30 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
 
     def get_cover_url(self, obj: Workspace) -> str | None:
         return obj.cover.url if obj.cover else None
+
+    def get_social_links(self, obj: Workspace) -> dict:
+        # Stripneme `email` z public response — bot scraper to nestáhne.
+        # Owner (čte přes /detail/) e-mail vidí, jinak ho nahrazuje
+        # contact-form flag.
+        links = obj.social_links or {}
+        request = self.context.get("request")
+        viewer_is_owner = False
+        if request and request.user.is_authenticated:
+            viewer_is_owner = WorkspaceMember.objects.filter(
+                workspace=obj,
+                user=request.user,
+                role__in=[
+                    WorkspaceMember.ROLE_OWNER,
+                    WorkspaceMember.ROLE_ADMIN,
+                ],
+            ).exists()
+        return {
+            k: v
+            for k, v in links.items()
+            if v and (viewer_is_owner or k != "email")
+        }
+
+    def get_has_contact_form(self, obj: Workspace) -> bool:
+        # True iff má email v social_links → ContactFormDialog se na
+        # public stránce zobrazí jako "Napsat komunitě" tlačítko.
+        return bool((obj.social_links or {}).get("email"))

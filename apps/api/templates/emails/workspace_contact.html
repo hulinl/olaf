@@ -1,0 +1,31 @@
+{% extends "emails/_base.html" %}
+
+{% block subject %}[{{ workspace.name }}] Zpráva z kontaktního formuláře{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Nová zpráva z {{ workspace.name }}
+  </p>
+
+  <p style="margin:0 0 20px;">
+    Přes kontaktní formulář na stránce komunity ti někdo napsal.
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+    <tr>
+      <td style="padding:18px 22px;">
+        <p style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:0.14em;color:#666;font-weight:600;">Od</p>
+        <p style="margin:0 0 14px;font-size:15px;color:#1a1a1a;">
+          {{ sender_name }} &lt;{{ sender_email }}&gt;
+        </p>
+        <p style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:0.14em;color:#666;font-weight:600;">Zpráva</p>
+        <p style="margin:0;font-size:15px;color:#1a1a1a;white-space:pre-line;">{{ message }}</p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0 0 10px;font-size:14px;color:#555;">
+    Pokud chceš odpovědět, použij „Reply" v mailovém klientu — adresa
+    odesílatele je předvyplněná.
+  </p>
+{% endblock %}
