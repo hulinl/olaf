@@ -579,90 +579,140 @@ export function EventForm({
       </Card>
 
       {(() => {
-        const shareCandidates = (ownedWorkspaces ?? []).filter(
-          (w) => w.slug !== workspaceSlug,
+        // Unified komunity model — žádná „domovská". User vidí jeden
+        // seznam komunit, ve kterých event je. Klik na ✕ ji odebere;
+        // dropdown přidá novou ze seznamu komunit, kam má user
+        // permission ke sdílení. Primární workspace (technicky FK
+        // `event.workspace`) je v listu prostě jedna z položek — bez
+        // vizuálního zvýraznění. (Backend přesune primary mezi sdílenými
+        // pokud user odebere současný primary; viz endpoint
+        // `event_move_workspace`.)
+        const shareableCommunities = (ownedWorkspaces ?? []).filter(
+          (w) => w.can_share_events,
         );
-        const homeWorkspace = (ownedWorkspaces ?? []).find(
-          (w) => w.slug === workspaceSlug,
+        // Komunity, ve kterých event teď je: workspace + shared slugs,
+        // deduplikované. Pořadí: primary první, pak shared v order.
+        const inCommunitySlugs: string[] = [
+          workspaceSlug,
+          ...sharedSlugs.filter((s) => s !== workspaceSlug),
+        ];
+        const inCommunities = inCommunitySlugs
+          .map((slug) =>
+            shareableCommunities.find((w) => w.slug === slug) ??
+            (ownedWorkspaces ?? []).find((w) => w.slug === slug) ??
+            null,
+          )
+          .filter((w): w is Workspace => w !== null);
+        const notYetInCommunitySlugs = new Set(inCommunitySlugs);
+        const availableToAdd = shareableCommunities.filter(
+          (w) => !notYetInCommunitySlugs.has(w.slug),
         );
-        const homeWorkspaceName = homeWorkspace?.name ?? workspaceSlug;
         return (
         <Card>
           <CardSection>
             <h2 className="text-base font-semibold text-ink-900">
-              Komunity
+              Sdíleno v komunitách
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              Akce patří do své <strong>domovské komunity</strong> (je to
-              její URL: <code>/{workspaceSlug}/e/{"<slug>"}</code>). Můžeš ji
-              navíc sdílet do dalších komunit, kde se objeví v jejich feedu
-              i veřejném profilu.
+              Akce se objeví v každé komunitě, kterou tu máš zaškrtnutou —
+              ve feedu i na veřejném profilu té komunity. Odškrtnutím se
+              sdílení zruší; přidat můžeš pomocí dropdownu níže.
             </p>
-            <div className="mt-4 rounded-md border border-brand/40 bg-brand/5 px-3 py-3 text-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
-                Domovská komunita
-              </p>
-              <p className="mt-1 font-medium text-ink-900">
-                {homeWorkspaceName}
-              </p>
-              {shareCandidates.length > 0 && initial && onMoveToWorkspace && (
-                <div className="mt-3">
-                  <MoveWorkspaceTrigger
-                    candidates={shareCandidates}
-                    onMove={onMoveToWorkspace}
-                  />
-                </div>
-              )}
-            </div>
-            {/* Sub-sekci „Sdílet do dalších" ukazujeme JEN když opravdu
-                jsou kam sdílet. Když má user jen jednu komunitu (= ten
-                event už v ní žije), nemá smysl mu ukazovat „Zatím nemáš
-                kam sdílet" hlášku — působí to jako že feature nefunguje.
-                User report 2026-06-25. */}
-            {shareCandidates.length > 0 && (
-              <>
-                <h3 className="mt-5 text-sm font-semibold text-ink-900">
-                  Sdílet i do dalších komunit
-                </h3>
-                <p className="mt-1 text-xs text-ink-500">
-                  Akce zůstává v domovské komunitě (viz výše). Tady jen
-                  vybereš, kde se má navíc zobrazit.
-                </p>
-                <div className="mt-3 grid grid-cols-1 gap-2">
-                  {shareCandidates.map((w) => {
-                    const checked = sharedSlugs.includes(w.slug);
-                    return (
-                      <label
-                        key={w.slug}
-                        className="flex items-start gap-3 rounded-md border border-border p-3 text-sm hover:bg-surface-muted has-[input:checked]:border-brand"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setSharedSlugs((prev) =>
-                              prev.includes(w.slug)
-                                ? prev.filter((s) => s !== w.slug)
-                                : [...prev, w.slug],
-                            )
+
+            <ul className="mt-4 flex flex-col gap-2">
+              {inCommunities.map((w) => (
+                <li
+                  key={w.slug}
+                  className="flex items-center gap-3 rounded-md border border-brand bg-brand/5 px-3 py-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked
+                    onChange={() => {
+                      // Odebrat ze seznamu. Pokud je to současný primary,
+                      // backend volání move-workspace převede event jinam.
+                      if (w.slug === workspaceSlug) {
+                        // Primary workspace — musí zůstat aspoň jedna
+                        // jiná komunita v seznamu, kterou owner umí
+                        // ovládat. Pro V1 odkážeme na move-flow.
+                        if (onMoveToWorkspace) {
+                          const candidate = inCommunities.find(
+                            (c) =>
+                              c.slug !== workspaceSlug &&
+                              (c.my_role === "owner" || c.my_role === "admin"),
+                          );
+                          if (!candidate) {
+                            // eslint-disable-next-line no-alert
+                            alert(
+                              'Akci musí někdo „vlastnit". Než ji odebereš odsud, přidej do seznamu komunitu, kde jsi vlastník nebo admin.',
+                            );
+                            return;
                           }
-                          className="mt-0.5 size-4 accent-brand"
-                        />
-                        <span className="flex flex-col">
-                          <span className="font-medium text-ink-900">
-                            {w.name}
-                          </span>
-                          {w.location && (
-                            <span className="text-xs text-ink-500">
-                              {w.location}
-                            </span>
-                          )}
-                        </span>
-                      </label>
+                          void onMoveToWorkspace(candidate.slug);
+                        }
+                        return;
+                      }
+                      setSharedSlugs((prev) =>
+                        prev.filter((s) => s !== w.slug),
+                      );
+                    }}
+                    className="size-4 accent-brand"
+                    aria-label={`Odebrat ${w.name}`}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium text-ink-900">
+                      {w.name}
+                    </span>
+                    {w.location && (
+                      <span className="truncate text-xs text-ink-500">
+                        {w.location}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {availableToAdd.length > 0 && (
+              <div className="mt-4 flex items-center gap-2">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    if (!slug) return;
+                    setSharedSlugs((prev) =>
+                      prev.includes(slug) ? prev : [...prev, slug],
                     );
-                  })}
-                </div>
-              </>
+                    e.target.value = "";
+                  }}
+                  className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+                  aria-label="Přidat komunitu, kam akci sdílet"
+                >
+                  <option value="">+ Přidat komunitu, kam sdílet…</option>
+                  {availableToAdd.map((w) => (
+                    <option key={w.slug} value={w.slug}>
+                      {w.name}
+                      {w.my_role && w.my_role !== "owner"
+                        ? ` (${w.my_role === "admin" ? "admin" : "člen"})`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {availableToAdd.length === 0 && inCommunities.length <= 1 && (
+              <p className="mt-3 text-xs text-ink-500">
+                Nemáš další komunitu, kam by se akce dala sdílet. Vytvoř
+                si komunitu nebo se přidej do existující v sekci{" "}
+                <a
+                  href="/admin/komunity"
+                  className="font-medium text-ink-700 underline hover:text-ink-900"
+                >
+                  Komunity
+                </a>
+                .
+              </p>
             )}
           </CardSection>
         </Card>

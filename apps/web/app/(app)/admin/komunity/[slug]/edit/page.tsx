@@ -82,6 +82,9 @@ export default function WorkspaceEditPage({ params }: Props) {
   const [paymentIban, setPaymentIban] = useState("");
   const [paymentBankName, setPaymentBankName] = useState("");
   const [paymentDueDays, setPaymentDueDays] = useState("14");
+  const [eventSharingPolicy, setEventSharingPolicy] = useState<
+    "admin_only" | "members"
+  >("admin_only");
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +114,9 @@ export default function WorkspaceEditPage({ params }: Props) {
         setPaymentIban(ws.payment_iban ?? "");
         setPaymentBankName(ws.payment_bank_name ?? "");
         setPaymentDueDays(String(ws.payment_due_days ?? 14));
+        setEventSharingPolicy(
+          (ws.event_sharing_policy as "admin_only" | "members") ?? "admin_only",
+        );
       })
       .catch((err) => {
         if (cancelled) return;
@@ -228,6 +234,7 @@ export default function WorkspaceEditPage({ params }: Props) {
         payment_iban: paymentIban.replace(/\s+/g, ""),
         payment_bank_name: paymentBankName,
         payment_due_days: Number(paymentDueDays) || 14,
+        event_sharing_policy: eventSharingPolicy,
       };
       const updated = await workspaces.update(slug, payload);
       setWorkspace(updated);
@@ -525,6 +532,53 @@ export default function WorkspaceEditPage({ params }: Props) {
                     />
                     <span className="flex flex-col">
                       <span className="font-medium text-ink-900">{o.label}</span>
+                      <span className="text-xs text-ink-500">{o.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </CardSection>
+          </Card>
+
+          <Card>
+            <CardSection>
+              <h2 className="text-base font-semibold text-ink-900">
+                Sdílení akcí do komunity
+              </h2>
+              <p className="mt-1 text-sm text-ink-500">
+                Kdo z členů této komunity smí do ní sdílet vlastní akce
+                (= akce se objeví v komunitním feedu).
+              </p>
+              <div className="mt-4 flex flex-col gap-2 text-sm">
+                {(
+                  [
+                    {
+                      value: "admin_only" as const,
+                      label: "Pouze admini komunity",
+                      hint: "Owner a admini můžou sdílet vlastní akce do komunity. Běžní členové ne — komunitní feed zůstává pod tvou kontrolou.",
+                    },
+                    {
+                      value: "members" as const,
+                      label: "Všichni členové komunity",
+                      hint: "Kdokoli ze členů může sdílet vlastní akce do komunity. Hodí se pro otevřenější skupiny, kde lidé pořádají vlastní setkání.",
+                    },
+                  ]
+                ).map((o) => (
+                  <label
+                    key={o.value}
+                    className="flex items-start gap-3 rounded-md border border-border p-3 hover:bg-surface-muted has-[input:checked]:border-brand"
+                  >
+                    <input
+                      type="radio"
+                      name="share"
+                      checked={eventSharingPolicy === o.value}
+                      onChange={() => setEventSharingPolicy(o.value)}
+                      className="mt-1 accent-brand"
+                    />
+                    <span className="flex flex-col">
+                      <span className="font-medium text-ink-900">
+                        {o.label}
+                      </span>
                       <span className="text-xs text-ink-500">{o.hint}</span>
                     </span>
                   </label>

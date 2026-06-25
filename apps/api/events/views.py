@@ -794,26 +794,51 @@ def _set_event_communities(event: Event, community_slugs: list[str]) -> None:
 def _set_event_shared_workspaces(
     event: Event, workspace_slugs: list[str], *, requesting_user
 ) -> None:
-    """Replace shared_workspaces with the given slugs, but only attach
-    workspaces the requesting user actually owns. The primary owner
-    workspace (event.workspace) is never added here — it's already the
-    canonical owner via the FK."""
+    """Replace shared_workspaces with the given slugs.
+
+    Akceptuje jakoukoliv komunitu, ve které má requesting_user
+    permission ke sdílení events:
+      - role OWNER nebo ADMIN — vždy,
+      - role MEMBER — jen pokud má komunita
+        `event_sharing_policy=members`.
+
+    Personal workspace + primary workspace eventu se přeskakují
+    (primary už je via FK, personal nemá smysl ve share linku).
+    """
     from workspaces.models import Workspace, WorkspaceMember
 
     if not workspace_slugs:
         event.shared_workspaces.clear()
         return
 
-    owned_slugs = set(
-        WorkspaceMember.objects.filter(
-            user=requesting_user,
-            role=WorkspaceMember.ROLE_OWNER,
-        ).values_list("workspace__slug", flat=True)
+    # Mapa user-ových workspace memberships → role.
+    memberships = (
+        WorkspaceMember.objects.filter(user=requesting_user)
+        .select_related("workspace")
     )
-    target_slugs = [
-        s for s in workspace_slugs
-        if s in owned_slugs and s != event.workspace.slug
-    ]
+    role_by_slug: dict[str, str] = {
+        m.workspace.slug: m.role for m in memberships
+    }
+    workspace_by_slug: dict[str, Workspace] = {
+        m.workspace.slug: m.workspace for m in memberships
+    }
+
+    target_slugs: list[str] = []
+    for slug in workspace_slugs:
+        if slug == event.workspace.slug:
+            continue
+        role = role_by_slug.get(slug)
+        if not role:
+            continue
+        ws = workspace_by_slug[slug]
+        if ws.is_personal:
+            continue
+        if role in (
+            WorkspaceMember.ROLE_OWNER,
+            WorkspaceMember.ROLE_ADMIN,
+        ) or ws.event_sharing_policy == Workspace.EVENT_SHARING_MEMBERS:
+            target_slugs.append(slug)
+
     matches = Workspace.objects.filter(slug__in=target_slugs)
     event.shared_workspaces.set(matches)
 
