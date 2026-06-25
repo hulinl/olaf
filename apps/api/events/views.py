@@ -2523,6 +2523,345 @@ def my_rsvp_document_detail(
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def event_move_workspace(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Move an event to a different workspace owned by the same user.
+
+    User report 2026-06-25: akce vytvořená v personal-2 (před tím, než
+    si user založil olaf-adventures) má URL `/personal-2/e/<slug>/` a
+    visí pod jeho personal komunitou. Chce ji přesunout do
+    `olaf-adventures` — tady je endpoint.
+
+    Bezpečnost: target workspace musí být v role OWNER pro tohoto
+    user-a. Slug se NEmění; redirect handle na frontend (nová URL
+    `/<new-ws>/e/<slug>/`). Existující RSVPs zůstávají, fakturace
+    + audit log dál odkazují na původní event id.
+    """
+    from workspaces.models import Workspace, WorkspaceMember
+
+    from .models import Event
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+
+    target_slug = (request.data.get("target_workspace_slug") or "").strip()
+    if not target_slug:
+        return Response(
+            {"target_workspace_slug": "Vyplň cílovou komunitu."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if target_slug == event.workspace.slug:
+        return Response(
+            {"target_workspace_slug": "Akce už v této komunitě je."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        target_ws = Workspace.objects.get(slug=target_slug)
+    except Workspace.DoesNotExist:
+        return Response(
+            {"target_workspace_slug": "Komunita neexistuje."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    is_owner_of_target = WorkspaceMember.objects.filter(
+        user=request.user,
+        workspace=target_ws,
+        role__in=[WorkspaceMember.ROLE_OWNER, WorkspaceMember.ROLE_ADMIN],
+    ).exists()
+    if not is_owner_of_target:
+        return Response(
+            {"target_workspace_slug": "Nemáš oprávnění do této komunity."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Pokud event ve `shared_workspaces` cílovou ws obsahuje, odstranit
+    # ji odtud (po move se stane primární — držet ji v share linku
+    # by mátlo).
+    event.shared_workspaces.remove(target_ws)
+
+    # Slug unique pouze v rámci workspace — po přesunu může konfliktovat
+    # s jiným event slug-em pod cílovou komunitou.
+    if Event.objects.filter(workspace=target_ws, slug=event.slug).exclude(pk=event.pk).exists():
+        return Response(
+            {
+                "target_workspace_slug": (
+                    f'V komunitě „{target_ws.name}" už existuje akce se stejným slug-em.'
+                ),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    old_workspace_slug = event.workspace.slug
+    event.workspace = target_ws
+    event.save(update_fields=["workspace", "updated_at"])
+
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action="event.move_workspace",
+        workspace=target_ws,
+        target_type="event",
+        target_id=event.pk,
+        summary=(
+            f'Přesunul akci „{event.title}" '
+            f'z {old_workspace_slug} do {target_ws.slug}'
+        ),
+        payload={
+            "old_workspace_slug": old_workspace_slug,
+            "new_workspace_slug": target_ws.slug,
+            "event_slug": event.slug,
+        },
+    )
+
+    return Response(
+        {
+            "ok": True,
+            "new_workspace_slug": target_ws.slug,
+            "event_slug": event.slug,
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Documents bulk view — owner-side review across all RSVPs of an event
+# ---------------------------------------------------------------------------
+
+
+def _serialize_doc_for_owner(
+    doc, *, request: Request
+) -> dict:
+    rsvp = doc.rsvp
+    user = rsvp.user
+    user_name = user.get_full_name() if user else ""
+    user_email = user.email if user else ""
+    # required_documents je list — najdeme label podle key
+    label = ""
+    for entry in rsvp.event.required_documents or []:
+        if entry.get("key") == doc.key:
+            label = entry.get("label") or ""
+            break
+    try:
+        url = (
+            request.build_absolute_uri(doc.file.url)
+            if request
+            else doc.file.url
+        )
+    except Exception:
+        url = ""
+    return {
+        "id": doc.pk,
+        "rsvp_id": rsvp.pk,
+        "user_id": rsvp.user_id,
+        "user_full_name": user_name,
+        "user_email": user_email,
+        "key": doc.key,
+        "label": label,
+        "original_name": doc.original_name,
+        "url": url,
+        "uploaded_at": doc.uploaded_at,
+        "verified_at": doc.verified_at,
+        "verified_by_name": (
+            doc.verified_by.get_full_name() if doc.verified_by else ""
+        ),
+        "rejected_at": doc.rejected_at,
+        "rejected_by_name": (
+            doc.rejected_by.get_full_name() if doc.rejected_by else ""
+        ),
+        "reject_reason": doc.reject_reason,
+        "status": doc.status,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_documents(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner-side bulk view všech nahraných dokumentů pro event.
+
+    Vrací list dokumentů napříč všemi účastníky + souhrn požadavků
+    z `event.required_documents`. Frontend si je sám seskupí podle
+    účastníka nebo statusu.
+    """
+    from .models import RSVPDocument
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+
+    docs = (
+        RSVPDocument.objects.filter(rsvp__event=event)
+        .select_related("rsvp__user", "rsvp__event", "verified_by", "rejected_by")
+        .order_by("rsvp__user__last_name", "rsvp__user__first_name", "key", "-uploaded_at")
+    )
+    return Response(
+        {
+            "required_documents": event.required_documents or [],
+            "documents": [
+                _serialize_doc_for_owner(d, request=request) for d in docs
+            ],
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def event_document_verify(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    document_id: int,
+) -> Response:
+    """Owner označí dokument za schválený."""
+    from audit.services import log as audit_log
+
+    from .models import RSVPDocument
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        doc = RSVPDocument.objects.select_related("rsvp__user").get(
+            pk=document_id, rsvp__event=event
+        )
+    except RSVPDocument.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    doc.verified_at = timezone.now()
+    doc.verified_by = request.user
+    # Verify ruší případný reject — fresh „ok" stav.
+    doc.rejected_at = None
+    doc.rejected_by = None
+    doc.reject_reason = ""
+    doc.save(
+        update_fields=[
+            "verified_at",
+            "verified_by",
+            "rejected_at",
+            "rejected_by",
+            "reject_reason",
+        ]
+    )
+
+    user_name = doc.rsvp.user.get_full_name() if doc.rsvp.user else "(neznámý)"
+    audit_log(
+        actor=request.user,
+        action="rsvp.doc_verify",
+        workspace=event.workspace,
+        target_type="rsvp_document",
+        target_id=doc.pk,
+        summary=f'Schválil dokument „{doc.original_name or doc.key}" účastníka {user_name}',
+        payload={"event_slug": event.slug, "rsvp_id": doc.rsvp_id, "key": doc.key},
+    )
+    return Response(_serialize_doc_for_owner(doc, request=request))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def event_document_unverify(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    document_id: int,
+) -> Response:
+    """Owner zruší předchozí schválení (např. po druhém pohledu)."""
+    from .models import RSVPDocument
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+    try:
+        doc = RSVPDocument.objects.get(pk=document_id, rsvp__event=event)
+    except RSVPDocument.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    doc.verified_at = None
+    doc.verified_by = None
+    doc.save(update_fields=["verified_at", "verified_by"])
+    return Response(_serialize_doc_for_owner(doc, request=request))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def event_document_reject(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    document_id: int,
+) -> Response:
+    """Owner zamítne dokument s důvodem. Účastníkovi pošleme e-mail."""
+    from audit.services import log as audit_log
+
+    from .emails import send_rsvp_document_rejected
+    from .models import RSVPDocument
+
+    event, err = _owner_event_or_403(request, workspace_slug, event_slug)
+    if err:
+        return err
+
+    reason = (request.data.get("reason") or "").strip()
+    if not reason:
+        return Response(
+            {"reason": "Vyplň důvod, ať účastník ví, co je špatně."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if len(reason) > 500:
+        return Response(
+            {"reason": "Důvod je moc dlouhý (max 500 znaků)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        doc = RSVPDocument.objects.select_related(
+            "rsvp__user", "rsvp__event"
+        ).get(pk=document_id, rsvp__event=event)
+    except RSVPDocument.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    doc.rejected_at = timezone.now()
+    doc.rejected_by = request.user
+    doc.reject_reason = reason
+    # Reject ruší případný verified stav.
+    doc.verified_at = None
+    doc.verified_by = None
+    doc.save(
+        update_fields=[
+            "rejected_at",
+            "rejected_by",
+            "reject_reason",
+            "verified_at",
+            "verified_by",
+        ]
+    )
+
+    user_name = doc.rsvp.user.get_full_name() if doc.rsvp.user else "(neznámý)"
+    audit_log(
+        actor=request.user,
+        action="rsvp.doc_reject",
+        workspace=event.workspace,
+        target_type="rsvp_document",
+        target_id=doc.pk,
+        summary=f'Zamítl dokument „{doc.original_name or doc.key}" účastníka {user_name}',
+        payload={
+            "event_slug": event.slug,
+            "rsvp_id": doc.rsvp_id,
+            "key": doc.key,
+            "reason": reason,
+        },
+    )
+
+    with contextlib.suppress(Exception):
+        send_rsvp_document_rejected(doc)
+
+    return Response(_serialize_doc_for_owner(doc, request=request))
+
+
 # ---------------------------------------------------------------------------
 # Slice 8 — Invoices (V1 minimum: list, detail, edit; no PDF yet)
 # ---------------------------------------------------------------------------

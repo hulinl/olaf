@@ -726,6 +726,25 @@ export interface HiddenPersonSummary {
   hidden_at: string | null;
 }
 
+export interface EventDocument {
+  id: number;
+  rsvp_id: number;
+  user_id: number;
+  user_full_name: string;
+  user_email: string;
+  key: string;
+  label: string;
+  original_name: string;
+  url: string;
+  uploaded_at: string;
+  verified_at: string | null;
+  verified_by_name: string;
+  rejected_at: string | null;
+  rejected_by_name: string;
+  reject_reason: string;
+  status: "pending" | "verified" | "rejected";
+}
+
 export interface EventCollaborator {
   id: number;
   user_id: number;
@@ -1686,6 +1705,52 @@ export const events = {
    *  EventCollaborator záznam, takže re-přihlášení projde standardním
    *  schvalováním. `rejectRsvp` umí jen `pending_approval`; tohle je
    *  univerzální (duplikáty, organizátoři, odhlášení účastníci). */
+  listEventDocuments: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<{
+      required_documents: { key: string; label: string; required: boolean }[];
+      documents: EventDocument[];
+    }>(`/api/events/${workspaceSlug}/${eventSlug}/documents/`),
+  verifyDocument: (
+    workspaceSlug: string,
+    eventSlug: string,
+    documentId: number,
+  ) =>
+    apiFetch<EventDocument>(
+      `/api/events/${workspaceSlug}/${eventSlug}/documents/${documentId}/verify/`,
+      { method: "POST" },
+    ),
+  unverifyDocument: (
+    workspaceSlug: string,
+    eventSlug: string,
+    documentId: number,
+  ) =>
+    apiFetch<EventDocument>(
+      `/api/events/${workspaceSlug}/${eventSlug}/documents/${documentId}/unverify/`,
+      { method: "POST" },
+    ),
+  rejectDocument: (
+    workspaceSlug: string,
+    eventSlug: string,
+    documentId: number,
+    reason: string,
+  ) =>
+    apiFetch<EventDocument>(
+      `/api/events/${workspaceSlug}/${eventSlug}/documents/${documentId}/reject/`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+    ),
+  moveEventToWorkspace: (
+    workspaceSlug: string,
+    eventSlug: string,
+    targetWorkspaceSlug: string,
+  ) =>
+    apiFetch<{
+      ok: true;
+      new_workspace_slug: string;
+      event_slug: string;
+    }>(`/api/events/${workspaceSlug}/${eventSlug}/move-workspace/`, {
+      method: "POST",
+      body: JSON.stringify({ target_workspace_slug: targetWorkspaceSlug }),
+    }),
   removeRsvp: (workspaceSlug: string, eventSlug: string, rsvpId: number) =>
     apiFetch<{ removed: true; rsvp_id: number }>(
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/remove/`,

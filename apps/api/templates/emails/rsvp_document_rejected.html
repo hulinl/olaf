@@ -1,0 +1,38 @@
+{% extends "emails/_base.html" %}
+{% load czech %}
+
+{% block subject %}Dokument vyžaduje opravu — {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name|czech_vocative }},
+  </p>
+
+  <p style="margin:0 0 20px;">
+    pořadatel akce <strong>„{{ event.title }}"</strong> vrátil tvůj dokument
+    <strong>„{{ label }}"</strong> k opravě.
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+    <tr>
+      <td style="padding:18px 22px;">
+        <p style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:0.14em;color:#666;font-weight:600;">Důvod</p>
+        <p style="margin:0;font-size:15px;color:#1a1a1a;white-space:pre-line;">{{ reason }}</p>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0 0 24px;">
+    Otevři stránku akce a nahraj nový soubor. Až ho organizátor schválí, dáme ti vědět.
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;">
+    <tr>
+      <td style="background-color:#f4994b;border-radius:8px;">
+        <a href="{{ event_url }}" style="display:inline-block;padding:12px 22px;color:#1a1a1a;text-decoration:none;font-weight:600;font-size:15px;">
+          Otevřít akci →
+        </a>
+      </td>
+    </tr>
+  </table>
+{% endblock %}

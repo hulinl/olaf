@@ -199,6 +199,31 @@ urlpatterns = [
         name="rsvp-document-detail",
     ),
     path(
+        "<slug:workspace_slug>/<slug:event_slug>/move-workspace/",
+        views.event_move_workspace,
+        name="event-move-workspace",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/documents/",
+        views.event_documents,
+        name="event-documents",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/documents/<int:document_id>/verify/",
+        views.event_document_verify,
+        name="event-document-verify",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/documents/<int:document_id>/unverify/",
+        views.event_document_unverify,
+        name="event-document-unverify",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/documents/<int:document_id>/reject/",
+        views.event_document_reject,
+        name="event-document-reject",
+    ),
+    path(
         "<slug:workspace_slug>/<slug:event_slug>/invoices/",
         views.event_invoices,
         name="invoices",

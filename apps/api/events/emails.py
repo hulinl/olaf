@@ -123,3 +123,32 @@ def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
         },
         recipient_list=[rsvp.user.email],
     )
+
+
+def send_rsvp_document_rejected(doc) -> None:
+    """Notify participant that owner rejected a previously uploaded
+    document — typicky scan / fotka byla nečitelná nebo chyběl podpis.
+    User dostane reason + odkaz na re-upload, takže může okamžitě
+    nahrát nový soubor."""
+    rsvp = doc.rsvp
+    event = rsvp.event
+    if rsvp.user is None or not rsvp.user.email:
+        return
+    label = doc.key
+    for entry in event.required_documents or []:
+        if entry.get("key") == doc.key:
+            label = entry.get("label") or doc.key
+            break
+    send_branded_email(
+        subject=f"Dokument vyžaduje opravu — {event.title}",
+        template_base="emails/rsvp_document_rejected",
+        context={
+            "user": rsvp.user,
+            "event": event,
+            "workspace": event.workspace,
+            "label": label,
+            "reason": doc.reject_reason,
+            "event_url": _frontend_event_url(event),
+        },
+        recipient_list=[rsvp.user.email],
+    )

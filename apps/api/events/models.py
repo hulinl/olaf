@@ -761,7 +761,8 @@ class RSVPDocument(models.Model):
     Owner defines required documents on the Event; participants upload
     files keyed by the document's `key`. We allow multiple uploads per
     (rsvp, key) and use the most recent as canonical (so users can fix
-    a mistake). Owner reviews/approves via `verified_at`.
+    a mistake). Owner reviews/approves via `verified_at` or rejects via
+    `rejected_at` + free-text `reject_reason` (mail to user).
     """
 
     rsvp = models.ForeignKey(
@@ -782,6 +783,19 @@ class RSVPDocument(models.Model):
         blank=True,
         related_name="verified_rsvp_documents",
     )
+    # Reject flow (V1 — odděleno od `verified`). Owner může dokument
+    # zamítnout s textovým důvodem — backend pošle účastníkovi e-mail,
+    # ten ví, co je špatně, a může nahrát znovu. Nový upload pod stejný
+    # klíč implicitně překryje rejected záznam (latest = canonical).
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rejected_rsvp_documents",
+    )
+    reject_reason = models.CharField(max_length=500, blank=True, default="")
 
     class Meta:
         db_table = "events_rsvpdocument"
@@ -790,6 +804,14 @@ class RSVPDocument(models.Model):
 
     def __str__(self) -> str:
         return f"{self.rsvp_id}/{self.key} (#{self.pk})"
+
+    @property
+    def status(self) -> str:
+        if self.rejected_at:
+            return "rejected"
+        if self.verified_at:
+            return "verified"
+        return "pending"
 
 
 class Invoice(models.Model):
