@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field } from "@/components/ui/field";
 import { ApiError, type APITokenInfo, auth } from "@/lib/api";
 
@@ -135,6 +136,7 @@ function ApiTokensCard() {
   const [busy, setBusy] = useState(false);
   const [justCreatedKey, setJustCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const confirmDialog = useConfirm();
 
   useEffect(() => {
     void refresh();
@@ -176,9 +178,14 @@ function ApiTokensCard() {
   }
 
   async function handleRevoke(id: number, name: string) {
-    if (!confirm(`Zrušit token „${name}"? Externí klient s ním přestane fungovat.`)) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: `Zrušit token „${name}"?`,
+      description:
+        "Externí klient s tímto tokenem okamžitě přestane fungovat. Akce se nedá vrátit — pokud token potřebuješ znovu, musíš vystavit nový.",
+      confirmLabel: "Zrušit token",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
@@ -411,6 +418,7 @@ function IntegrationCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   useEffect(() => {
     get()
@@ -444,7 +452,14 @@ function IntegrationCard({
   }
 
   async function handleRemove() {
-    if (!confirm(`Odpojit ${title}? Token z databáze odstraníme.`)) return;
+    const ok = await confirmDialog({
+      title: `Odpojit ${title}?`,
+      description:
+        "Token z databáze smažeme. Aplikace co se na něj váže přestane fungovat — pokud ho potřebuješ znovu, musíš ho zase vložit.",
+      confirmLabel: "Odpojit",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     setMsg(null);

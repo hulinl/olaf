@@ -79,9 +79,24 @@ export default function InvitationAcceptPage({ params }: Props) {
           Pozvánka neexistuje
         </h1>
         <p className="mt-2 text-ink-500">
-          Odkaz mohl být zneplatněn nebo už byl použit. Kontaktuj
-          vlastníka komunity.
+          Odkaz mohl být zneplatněn nebo už byl použit. Pokud čekáš
+          pozvánku do konkrétní komunity, popros pořadatele o nový
+          odkaz — staré linky vypršely.
         </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            Zpět na hlavní stránku
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90 focus-ring"
+          >
+            Přihlásit se
+          </Link>
+        </div>
       </PageShell>
     );
   }

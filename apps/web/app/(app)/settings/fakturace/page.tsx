@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CountryPicker } from "@/components/ui/country-picker";
 import { Field, Input } from "@/components/ui/field";
 import {
@@ -39,6 +40,7 @@ export default function BillingProfilesPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function reload() {
     try {
@@ -79,7 +81,14 @@ export default function BillingProfilesPage() {
   }
 
   async function remove(id: number) {
-    if (!confirm("Smazat tento fakturační profil?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat tento fakturační profil?",
+      description:
+        "Profil zmizí z přepínače u nových akcí. Už vystavené faktury zůstanou — držíme si jejich vlastní snapshot.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await auth.deleteBillingProfile(id);
       await reload();
