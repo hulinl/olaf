@@ -226,11 +226,18 @@ export default async function WorkspaceProfilePage({ params }: Props) {
           </div>
         </section>
 
-        {/* PAST */}
-        {past.length > 0 && (
-          <section className="bg-canvas">
-            <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
-              <SectionHead eyebrow="Archiv" title="Minulé akce" />
+        {/* PAST — sekce vždy viditelná, i když je archiv prázdný.
+            Předtím se podmiňovala `past.length > 0` a po unshare
+            posledního minulého eventu úplně mizela ze stránky.
+            User pak nevěděl, kde sekce vlastně je. */}
+        <section className="bg-canvas">
+          <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
+            <SectionHead eyebrow="Archiv" title="Minulé akce" />
+            {past.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center text-ink-500">
+                Žádné minulé akce. Tady se časem objeví archiv.
+              </p>
+            ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {past.map((e) => (
                   <EventCard
@@ -241,9 +248,9 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                   />
                 ))}
               </div>
-            </div>
-          </section>
-        )}
+            )}
+          </div>
+        </section>
 
         <AppFooter />
       </main>
