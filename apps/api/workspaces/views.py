@@ -174,8 +174,9 @@ def my_personal_workspace(request: Request) -> Response:
 def my_workspaces(request: Request) -> Response:
     """Workspaces the current user belongs to (any role).
 
-    Returns workspace data + the viewer's role on each (so the frontend
-    can show owner controls without a second request).
+    Returns workspace data + viewer's role on each + `can_share_events`
+    flag (= true iff user může do téhle komunity sdílet akce — owner/
+    admin vždy, members jen pokud `event_sharing_policy=members`).
     """
     memberships = (
         WorkspaceMember.objects.filter(user=request.user)
@@ -189,8 +190,18 @@ def my_workspaces(request: Request) -> Response:
             m.workspace, context={"request": request}
         ).data
         data["my_role"] = m.role
+        data["can_share_events"] = _user_can_share_events(m.role, m.workspace)
         out.append(data)
     return Response(out)
+
+
+def _user_can_share_events(role: str, workspace: Workspace) -> bool:
+    """Owner + admin smí vždy. Běžný member jen pokud má komunita
+    politiku „members". Použito v `my_workspaces` + při validaci
+    PATCH event.community_slugs."""
+    if role in (WorkspaceMember.ROLE_OWNER, WorkspaceMember.ROLE_ADMIN):
+        return True
+    return workspace.event_sharing_policy == Workspace.EVENT_SHARING_MEMBERS
 
 
 @api_view(["GET", "PATCH"])

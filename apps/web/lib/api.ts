@@ -223,9 +223,15 @@ export interface Workspace {
   payment_due_days: number;
   created_at: string;
   /** Present on /workspaces/mine/ + /workspaces/{slug}/detail/ for auth'd members. */
-  my_role?: "owner" | "admin" | null;
+  my_role?: "owner" | "admin" | "member" | null;
   /** Present on /workspaces/{slug}/detail/. */
   member_count?: number;
+  /** Per-komunita policy: kdo smí sdílet eventy do téhle komunity.
+   *  `admin_only` = jen owner/admin · `members` = i běžní členové. */
+  event_sharing_policy?: "admin_only" | "members";
+  /** Computed (na `/mine/`): true iff user smí do téhle komunity sdílet
+   *  eventy. Owner/admin = vždy, member jen pokud `policy=members`. */
+  can_share_events?: boolean;
 }
 
 export interface EventSummary {
@@ -977,6 +983,7 @@ export interface WorkspaceWritePayload {
   payment_iban?: string;
   payment_bank_name?: string;
   payment_due_days?: number;
+  event_sharing_policy?: "admin_only" | "members";
 }
 
 export interface WorkspaceCreatePayload {

@@ -78,6 +78,24 @@ class Workspace(models.Model):
         db_index=True,
     )
 
+    # Kdo smí do téhle komunity sdílet události. Owner si nastaví:
+    #   - `admin_only` (default) — pouze owner / admin komunity,
+    #   - `members` — i běžní členové (užitečné pro „komunita pořádá
+    #     spoustu drobných akcí, sdílet smí kdokoli").
+    # Backend validuje při PATCH `event.community_slugs`.
+    EVENT_SHARING_ADMIN_ONLY = "admin_only"
+    EVENT_SHARING_MEMBERS = "members"
+    EVENT_SHARING_CHOICES = [
+        (EVENT_SHARING_ADMIN_ONLY, "Pouze admini komunity"),
+        (EVENT_SHARING_MEMBERS, "Všichni členové komunity"),
+    ]
+    event_sharing_policy = models.CharField(
+        max_length=20,
+        choices=EVENT_SHARING_CHOICES,
+        default=EVENT_SHARING_ADMIN_ONLY,
+        help_text="Kdo smí do téhle komunity sdílet události.",
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
