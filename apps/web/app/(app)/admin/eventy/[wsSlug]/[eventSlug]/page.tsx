@@ -12,6 +12,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ShareButton } from "@/components/ui/share-button";
 import {
   ApiError,
+  contracts,
   type Event as OlafEvent,
   type RSVPRecord,
   events,
@@ -655,6 +656,13 @@ function RsvpRow({
       <td className="whitespace-nowrap px-4 py-3 text-right">
         {rsvp.is_organizer || rsvp.status === "cancelled" ? (
           <span className="text-ink-300">—</span>
+        ) : rsvp.contract?.configured ? (
+          <ContractCell
+            rsvp={rsvp}
+            wsSlug={wsSlug}
+            eventSlug={eventSlug}
+            onUpdate={onUpdate}
+          />
         ) : (
           <DocCell
             docKey="smlouva"
@@ -788,6 +796,103 @@ function InvoiceCell({
     >
       Vystaveno →
     </Link>
+  );
+}
+
+const CONTRACT_STATUS_LABEL: Record<
+  NonNullable<RSVPRecord["contract"]>["status"],
+  string
+> = {
+  not_sent: "Neposláno",
+  pending: "Připraveno",
+  sent: "K podpisu",
+  signed: "Podepsáno",
+  rejected: "Odmítnuto",
+  expired: "Vypršelo",
+};
+
+const CONTRACT_STATUS_TONE: Record<
+  NonNullable<RSVPRecord["contract"]>["status"],
+  string
+> = {
+  not_sent: "bg-ink-100 text-ink-700",
+  pending: "bg-warning/15 text-warning",
+  sent: "bg-brand/15 text-brand",
+  signed: "bg-success/15 text-success",
+  rejected: "bg-danger-soft text-danger",
+  expired: "bg-ink-100 text-ink-500",
+};
+
+function ContractCell({
+  rsvp,
+  wsSlug,
+  eventSlug,
+  onUpdate,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+  onUpdate: (updated: RSVPRecord) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const contract = rsvp.contract;
+  if (!contract) return <span className="text-ink-300">—</span>;
+
+  async function sendForSigning() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // Backend vrátí RSVPContract; my refreshneme RSVP record přes
+      // light request, ať se status v UI updatne. Simpler: backend
+      // mark + caller updatne pomocí onUpdate.
+      const rc = await contracts.sendRsvpContract(wsSlug, eventSlug, rsvp.id);
+      onUpdate({
+        ...rsvp,
+        contract: {
+          configured: true,
+          template_name: contract!.template_name,
+          rsvp_contract_id: rc.id,
+          status: rc.status,
+          signing_url: rc.signing_url,
+          signed_at: rc.signed_at,
+          sent_at: rc.sent_at,
+        },
+      });
+    } catch {
+      /* quietly fail */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span
+        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${CONTRACT_STATUS_TONE[contract.status]}`}
+      >
+        {CONTRACT_STATUS_LABEL[contract.status]}
+      </span>
+      {contract.status === "not_sent" && (
+        <button
+          type="button"
+          onClick={sendForSigning}
+          disabled={busy}
+          className="text-[11px] font-medium text-brand hover:text-brand-hover disabled:opacity-50"
+        >
+          {busy ? "..." : "Poslat k podpisu"}
+        </button>
+      )}
+      {contract.status === "sent" && contract.signing_url && (
+        <a
+          href={contract.signing_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] font-medium text-ink-500 hover:text-ink-900"
+        >
+          Otevřít link ↗
+        </a>
+      )}
+    </div>
   );
 }
 
