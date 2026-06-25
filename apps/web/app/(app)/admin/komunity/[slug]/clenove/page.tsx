@@ -1482,6 +1482,7 @@ function TagManageDialog({
 }) {
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("");
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1526,12 +1527,14 @@ function TagManageDialog({
   }
 
   async function remove(t: PersonTag) {
-    if (
-      !confirm(
-        `Smazat tag „${t.name}"? Odebere se ze všech lidí, ale samotní lidi zůstanou.`,
-      )
-    )
-      return;
+    const ok = await confirmDialog({
+      title: `Smazat tag „${t.name}"?`,
+      description:
+        "Tag se odebere ze všech lidí, ale samotní lidi v komunitě zůstanou. Jen ztratí toto označení.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await workspaces.deleteTag(wsSlug, t.id);
       onChange(tags.filter((x) => x.id !== t.id));

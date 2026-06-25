@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -104,6 +105,7 @@ function CategorySection({
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   // Count items per category so the owner can see what's actually used.
   const usageById = new Map<number, number>();
@@ -141,11 +143,15 @@ function CategorySection({
 
   async function remove(c: GearCategory) {
     const usage = usageById.get(c.id) ?? 0;
-    const ok = confirm(
-      usage > 0
-        ? `Smazat kategorii „${c.name}"? Položky zůstanou, ale ztratí kategorii (${usage} ks).`
-        : `Smazat kategorii „${c.name}"?`,
-    );
+    const ok = await confirmDialog({
+      title: `Smazat kategorii „${c.name}"?`,
+      description:
+        usage > 0
+          ? `Položky kategorii ztratí (${usage} ks), ale samotné položky zůstanou — jen budou bez zařazení.`
+          : "Kategorie je prázdná, smazání je čistá akce.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
     if (!ok) return;
     try {
       await gear.deleteCategory(c.id);
@@ -857,6 +863,7 @@ function ItemRow({
   hideCategoryCell?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const confirmDialog = useConfirm();
 
   if (editing) {
     return (
@@ -873,7 +880,14 @@ function ItemRow({
               await onChange();
             }}
             onDelete={async () => {
-              if (!confirm(`Smazat položku „${item.name}"?`)) return;
+              const ok = await confirmDialog({
+                title: `Smazat položku „${item.name}"?`,
+                description:
+                  "Položka zmizí ze všech tvých gear seznamů. Akce se nedá vrátit.",
+                confirmLabel: "Smazat",
+                variant: "danger",
+              });
+              if (!ok) return;
               await gear.deleteItem(item.id);
               setEditing(false);
               await onChange();
@@ -1359,9 +1373,17 @@ function ListCard({
    *  controls stay so the owner can keep tweaking metadata even when
    *  the long list is folded). */
   const [itemsOpen, setItemsOpen] = useState(true);
+  const confirmDialog = useConfirm();
 
   async function handleDelete() {
-    if (!confirm(`Smazat seznam „${list.name}"?`)) return;
+    const ok = await confirmDialog({
+      title: `Smazat seznam „${list.name}"?`,
+      description:
+        "Položky uvnitř seznamu zůstanou v katalogu, ale jejich propojení s tímto listem se ztratí.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     await gear.deleteList(list.id);
     await onChange();
   }
@@ -1677,7 +1699,12 @@ function ItemPicker({
           type="button"
           onClick={confirm}
           disabled={pickedId == null}
-          className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+          title={
+            pickedId == null
+              ? "Nejprve vyber položku ze seznamu vlevo"
+              : undefined
+          }
+          className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-ink hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
         >
           Přidat
         </button>

@@ -314,9 +314,17 @@ function FallbackHero({
               Přihlásit se
             </Link>
           ) : (
-            <span className="text-sm text-ink-500">
-              Registrace zatím není otevřená.
-            </span>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-ink-500">
+                Registrace zatím není otevřená.
+              </span>
+              <Link
+                href={`/${event.workspace_slug}`}
+                className="inline-flex items-center text-sm font-medium text-ink-700 underline hover:text-ink-900"
+              >
+                Kontakt na pořadatele najdeš na stránce komunity →
+              </Link>
+            </div>
           )}
         </div>
       </div>
