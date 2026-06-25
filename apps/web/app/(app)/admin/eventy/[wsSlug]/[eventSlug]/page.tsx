@@ -185,6 +185,13 @@ function AdminEventDetail({ params }: Props) {
           >
             Upravit akci →
           </LinkButton>
+          <LinkButton
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/dokumenty`}
+            variant="ghost"
+            size="md"
+          >
+            Dokumenty →
+          </LinkButton>
           <a
             href={`/${wsSlug}/e/${eventSlug}`}
             target="_blank"

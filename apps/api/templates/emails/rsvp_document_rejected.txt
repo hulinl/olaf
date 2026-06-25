@@ -1,0 +1,12 @@
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
+
+pořadatel akce „{{ event.title }}" vrátil tvůj dokument „{{ label }}" k opravě.
+
+Důvod:
+{{ reason }}
+
+Stránka akce: {{ event_url }}
+
+Otevři stránku akce a nahraj nový soubor. Až ho schválí, dáme ti vědět.
+
+— Aplikace olaf

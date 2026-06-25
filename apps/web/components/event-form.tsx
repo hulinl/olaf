@@ -45,6 +45,13 @@ interface Props {
   onSubmit: (payload: EventWritePayload) => Promise<OlafEvent>;
   onSuccess: (event: OlafEvent) => void;
   submitLabel: string;
+  /** Edit-mode-only: pokud je definované, ukáže se „Přesunout do…"
+   *  trigger v sekci Komunity, který akci přepne pod jiný workspace.
+   *  Callback dostane cílový slug, vrátí novou URL ke které router
+   *  routovne. */
+  onMoveToWorkspace?: (
+    targetWorkspaceSlug: string,
+  ) => Promise<{ new_workspace_slug: string; event_slug: string }>;
 }
 
 /**
@@ -108,6 +115,7 @@ export function EventForm({
   onSubmit,
   onSuccess,
   submitLabel,
+  onMoveToWorkspace,
 }: Props) {
   const isEdit = Boolean(initial);
 
@@ -574,25 +582,45 @@ export function EventForm({
         const shareCandidates = (ownedWorkspaces ?? []).filter(
           (w) => w.slug !== workspaceSlug,
         );
-        // Vždy ukážeme kartu, i když user ještě jinou komunitu nemá.
-        // Bez tohohle hint-u user neví, že feature existuje — user
-        // report 2026-06-25: "nikde na eventu nastavení jsem nenašel
-        // možnost přidat nebo odebrat akci z komunity".
+        const homeWorkspace = (ownedWorkspaces ?? []).find(
+          (w) => w.slug === workspaceSlug,
+        );
+        const homeWorkspaceName = homeWorkspace?.name ?? workspaceSlug;
         return (
         <Card>
           <CardSection>
             <h2 className="text-base font-semibold text-ink-900">
-              Sdílet do dalších komunit
+              Komunity
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              Akce vždy patří do své domovské komunity (vidíš ji v jejím
-              dashboardu). Pokud máš víc komunit, můžeš ji ukázat i
-              v dalších — objeví se v jejich feedu i veřejném profilu.
+              Akce patří do své <strong>domovské komunity</strong> (je to
+              její URL: <code>/{workspaceSlug}/e/{"<slug>"}</code>). Můžeš ji
+              navíc sdílet do dalších komunit, kde se objeví v jejich feedu
+              i veřejném profilu.
             </p>
+            <div className="mt-4 rounded-md border border-brand/40 bg-brand/5 px-3 py-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+                Domovská komunita
+              </p>
+              <p className="mt-1 font-medium text-ink-900">
+                {homeWorkspaceName}
+              </p>
+              {shareCandidates.length > 0 && initial && onMoveToWorkspace && (
+                <div className="mt-3">
+                  <MoveWorkspaceTrigger
+                    candidates={shareCandidates}
+                    onMove={onMoveToWorkspace}
+                  />
+                </div>
+              )}
+            </div>
+            <h3 className="mt-5 text-sm font-semibold text-ink-900">
+              Sdílet do dalších komunit
+            </h3>
             {shareCandidates.length === 0 ? (
-              <p className="mt-4 rounded-md border border-dashed border-border bg-surface-muted/40 px-3 py-3 text-sm text-ink-500">
-                Zatím nemáš další komunitu, do které bys mohl akci
-                nasdílet. Vytvoř si je v sekci{" "}
+              <p className="mt-2 rounded-md border border-dashed border-border bg-surface-muted/40 px-3 py-3 text-sm text-ink-500">
+                Zatím nemáš další komunitu, do které bys mohl akci nasdílet.
+                Vytvoř si je v sekci{" "}
                 <a
                   href="/admin/komunity"
                   className="font-medium text-ink-700 underline hover:text-ink-900"
@@ -602,7 +630,7 @@ export function EventForm({
                 — pak se ti tady ukáží jako zaškrtávací políčka.
               </p>
             ) : (
-              <div className="mt-4 grid grid-cols-1 gap-2">
+              <div className="mt-2 grid grid-cols-1 gap-2">
                 {shareCandidates.map((w) => {
                   const checked = sharedSlugs.includes(w.slug);
                   return (
@@ -1159,6 +1187,78 @@ export function EventForm({
           {submitting ? "Ukládám…" : submitLabel}
         </Button>
       </div>
+    </form>
+  );
+}
+
+/** Trigger pro „Přesunout akci do jiné komunity". Per-event move
+ *  endpoint dotneme s vybranou cílovou komunitou. Po úspěchu parent
+ *  router-uje na novou URL (`/<new-ws>/e/<slug>/edit`). */
+function MoveWorkspaceTrigger({
+  candidates,
+  onMove,
+}: {
+  candidates: Workspace[];
+  onMove: (
+    targetWorkspaceSlug: string,
+  ) => Promise<{ new_workspace_slug: string; event_slug: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState(candidates[0]?.slug ?? "");
+  const [moving, setMoving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle(e: React.FormEvent) {
+    e.preventDefault();
+    if (!target) return;
+    setMoving(true);
+    setErr(null);
+    try {
+      await onMove(target);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Přesun selhal.");
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-xs font-medium text-ink-700 underline hover:text-ink-900"
+      >
+        Přesunout do jiné komunity…
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handle} className="flex flex-wrap items-center gap-2">
+      <select
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
+        className="rounded-md border border-border bg-surface px-2 py-1 text-sm focus-ring"
+      >
+        {candidates.map((w) => (
+          <option key={w.slug} value={w.slug}>
+            {w.name}
+          </option>
+        ))}
+      </select>
+      <Button type="submit" variant="primary" size="md" loading={moving}>
+        {moving ? "Přesouvám…" : "Přesunout"}
+      </Button>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        disabled={moving}
+        className="text-xs text-ink-500 hover:text-ink-900"
+      >
+        Zrušit
+      </button>
+      {err && <p className="w-full text-xs text-danger">{err}</p>}
     </form>
   );
 }

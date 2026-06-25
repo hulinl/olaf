@@ -112,6 +112,13 @@ export default function EditEventPage({ params }: Props) {
           router.push(`/admin/eventy/${wsSlug}/${updated.slug}/edit`)
         }
         submitLabel="Uložit změny"
+        onMoveToWorkspace={async (target) => {
+          const r = await events.moveEventToWorkspace(wsSlug, eventSlug, target);
+          // Přesměrujeme na novou URL — předchozí workspaceSlug už
+          // pro tento event neplatí, refresh by spadl na 404.
+          router.push(`/admin/eventy/${r.new_workspace_slug}/${r.event_slug}/edit/detaily`);
+          return r;
+        }}
       />
     </div>
   );
