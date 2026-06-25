@@ -107,7 +107,7 @@ export default function Home() {
               </div>
               <div className="shrink-0">
                 <Link
-                  href="/olafadventures"
+                  href="/olaf-adventures"
                   className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-7 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
                 >
                   Olaf Adventures →

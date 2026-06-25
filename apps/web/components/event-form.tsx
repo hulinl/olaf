@@ -574,20 +574,36 @@ export function EventForm({
         const shareCandidates = (ownedWorkspaces ?? []).filter(
           (w) => w.slug !== workspaceSlug,
         );
-        if (shareCandidates.length === 0) return null;
+        // Vždy ukážeme kartu, i když user ještě jinou komunitu nemá.
+        // Bez tohohle hint-u user neví, že feature existuje — user
+        // report 2026-06-25: "nikde na eventu nastavení jsem nenašel
+        // možnost přidat nebo odebrat akci z komunity".
         return (
         <Card>
           <CardSection>
             <h2 className="text-base font-semibold text-ink-900">
-              Sdílet do komunit
+              Sdílet do dalších komunit
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              Akce má vlastní stránku a registraci nezávisle na komunitě.
-              Pokud chceš, můžeš ji ukázat i členům některé ze svých
-              komunit — objeví se na jejich profilu a v jejich feedu akcí.
+              Akce vždy patří do své domovské komunity (vidíš ji v jejím
+              dashboardu). Pokud máš víc komunit, můžeš ji ukázat i
+              v dalších — objeví se v jejich feedu i veřejném profilu.
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-2">
-              {shareCandidates.map((w) => {
+            {shareCandidates.length === 0 ? (
+              <p className="mt-4 rounded-md border border-dashed border-border bg-surface-muted/40 px-3 py-3 text-sm text-ink-500">
+                Zatím nemáš další komunitu, do které bys mohl akci
+                nasdílet. Vytvoř si je v sekci{" "}
+                <a
+                  href="/admin/komunity"
+                  className="font-medium text-ink-700 underline hover:text-ink-900"
+                >
+                  Komunity
+                </a>{" "}
+                — pak se ti tady ukáží jako zaškrtávací políčka.
+              </p>
+            ) : (
+              <div className="mt-4 grid grid-cols-1 gap-2">
+                {shareCandidates.map((w) => {
                   const checked = sharedSlugs.includes(w.slug);
                   return (
                     <label
@@ -619,7 +635,8 @@ export function EventForm({
                     </label>
                   );
                 })}
-            </div>
+              </div>
+            )}
           </CardSection>
         </Card>
         );

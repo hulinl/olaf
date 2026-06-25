@@ -112,12 +112,27 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
   if (error) return <Alert variant="danger">{error}</Alert>;
   if (!workspace || !eventList) return null;
 
-  const now = Date.now();
+  // In-app komunita view = co skutečně visí na public stránce komunity.
+  // Bez status filtru se ownerovi míchaly drafty + zrušené + uzavřené
+  // akce do nadcházejících. User report 2026-06-25 — sjednoceno s
+  // public viewem (apps/web/app/[slug]/page.tsx): jen `published`
+  // (a `completed` v archivu), dělení podle `starts_at`. Pro správu
+  // všech statusů má owner /admin/eventy.
+  const now = new Date();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const upcoming = eventList.filter(
-    (e) => new Date(e.ends_at).getTime() >= now,
+    (e) =>
+      e.status === "published" &&
+      new Date(e.starts_at).getTime() >= todayStart,
   );
   const past = eventList.filter(
-    (e) => new Date(e.ends_at).getTime() < now,
+    (e) =>
+      (e.status === "published" || e.status === "completed") &&
+      new Date(e.starts_at).getTime() < todayStart,
   );
 
   return (
