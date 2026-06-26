@@ -6,6 +6,7 @@ audit is per-tenant by design.
 """
 from __future__ import annotations
 
+from django.db.models import Q
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -61,6 +62,7 @@ def list_audit_log(request: Request) -> Response:
       - action (optional) — exact match on dotted code
       - target_type / target_id (optional) — when drilling into one row
       - after / before (ISO datetimes) — time window
+      - q (optional) — full-text-ish search (actor name/email + summary)
       - page / page_size (default 50, max 200)
     """
     workspace_slug = (request.query_params.get("workspace") or "").strip()
@@ -99,6 +101,19 @@ def list_audit_log(request: Request) -> Response:
         dt = parse_datetime(before)
         if dt is not None:
             qs = qs.filter(created_at__lt=dt)
+
+    # Free-text search — používáme to když uživatel zadá jméno
+    # osoby nebo slovo z popisu („kdo schválil Mahdala"). icontains
+    # je pro V1 dost rychlé (audit feed má desítky/stovky řádků
+    # per workspace).
+    q_term = (request.query_params.get("q") or "").strip()
+    if q_term:
+        qs = qs.filter(
+            Q(summary__icontains=q_term)
+            | Q(actor__first_name__icontains=q_term)
+            | Q(actor__last_name__icontains=q_term)
+            | Q(actor__email__icontains=q_term)
+        )
 
     # Lightweight cursor: page + page_size. Audit feeds are append-only
     # so plain offset paging is fine — no risk of mid-scan shifts.

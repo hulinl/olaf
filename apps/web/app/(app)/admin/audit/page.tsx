@@ -45,11 +45,29 @@ export default function AuditPage() {
   const [mine, setMine] = useState<Workspace[] | null>(null);
   const [wsSlug, setWsSlug] = useState<string>("");
   const [actionFilter, setActionFilter] = useState<string>("");
+  /** Debounced free-text — actor name/email/summary. Stejný klíč jako
+   *  `q` na backendu (Q(actor__name) | Q(summary)). Aktuální typed
+   *  hodnota = `searchInput`, debounced verze posílaná do backendu
+   *  = `searchTerm`. 300ms je dost rychlé na to, aby user neviděl
+   *  zaseknutý vstup, a zároveň ne tolik aby každé písmeno spustilo
+   *  request. */
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [rows, setRows] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSearchTerm(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
 
   // Bootstrap: load workspaces the user manages, default to the first
   // owner/admin one.
@@ -98,6 +116,13 @@ export default function AuditPage() {
         const data = await audit.list({
           workspace: wsSlug,
           action: actionFilter || undefined,
+          q: searchTerm || undefined,
+          // <input type="date"> dá YYYY-MM-DD. Backend chce ISO,
+          // takže klempujeme T00:00 (after) a T23:59 (before) v
+          // browser timezonu. Pro CZ to znamená +01:00/+02:00,
+          // což je co user reálně myslel ("od 1. června").
+          after: dateFrom ? `${dateFrom}T00:00:00` : undefined,
+          before: dateTo ? `${dateTo}T23:59:59` : undefined,
           page,
           page_size: PAGE_SIZE,
         });
@@ -116,7 +141,7 @@ export default function AuditPage() {
     return () => {
       cancelled = true;
     };
-  }, [wsSlug, actionFilter, page]);
+  }, [wsSlug, actionFilter, searchTerm, dateFrom, dateTo, page]);
 
   const pageCount = useMemo(
     () => Math.max(1, Math.ceil(total / PAGE_SIZE)),
@@ -150,47 +175,101 @@ export default function AuditPage() {
       )}
 
       {mine && mine.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-ink-500">Workspace:</span>
-            <select
-              value={wsSlug}
-              onChange={(e) => {
-                setWsSlug(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring"
-            >
-              {mine.map((w) => (
-                <option key={w.slug} value={w.slug}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-ink-500">Typ akce:</span>
-            <select
-              value={actionFilter}
-              onChange={(e) => {
-                setActionFilter(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring"
-            >
-              <option value="">Vše</option>
-              {Object.entries(ACTION_LABELS).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {actionFilter && actionOptions.length === 0 && (
-            <span className="text-xs text-ink-500">
-              Žádné záznamy s tímto filtrem.
-            </span>
-          )}
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-ink-500">Workspace:</span>
+              <select
+                value={wsSlug}
+                onChange={(e) => {
+                  setWsSlug(e.target.value);
+                  setPage(1);
+                }}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring"
+              >
+                {mine.map((w) => (
+                  <option key={w.slug} value={w.slug}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-ink-500">Typ akce:</span>
+              <select
+                value={actionFilter}
+                onChange={(e) => {
+                  setActionFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring"
+              >
+                <option value="">Vše</option>
+                {Object.entries(ACTION_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {actionFilter && actionOptions.length === 0 && (
+              <span className="text-xs text-ink-500">
+                Žádné záznamy s tímto filtrem.
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex flex-1 items-center gap-2 text-sm sm:flex-none">
+              <span className="text-ink-500">Hledat:</span>
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="jméno nebo slovo z popisu"
+                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring sm:w-64 sm:flex-none"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-ink-500">Od:</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setPage(1);
+                }}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-ink-500">Do:</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setPage(1);
+                }}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring"
+              />
+            </label>
+            {(searchTerm || dateFrom || dateTo || actionFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchTerm("");
+                  setDateFrom("");
+                  setDateTo("");
+                  setActionFilter("");
+                  setPage(1);
+                }}
+                className="text-xs font-medium text-ink-500 hover:text-ink-900 focus-ring rounded-sm"
+              >
+                Vymazat filtry
+              </button>
+            )}
+          </div>
         </div>
       )}
 

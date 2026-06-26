@@ -210,6 +210,36 @@ class AuditListEndpointTests(TestCase):
         self.assertEqual(body["total"], 1)
         self.assertEqual(body["results"][0]["action"], "event.cancel")
 
+    def test_q_filter_matches_summary(self) -> None:
+        self.client.force_authenticate(self.owner)
+        r = self.client.get(
+            self._url(),
+            {"workspace": self.ws.slug, "q": "Zrušil"},
+        )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(body["results"][0]["summary"], "Zrušil akci")
+
+    def test_q_filter_matches_actor_email(self) -> None:
+        self.client.force_authenticate(self.owner)
+        r = self.client.get(
+            self._url(),
+            {"workspace": self.ws.slug, "q": "owner2"},
+        )
+        self.assertEqual(r.status_code, 200)
+        # Both rows belong to owner2@a.com — matches actor email.
+        self.assertEqual(r.json()["total"], 2)
+
+    def test_q_filter_no_match_returns_empty(self) -> None:
+        self.client.force_authenticate(self.owner)
+        r = self.client.get(
+            self._url(),
+            {"workspace": self.ws.slug, "q": "totalnenajdes"},
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["total"], 0)
+
     def test_target_filter(self) -> None:
         self.client.force_authenticate(self.owner)
         r = self.client.get(
