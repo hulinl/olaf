@@ -13,6 +13,39 @@ import {
   events,
 } from "@/lib/api";
 
+type SortKey = "name" | "email" | "events" | "last_rsvp";
+type SortDir = "asc" | "desc";
+interface SortState {
+  key: SortKey;
+  dir: SortDir;
+}
+
+function comparePersons(
+  a: PersonSummary,
+  b: PersonSummary,
+  sort: SortState,
+): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "name":
+      return (
+        a.full_name.localeCompare(b.full_name, "cs", {
+          sensitivity: "base",
+        }) * dir
+      );
+    case "email":
+      return a.email.localeCompare(b.email) * dir;
+    case "events":
+      return (a.event_count - b.event_count) * dir;
+    case "last_rsvp": {
+      // null = nikdy se nepřihlásil → na konec při desc, na začátek při asc.
+      const aT = a.last_rsvp_at ? new Date(a.last_rsvp_at).getTime() : 0;
+      const bT = b.last_rsvp_at ? new Date(b.last_rsvp_at).getTime() : 0;
+      return (aT - bT) * dir;
+    }
+  }
+}
+
 /**
  * Lidé — proto-CRM list of everyone who's had an RSVP on any event
  * the caller owns. Deduped across events; one row per person with
@@ -28,6 +61,14 @@ export default function LidePage() {
   const [openUserId, setOpenUserId] = useState<number | null>(null);
   const [restoreBusy, setRestoreBusy] = useState<number | null>(null);
   const [purgeBusy, setPurgeBusy] = useState<number | null>(null);
+  // Search a sort jsou client-side — Lidé list je per-tenant agregát
+  // a v praxi pod 1000 řádků, takže DB roundtrip pro každý keystroke
+  // by byl plýtvání. Default sort = nejnovější registrace nahoře.
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortState>({
+    key: "last_rsvp",
+    dir: "desc",
+  });
 
   async function refreshPeople() {
     const list = await events.people().catch(() => null);
@@ -111,6 +152,30 @@ export default function LidePage() {
 
       {error && <Alert variant="danger">{error}</Alert>}
 
+      {people && people.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex flex-1 items-center gap-2 text-sm sm:flex-none">
+            <span className="text-ink-500">Hledat:</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="jméno, e-mail nebo telefon"
+              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm focus-ring sm:w-72 sm:flex-none"
+            />
+          </label>
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="text-xs font-medium text-ink-500 hover:text-ink-900 focus-ring rounded-sm"
+            >
+              Vymazat
+            </button>
+          )}
+        </div>
+      )}
+
       {people === null && !error && (
         <div className="flex justify-center py-12">
           <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
@@ -129,11 +194,38 @@ export default function LidePage() {
         </div>
       )}
 
-      {people && people.length > 0 && (
+      {(() => {
+        if (!people || people.length === 0) return null;
+        const q = search.trim().toLowerCase();
+        const filtered = q
+          ? people.filter(
+              (p) =>
+                p.full_name.toLowerCase().includes(q) ||
+                p.email.toLowerCase().includes(q) ||
+                p.phone.toLowerCase().includes(q),
+            )
+          : people;
+        const sorted = filtered.slice().sort((a, b) => comparePersons(a, b, sort));
+        function toggleSort(key: SortKey) {
+          setSort((prev) =>
+            prev.key === key
+              ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+              : {
+                  key,
+                  dir: key === "name" || key === "email" ? "asc" : "desc",
+                },
+          );
+        }
+        return (
         <>
+          {sorted.length === 0 && (
+            <div className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-6 text-center text-sm text-ink-500">
+              Nikdo neodpovídá hledání „{search}".
+            </div>
+          )}
           {/* Mobile cards */}
           <div className="flex flex-col gap-2 sm:hidden">
-            {people.map((p) => (
+            {sorted.map((p) => (
               <button
                 key={p.user_id}
                 type="button"
@@ -161,15 +253,36 @@ export default function LidePage() {
             <table className="w-full text-sm">
               <thead className="bg-surface-muted/60">
                 <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                  <th className="px-4 py-3">Jméno</th>
-                  <th className="px-4 py-3">E-mail</th>
+                  <PeopleSortableTh
+                    label="Jméno"
+                    sortKey="name"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
+                  <PeopleSortableTh
+                    label="E-mail"
+                    sortKey="email"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
                   <th className="px-4 py-3">Telefon</th>
-                  <th className="px-4 py-3 text-right">Akcí</th>
-                  <th className="px-4 py-3">Poslední registrace</th>
+                  <PeopleSortableTh
+                    label="Akcí"
+                    sortKey="events"
+                    active={sort}
+                    onClick={toggleSort}
+                    align="right"
+                  />
+                  <PeopleSortableTh
+                    label="Poslední registrace"
+                    sortKey="last_rsvp"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {people.map((p) => (
+                {sorted.map((p) => (
                   <tr
                     key={p.user_id}
                     onClick={() => setOpenUserId(p.user_id)}
@@ -199,7 +312,8 @@ export default function LidePage() {
             </table>
           </div>
         </>
-      )}
+        );
+      })()}
 
       {hidden && hidden.length > 0 && (
         <section>
@@ -317,4 +431,56 @@ function plurAkce(n: number): string {
   if (n === 1) return "akce";
   if (n < 5) return "akce";
   return "akcí";
+}
+
+function PeopleSortableTh({
+  label,
+  sortKey,
+  active,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: SortState;
+  onClick: (key: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = active.key === sortKey;
+  const arrow = isActive ? (active.dir === "asc" ? "↑" : "↓") : "";
+  return (
+    <th
+      scope="col"
+      className={
+        align === "right" ? "px-4 py-3 text-right" : "px-4 py-3 text-left"
+      }
+      aria-sort={
+        isActive
+          ? active.dir === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={[
+          "inline-flex items-center gap-1 font-medium uppercase tracking-wide focus-ring rounded-sm",
+          isActive ? "text-ink-900" : "text-ink-500 hover:text-ink-900",
+        ].join(" ")}
+      >
+        <span>{label}</span>
+        <span
+          aria-hidden="true"
+          className={[
+            "text-[10px]",
+            isActive ? "opacity-100" : "opacity-30",
+          ].join(" ")}
+        >
+          {arrow || "↕"}
+        </span>
+      </button>
+    </th>
+  );
 }
