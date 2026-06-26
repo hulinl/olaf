@@ -330,7 +330,7 @@ function NotionSyncButton({
     const ok = await confirmDialog({
       title: "Aktualizovat z Notion?",
       description:
-        "Bloky landing-page se přepíšou tím, co Claude extrahuje. Slug, status, RSVPs a faktury zůstanou.",
+        "Bloky landing-page se přepíšou tím, co Claude extrahuje. Slug, status, přihlášky a faktury zůstanou.",
       confirmLabel: "Aktualizovat",
     });
     if (!ok) return;
@@ -480,7 +480,7 @@ function NotionReplaceButton({
       <Field
         label="Nová Notion URL"
         htmlFor="replace-notion-url"
-        hint="Stará stránka přestane být zdrojem; sync bude tahat z nové. Slug, status, RSVPs a faktury zůstanou."
+        hint="Stará stránka přestane být zdrojem; sync bude tahat z nové. Slug, status, přihlášky a faktury zůstanou."
       >
         <Input
           id="replace-notion-url"
