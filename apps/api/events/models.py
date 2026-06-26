@@ -615,7 +615,26 @@ class RSVP(models.Model):
         rsvp.questionnaire_answers = questionnaire_answers
         previous_status = rsvp.status if not created else None
 
-        if locked_event.requires_approval:
+        # Owner/admin workspace-u nemusí čekat na schválení vlastní akce —
+        # akce vyžadující approval je gate pro veřejnost, ne pro toho,
+        # kdo akci pořádá. User report 2026-06-26: „mám sám sebe v
+        # přihlášce jako čeká na schválení".
+        from workspaces.models import WorkspaceMember
+
+        is_workspace_admin = (
+            user is not None
+            and user.is_authenticated
+            and WorkspaceMember.objects.filter(
+                workspace=locked_event.workspace,
+                user=user,
+                role__in=[
+                    WorkspaceMember.ROLE_OWNER,
+                    WorkspaceMember.ROLE_ADMIN,
+                ],
+            ).exists()
+        )
+
+        if locked_event.requires_approval and not is_workspace_admin:
             rsvp.status = cls.STATUS_PENDING_APPROVAL
             rsvp.waitlist_position = None
         elif previous_status == cls.STATUS_YES:
