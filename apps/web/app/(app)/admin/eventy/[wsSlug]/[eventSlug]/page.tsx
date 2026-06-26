@@ -20,6 +20,54 @@ import {
 
 type Filter = "all" | "yes" | "waitlist" | "pending_approval" | "cancelled";
 
+type SortKey = "name" | "status" | "payment" | "created";
+type SortDir = "asc" | "desc";
+interface SortState {
+  key: SortKey;
+  dir: SortDir;
+}
+
+const STATUS_ORDER: Record<RSVPRecord["status"], number> = {
+  yes: 0,
+  pending_approval: 1,
+  waitlist: 2,
+  maybe: 3,
+  no: 4,
+  cancelled: 5,
+};
+
+const PAYMENT_ORDER: Record<RSVPRecord["payment_status"], number> = {
+  pending: 0,
+  paid: 1,
+  waived: 2,
+  refunded: 3,
+};
+
+function compareRsvps(a: RSVPRecord, b: RSVPRecord, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "name":
+      return (
+        a.user_full_name.localeCompare(b.user_full_name, "cs", {
+          sensitivity: "base",
+        }) * dir
+      );
+    case "status":
+      return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) * dir;
+    case "payment":
+      return (
+        (PAYMENT_ORDER[a.payment_status] - PAYMENT_ORDER[b.payment_status]) *
+        dir
+      );
+    case "created":
+      return (
+        (new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()) *
+        dir
+      );
+  }
+}
+
 const RSVP_STATUS_LABEL: Record<RSVPRecord["status"], string> = {
   yes: "Potvrzeno",
   maybe: "Možná",
@@ -88,6 +136,14 @@ function AdminEventDetail({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileRsvpId, setProfileRsvpId] = useState<number | null>(null);
+  // Default sort = nejnovější přihlášky nahoře. Owner v praxi
+  // sleduje "co se za poslední dny stalo" víc než abeceda, takže
+  // chronologie sestupně sedí jako landing state. Klik na hlavičku
+  // toggluje směr / přepíná na jiný klíč.
+  const [sort, setSort] = useState<SortState>({
+    key: "created",
+    dir: "desc",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -142,10 +198,21 @@ function AdminEventDetail({ params }: Props) {
   // dedikovaný stat tile a vlastní filtr, aby nepřekážely v denní
   // práci ownera. Když user explicitně klikne na "Zrušeno", uvidí
   // jen je.
-  const filteredRsvps =
+  const filteredRsvps = (
     filter === "all"
       ? rsvps.filter((r) => r.status !== "cancelled")
-      : rsvps.filter((r) => r.status === filter);
+      : rsvps.filter((r) => r.status === filter)
+  )
+    .slice()
+    .sort((a, b) => compareRsvps(a, b, sort));
+
+  function toggleSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "name" ? "asc" : "desc" },
+    );
+  }
 
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
@@ -315,13 +382,34 @@ function AdminEventDetail({ params }: Props) {
             <table className="w-full text-sm">
               <thead className="bg-surface-muted/60">
                 <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
-                  <th className="px-4 py-3">Účastník</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Platba</th>
+                  <SortableTh
+                    label="Účastník"
+                    sortKey="name"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
+                  <SortableTh
+                    label="Status"
+                    sortKey="status"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
+                  <SortableTh
+                    label="Platba"
+                    sortKey="payment"
+                    active={sort}
+                    onClick={toggleSort}
+                    align="right"
+                  />
                   <th className="px-4 py-3 text-right">Faktura</th>
                   <th className="px-4 py-3 text-right">Smlouva</th>
                   <th className="px-4 py-3 text-right">Pojištění</th>
-                  <th className="px-4 py-3">Přihlášen</th>
+                  <SortableTh
+                    label="Přihlášen"
+                    sortKey="created"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
                   {/* Akční sloupec na pravém konci řádku — daleko od
                       dat, snižuje riziko misclick-u při procházení
                       rosteru. Hlavička prázdná, ikona-only buttony
@@ -1205,5 +1293,56 @@ function RsvpCard({
         </button>
       )}
     </div>
+  );
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  active,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: SortState;
+  onClick: (key: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = active.key === sortKey;
+  const arrow = isActive ? (active.dir === "asc" ? "↑" : "↓") : "";
+  return (
+    <th
+      scope="col"
+      className={
+        align === "right" ? "px-4 py-3 text-right" : "px-4 py-3 text-left"
+      }
+      aria-sort={
+        isActive
+          ? active.dir === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={[
+          "inline-flex items-center gap-1 font-medium uppercase tracking-wide focus-ring rounded-sm",
+          isActive ? "text-ink-900" : "text-ink-500 hover:text-ink-900",
+        ].join(" ")}
+      >
+        <span>{label}</span>
+        <span
+          aria-hidden="true"
+          className={["text-[10px]", isActive ? "opacity-100" : "opacity-30"].join(
+            " ",
+          )}
+        >
+          {arrow || "↕"}
+        </span>
+      </button>
+    </th>
   );
 }
