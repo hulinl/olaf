@@ -2584,6 +2584,7 @@ export const audit = {
     target_id?: string;
     after?: string;
     before?: string;
+    q?: string;
     page?: number;
     page_size?: number;
   }) => {
@@ -2594,6 +2595,7 @@ export const audit = {
     if (params.target_id) qs.set("target_id", params.target_id);
     if (params.after) qs.set("after", params.after);
     if (params.before) qs.set("before", params.before);
+    if (params.q) qs.set("q", params.q);
     if (params.page) qs.set("page", String(params.page));
     if (params.page_size) qs.set("page_size", String(params.page_size));
     return apiFetch<AuditListResponse>(`/api/audit/?${qs}`);
