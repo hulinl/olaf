@@ -382,8 +382,10 @@ function StatTile({
 }: {
   label: string;
   value: string;
-  /** Drobný subtitle pod hlavní hodnotou — např. „celkem 4" když
-   *  hlavní value je platící count a chceme info o celku. */
+  /** Drobný subtitle POD hlavní hodnotou — např. „celkem 4" když
+   *  hlavní value je platící count a chceme info o celku. Vždycky
+   *  rezervujeme jeden řádek pro něj (i prázdný), aby velká čísla
+   *  napříč všemi tiles byla zarovnaná na stejné vertikále. */
   subValue?: string;
   tone?: "warning";
   href?: string;
@@ -392,7 +394,7 @@ function StatTile({
   const body = (
     <div
       className={[
-        "flex h-full flex-col justify-between rounded-xl border bg-surface p-2.5 transition-colors sm:rounded-2xl sm:p-5",
+        "flex h-full flex-col rounded-xl border bg-surface p-2.5 transition-colors sm:rounded-2xl sm:p-5",
         active
           ? "border-brand bg-brand/5"
           : tone === "warning"
@@ -404,7 +406,7 @@ function StatTile({
       <p className="text-[10px] font-medium uppercase tracking-wide text-ink-500 sm:text-xs">
         {label}
       </p>
-      <div className="mt-1 flex items-baseline gap-1.5 sm:mt-2">
+      <div className="mt-auto pt-1 sm:pt-2">
         <p
           className={[
             "text-lg font-semibold leading-tight sm:text-3xl",
@@ -413,9 +415,11 @@ function StatTile({
         >
           {value}
         </p>
-        {subValue && (
-          <p className="text-[10px] text-ink-500 sm:text-xs">{subValue}</p>
-        )}
+        {/* Subtitle řádek je VŽDYCKY rendered (i prázdný), aby velké
+            číslo bylo na stejné vertikále napříč tiles. */}
+        <p className="mt-0.5 text-[10px] leading-tight text-ink-500 sm:text-xs">
+          {subValue || " "}
+        </p>
       </div>
     </div>
   );
