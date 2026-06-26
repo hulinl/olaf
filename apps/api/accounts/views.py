@@ -296,6 +296,7 @@ def me_todo(request: Request) -> Response:
     already render.
     """
     from events.models import RSVP, RSVPDocument
+    from workspaces.models import WorkspaceMember
 
     items: list[dict] = []
 
@@ -305,8 +306,28 @@ def me_todo(request: Request) -> Response:
         .select_related("event", "event__workspace")
     )
 
+    # Workspace, ve kterých je user owner/admin — todo dluží jen jako
+    # běžný účastník, ne jako tvůrce / správce vlastní akce. User report
+    # 2026-06-26: „když jsem organizátor nebo tvůrce, nemusím dokládat
+    # ty dokumenty co jsou v nastavení události".
+    admin_workspace_ids = set(
+        WorkspaceMember.objects.filter(
+            user=request.user,
+            role__in=[
+                WorkspaceMember.ROLE_OWNER,
+                WorkspaceMember.ROLE_ADMIN,
+            ],
+        ).values_list("workspace_id", flat=True)
+    )
+
     for rsvp in rsvps:
         event = rsvp.event
+
+        # Skip self-managed events — owner/admin nemusí sám sobě dokládat
+        # ani platit, je-li označen jako organizátor nebo má roli ve
+        # workspace-u akce.
+        if rsvp.is_organizer or event.workspace_id in admin_workspace_ids:
+            continue
 
         # Payment todo
         if rsvp.payment_status == RSVP.PAYMENT_PENDING and rsvp.payment_due_amount:
