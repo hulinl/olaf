@@ -568,8 +568,11 @@ function MyReservationPanel({
             </h3>
             <div className="flex items-center gap-2">
               {my.waitlist_position != null && (
-                <span className="text-xs text-ink-500">
-                  pořadí #{my.waitlist_position}
+                <span
+                  className="text-xs text-ink-500"
+                  title="Tvoje pořadí ve frontě. Pokud se někdo odhlásí, posunou se před tebou jen lidé s nižším pořadím."
+                >
+                  {my.waitlist_position}.&nbsp;v pořadí
                 </span>
               )}
               <span
