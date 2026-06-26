@@ -214,17 +214,21 @@ function AdminEventDetail({ params }: Props) {
         <StatTile
           label="Přihlášeno"
           value={(() => {
-            // Tile ukazuje „N · M platících" pokud má event organizátory:
-            //   N = celkem (= confirmed včetně organizátorů)
-            //   M = platících (= bez organizátorů, započítává se do
-            //       kapacity a chodí jim platba)
-            // User report 2026-06-26: chtěl mít přehled o obojím.
-            const total = confirmed.length;
+            // Hlavní číslo: počet platících účastníků (bez organizátorů).
+            // Drobný subtitle: celkem vč. organizátorů (= údaj pro
+            // kapacitu ubytování atd.). User report 2026-06-26:
+            // „nejdůležitější je přihlášeno bez, to s organizátory
+            // jen malým".
             const paying = confirmed.filter((r) => !r.is_organizer).length;
-            const cap =
-              event.capacity != null ? ` / ${event.capacity}` : "";
-            if (total === paying) return `${total}${cap}`;
-            return `${total}${cap} · ${paying} plat.`;
+            const total = confirmed.length;
+            return event.capacity != null
+              ? `${paying} / ${event.capacity}`
+              : String(paying);
+          })()}
+          subValue={(() => {
+            const paying = confirmed.filter((r) => !r.is_organizer).length;
+            const total = confirmed.length;
+            return total !== paying ? `celkem ${total}` : undefined;
           })()}
           href={`/admin/eventy/${wsSlug}/${eventSlug}?filter=yes`}
           active={filter === "yes"}
@@ -371,12 +375,16 @@ function AdminEventDetail({ params }: Props) {
 function StatTile({
   label,
   value,
+  subValue,
   tone,
   href,
   active,
 }: {
   label: string;
   value: string;
+  /** Drobný subtitle pod hlavní hodnotou — např. „celkem 4" když
+   *  hlavní value je platící count a chceme info o celku. */
+  subValue?: string;
   tone?: "warning";
   href?: string;
   active?: boolean;
@@ -396,14 +404,19 @@ function StatTile({
       <p className="text-[10px] font-medium uppercase tracking-wide text-ink-500 sm:text-xs">
         {label}
       </p>
-      <p
-        className={[
-          "mt-1 text-lg font-semibold leading-tight sm:mt-2 sm:text-3xl",
-          tone === "warning" ? "text-warning" : "text-ink-900",
-        ].join(" ")}
-      >
-        {value}
-      </p>
+      <div className="mt-1 flex items-baseline gap-1.5 sm:mt-2">
+        <p
+          className={[
+            "text-lg font-semibold leading-tight sm:text-3xl",
+            tone === "warning" ? "text-warning" : "text-ink-900",
+          ].join(" ")}
+        >
+          {value}
+        </p>
+        {subValue && (
+          <p className="text-[10px] text-ink-500 sm:text-xs">{subValue}</p>
+        )}
+      </div>
     </div>
   );
   if (href) return <Link href={href} className="block h-full focus-ring">{body}</Link>;
