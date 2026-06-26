@@ -568,6 +568,7 @@ export default function RSVPPage({ params }: Props) {
                         value={dietNote}
                         onChange={(e) => setDietNote(e.target.value)}
                         placeholder="např. bezlepková dieta, alergie na ořechy…"
+                        required={diet === "other"}
                       />
                     </Field>
                   </div>

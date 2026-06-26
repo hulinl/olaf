@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   BLOCK_TYPE_LABELS,
   type BlockType,
@@ -72,6 +73,7 @@ export function Builder({
   const [openId, setOpenId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [presetPickerOpen, setPresetPickerOpen] = useState(false);
+  const confirmDialog = useConfirm();
 
   function add(type: BlockType) {
     const block = makeBlock(type, { eventLocationUrl });
@@ -159,8 +161,14 @@ export function Builder({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm("Opravdu smazat tento blok?")) remove(block.id);
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: "Smazat blok?",
+                      description: `Blok „${BLOCK_TYPE_LABELS[block.type] ?? block.type}" zmizí z landing page. Můžeš ho znovu přidat z palety bloků.`,
+                      confirmLabel: "Smazat",
+                      variant: "danger",
+                    });
+                    if (ok) remove(block.id);
                   }}
                   className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-500 hover:text-danger focus-ring"
                 >

@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -241,6 +242,7 @@ function PublicLinkPanel({
 }) {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const confirmDialog = useConfirm();
 
   async function generate() {
     setBusy(true);
@@ -252,8 +254,14 @@ function PublicLinkPanel({
     }
   }
   async function revoke() {
-    if (!confirm("Zrušit veřejný odkaz? Stávající URL přestane fungovat."))
-      return;
+    const ok = await confirmDialog({
+      title: "Zrušit veřejný odkaz?",
+      description:
+        "Stávající URL přestane fungovat — kdo ji zná, už se přes ni nepřipojí. Nový odkaz si můžeš kdykoli vygenerovat.",
+      confirmLabel: "Zrušit odkaz",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await workspaces.revokeInviteLink(wsSlug);
@@ -488,6 +496,34 @@ function BulkInvitePanel({
   );
 }
 
+function PendingInvitationCancel({
+  email,
+  onConfirm,
+}: {
+  email: string;
+  onConfirm: () => Promise<void>;
+}) {
+  const confirmDialog = useConfirm();
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        const ok = await confirmDialog({
+          title: "Zrušit pozvánku?",
+          description: `Pozvánka pro ${email} přestane platit. Pokud se přihlásí, dostane chybu.`,
+          confirmLabel: "Zrušit pozvánku",
+          variant: "danger",
+        });
+        if (!ok) return;
+        await onConfirm();
+      }}
+      className="text-xs font-medium text-ink-500 hover:text-danger"
+    >
+      Zrušit
+    </button>
+  );
+}
+
 function PendingInvitations({
   wsSlug,
   invitations,
@@ -516,17 +552,13 @@ function PendingInvitations({
                 {new Date(inv.created_at).toLocaleDateString("cs-CZ")}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!confirm(`Zrušit pozvánku pro ${inv.email}?`)) return;
+            <PendingInvitationCancel
+              email={inv.email}
+              onConfirm={async () => {
                 await workspaces.cancelInvitation(wsSlug, inv.id);
                 await onChange();
               }}
-              className="text-xs font-medium text-ink-500 hover:text-danger"
-            >
-              Zrušit
-            </button>
+            />
           </div>
         ))}
       </div>

@@ -753,8 +753,7 @@ export function EventForm({
                           ownedElsewhere ??
                           personalWorkspace;
                         if (!target) {
-                          // eslint-disable-next-line no-alert
-                          alert(
+                          setError(
                             "Tvoji akci momentálně nemám kam přesunout. Zkontroluj si Komunity v Tvůrci.",
                           );
                           return;

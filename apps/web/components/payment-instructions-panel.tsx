@@ -88,10 +88,14 @@ export function PaymentInstructionsPanel({
           Děkujeme — registrace je plně potvrzená.
         </p>
       ) : !data.iban ? (
-        <p className="mt-3 text-sm text-ink-500">
-          Organizátor ještě nezadal platební údaje. Kontaktuj ho prosím
-          přímo.
-        </p>
+        <div className="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-sm text-ink-900">
+          <p className="font-medium">Pořadatel ještě nezadal platební údaje.</p>
+          <p className="mt-1 text-xs text-ink-700">
+            Napiš mu zprávu z veřejné stránky komunity — jakmile účet
+            doplní, uvidíš tady QR a podrobnosti k platbě. Registrace
+            zůstává v platnosti.
+          </p>
+        </div>
       ) : (
         <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
           <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
@@ -100,7 +104,7 @@ export function PaymentInstructionsPanel({
               {formatEventPrice(data.amount, data.currency)}
             </dd>
             <dt className="text-ink-500">Účet (IBAN)</dt>
-            <dd className="font-mono text-ink-900">{data.iban}</dd>
+            <dd className="break-all font-mono text-ink-900">{data.iban}</dd>
             {data.bank_name && (
               <>
                 <dt className="text-ink-500">Banka</dt>
@@ -116,13 +120,14 @@ export function PaymentInstructionsPanel({
           </dl>
           {data.qr_png_url && (
             <div className="flex flex-col items-center gap-2">
+              {/* QR na mobilu max-w 200px aby se neoříznul; image
+                  intrinsic je čtverec, takže auto-height ho udrží
+                  proporcionální. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={data.qr_png_url}
-                alt="QR Platba"
-                width={200}
-                height={200}
-                className="rounded-md border border-border bg-white p-2"
+                alt={`QR kód pro platbu ${formatEventPrice(data.amount, data.currency) ?? data.amount}`}
+                className="h-auto w-full max-w-[200px] rounded-md border border-border bg-white p-2"
               />
               <span className="text-[10px] uppercase tracking-[0.16em] text-ink-500">
                 QR Platba

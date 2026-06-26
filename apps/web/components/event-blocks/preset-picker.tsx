@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   EVENT_BLOCK_PRESETS,
   type EventBlockPreset,
@@ -25,13 +26,18 @@ export function PresetPicker({
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState<EventBlockPreset | null>(null);
+  const confirmDialog = useConfirm();
 
-  function confirm() {
+  async function confirm() {
     if (!selected) return;
     if (hasExistingBlocks) {
-      const ok = window.confirm(
-        "V akci už nějaké bloky jsou. Použitím vzoru je nahradíš. Pokračovat?",
-      );
+      const ok = await confirmDialog({
+        title: "Nahradit existující bloky?",
+        description:
+          "V akci už nějaké bloky jsou. Použitím vzoru se přepíšou — pak je můžeš upravit nebo přidat další.",
+        confirmLabel: "Nahradit vzorem",
+        variant: "danger",
+      });
       if (!ok) return;
     }
     onPick(selected.build());
