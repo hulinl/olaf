@@ -199,9 +199,33 @@ function DocRow({
   const inputRef = useRef<HTMLInputElement>(null);
   const verified = !!uploaded?.verified_at;
   const fileUrl = uploaded?.url ? assetUrl(uploaded.url) : undefined;
+  const [dragOver, setDragOver] = useState(false);
+  const canAcceptDrop = !verified && !busy;
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    if (!canAcceptDrop) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) onPick(file);
+  }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      onDragOver={(e) => {
+        if (!canAcceptDrop) return;
+        e.preventDefault();
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className={[
+        "flex flex-col gap-3 rounded-md border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between",
+        dragOver
+          ? "border-brand border-dashed bg-brand/5"
+          : "border-border",
+      ].join(" ")}
+    >
       <div className="flex min-w-0 flex-1 flex-col">
         <p className="text-sm font-medium text-ink-900">
           {label}
@@ -228,7 +252,9 @@ function DocRow({
             )}
           </p>
         ) : (
-          <p className="text-xs text-ink-500">Zatím nenahráno.</p>
+          <p className="text-xs text-ink-500">
+            Klikni „Nahrát" nebo přetáhni soubor (PDF / obrázek).
+          </p>
         )}
       </div>
 
