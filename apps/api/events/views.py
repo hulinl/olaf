@@ -2149,6 +2149,34 @@ def event_rsvps(request: Request, workspace_slug: str, event_slug: str) -> Respo
     if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
+    # Self-heal pre-PR-#240 stav: pokud má event pending_approval RSVPs
+    # pro workspace owner/admina, upgradujeme je rovnou na yes +
+    # is_organizer + payment_waived. Backend od #240 je takhle nastavuje
+    # přímo při create, ale starší rows zůstaly v DB. Bezpečné — owner
+    # by tam nikdy neměl být v pending_approval flow.
+    from workspaces.models import WorkspaceMember
+
+    admin_user_ids = list(
+        WorkspaceMember.objects.filter(
+            workspace=event.workspace,
+            role__in=[
+                WorkspaceMember.ROLE_OWNER,
+                WorkspaceMember.ROLE_ADMIN,
+            ],
+        ).values_list("user_id", flat=True)
+    )
+    if admin_user_ids:
+        RSVP.objects.filter(
+            event=event,
+            status=RSVP.STATUS_PENDING_APPROVAL,
+            user_id__in=admin_user_ids,
+        ).update(
+            status=RSVP.STATUS_YES,
+            is_organizer=True,
+            payment_status=RSVP.PAYMENT_WAIVED,
+            waitlist_position=None,
+        )
+
     rsvps = list(
         RSVP.objects.filter(event=event)
         .exclude(status=RSVP.STATUS_CANCELLED)
