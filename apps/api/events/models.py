@@ -634,6 +634,16 @@ class RSVP(models.Model):
             ).exists()
         )
 
+        # Tvůrce / admin akce je automaticky organizátor (= nezapočítává
+        # se do kapacity, neplatí, badge „Organizátor" v rosteru). User
+        # report 2026-06-26: „když jsem tvůrce, měl bych tam být
+        # automaticky jako organizátor". Nastavujeme jen jednou — pokud
+        # owner ručně toggle-em vypnul organizer flag (=teď chce být
+        # počítán v kapacitě), nepřepisujeme zpátky.
+        if is_workspace_admin and created:
+            rsvp.is_organizer = True
+            rsvp.payment_status = cls.PAYMENT_WAIVED
+
         if locked_event.requires_approval and not is_workspace_admin:
             rsvp.status = cls.STATUS_PENDING_APPROVAL
             rsvp.waitlist_position = None

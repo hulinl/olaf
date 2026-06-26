@@ -517,18 +517,29 @@ class RSVPSerializer(serializers.ModelSerializer):
         }
 
     def get_can_toggle_organizer(self, obj: RSVP) -> bool:
-        """Frontend signal — skrýt "Označit/Odebrat organizátora" toggle
-        u zakladatele workspace (super-admin musí zůstat organizátorem).
-        Backend kontroluje při POST znovu.
+        """Frontend signal pro toggle „Označit/Odebrat organizátora".
+
+        Pravidla:
+          - Cancelled RSVP nemá toggle vůbec.
+          - Super-admin co JE organizátor → toggle skrytý (nelze
+            demote, viz user report „pořád si mohu odebrat
+            organizátora, což je blbost").
+          - Super-admin co NENÍ organizátor → toggle viditelný
+            (promotion je OK; bez tohohle by nemohl ze sebe udělat
+            organizátora po RSVP). User report 2026-06-26.
+          - Ostatní RSVPs → toggle viditelný.
         """
         if obj.status == RSVP.STATUS_CANCELLED:
             return False
         from .permissions import is_workspace_super_admin
 
-        return not (
+        is_super = bool(
             obj.user_id
             and is_workspace_super_admin(obj.user, obj.event.workspace)
         )
+        # Skrýt jen když super-admin už organizátor je (= bránění
+        # demote-u). Promotion z neorganizátora → organizátor je OK.
+        return not (is_super and obj.is_organizer)
 
     def get_can_be_removed(self, obj: RSVP) -> bool:
         """Frontend signál pro zobrazení popelnice. Backend pak při

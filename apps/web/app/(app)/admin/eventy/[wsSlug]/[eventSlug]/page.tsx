@@ -213,7 +213,19 @@ function AdminEventDetail({ params }: Props) {
       <div className="grid grid-cols-4 items-stretch gap-2 sm:gap-3">
         <StatTile
           label="Přihlášeno"
-          value={`${confirmed.length}${event.capacity != null ? ` / ${event.capacity}` : ""}`}
+          value={(() => {
+            // Tile ukazuje „N · M platících" pokud má event organizátory:
+            //   N = celkem (= confirmed včetně organizátorů)
+            //   M = platících (= bez organizátorů, započítává se do
+            //       kapacity a chodí jim platba)
+            // User report 2026-06-26: chtěl mít přehled o obojím.
+            const total = confirmed.length;
+            const paying = confirmed.filter((r) => !r.is_organizer).length;
+            const cap =
+              event.capacity != null ? ` / ${event.capacity}` : "";
+            if (total === paying) return `${total}${cap}`;
+            return `${total}${cap} · ${paying} plat.`;
+          })()}
           href={`/admin/eventy/${wsSlug}/${eventSlug}?filter=yes`}
           active={filter === "yes"}
         />
