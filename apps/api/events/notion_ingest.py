@@ -118,10 +118,18 @@ def _notion_request(path: str, token: str) -> dict[str, Any]:
                 status_code=400,
             ) from e
         if e.code == 404:
+            # Snippet z URL pomáhá ladit, zda Notion vidí správný page
+            # ID. Typicky 404 značí, že integrace nemá přístup k téhle
+            # konkrétní stránce — sdílení parent databáze nestačí
+            # u page-ů, které byly přidané později než share.
+            snippet = path
+            if len(snippet) > 80:
+                snippet = snippet[:77] + "..."
             raise IngestError(
-                "Notion stránku se nepodařilo otevřít. Otevři ji v "
-                "Notionu → ⋯ → Connections → vyber svoji integraci a "
-                "zkus to znovu.",
+                f"Notion stránku se nepodařilo otevřít ({snippet}). "
+                "Otevři ji v Notionu → ⋯ → Connections → vyber svoji "
+                "integraci. Pokud je stránka v databázi, sdílej "
+                "i samotnou stránku, ne jen parent databázi.",
                 status_code=400,
             ) from e
         raise IngestError(

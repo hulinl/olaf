@@ -113,6 +113,9 @@ def sync_template_from_notion_url(
     if not notion_token:
         raise IngestError("Chybí Notion API token.", code="notion")
 
-    page_text = fetch_notion_page_text(page_id, notion_token)
+    # `fetch_notion_page_text` vrací (text, diagnostics) tuple — bug
+    # z PR #230 byl, že jsem to ukládal jako string a Claude pak
+    # dostal repr tuple-u místo skutečného textu. Teď unpack-uji.
+    page_text, _diag = fetch_notion_page_text(page_id, notion_token)
     body_html = html_from_notion_text(page_text, anthropic_api_key)
     return {"body_html": body_html}
