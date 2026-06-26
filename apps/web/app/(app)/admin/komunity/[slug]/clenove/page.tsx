@@ -540,7 +540,7 @@ export function MembersCrmView({ slug }: { slug: string }) {
             const ok = await confirmDialog({
               title: `Přidat ${participantSelected.size} účastníků?`,
               description:
-                "Stanou se členy komunity. Jejich RSVPs zůstávají; nedostanou e-mailovou notifikaci.",
+                "Stanou se členy komunity. Jejich přihlášky na akce zůstávají; nedostanou e-mailovou notifikaci.",
               confirmLabel: "Přidat do komunity",
             });
             if (!ok) return;
@@ -687,7 +687,7 @@ function useMemberRoleActions({
     const ok = await confirmDialog({
       title: `Odebrat ${name} z komunity?`,
       description:
-        "RSVPs a faktury zůstanou; přestane být v seznamu členů. " +
+        "Přihlášky na akce a faktury zůstanou; přestane být v seznamu členů. " +
         "Žádná notifikace ani e-mail mu o tom nepřijde.",
       confirmLabel: "Odebrat",
       variant: "danger",
@@ -878,7 +878,7 @@ function ParticipantsSection({
               </th>
               <th className="px-4 py-3">Jméno</th>
               <th className="px-4 py-3">Kontakt</th>
-              <th className="px-4 py-3 text-right">RSVPs</th>
+              <th className="px-4 py-3 text-right">Přihlášek</th>
               <th className="px-4 py-3 text-right">Akce</th>
             </tr>
           </thead>
