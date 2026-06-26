@@ -8,6 +8,7 @@ import { DiscussionWall } from "@/components/discussion-wall";
 import { PaymentInstructionsPanel } from "@/components/payment-instructions-panel";
 import { RequiredDocsPanel } from "@/components/required-docs-panel";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useUser } from "@/lib/user-context";
 import {
   ApiError,
@@ -703,28 +704,50 @@ function CancelRsvpButton({
   eventSlug: string;
 }) {
   const router = useRouter();
+  const confirmDialog = useConfirm();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handle() {
-    if (!confirm("Opravdu chceš svojí registraci zrušit?")) return;
+    const ok = await confirmDialog({
+      title: "Zrušit registraci?",
+      description:
+        "Z účasti se odhlásíš a uvolníš místo dalšímu na waitlistu. Můžeš se kdykoli znovu přihlásit, pokud kapacita dovolí.",
+      confirmLabel: "Zrušit registraci",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
+    setError(null);
     try {
       await events.cancelMyRsvp(wsSlug, eventSlug);
       router.refresh();
       window.location.reload();
-    } catch {
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Zrušení se nepovedlo. Zkus to prosím znovu.",
+      );
       setBusy(false);
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={handle}
-      disabled={busy}
-      className="mt-3 inline-flex items-center rounded-md border border-danger/40 bg-surface px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
-    >
-      {busy ? "Ruším…" : "Zrušit registraci"}
-    </button>
+    <div className="mt-3 flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={handle}
+        disabled={busy}
+        className="inline-flex w-fit items-center rounded-md border border-danger/40 bg-surface px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
+      >
+        {busy ? "Ruším…" : "Zrušit registraci"}
+      </button>
+      {error && (
+        <p className="rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
