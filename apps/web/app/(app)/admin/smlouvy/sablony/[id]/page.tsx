@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, use, useEffect, useState } from "react";
+import {
+  FormEvent,
+  use,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
@@ -34,6 +41,33 @@ const PLACEHOLDERS = [
   "datum_dnes",
 ];
 
+/** Mock data co se v náhledu propíše do placeholderů — aby uživatel
+ *  viděl, jak smlouva bude vypadat až ji dostane účastník. Reálná
+ *  substituce probíhá na backendu při generování PDF. */
+const PREVIEW_VALUES: Record<string, string> = {
+  ucastnik_jmeno: "Jan Novák",
+  ucastnik_email: "jan.novak@example.com",
+  ucastnik_telefon: "+420 777 123 456",
+  ucastnik_adresa: "Hlavní 12, Praha, 11000",
+  ucastnik_datum_narozeni: "15. 3. 1990",
+  event_titul: "Spring Camp Beskydy",
+  event_datum: "16.–19. května 2026",
+  event_misto: "Beskydy, ČR",
+  event_cena: "2 500 CZK",
+  workspace_jmeno: "Olaf Adventures",
+  datum_dnes: new Date().toLocaleDateString("cs-CZ"),
+};
+
+function renderPreview(html: string): string {
+  return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
+    const value = PREVIEW_VALUES[key];
+    if (value === undefined) {
+      return `<mark style="background:#fff3cd;padding:0 2px;">{{${key}}}</mark>`;
+    }
+    return `<strong style="color:#155724;background:#d4edda;padding:0 2px;border-radius:2px;">${value}</strong>`;
+  });
+}
+
 export default function TemplateEditPage({ params }: Props) {
   const { id } = use(params);
   const templateId = parseInt(id, 10);
@@ -49,6 +83,27 @@ export default function TemplateEditPage({ params }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewHtml = useMemo(() => renderPreview(bodyHtml), [bodyHtml]);
+
+  function insertPlaceholder(key: string) {
+    const token = `{{${key}}}`;
+    const ta = bodyRef.current;
+    if (!ta) {
+      setBodyHtml((prev) => prev + token);
+      return;
+    }
+    const start = ta.selectionStart ?? bodyHtml.length;
+    const end = ta.selectionEnd ?? bodyHtml.length;
+    const next = bodyHtml.slice(0, start) + token + bodyHtml.slice(end);
+    setBodyHtml(next);
+    // Po re-render přesuneme kurzor za vložený placeholder.
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + token.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -268,41 +323,72 @@ export default function TemplateEditPage({ params }: Props) {
         <Card>
           <CardSection>
             <h2 className="text-base font-semibold text-ink-900">
-              Tělo smlouvy (HTML)
+              Tělo smlouvy
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              HTML obsah s placeholdery typu{" "}
+              Vlevo HTML obsah s placeholdery typu{" "}
               <code className="rounded bg-surface-muted px-1">
                 {"{{"}ucastnik_jmeno{"}}"}
               </code>
-              . Při odesílání účastníkovi se nahradí jeho daty +
-              detaily eventu. Placeholdery dostupné v Olafu:
+              . Vpravo živý náhled — placeholdery jsou nahrazené
+              ukázkovými daty (Jan Novák, Spring Camp Beskydy, …),
+              ať vidíš, jak smlouva bude vypadat. Při generování PDF
+              backend místo nich dosadí reálná data účastníka a akce.
             </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-ink-500">
+                Vložit:
+              </span>
               {PLACEHOLDERS.map((p) => (
                 <button
                   key={p}
                   type="button"
-                  onClick={() =>
-                    setBodyHtml((prev) => prev + `{{${p}}}`)
-                  }
+                  onClick={() => insertPlaceholder(p)}
                   className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-ink-700 hover:bg-surface-muted"
-                  title="Klikni a vlož kurzor do těla"
+                  title="Vložit na pozici kurzoru"
                 >
                   {"{{"}{p}{"}}"}
                 </button>
               ))}
             </div>
-            <div className="mt-4"><Field label="HTML tělo" htmlFor="body_html">
-              <textarea
-                id="body_html"
-                value={bodyHtml}
-                onChange={(e) => setBodyHtml(e.target.value)}
-                rows={20}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-ink-900 focus-ring"
-                placeholder="<h2>Smlouva o účasti</h2>&#10;<p>Mezi pořadatelem {{workspace_jmeno}} a {{ucastnik_jmeno}}…</p>"
-              />
-            </Field></div>
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="body_html"
+                  className="mb-1 block text-xs font-medium text-ink-500"
+                >
+                  HTML zdroj
+                </label>
+                <textarea
+                  id="body_html"
+                  ref={bodyRef}
+                  value={bodyHtml}
+                  onChange={(e) => setBodyHtml(e.target.value)}
+                  rows={24}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-ink-900 focus-ring"
+                  placeholder="<h2>Smlouva o účasti</h2>&#10;<p>Mezi pořadatelem {{workspace_jmeno}} a {{ucastnik_jmeno}}…</p>"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-500">
+                  Náhled (Jan Novák · Spring Camp Beskydy)
+                </label>
+                <div
+                  className="prose prose-sm max-w-none rounded-md border border-border bg-canvas px-4 py-3 text-sm leading-relaxed text-ink-900"
+                  style={{
+                    minHeight: "24rem",
+                    maxHeight: "32rem",
+                    overflowY: "auto",
+                  }}
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      previewHtml ||
+                      '<p style="color:#888;font-style:italic;">Náhled se objeví, jakmile něco vyplníš.</p>',
+                  }}
+                />
+              </div>
+            </div>
           </CardSection>
         </Card>
 
