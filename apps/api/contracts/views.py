@@ -139,8 +139,18 @@ def template_sync_notion(
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    notion_token = getattr(request.user, "notion_token", "")
-    anthropic_key = getattr(request.user, "anthropic_api_key", "")
+    # Tokens jsou v User modelu šifrovaně — sahej přes safe_decrypt_token
+    # ze `accounts.integrations`, ne přes hot atribut. (Bug z PR #230 —
+    # contracts/views.py četl `request.user.notion_token` který existuje
+    # jen jako getter v některých testech, ale ne na reálném User row.)
+    from accounts.integrations import safe_decrypt_token
+
+    notion_token = safe_decrypt_token(
+        request.user.notion_integration_token_encrypted
+    )
+    anthropic_key = safe_decrypt_token(
+        request.user.anthropic_api_key_encrypted
+    )
     if not notion_token or not anthropic_key:
         return Response(
             {
