@@ -148,9 +148,28 @@ export default function AdminEventyTablePage() {
                 : "Zatím žádné akce"}
           </h3>
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
-            Vytvoř svojí první akci. Komunitu mít nemusíš — akce má vlastní
-            stránku a registraci.
+            {filter === "all" || filter === "upcoming"
+              ? "Vytvoř svojí první akci. Komunitu mít nemusíš — akce má vlastní stránku a registraci."
+              : "Tady se ti časem ukáže archiv."}
           </p>
+          {(filter === "all" || filter === "upcoming") && (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <LinkButton
+                href="/admin/eventy/new"
+                variant="primary"
+                size="md"
+              >
+                + Vytvořit akci
+              </LinkButton>
+              <LinkButton
+                href="/admin/eventy/new/from-source"
+                variant="secondary"
+                size="md"
+              >
+                ↗ Z odkazu (Notion)
+              </LinkButton>
+            </div>
+          )}
         </div>
       )}
 
