@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -56,6 +57,7 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState(false);
+  const confirmDialog = useConfirm();
   // Collapsed by default — the section eats almost a full mobile
   // viewport when expanded; owner expands when they want to act on
   // it. Progress badge stays visible in the collapsed header.
@@ -247,7 +249,14 @@ export function EventChecklist({ workspaceSlug, eventSlug }: Props) {
                   }
                 }}
                 onDelete={async () => {
-                  if (!confirm("Smazat úkol?")) return;
+                  const ok = await confirmDialog({
+                    title: "Smazat úkol?",
+                    description:
+                      "Položka zmizí ze checklistu. Pokud byla auto-vygenerovaná, vrátí se při příští úpravě nastavení akce.",
+                    confirmLabel: "Smazat",
+                    variant: "danger",
+                  });
+                  if (!ok) return;
                   try {
                     await events.deleteChecklistItem(
                       workspaceSlug,

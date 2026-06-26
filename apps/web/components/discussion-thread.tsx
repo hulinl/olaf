@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type DiscussionComment,
@@ -62,6 +63,7 @@ export function DiscussionThread({
   const [notFound, setNotFound] = useState(false);
   /** When set, the composer at the bottom is "replying to" this comment. */
   const [replyTo, setReplyTo] = useState<DiscussionComment | null>(null);
+  const confirmDialog = useConfirm();
 
   async function loadDetail() {
     setLoading(true);
@@ -140,7 +142,14 @@ export function DiscussionThread({
   }
 
   async function handleDeleteTopic() {
-    if (!confirm("Smazat téma se všemi komentáři?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat téma?",
+      description:
+        "Téma zmizí společně se všemi komentáři a přílohami. Tuto akci nelze vrátit.",
+      confirmLabel: "Smazat téma",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       if (scope.kind === "workspace") {
         await discussions.deleteWorkspaceTopic(scope.slug, topicId);
@@ -221,7 +230,13 @@ export function DiscussionThread({
   }
 
   async function handleDeleteComment(c: DiscussionComment) {
-    if (!confirm("Smazat komentář?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat komentář?",
+      description: "Komentář i jeho přílohu odebereme nadobro.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       if (scope.kind === "workspace") {
         await discussions.deleteWorkspaceComment(scope.slug, topicId, c.id);

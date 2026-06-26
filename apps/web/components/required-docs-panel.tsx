@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type RSVPDocumentsBundle,
@@ -30,6 +31,7 @@ export function RequiredDocsPanel({ workspaceSlug, eventSlug }: Props) {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function reload() {
     try {
@@ -65,7 +67,13 @@ export function RequiredDocsPanel({ workspaceSlug, eventSlug }: Props) {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Smazat dokument?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat dokument?",
+      description: "Soubor odebereme — pak musíš nahrát nový.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
     setBusyKey(`del-${id}`);
     try {
       await events.deleteDocument(workspaceSlug, eventSlug, id);

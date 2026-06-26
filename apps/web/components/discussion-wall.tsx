@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field, Input } from "@/components/ui/field";
 import {
   ApiError,
@@ -45,6 +46,7 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
   const [topics, setTopics] = useState<DiscussionTopic[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const confirmDialog = useConfirm();
 
   async function listTopics() {
     try {
@@ -91,7 +93,14 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
   }
 
   async function handleDeleteTopic(topicId: number) {
-    if (!confirm("Smazat téma se všemi komentáři?")) return;
+    const ok = await confirmDialog({
+      title: "Smazat téma?",
+      description:
+        "Téma zmizí společně se všemi komentáři a přílohami. Tuto akci nelze vrátit.",
+      confirmLabel: "Smazat téma",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       if (scope.kind === "workspace") {
         await discussions.deleteWorkspaceTopic(scope.slug, topicId);

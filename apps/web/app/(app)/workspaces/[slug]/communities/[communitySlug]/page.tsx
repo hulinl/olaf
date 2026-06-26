@@ -6,6 +6,7 @@ import { FormEvent, use, useEffect, useState } from "react";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ApiError,
   type Community,
@@ -51,6 +52,7 @@ export default function CommunityDetailPage({ params }: Props) {
   const [members, setMembers] = useState<CommunityMemberRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   const [inviteEmails, setInviteEmails] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -120,7 +122,14 @@ export default function CommunityDetailPage({ params }: Props) {
   }
 
   async function handleRemove(member: CommunityMemberRecord) {
-    if (!confirm(`Odstranit ${member.user_full_name} z komunity?`)) return;
+    const ok = await confirmDialog({
+      title: `Odstranit ${member.user_full_name} z komunity?`,
+      description:
+        "Jeho RSVPs zůstávají, nebude ale dostávat newsletter ani uvidí soukromé akce. Pozvat zpět můžeš kdykoli.",
+      confirmLabel: "Odstranit",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await communitiesApi.removeMember(wsSlug, communitySlug, member.id);
       setMembers((prev) =>
@@ -135,10 +144,17 @@ export default function CommunityDetailPage({ params }: Props) {
 
   async function handleRoleChange(member: CommunityMemberRecord) {
     const promoting = member.role === "member";
-    const confirmMsg = promoting
-      ? `Povýšit ${member.user_full_name} na admina komunity?`
-      : `Snížit ${member.user_full_name} z admina na běžného člena?`;
-    if (!confirm(confirmMsg)) return;
+    const ok = await confirmDialog({
+      title: promoting
+        ? `Povýšit ${member.user_full_name} na admina?`
+        : `Snížit ${member.user_full_name} z admina?`,
+      description: promoting
+        ? "Admin uvidí všechny akce, může spravovat členy a editovat komunitní obsah."
+        : "Ztratí přístup ke správě členů i editaci komunitního obsahu. Zůstává jako běžný člen.",
+      confirmLabel: promoting ? "Povýšit" : "Snížit",
+      variant: promoting ? "primary" : "danger",
+    });
+    if (!ok) return;
     try {
       const updated = await communitiesApi.setMemberRole(
         wsSlug,
