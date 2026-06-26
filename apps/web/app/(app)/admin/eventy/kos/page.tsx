@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ApiError, type EventSummary, events } from "@/lib/api";
 
 const RETENTION_DAYS = 30;
@@ -28,6 +29,7 @@ export default function EventTrashPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
 
   async function load() {
     try {
@@ -66,13 +68,14 @@ export default function EventTrashPage() {
   }
 
   async function handlePurge(e: EventSummary) {
-    if (
-      !window.confirm(
-        `Smazat „${e.title}" nadobro? Tuto akci už nelze vrátit.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: `Smazat „${e.title}" nadobro?`,
+      description:
+        "Akce zmizí včetně všech registrací, smluv, plateb a nahraných dokumentů. Po purge už ji nelze obnovit.",
+      confirmLabel: "Smazat nadobro",
+      variant: "danger",
+    });
+    if (!ok) return;
     const key = `purge:${e.workspace_slug}/${e.slug}`;
     setBusy(key);
     try {
