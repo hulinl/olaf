@@ -160,6 +160,79 @@ class ToggleOrganizerTests(TestCase):
         )
         self.assertIn(r.status_code, (401, 403))
 
+    def test_unmark_organizer_removes_from_organizers_block(self) -> None:
+        # Owner report: „odstranil jsem organizátora, ale na veřejné
+        # stránce zůstal". Rooster toggle (RSVP.is_organizer) a landing
+        # „Organizátoři" blok (Event.blocks.user_ids) jsou dva různé
+        # zdroje — remove z rosteru musí syncnout do bloku, jinak
+        # user vidí stale data.
+        self.event.blocks = [
+            {
+                "id": "b1",
+                "type": "organizers",
+                "payload": {
+                    "eyebrow": "",
+                    "title": "Kdo to vede",
+                    "intro": "",
+                    "user_ids": [self.participant.id, self.owner.id],
+                },
+            },
+            {
+                "id": "b2",
+                "type": "prose",
+                "payload": {"body_md": "text"},
+            },
+        ]
+        self.event.save(update_fields=["blocks"])
+        self.rsvp.is_organizer = True
+        self.rsvp.save(update_fields=["is_organizer"])
+
+        self.client.force_authenticate(self.owner)
+        r = self.client.post(
+            self.url, {"is_organizer": False}, format="json"
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+
+        self.event.refresh_from_db()
+        organizers_block = next(
+            b for b in self.event.blocks if b["type"] == "organizers"
+        )
+        # participant.id vypadl, owner.id zůstává (nemá RSVP toggle).
+        self.assertEqual(
+            organizers_block["payload"]["user_ids"], [self.owner.id]
+        )
+        # Ostatní bloky netouchnuté.
+        prose_block = next(b for b in self.event.blocks if b["type"] == "prose")
+        self.assertEqual(prose_block["payload"], {"body_md": "text"})
+
+    def test_mark_organizer_does_not_add_to_block(self) -> None:
+        # Sync jde jen v remove směru. Add do bloku zůstává explicitní
+        # akce owner v landing editoru (může chtít někoho v rosteru bez
+        # toho, aby ho ukazoval veřejně).
+        self.event.blocks = [
+            {
+                "id": "b1",
+                "type": "organizers",
+                "payload": {
+                    "eyebrow": "",
+                    "title": "Kdo to vede",
+                    "intro": "",
+                    "user_ids": [self.owner.id],
+                },
+            },
+        ]
+        self.event.save(update_fields=["blocks"])
+
+        self.client.force_authenticate(self.owner)
+        r = self.client.post(
+            self.url, {"is_organizer": True}, format="json"
+        )
+        self.assertEqual(r.status_code, 200)
+
+        self.event.refresh_from_db()
+        organizers_block = self.event.blocks[0]
+        self.assertEqual(organizers_block["payload"]["user_ids"], [self.owner.id])
+
 
 class ParticipantProfileTests(TestCase):
     def setUp(self) -> None:
