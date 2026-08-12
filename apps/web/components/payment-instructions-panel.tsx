@@ -81,11 +81,7 @@ export function PaymentInstructionsPanel({
           <span className="rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
             Zaplaceno
           </span>
-        ) : cashOnSite ? (
-          <span className="rounded-full bg-ink-100 px-3 py-0.5 text-xs font-semibold text-ink-700">
-            Hotovost na místě
-          </span>
-        ) : (
+        ) : cashOnSite ? null : (
           <span className="rounded-full bg-warning/15 px-3 py-0.5 text-xs font-semibold text-warning">
             Čeká na platbu
           </span>
