@@ -306,7 +306,16 @@ class EventPublicSerializer(serializers.ModelSerializer):
         karty bez druhého fetch-u.
 
         Drop-uje user_ids co už nemají odpovídajícího Usera — owner mohl
-        smazat collaborator-a po vložení do bloku."""
+        smazat collaborator-a po vložení do bloku.
+
+        Také filtruje user_ids proti aktuálnímu **organizer poolu** —
+        workspace owner/admins + EventCollaborators. Bez tohohle filtru:
+        když user vypadne z poolu (přestane být workspace admin nebo
+        collaborator), owner ho v landing editoru už nevidí (picker
+        renderuje jen pool), ale ID pořád visí v `block.payload.user_ids`
+        z minulosti a public landing ho pořád ukazuje. Dogfood report:
+        „v nastavení landing už toho člověka nevidím, tam už není, ale
+        na landing ho vidím pořád"."""
         ids: set[int] = set()
         for block in obj.blocks or []:
             if not isinstance(block, dict) or block.get("type") != "organizers":
@@ -319,6 +328,27 @@ class EventPublicSerializer(serializers.ModelSerializer):
             return {}
 
         from accounts.models import User
+        from workspaces.models import WorkspaceMember
+
+        from .models import EventCollaborator
+
+        pool_ids: set[int] = set(
+            WorkspaceMember.objects.filter(
+                workspace=obj.workspace,
+                role__in=[
+                    WorkspaceMember.ROLE_OWNER,
+                    WorkspaceMember.ROLE_ADMIN,
+                ],
+            ).values_list("user_id", flat=True)
+        )
+        pool_ids.update(
+            EventCollaborator.objects.filter(event=obj).values_list(
+                "user_id", flat=True
+            )
+        )
+        ids = ids & pool_ids
+        if not ids:
+            return {}
 
         request = self.context.get("request")
         users = User.objects.filter(id__in=ids)

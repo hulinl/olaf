@@ -1473,6 +1473,8 @@ class ConfigurableQuestionnaireTests(TestCase):
         # Block payload nese user_ids; veřejný endpoint side-lookup
         # vyplní bio + display_name + avatar_url, takže renderer
         # nemusí dělat druhý fetch.
+        from workspaces.models import WorkspaceMember
+
         organizer = User.objects.create_user(
             email="org@example.com",
             password="pass-abcdef-1234",
@@ -1482,6 +1484,14 @@ class ConfigurableQuestionnaireTests(TestCase):
         organizer.bio = "Vede kempy 10 let."
         organizer.display_name = "Olaf"
         organizer.save(update_fields=["bio", "display_name"])
+        # Serializer teď filtruje user_ids proti pool-u (workspace
+        # owner/admins + EventCollaborators). Organizer musí být v
+        # poolu, jinak z payloadu vypadne.
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=organizer,
+            role=WorkspaceMember.ROLE_ADMIN,
+        )
 
         self.event.blocks = [
             {
@@ -1510,6 +1520,56 @@ class ConfigurableQuestionnaireTests(TestCase):
         self.assertEqual(lookup[str(organizer.id)]["display_name"], "Olaf")
         self.assertEqual(lookup[str(organizer.id)]["bio"], "Vede kempy 10 let.")
         self.assertNotIn("999999", lookup)
+
+    def test_organizers_out_of_pool_are_dropped(self) -> None:
+        # Owner report: „v nastavení landing už toho člověka nevidím,
+        # tam už není, ale na landing ho vidím pořád". Root cause:
+        # když user vypadne z organizer poolu (přestane být workspace
+        # admin nebo EventCollaborator), owner ho v landing editoru
+        # už nevidí (picker renderuje jen pool), ale ID pořád visí
+        # v `block.payload.user_ids`. Serializer musí defensively
+        # filtrovat proti aktuálnímu poolu.
+        from workspaces.models import WorkspaceMember
+
+        stale = User.objects.create_user(
+            email="stale@example.com",
+            password="pass-abcdef-1234",
+            first_name="X", last_name="Y",
+            email_verified=True,
+        )
+        active = User.objects.create_user(
+            email="active@example.com",
+            password="pass-abcdef-1234",
+            first_name="A", last_name="B",
+            email_verified=True,
+        )
+        # Jen `active` je v poolu.
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=active,
+            role=WorkspaceMember.ROLE_ADMIN,
+        )
+        # `stale` existuje jako User (kdysi byl v poolu), ale už
+        # nikdy — přesto sedí v block.payload.user_ids z minulosti.
+        self.event.blocks = [
+            {
+                "id": "team",
+                "type": "organizers",
+                "payload": {"user_ids": [active.id, stale.id]},
+            }
+        ]
+        self.event.save(update_fields=["blocks"])
+
+        resp = self.client.get(
+            reverse(
+                "events:public",
+                kwargs={"workspace_slug": "olafadventures", "event_slug": "letni-kemp-2026"},
+            )
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        lookup = resp.json()["organizers_by_user_id"]
+        self.assertIn(str(active.id), lookup)
+        self.assertNotIn(str(stale.id), lookup)
 
     def test_event_payload_exposes_effective_sections(self) -> None:
         self.event.enabled_questionnaire_sections = ["tshirt_size", "diet"]
