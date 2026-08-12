@@ -17,7 +17,7 @@ export default function VerifyEmailPage({
   const { token } = use(params);
   const [status, setStatus] = useState<Status>("pending");
   const [message, setMessage] = useState<string>(
-    "Hold on a sec — confirming your email.",
+    "Chviličku — ověřujeme tvůj e-mail.",
   );
 
   useEffect(() => {
@@ -27,14 +27,14 @@ export default function VerifyEmailPage({
         await auth.verifyEmail(token);
         if (cancelled) return;
         setStatus("success");
-        setMessage("Email verified. You can now sign in.");
+        setMessage("E-mail je ověřený. Teď se můžeš přihlásit.");
       } catch (err) {
         if (cancelled) return;
         setStatus("error");
         if (err instanceof ApiError) {
           setMessage(err.message);
         } else {
-          setMessage("Verification failed. The link may be expired.");
+          setMessage("Ověření se nepovedlo. Odkaz asi vypršel.");
         }
       }
     })();
@@ -45,10 +45,10 @@ export default function VerifyEmailPage({
 
   const title =
     status === "pending"
-      ? "Verifying your email…"
+      ? "Ověřuji e-mail…"
       : status === "success"
-        ? "All set"
-        : "Verification failed";
+        ? "Hotovo"
+        : "Ověření se nepovedlo";
 
   return (
     <AuthShell
@@ -60,7 +60,7 @@ export default function VerifyEmailPage({
             href="/signup"
             className="font-medium text-ink-900 underline"
           >
-            Try signing up again
+            Zkusit registraci znovu
           </Link>
         ) : null
       }
@@ -72,7 +72,7 @@ export default function VerifyEmailPage({
       )}
       {status === "success" && (
         <LinkButton href="/login" variant="primary" size="lg" fullWidth>
-          Go to login
+          Přejít na přihlášení
         </LinkButton>
       )}
     </AuthShell>
