@@ -87,6 +87,7 @@ class MyRsvpPaymentTests(TestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 200)
         data = r.json()
+        self.assertEqual(data["payment_type"], "bank_transfer")
         self.assertEqual(data["amount"], "2500.00")
         self.assertEqual(data["currency"], "CZK")
         self.assertEqual(data["variable_symbol"], "99999")
@@ -99,6 +100,26 @@ class MyRsvpPaymentTests(TestCase):
         self.assertIsNotNone(data["qr_png_url"])
         # Message má workspace + event title.
         self.assertIn("payws", data["message"].lower())
+
+    def test_cash_on_site_event_skips_iban_and_qr(self) -> None:
+        # Owner nastavil „platba v hotovosti na místě" → endpoint musí
+        # frontendem srozumitelně signalizovat, že žádný převod není
+        # potřeba. Před fixem endpoint vracel QR + IBAN i pro cash
+        # eventy a účastník viděl matoucí bankovní pokyny.
+        self.event.payment_in_cash = True
+        self.event.save(update_fields=["payment_in_cash"])
+        self.client.force_authenticate(self.participant)
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["payment_type"], "cash_on_site")
+        # Amount se pořád vrací — frontend user říká, jakou částku má
+        # přinést v hotovosti.
+        self.assertEqual(data["amount"], "2500.00")
+        self.assertEqual(data["currency"], "CZK")
+        # Žádný QR ani IBAN — payment probíhá offline.
+        self.assertEqual(data["iban"], "")
+        self.assertIsNone(data["qr_png_url"])
 
     def test_free_event_returns_400(self) -> None:
         # Free event = žádná platba, endpoint vrátí 400.

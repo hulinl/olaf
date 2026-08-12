@@ -203,22 +203,23 @@ export default function MyEventPage({ params }: Props) {
           }
         />
 
-        {/* The participant zone is a "framed card" for registration /
-            documents — but the nástěnka is itself already a bordered
-            section, so wrapping it in the same frame doubles up the
-            chrome and steals horizontal real estate. Skip the inner
-            canvas + padding wrapper when nastenka is active so the
-            wall gets the full width of the page. */}
+        {/* The participant zone used to wrap every tab in a canvas card
+            frame — but that added chrome around the registration content
+            (which already renders its own status card + sub-tabs) and
+            just looked like a redundant border. Only "vybaveni" (gear
+            checklist) still gets the framed treatment since its content
+            is a bare checkbox list; nastenka + registrace render flush
+            with the page. */}
         <div
           className={
-            tab === "nastenka"
-              ? ""
-              : "rounded-2xl border border-border bg-surface-muted/30 p-1"
+            tab === "vybaveni"
+              ? "rounded-2xl border border-border bg-surface-muted/30 p-1"
+              : ""
           }
         >
           <div
             className={
-              tab === "nastenka" ? "" : "rounded-xl bg-canvas p-4 sm:p-6"
+              tab === "vybaveni" ? "rounded-xl bg-canvas p-4 sm:p-6" : ""
             }
           >
             {tab === "nastenka" ? (
@@ -687,10 +688,10 @@ function MyReservationPanel({
       )}
 
       {my && my.status !== "cancelled" && event.status !== "cancelled" && (
-        <div className="rounded-md border border-danger/30 bg-danger-soft/30 p-4 text-sm text-ink-700">
+        <div className="mt-2 flex flex-col items-start gap-1 border-t border-border pt-4 text-xs text-ink-500">
           <p>
-            Chceš svojí registraci zrušit? Klik níže ji okamžitě zruší a
-            uvolní místo dalšímu zájemci.
+            Zrušení registrace uvolní místo dalšímu zájemci — kdykoli se
+            můžeš přihlásit znovu, pokud kapacita dovolí.
           </p>
           <CancelRsvpButton wsSlug={wsSlug} eventSlug={eventSlug} />
         </div>
@@ -737,12 +738,12 @@ function CancelRsvpButton({
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2">
+    <div className="mt-2 flex flex-col gap-2">
       <button
         type="button"
         onClick={handle}
         disabled={busy}
-        className="inline-flex w-fit items-center rounded-md border border-danger/40 bg-surface px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
+        className="inline-flex w-fit items-center rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-500 hover:border-danger/40 hover:text-danger disabled:opacity-50"
       >
         {busy ? "Ruším…" : "Zrušit registraci"}
       </button>

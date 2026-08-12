@@ -59,6 +59,7 @@ export function PaymentInstructionsPanel({
   if (hidden || !data) return null;
 
   const paid = data.status === "paid";
+  const cashOnSite = data.payment_type === "cash_on_site";
 
   return (
     <section
@@ -70,11 +71,19 @@ export function PaymentInstructionsPanel({
     >
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-base font-semibold text-ink-900">
-          {paid ? "Platba přijata" : "Pokyny k platbě"}
+          {paid
+            ? "Platba přijata"
+            : cashOnSite
+              ? "Platba na místě"
+              : "Pokyny k platbě"}
         </h3>
         {paid ? (
           <span className="rounded-full bg-success/20 px-3 py-0.5 text-xs font-semibold text-success">
             Zaplaceno
+          </span>
+        ) : cashOnSite ? (
+          <span className="rounded-full bg-ink-100 px-3 py-0.5 text-xs font-semibold text-ink-700">
+            Hotovost na místě
           </span>
         ) : (
           <span className="rounded-full bg-warning/15 px-3 py-0.5 text-xs font-semibold text-warning">
@@ -87,6 +96,23 @@ export function PaymentInstructionsPanel({
         <p className="mt-3 text-sm text-ink-700">
           Děkujeme — registrace je plně potvrzená.
         </p>
+      ) : cashOnSite ? (
+        <div className="mt-3 text-sm text-ink-700">
+          <p>
+            Platba proběhne{" "}
+            <strong className="text-ink-900">v hotovosti na místě</strong>
+            {data.amount && (
+              <>
+                {" "}— přines si částku{" "}
+                <strong className="text-ink-900">
+                  {formatEventPrice(data.amount, data.currency)}
+                </strong>
+              </>
+            )}
+            . Žádný převod ani QR kód není potřeba, registrace platí i bez
+            platby předem.
+          </p>
+        </div>
       ) : !data.iban ? (
         <div className="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-sm text-ink-900">
           <p className="font-medium">Pořadatel ještě nezadal platební údaje.</p>

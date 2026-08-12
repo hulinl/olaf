@@ -140,6 +140,22 @@ class DocumentListUploadTests(TestCase):
         )
         self.assertEqual(r.status_code, 400)
 
+    def test_optional_docs_are_hidden_from_participant(self) -> None:
+        # Owner v event settings může mít v seznamu i položky s
+        # required=False (legacy nebo "nice to have"). Participant view
+        # je nesmí ukázat — badge "0 / N doloženo" a hvězdička pak
+        # nekorespondují s tím, co se v listu vykresluje.
+        self.event.required_documents = [
+            {"key": "liability", "label": "Souhlas", "required": True},
+            {"key": "smlouva", "label": "Smlouva", "required": False},
+        ]
+        self.event.save(update_fields=["required_documents"])
+        self.client.force_authenticate(self.participant)
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        keys = [d["key"] for d in r.json()["required"]]
+        self.assertEqual(keys, ["liability"])
+
     def test_outsider_404_no_rsvp(self) -> None:
         self.client.force_authenticate(self.outsider)
         r = self.client.post(
