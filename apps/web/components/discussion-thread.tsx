@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
+import { RichText } from "@/components/rich-text";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -381,9 +382,7 @@ export function DiscussionThread({
         </header>
 
         {detail.body && (
-          <p className="whitespace-pre-wrap text-base text-ink-700">
-            {detail.body}
-          </p>
+          <RichText text={detail.body} className="text-base text-ink-700" />
         )}
 
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
@@ -639,9 +638,7 @@ function CommentCard({
         </p>
       </div>
       {c.body && (
-        <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">
-          {c.body}
-        </p>
+        <RichText text={c.body} className="mt-2 block text-sm text-ink-700" />
       )}
       {c.attachment_url && (
         <CommentAttachment
