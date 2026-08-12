@@ -17,6 +17,7 @@ import {
   assetUrl,
   events,
   formatEventPrice,
+  formatSpotsRemaining,
 } from "@/lib/api";
 
 interface Props {
@@ -614,6 +615,15 @@ function MyReservationPanel({
               </span>
             </div>
           </div>
+          {event.capacity != null && (
+            <p className="mt-2 text-xs text-ink-500">
+              Přihlášeno {event.confirmed_count} z {event.capacity}
+              {event.remaining_capacity != null &&
+                event.remaining_capacity > 0 &&
+                ` · ${formatSpotsRemaining(event.remaining_capacity)}`}
+              {event.waitlist_count > 0 && ` · waitlist ${event.waitlist_count}`}
+            </p>
+          )}
         </div>
       )}
 

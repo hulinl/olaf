@@ -31,7 +31,7 @@ export default function ResetPasswordPage({
       if (err instanceof ApiError) {
         setError(err.firstFieldError() ?? err.message);
       } else {
-        setError("Something went wrong. Please try again.");
+        setError("Něco se pokazilo. Zkus to prosím znovu.");
       }
     } finally {
       setSubmitting(false);
@@ -41,11 +41,11 @@ export default function ResetPasswordPage({
   if (submitted) {
     return (
       <AuthShell
-        title="Password updated"
-        subtitle="You can now sign in with your new password."
+        title="Heslo je změněné"
+        subtitle="Teď se můžeš přihlásit s novým heslem."
       >
         <LinkButton href="/login" variant="primary" size="lg" fullWidth>
-          Go to login
+          Přejít na přihlášení
         </LinkButton>
       </AuthShell>
     );
@@ -53,19 +53,19 @@ export default function ResetPasswordPage({
 
   return (
     <AuthShell
-      title="Choose a new password"
-      subtitle="Pick something memorable but not obvious."
+      title="Zvol si nové heslo"
+      subtitle="Vyber něco, co si zapamatuješ, ale co není zřejmé."
       footer={
         <Link href="/login" className="font-medium text-ink-900 underline">
-          Back to log in
+          Zpět na přihlášení
         </Link>
       }
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field
-          label="New password"
+          label="Nové heslo"
           htmlFor="password"
-          hint="At least 10 characters, with a letter and a digit."
+          hint="Aspoň 10 znaků, s písmenem a číslicí."
         >
           <Input
             id="password"
@@ -87,7 +87,7 @@ export default function ResetPasswordPage({
           fullWidth
           loading={submitting}
         >
-          {submitting ? "Updating…" : "Update password"}
+          {submitting ? "Ukládám…" : "Uložit heslo"}
         </Button>
       </form>
     </AuthShell>

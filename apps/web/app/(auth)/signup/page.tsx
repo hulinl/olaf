@@ -50,7 +50,7 @@ function SignupForm() {
       if (err instanceof ApiError) {
         setError(err.firstFieldError() ?? err.message);
       } else {
-        setError("Something went wrong. Please try again.");
+        setError("Něco se pokazilo. Zkus to prosím znovu.");
       }
     } finally {
       setSubmitting(false);
@@ -60,22 +60,22 @@ function SignupForm() {
   if (success) {
     return (
       <AuthShell
-        title="Check your email"
+        title="Zkontroluj e-mail"
         subtitle={
           <>
-            We sent a verification link to <strong>{email}</strong>. Click it
-            to activate your account.
+            Poslali jsme ověřovací odkaz na <strong>{email}</strong>. Klikni
+            na něj a účet ti aktivujeme.
           </>
         }
         footer={
           <Link href="/login" className="underline">
-            Back to log in
+            Zpět na přihlášení
           </Link>
         }
       >
         <p className="text-sm text-ink-500">
-          The link expires in 24 hours. If you don&apos;t see the email, check
-          your spam folder.
+          Odkaz platí 24 hodin. Pokud e-mail nevidíš, mrkni do složky
+          Spam.
         </p>
       </AuthShell>
     );
@@ -83,20 +83,20 @@ function SignupForm() {
 
   return (
     <AuthShell
-      title="Create your account"
-      subtitle="Join the crew. RSVP to your first event in minutes."
+      title="Vytvoř si účet"
+      subtitle="Přidej se ke crew. Na první akci se přihlásíš za pár minut."
       footer={
         <>
-          Already have an account?{" "}
+          Už máš účet?{" "}
           <Link href="/login" className="font-medium text-ink-900 underline">
-            Log in
+            Přihlásit se
           </Link>
         </>
       }
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="First name" htmlFor="first_name">
+          <Field label="Jméno" htmlFor="first_name">
             <Input
               id="first_name"
               type="text"
@@ -106,7 +106,7 @@ function SignupForm() {
               onChange={(e) => setFirstName(e.target.value)}
             />
           </Field>
-          <Field label="Last name" htmlFor="last_name">
+          <Field label="Příjmení" htmlFor="last_name">
             <Input
               id="last_name"
               type="text"
@@ -118,7 +118,7 @@ function SignupForm() {
           </Field>
         </div>
 
-        <Field label="Email" htmlFor="email">
+        <Field label="E-mail" htmlFor="email">
           <Input
             id="email"
             type="email"
@@ -130,9 +130,9 @@ function SignupForm() {
         </Field>
 
         <Field
-          label="Password"
+          label="Heslo"
           htmlFor="password"
-          hint="At least 10 characters, with a letter and a digit."
+          hint="Aspoň 10 znaků, s písmenem a číslicí."
         >
           <Input
             id="password"
@@ -154,7 +154,7 @@ function SignupForm() {
           fullWidth
           loading={submitting}
         >
-          {submitting ? "Creating account…" : "Create account"}
+          {submitting ? "Zakládám účet…" : "Vytvořit účet"}
         </Button>
       </form>
     </AuthShell>

@@ -13,6 +13,7 @@ import {
   type Event,
   type EventDraftPreview,
   formatEventDateRange,
+  formatSpotsRemaining,
 } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
@@ -167,7 +168,15 @@ export default async function EventLandingPage({ params }: Props) {
                   </span>
                 );
               }
-              return null;
+              // Neutral „ještě je místo" indikátor. Tester chtěl vidět, jak
+              // se počet volných míst reálně odpočítává, ne jen extrémní
+              // stav VYPRODÁNO / POSLEDNÍ. Ink-tone badge, aby nekřičel
+              // stejně jako alarming brand-orange verze.
+              return (
+                <span className="mb-4 inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
+                  {formatSpotsRemaining(remaining)}
+                </span>
+              );
             })()
           ) : null;
           const heroIndex = event.blocks.findIndex((b) => b.type === "hero");
@@ -326,6 +335,14 @@ function FallbackHero({
           {dateLabel}
           {event.location_text && ` · ${event.location_text}`}
         </p>
+        {event.capacity != null && event.is_open_for_rsvp && (
+          <p className="mt-2 text-sm text-ink-500">
+            Přihlášeno {event.confirmed_count} z {event.capacity}
+            {event.remaining_capacity != null &&
+              event.remaining_capacity > 0 &&
+              ` · ${formatSpotsRemaining(event.remaining_capacity)}`}
+          </p>
+        )}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           {cancelled ? (
             <span className="rounded-md bg-danger px-4 py-2 text-sm font-semibold text-white">

@@ -39,6 +39,23 @@ export function formatEventDateRange(starts: string, ends: string): string {
   )}`;
 }
 
+/**
+ * Czech pluralized „X volných míst" formatting.
+ *
+ * - 1 → „1 volné místo"
+ * - 2–4 → „N volná místa"
+ * - 5+ (a 0) → „N volných míst"
+ *
+ * Používá se v hero badge veřejného eventu + status card v „Moje účast".
+ * Aby tester viděl, jak se počet volných míst reálně odpočítává, ne
+ * jen extrémní stav VYPRODÁNO / POSLEDNÍ.
+ */
+export function formatSpotsRemaining(remaining: number): string {
+  if (remaining === 1) return "1 volné místo";
+  if (remaining >= 2 && remaining <= 4) return `${remaining} volná místa`;
+  return `${remaining} volných míst`;
+}
+
 /** Format an event price for display, or null if the event is free. */
 export function formatEventPrice(
   amount: string | null | undefined,

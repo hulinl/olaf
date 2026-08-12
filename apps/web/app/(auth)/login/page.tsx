@@ -40,7 +40,7 @@ function LoginForm() {
       if (err instanceof ApiError) {
         setError(err.firstFieldError() ?? err.message);
       } else {
-        setError("Something went wrong. Please try again.");
+        setError("Něco se pokazilo. Zkus to prosím znovu.");
       }
     } finally {
       setSubmitting(false);
@@ -49,19 +49,19 @@ function LoginForm() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to manage your communities and events."
+      title="Vítej zpátky"
+      subtitle="Přihlaš se a spravuj své komunity a akce."
       footer={
         <>
-          New here?{" "}
+          Ještě nemáš účet?{" "}
           <Link href="/signup" className="font-medium text-ink-900 underline">
-            Create an account
+            Vytvořit účet
           </Link>
         </>
       }
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field label="Email" htmlFor="email">
+        <Field label="E-mail" htmlFor="email">
           <Input
             id="email"
             type="email"
@@ -75,12 +75,12 @@ function LoginForm() {
         <Field
           label={
             <span className="flex items-center justify-between">
-              <span>Password</span>
+              <span>Heslo</span>
               <Link
                 href="/forgot-password"
                 className="text-xs font-normal text-ink-500 underline"
               >
-                Forgot?
+                Zapomenuté?
               </Link>
             </span>
           }
@@ -105,7 +105,7 @@ function LoginForm() {
           fullWidth
           loading={submitting}
         >
-          {submitting ? "Signing in…" : "Sign in"}
+          {submitting ? "Přihlašuji…" : "Přihlásit se"}
         </Button>
       </form>
     </AuthShell>

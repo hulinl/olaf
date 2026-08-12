@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
       if (err instanceof ApiError) {
         setError(err.firstFieldError() ?? err.message);
       } else {
-        setError("Something went wrong. Please try again.");
+        setError("Něco se pokazilo. Zkus to prosím znovu.");
       }
     } finally {
       setSubmitting(false);
@@ -36,17 +36,16 @@ export default function ForgotPasswordPage() {
   if (submitted) {
     return (
       <AuthShell
-        title="Check your email"
-        subtitle="If an account exists for that email, we've sent a reset link. It expires in one hour."
+        title="Zkontroluj e-mail"
+        subtitle="Pokud pro tento e-mail existuje účet, poslali jsme odkaz na obnovu hesla. Platí jednu hodinu."
         footer={
           <Link href="/login" className="font-medium text-ink-900 underline">
-            Back to log in
+            Zpět na přihlášení
           </Link>
         }
       >
         <p className="text-sm text-ink-500">
-          Don&apos;t see it? Check your spam folder, or wait a minute and try
-          again.
+          Nevidíš ho? Mrkni do složky Spam, nebo za chvíli zkus znovu.
         </p>
       </AuthShell>
     );
@@ -54,16 +53,16 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell
-      title="Reset your password"
-      subtitle="Enter your email and we'll send a link to choose a new one."
+      title="Obnova hesla"
+      subtitle="Zadej svůj e-mail a pošleme ti odkaz, kde si zvolíš nové heslo."
       footer={
         <Link href="/login" className="font-medium text-ink-900 underline">
-          Back to log in
+          Zpět na přihlášení
         </Link>
       }
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field label="Email" htmlFor="email">
+        <Field label="E-mail" htmlFor="email">
           <Input
             id="email"
             type="email"
@@ -83,7 +82,7 @@ export default function ForgotPasswordPage() {
           fullWidth
           loading={submitting}
         >
-          {submitting ? "Sending…" : "Send reset link"}
+          {submitting ? "Odesílám…" : "Poslat odkaz"}
         </Button>
       </form>
     </AuthShell>
