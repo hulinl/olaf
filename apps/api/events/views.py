@@ -2443,6 +2443,33 @@ def toggle_rsvp_organizer(
         ]
     )
 
+    # Sync s public landing „Organizátoři" blokem. Owner report: „odstranil
+    # jsem organizátora, ale na veřejné stránce zůstal". Root cause: block
+    # je statická JSONField konfigurace (`user_ids[]`), roster toggle
+    # upravuje `RSVP.is_organizer` — dvě různá data. Když owner remove-uje
+    # z rosteru, chce, aby to zmizelo i z veřejné stránky. Sync děláme jen
+    # v remove směru: add do bloku zůstává explicitní akce v landing
+    # editoru (owner může chtít někoho v bloku bez toho, aby byl v rosteru
+    # — externí kouč, apod.).
+    if not is_organizer and rsvp.user_id:
+        event = rsvp.event
+        blocks = event.blocks or []
+        changed = False
+        for block in blocks:
+            if block.get("type") != "organizers":
+                continue
+            payload = block.get("payload") or {}
+            user_ids = payload.get("user_ids") or []
+            if rsvp.user_id in user_ids:
+                payload["user_ids"] = [
+                    uid for uid in user_ids if uid != rsvp.user_id
+                ]
+                block["payload"] = payload
+                changed = True
+        if changed:
+            event.blocks = blocks
+            event.save(update_fields=["blocks", "updated_at"])
+
     from audit.models import AuditLog
     from audit.services import log as audit_log
 
