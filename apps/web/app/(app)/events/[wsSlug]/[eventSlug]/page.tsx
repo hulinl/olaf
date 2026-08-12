@@ -483,10 +483,14 @@ function RegSubTabs({
   active,
   onChange,
   fakturaAvailable,
+  docsAvailable,
+  platbaAvailable,
 }: {
   active: RegSubTab;
   onChange: (next: RegSubTab) => void;
   fakturaAvailable: boolean;
+  docsAvailable: boolean;
+  platbaAvailable: boolean;
 }) {
   return (
     <div
@@ -494,16 +498,20 @@ function RegSubTabs({
       aria-label="Sekce registrace"
       className="flex flex-wrap gap-2 text-sm"
     >
-      <TabButton
-        active={active === "platba"}
-        onClick={() => onChange("platba")}
-        label="Platba"
-      />
-      <TabButton
-        active={active === "dokumenty"}
-        onClick={() => onChange("dokumenty")}
-        label="Dokumenty"
-      />
+      {platbaAvailable && (
+        <TabButton
+          active={active === "platba"}
+          onClick={() => onChange("platba")}
+          label="Platba"
+        />
+      )}
+      {docsAvailable && (
+        <TabButton
+          active={active === "dokumenty"}
+          onClick={() => onChange("dokumenty")}
+          label="Dokumenty"
+        />
+      )}
       {fakturaAvailable && (
         <TabButton
           active={active === "faktura"}
@@ -534,17 +542,33 @@ function MyReservationPanel({
   // tabs over anchor jumps (back button gets confused, the URL
   // doesn't tell you which section is active).
   //
-  // Default tab pick: honor a deep-link hash if it points at a real
-  // section (faktura collapses to platba when no invoice yet), else
-  // start on platba. The user lands here from the dashboard either
-  // because they owe money (anchor=platba) or need to upload docs
-  // (anchor=dokumenty) — platba is the safer default when no anchor.
+  // Each sub-tab is conditional on there being *something* to show:
+  //   - platba: event is paid (price_amount > 0). Free events
+  //     don't need a payment tab; cash-on-site still does (shows
+  //     "hotovost na místě" message).
+  //   - dokumenty: event has at least one required doc entry with
+  //     required=True. Empty required_documents = hide the tab so
+  //     the participant isn't clicking into an empty section.
+  //   - faktura: invoice has been issued.
+  // Default tab pick: honor a deep-link hash if it points at a
+  // currently-visible section, otherwise fall back to whatever *is*
+  // visible (platba > dokumenty > faktura).
+  const platbaAvailable = !!event.price_amount;
+  const docsAvailable = (event.required_documents ?? []).some(
+    (d) => d.required,
+  );
   const fakturaAvailable = invoice != null;
+  const availableTabs: RegSubTab[] = [
+    ...(platbaAvailable ? (["platba"] as const) : []),
+    ...(docsAvailable ? (["dokumenty"] as const) : []),
+    ...(fakturaAvailable ? (["faktura"] as const) : []),
+  ];
   const subTabResolved: RegSubTab =
-    initialSubTab === "faktura" && !fakturaAvailable
-      ? "platba"
-      : initialSubTab ?? "platba";
+    initialSubTab && availableTabs.includes(initialSubTab)
+      ? initialSubTab
+      : (availableTabs[0] ?? "platba");
   const [subTab, setSubTab] = useState<RegSubTab>(subTabResolved);
+  const anyTabVisible = availableTabs.length > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -554,7 +578,10 @@ function MyReservationPanel({
         </p>
         <h2 className="text-xl font-semibold text-ink-900">Moje registrace</h2>
         <p className="text-sm text-ink-500">
-          Status přihlášky, pokyny k platbě, povinné dokumenty a faktura.
+          Přehled tvé přihlášky
+          {platbaAvailable && ", pokyny k platbě"}
+          {docsAvailable && ", požadované dokumenty"}
+          {fakturaAvailable && " a faktura"}.
         </p>
       </header>
 
@@ -602,20 +629,24 @@ function MyReservationPanel({
         </div>
       )}
 
-      <RegSubTabs
-        active={subTab}
-        onChange={setSubTab}
-        fakturaAvailable={fakturaAvailable}
-      />
+      {anyTabVisible && (
+        <RegSubTabs
+          active={subTab}
+          onChange={setSubTab}
+          fakturaAvailable={fakturaAvailable}
+          docsAvailable={docsAvailable}
+          platbaAvailable={platbaAvailable}
+        />
+      )}
 
-      {subTab === "platba" && (
+      {subTab === "platba" && platbaAvailable && (
         <PaymentInstructionsPanel
           workspaceSlug={wsSlug}
           eventSlug={eventSlug}
         />
       )}
 
-      {subTab === "dokumenty" && (
+      {subTab === "dokumenty" && docsAvailable && (
         <RequiredDocsPanel workspaceSlug={wsSlug} eventSlug={eventSlug} />
       )}
 
