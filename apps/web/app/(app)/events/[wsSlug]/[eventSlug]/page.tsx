@@ -719,10 +719,10 @@ function MyReservationPanel({
       )}
 
       {my && my.status !== "cancelled" && event.status !== "cancelled" && (
-        <div className="mt-2 flex flex-col items-start gap-1 border-t border-border pt-4 text-xs text-ink-500">
+        <div className="rounded-md border border-danger/30 bg-danger-soft/30 p-4 text-sm text-ink-700">
           <p>
-            Zrušení registrace uvolní místo dalšímu zájemci — kdykoli se
-            můžeš přihlásit znovu, pokud kapacita dovolí.
+            Chceš svojí registraci zrušit? Klik níže ji okamžitě zruší a
+            uvolní místo dalšímu zájemci.
           </p>
           <CancelRsvpButton wsSlug={wsSlug} eventSlug={eventSlug} />
         </div>
@@ -769,12 +769,12 @@ function CancelRsvpButton({
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-2">
+    <div className="mt-3 flex flex-col gap-2">
       <button
         type="button"
         onClick={handle}
         disabled={busy}
-        className="inline-flex w-fit items-center rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-500 hover:border-danger/40 hover:text-danger disabled:opacity-50"
+        className="inline-flex w-fit items-center rounded-md border border-danger/40 bg-surface px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-50"
       >
         {busy ? "Ruším…" : "Zrušit registraci"}
       </button>
