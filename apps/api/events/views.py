@@ -2223,6 +2223,10 @@ def my_rsvp_payment(request: Request, workspace_slug: str, event_slug: str) -> R
     Returns the structured info the frontend needs to render a QR + IBAN
     + variable symbol panel. 404 when there's no RSVP, 400 when the
     event is free, 200 with the data otherwise.
+
+    When the event is `payment_in_cash`, returns 200 with
+    `payment_type="cash_on_site"` + amount only — no IBAN/QR, since
+    payment happens offline on arrival.
     """
     rsvp = _my_rsvp_or_404(request.user, workspace_slug, event_slug)
     if rsvp is None:
@@ -2231,6 +2235,27 @@ def my_rsvp_payment(request: Request, workspace_slug: str, event_slug: str) -> R
         return Response(
             {"detail": "Tato akce je zdarma — žádná platba se neřeší."},
             status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if rsvp.event.payment_in_cash:
+        return Response(
+            {
+                "payment_type": "cash_on_site",
+                "status": rsvp.payment_status,
+                "amount": str(
+                    rsvp.payment_due_amount or rsvp.event.price_amount
+                ),
+                "currency": (
+                    rsvp.payment_currency or rsvp.event.price_currency
+                ),
+                "variable_symbol": rsvp.variable_symbol,
+                "iban": "",
+                "bank_name": "",
+                "due_days": 0,
+                "qr_png_url": None,
+                "message": "",
+                "paid_at": rsvp.paid_at,
+            }
         )
 
     workspace = rsvp.event.workspace
@@ -2243,6 +2268,7 @@ def my_rsvp_payment(request: Request, workspace_slug: str, event_slug: str) -> R
     )
     return Response(
         {
+            "payment_type": "bank_transfer",
             "status": rsvp.payment_status,
             "amount": str(rsvp.payment_due_amount or rsvp.event.price_amount),
             "currency": rsvp.payment_currency or rsvp.event.price_currency,
@@ -2510,9 +2536,19 @@ def my_rsvp_documents(
 
     if request.method == "GET":
         docs = RSVPDocument.objects.filter(rsvp=rsvp)
+        # Participant only sees docs marked required=True. Optional
+        # entries (required=False) sit in the owner's config for future
+        # rules but would confuse the participant view — the summary
+        # badge already counts only required, so listing optionals
+        # alongside made "0/1 doloženo" look wrong when 2 rows were
+        # shown. Uploads for optional keys still work (POST accepts
+        # them) so historical data stays valid.
+        required = [
+            d for d in (rsvp.event.required_documents or []) if d.get("required")
+        ]
         return Response(
             {
-                "required": rsvp.event.required_documents or [],
+                "required": required,
                 "uploaded": RSVPDocumentSerializer(docs, many=True).data,
             }
         )

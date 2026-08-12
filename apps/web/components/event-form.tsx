@@ -352,9 +352,14 @@ export function EventForm({
         // Drop placeholder rows the owner added with "+ Přidat dokument"
         // but didn't fill in — those would fail server validation and
         // shouldn't block saving the rest of the form.
-        required_documents: requiredDocs.filter(
-          (d) => d.key.trim() && d.label.trim(),
-        ),
+        // Everything the owner keeps in the list is `required=true` —
+        // the "Povinný" checkbox was removed since optional docs made
+        // the participant view confusing and had no real use case in
+        // V1. Legacy rows loaded with required=false auto-migrate to
+        // required=true on the next save.
+        required_documents: requiredDocs
+          .filter((d) => d.key.trim() && d.label.trim())
+          .map((d) => ({ ...d, required: true })),
         recommended_gear_list: recommendedGearListId,
         risk_checklist: risks.filter(
           (r) => r.key.trim() && r.label.trim(),
@@ -1188,7 +1193,7 @@ export function EventForm({
                 return (
                   <div
                     key={idx}
-                    className="grid grid-cols-1 items-center gap-2 rounded-md border border-border p-3 sm:grid-cols-[1fr_auto_auto]"
+                    className="grid grid-cols-1 items-center gap-2 rounded-md border border-border p-3 sm:grid-cols-[1fr_auto]"
                   >
                     {isCustom ? (
                       <Input
@@ -1218,23 +1223,6 @@ export function EventForm({
                         </span>
                       </div>
                     )}
-                    <label className="flex items-center gap-2 text-xs text-ink-700">
-                      <input
-                        type="checkbox"
-                        checked={d.required}
-                        onChange={(e) =>
-                          setRequiredDocs((prev) =>
-                            prev.map((p, i) =>
-                              i === idx
-                                ? { ...p, required: e.target.checked }
-                                : p,
-                            ),
-                          )
-                        }
-                        className="size-4 accent-brand"
-                      />
-                      Povinný
-                    </label>
                     <button
                       type="button"
                       onClick={() =>

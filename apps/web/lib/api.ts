@@ -626,6 +626,10 @@ export interface MyRSVP {
 }
 
 export interface RSVPPaymentInstructions {
+  /** `cash_on_site` = platba probíhá offline na místě (owner nastavil
+   *  „platba v hotovosti"). Panel místo IBAN/QR ukáže friendly
+   *  message. `bank_transfer` = klasický QR Platba + IBAN flow. */
+  payment_type: "bank_transfer" | "cash_on_site";
   status: "pending" | "paid" | "refunded" | "waived";
   amount: string;
   currency: string;
