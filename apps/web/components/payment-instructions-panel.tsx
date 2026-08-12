@@ -109,8 +109,7 @@ export function PaymentInstructionsPanel({
                 </strong>
               </>
             )}
-            . Žádný převod ani QR kód není potřeba, registrace platí i bez
-            platby předem.
+            .
           </p>
         </div>
       ) : !data.iban ? (
