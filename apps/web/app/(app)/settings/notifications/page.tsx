@@ -102,8 +102,8 @@ export default function NotificationsSettingsPage() {
               onChange={() => toggle("notify_on_discussion_reply")}
             />
             <ToggleRow
-              label="Nová témata v komunitách a akcích"
-              hint="Owner nebo jiný člen otevře nové téma v komunitě, kde jsi člen, nebo na akci, kam jsi přihlášen/a."
+              label="Nová témata v komunitách"
+              hint="Owner nebo jiný člen otevře nové téma v komunitě, kde jsi člen. Nová témata na nástěnce akce, kam jsi přihlášen/a, dostáváš vždy — organizátor tak má jistotu, že se pokyny dostanou ke všem."
               checked={prefs.notify_on_discussion_announce}
               onChange={() => toggle("notify_on_discussion_announce")}
             />

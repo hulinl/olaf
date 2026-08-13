@@ -115,10 +115,20 @@ def _audience_for_topic(topic: Topic) -> list[User]:
     Workspace topics → all WorkspaceMembers (including the owner).
     Event topics → all users with a non-cancelled RSVP + the workspace owner.
     The author is excluded so they don't get their own announcement.
+
+    **Opt-out asymetrie:**
+    - Workspace scope respektuje `notify_on_discussion_announce`
+      preference — nová témata v komunitě jsou nice-to-have.
+    - Event scope opt-out **obchází** — nové téma na nástěnce akce
+      je považováno za nutný organizační kanál (pokyny k platbě,
+      změny místa, apod.) a organizátor potřebuje jistotu, že se
+      všichni registrovaní dozvědí. User request 2026-08-13:
+      „tato notifikace bude povinná a bude chodit všem registrovaným".
     """
     recipients: set[int] = set()
+    is_event = topic.parent_type == Topic.PARENT_EVENT
 
-    if topic.parent_type == Topic.PARENT_WORKSPACE:
+    if not is_event:
         recipients.update(
             WorkspaceMember.objects.filter(workspace_id=topic.parent_id)
             .values_list("user_id", flat=True)
@@ -144,12 +154,10 @@ def _audience_for_topic(topic: Topic) -> list[User]:
     if topic.author_id:
         recipients.discard(topic.author_id)
 
-    return list(
-        User.objects.filter(
-            id__in=recipients,
-            notify_on_discussion_announce=True,
-        )
-    )
+    user_qs = User.objects.filter(id__in=recipients)
+    if not is_event:
+        user_qs = user_qs.filter(notify_on_discussion_announce=True)
+    return list(user_qs)
 
 
 def send_topic_announce(topic: Topic) -> None:
@@ -161,6 +169,7 @@ def send_topic_announce(topic: Topic) -> None:
 
     parent_label = _parent_label(topic)
     topic_url = _topic_url(topic)
+    is_mandatory = topic.parent_type == Topic.PARENT_EVENT
 
     from notifications.push import send_push_to_user
 
@@ -174,6 +183,7 @@ def send_topic_announce(topic: Topic) -> None:
             "parent_label": parent_label,
             "recipient": user,
             "author_name": author_name,
+            "is_mandatory": is_mandatory,
         }
         from notifications.email_sender import send_branded_email
 

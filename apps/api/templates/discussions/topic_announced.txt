@@ -8,6 +8,6 @@
 
 Připojit se k diskuzi: {{ topic_url }}
 
-Nechceš dostávat tyto e-maily? V Nastavení → Notifikace vypni „Upozorňovat na nová témata v komunitách a akcích".
+{% if is_mandatory %}Tato notifikace chodí všem přihlášeným účastníkům akce a nedá se vypnout — organizátor tak má jistotu, že se důležité pokyny dostanou ke všem.{% else %}Nechceš dostávat tyto e-maily? V Nastavení → Notifikace vypni „Upozorňovat na nová témata v komunitách a akcích".{% endif %}
 
 — Aplikace olaf

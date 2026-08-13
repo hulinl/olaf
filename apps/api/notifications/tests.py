@@ -277,3 +277,70 @@ class DiscussionFanOutTests(TestCase):
         n = notifs.first()
         self.assertEqual(n.kind, Notification.KIND_DISCUSSION_ANNOUNCE)
         self.assertIn("Důležité!", n.title)
+
+    def test_workspace_announce_respects_opt_out(self) -> None:
+        # Workspace scope opt-out zůstává respektován — nová témata
+        # v komunitě jsou nice-to-have, user má právo je vypnout.
+        from discussions.emails import send_topic_announce
+        from discussions.models import Topic
+
+        self.member.notify_on_discussion_announce = False
+        self.member.save(update_fields=["notify_on_discussion_announce"])
+        new_topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.id,
+            title="Sraz",
+            body="Kde a kdy",
+            author=self.author,
+        )
+        send_topic_announce(new_topic)
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.member).count(),
+            0,
+        )
+
+    def test_event_announce_bypasses_opt_out(self) -> None:
+        # Event scope opt-out se OBCHÁZÍ — nové téma na nástěnce akce
+        # je organizační kanál, user request 2026-08-13: „tato notifikace
+        # bude povinná a bude chodit všem registrovaným".
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from discussions.emails import send_topic_announce
+        from discussions.models import Topic
+        from events.models import RSVP, Event
+
+        starts = timezone.now() + timedelta(days=7)
+        event = Event.objects.create(
+            workspace=self.ws,
+            slug="letni-kemp",
+            title="Letní kemp",
+            starts_at=starts,
+            ends_at=starts + timedelta(hours=4),
+            status=Event.STATUS_PUBLISHED,
+        )
+        RSVP.objects.create(
+            event=event,
+            user=self.member,
+            status=RSVP.STATUS_YES,
+        )
+        # Member má opt-out — pro workspace by nic nedostal, pro event
+        # dostane přesto.
+        self.member.notify_on_discussion_announce = False
+        self.member.save(update_fields=["notify_on_discussion_announce"])
+
+        new_topic = Topic.objects.create(
+            parent_type=Topic.PARENT_EVENT,
+            parent_id=event.id,
+            title="Pokyny k příjezdu",
+            body="Chata je otevřená od 17:00.",
+            author=self.author,
+        )
+        send_topic_announce(new_topic)
+
+        notifs = Notification.objects.filter(recipient=self.member)
+        self.assertEqual(notifs.count(), 1)
+        n = notifs.first()
+        self.assertEqual(n.kind, Notification.KIND_DISCUSSION_ANNOUNCE)
+        self.assertIn("Pokyny", n.title)
