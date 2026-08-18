@@ -1654,6 +1654,56 @@ export const events = {
       `/api/events/rsvp/cancel-by-token/`,
       { method: "POST", body: JSON.stringify({ token }) },
     ),
+  /** Public post-event feedback flow. Token = RSVP.feedback_token
+   *  (UUID). GET vrátí kontext akce + případnou už uloženou odpověď;
+   *  POST je upsert, druhý submit přepíše první. Bez auth. */
+  feedbackInfoByToken: (token: string) =>
+    apiFetch<{
+      event_title: string;
+      event_starts_at: string;
+      workspace_name: string;
+      user_name: string;
+      existing: {
+        rating: number;
+        went_well: string;
+        could_improve: string;
+        updated_at: string;
+      } | null;
+    }>(`/api/events/feedback/${encodeURIComponent(token)}/`),
+  submitFeedbackByToken: (
+    token: string,
+    payload: { rating: number; went_well: string; could_improve: string },
+  ) =>
+    apiFetch<{
+      rating: number;
+      went_well: string;
+      could_improve: string;
+      updated_at: string;
+    }>(`/api/events/feedback/${encodeURIComponent(token)}/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  /** Owner surface — vrátí list submitted feedback pro akci. */
+  listFeedback: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<
+      Array<{
+        id: number;
+        email: string;
+        name: string;
+        rating: number;
+        went_well: string;
+        could_improve: string;
+        created_at: string;
+        updated_at: string;
+        event_title: string;
+      }>
+    >(`/api/events/${workspaceSlug}/${eventSlug}/feedback/`),
+  /** Owner-triggered fan-out — mail všem YES non-organizer RSVP. */
+  sendFeedbackRequest: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<{ sent: number }>(
+      `/api/events/${workspaceSlug}/${eventSlug}/feedback/`,
+      { method: "POST" },
+    ),
   mine: () => apiFetch<EventSummary[]>("/api/events/mine/"),
   owner: () => apiFetch<EventSummary[]>("/api/events/owner/"),
   rsvpList: (workspaceSlug: string, eventSlug: string) =>

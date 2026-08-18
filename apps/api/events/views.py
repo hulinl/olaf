@@ -18,7 +18,7 @@ from accounts.models import User
 from communities.models import Community
 from workspaces.models import Workspace
 
-from .models import RSVP, Event, EventImage
+from .models import RSVP, Event, EventFeedback, EventImage
 from .permissions import (
     can_manage_event,
     is_workspace_owner,
@@ -3697,3 +3697,146 @@ def bulk_match_payments(
             },
         }
     )
+
+
+# ------------------------------------------------------------------ feedback
+
+
+@api_view(["GET", "POST"])
+@permission_classes([AllowAny])
+def feedback_by_token(request: Request, token: str) -> Response:
+    """Public feedback endpoint pro post-event dotazník.
+
+    GET vrátí kontext akce + případnou už uloženou odpověď (aby form
+    mohl přednatáhnout hodnoty když se user vrátí přes link znovu).
+    POST je upsert — druhý submit přepíše první. Token = UUID v4 z
+    `RSVP.feedback_token`; malformed / neznámý → 404 (neleak info).
+
+    Zámerně BEZ TTL/expiry: organizátor rozešle žádost ručně, form
+    může přijít týdny po akci a user na něj klikne, až se dostane
+    k mailu. Rušíme jen když RSVP samo zmizí (cascade)."""
+    try:
+        rsvp = RSVP.objects.select_related(
+            "event", "event__workspace", "user"
+        ).get(feedback_token=token)
+    except (RSVP.DoesNotExist, DjangoValidationError, ValueError):
+        return Response(
+            {"detail": "Invalid token."}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    event = rsvp.event
+    existing = EventFeedback.objects.filter(rsvp=rsvp).first()
+
+    if request.method == "GET":
+        return Response(
+            {
+                "event_title": event.title,
+                "event_starts_at": event.starts_at.isoformat(),
+                "workspace_name": event.workspace.name,
+                "user_name": rsvp.user.get_full_name() if rsvp.user else "",
+                "existing": (
+                    {
+                        "rating": existing.rating,
+                        "went_well": existing.went_well,
+                        "could_improve": existing.could_improve,
+                        "updated_at": existing.updated_at.isoformat(),
+                    }
+                    if existing
+                    else None
+                ),
+            }
+        )
+
+    from .serializers import FeedbackSubmitSerializer
+
+    ser = FeedbackSubmitSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
+    data = ser.validated_data
+
+    # Snapshot jméno + e-mail v okamžiku submitu — přežije případné
+    # smazání RSVP nebo přejmenování usera.
+    snapshot_email = rsvp.user.email if rsvp.user else ""
+    snapshot_name = rsvp.user.get_full_name() if rsvp.user else ""
+
+    feedback, _created = EventFeedback.objects.update_or_create(
+        rsvp=rsvp,
+        defaults={
+            "event": event,
+            "email": snapshot_email,
+            "name": snapshot_name,
+            "rating": data["rating"],
+            "went_well": data.get("went_well", ""),
+            "could_improve": data.get("could_improve", ""),
+        },
+    )
+    return Response(
+        {
+            "rating": feedback.rating,
+            "went_well": feedback.went_well,
+            "could_improve": feedback.could_improve,
+            "updated_at": feedback.updated_at.isoformat(),
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def event_feedback(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Owner surface — GET vrátí seznam odpovědí, POST spustí fan-out
+    mailů všem YES non-organizer RSVP.
+
+    Gate: `can_manage_event` (workspace owner/admin nebo co-creator).
+    Fan-out je synchronní přes Celery EAGER mode v prod (viz settings_prod);
+    jeden špatný adresát nesmí shodit ostatní → `fail_silently=True`
+    uvnitř `send_feedback_request`."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        from .serializers import EventFeedbackSerializer
+
+        qs = EventFeedback.objects.filter(event=event).order_by("-created_at")
+        return Response(EventFeedbackSerializer(qs, many=True).data)
+
+    # POST → fan-out. Idempotence: opakovaný trigger prostě rozešle
+    # znovu (mail servery si duplicity vyřeší). Bez rate-limitingu ve
+    # V1 — organizátor button v UI drží confirm dialog jako gate.
+    rsvps = list(
+        RSVP.objects.filter(
+            event=event,
+            status=RSVP.STATUS_YES,
+            is_organizer=False,
+        ).select_related("user", "event", "event__workspace")
+    )
+
+    sent = 0
+    from .emails import send_feedback_request
+
+    for rsvp in rsvps:
+        if rsvp.user is None or not rsvp.user.email:
+            continue
+        with contextlib.suppress(Exception):
+            send_feedback_request(rsvp)
+            sent += 1
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_UPDATE,
+        workspace=event.workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=(
+            f'Rozeslána žádost o zpětnou vazbu k akci „{event.title}" '
+            f"({sent} příjemc{'e' if sent == 1 else 'ů'})."
+        ),
+        payload={"event_slug": event.slug, "recipients": sent},
+    )
+
+    return Response({"sent": sent})

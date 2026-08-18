@@ -486,6 +486,16 @@ class RSVP(models.Model):
         unique=True,
         db_index=True,
     )
+    # Magic-link token pro post-event feedback formulář. Držíme oddělený
+    # od `cancel_token` schválně — feedback URL může chodit v mailu
+    # týdny po akci a nechceme, aby sdílení feedback linku implicitně
+    # dávalo dál i právo na cancel. Per-RSVP unique UUID v4.
+    feedback_token = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+    )
     # Kdo zrušil registraci — owner v rosteru vidí "Sám zrušil" vs
     # "Zrušil pořadatel" badge, aby měl kontext na cancelled řádkách.
     # Prázdný string = aktivní RSVP nebo legacy bez záznamu.
@@ -1199,6 +1209,55 @@ class EventCollaborator(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} on {self.event}"
+
+
+class EventFeedback(models.Model):
+    """Post-event feedback from a participant, submitted via magic-link.
+
+    Ptáme se manuálně po akci — organizátor zmáčkne „Rozeslat žádost
+    o zpětnou vazbu" a všem `RSVP.STATUS_YES` (kromě organizátorů)
+    přijde mail s odkazem `?token=<rsvp.feedback_token>`. Formulář je
+    veřejný (nevyžaduje login) a submit je upsert — user může
+    kliknout znovu a odpověď opravit.
+
+    Snapshot `email` + `name` držíme kvůli tomu, aby list v adminu
+    přežil případné smazání RSVP nebo přejmenování usera; RSVP FK
+    máme jen pro navigaci.
+    """
+
+    RATING_CHOICES = [(i, str(i)) for i in range(1, 6)]
+
+    rsvp = models.OneToOneField(
+        "RSVP",
+        on_delete=models.CASCADE,
+        related_name="feedback",
+    )
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="feedbacks",
+    )
+    # Snapshot fields — přežijí smazání RSVP / usera. `name` prázdný
+    # když user neměl vyplněné jméno, což ale u RSVP by nemělo nastat.
+    email = models.EmailField()
+    name = models.CharField(max_length=200, blank=True, default="")
+
+    rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
+    went_well = models.TextField(blank=True, default="")
+    could_improve = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_event_feedback"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["event", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Feedback #{self.pk} for {self.event.slug} ({self.rating}★)"
 
 
 def _maybe_schedule_auto_contract(rsvp: "RSVP") -> None:

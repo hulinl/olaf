@@ -285,6 +285,24 @@ export default function EventEditCockpitPage({ params }: Props) {
       <CollaboratorsSection wsSlug={wsSlug} eventSlug={eventSlug} />
 
       <section>
+        <h2 className="text-lg font-semibold text-ink-900">Zpětná vazba</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Po skončení akce rozešli všem účastníkům mail s odkazem na krátký
+          dotazník (hodnocení 1–5 + dvě volitelná pole). Odkaz funguje bez
+          přihlášení a odpověď se automaticky spojí s registrací.
+        </p>
+        <div className="mt-3 flex flex-wrap items-start gap-3">
+          <SendFeedbackButton wsSlug={wsSlug} eventSlug={eventSlug} />
+          <Link
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/zpetne-vazby`}
+            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 focus-ring"
+          >
+            Zobrazit odpovědi →
+          </Link>
+        </div>
+      </section>
+
+      <section>
         <h2 className="text-lg font-semibold text-ink-900">Šablona</h2>
         <p className="mt-1 text-sm text-ink-500">
           Pořádáš podobné akce opakovaně? Vytvoř z této akce kopii s novým
@@ -590,6 +608,59 @@ function NotionLinkForm({
         <p className="whitespace-pre-line text-sm text-danger">{err}</p>
       )}
     </form>
+  );
+}
+
+function SendFeedbackButton({
+  wsSlug,
+  eventSlug,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const confirmDialog = useConfirm();
+
+  async function handle() {
+    const ok = await confirmDialog({
+      title: "Rozeslat žádost o zpětnou vazbu?",
+      description:
+        "Mail s odkazem na dotazník dorazí všem účastníkům se statusem Potvrzeno. Organizátoři na seznamu vynecháme.",
+      confirmLabel: "Rozeslat",
+    });
+    if (!ok) return;
+    setBusy(true);
+    setErr(null);
+    setOkMsg(null);
+    try {
+      const r = await events.sendFeedbackRequest(wsSlug, eventSlug);
+      setOkMsg(
+        r.sent === 0
+          ? "Nikdo k rozeslání — akce nemá potvrzené účastníky."
+          : `Odesláno ${r.sent} mail${r.sent === 1 ? "" : r.sent < 5 ? "y" : "ů"}.`,
+      );
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Rozeslání selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={handle}
+        disabled={busy}
+        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring disabled:opacity-50"
+      >
+        {busy ? "Odesílám…" : "Rozeslat žádost o zpětnou vazbu"}
+      </button>
+      {okMsg && <p className="text-sm text-success">{okMsg}</p>}
+      {err && <p className="text-sm text-danger">{err}</p>}
+    </div>
   );
 }
 

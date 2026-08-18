@@ -1,0 +1,11 @@
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
+
+díky, že jsi jel/a s námi na „{{ event.title }}". Rádi bychom věděli, jak to bylo — pomůže nám to udělat příští akce ještě lepší.
+
+Zabere to dvě minuty a nemusíš být přihlášený/á v aplikaci:
+
+{{ feedback_url }}
+
+Odkaz je jen pro tebe — tvoje odpověď se z něj automaticky spojí s tvou registrací.
+
+— Aplikace olaf
