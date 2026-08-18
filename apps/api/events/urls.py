@@ -18,6 +18,14 @@ urlpatterns = [
         views.cancel_rsvp_by_token,
         name="rsvp-cancel-by-token",
     ),
+    # Public feedback formulář — token = RSVP.feedback_token. Musí být
+    # PŘED workspace-scoped `<slug:workspace_slug>/<slug:event_slug>/`
+    # patterny, jinak by matchnul `workspace_slug=feedback, event_slug=<token>`.
+    path(
+        "feedback/<str:token>/",
+        views.feedback_by_token,
+        name="feedback-by-token",
+    ),
     path(
         "from-source/",
         views.ingest_event_from_source,
@@ -277,5 +285,10 @@ urlpatterns = [
         "<slug:workspace_slug>/payments/bulk-match/",
         views.bulk_match_payments,
         name="payments-bulk-match",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/feedback/",
+        views.event_feedback,
+        name="event-feedback",
     ),
 ]

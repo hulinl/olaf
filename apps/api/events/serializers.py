@@ -946,3 +946,39 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
         ):
             instance.remind_sent_at = None
         return super().update(instance, validated_data)
+
+
+from .models import EventFeedback  # noqa: E402
+
+
+class EventFeedbackSerializer(serializers.ModelSerializer):
+    """Owner-facing view — jméno + e-mail + odpovědi na akci."""
+
+    event_title = serializers.CharField(source="event.title", read_only=True)
+
+    class Meta:
+        model = EventFeedback
+        fields = (
+            "id",
+            "email",
+            "name",
+            "rating",
+            "went_well",
+            "could_improve",
+            "created_at",
+            "updated_at",
+            "event_title",
+        )
+        read_only_fields = fields
+
+
+class FeedbackSubmitSerializer(serializers.Serializer):
+    """Public-facing input serializer — jen validace, upsert řeší view."""
+
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    went_well = serializers.CharField(
+        max_length=4000, required=False, allow_blank=True, default=""
+    )
+    could_improve = serializers.CharField(
+        max_length=4000, required=False, allow_blank=True, default=""
+    )

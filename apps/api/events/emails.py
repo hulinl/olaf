@@ -25,6 +25,14 @@ def _frontend_cancel_url(rsvp: RSVP) -> str:
     )
 
 
+def _frontend_feedback_url(rsvp: RSVP) -> str:
+    """Magic-link URL pro post-event feedback formulář. Otevře se
+    veřejná stránka `/feedback/<token>` bez loginu, submit z ní jde
+    přímo na `POST /api/events/feedback/<token>/`."""
+    base = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return f"{base}/feedback/{rsvp.feedback_token}"
+
+
 def send_rsvp_confirmation(rsvp: RSVP) -> None:
     """Email a participant that their RSVP was recorded."""
     event = rsvp.event
@@ -122,6 +130,39 @@ def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
             "event_when": format_event_dt(event.starts_at, event.tz),
         },
         recipient_list=[rsvp.user.email],
+    )
+
+
+def send_feedback_request(rsvp: RSVP) -> None:
+    """Pošle jednomu účastníkovi mail s magic-linkem na feedback form.
+    Best-effort — pokud user nemá usable e-mail, ticho ven; caller (fan-
+    out) pokračuje s dalšími.
+
+    Skip pravidla:
+    - `user is None` (legacy RSVP bez usera) → nic neposílá
+    - `user.email` prázdný → nic
+    - status ≠ YES → nic (waitlist/pending/cancelled sem nespadá)
+    - `is_organizer=True` → nic (organizátoři nejsou účastníci)
+    Gate se aplikuje uvnitř helper-u, aby caller nemusel filtrovat
+    pořád stejná pravidla."""
+    if rsvp.user is None or not rsvp.user.email:
+        return
+    if rsvp.status != RSVP.STATUS_YES or rsvp.is_organizer:
+        return
+    event = rsvp.event
+    send_branded_email(
+        subject=f"Jak to bylo? — {event.title}",
+        template_base="emails/feedback_request",
+        context={
+            "user": rsvp.user,
+            "event": event,
+            "rsvp": rsvp,
+            "feedback_url": _frontend_feedback_url(rsvp),
+            "workspace": event.workspace,
+            "event_when": format_event_dt(event.starts_at, event.tz),
+        },
+        recipient_list=[rsvp.user.email],
+        fail_silently=True,  # jeden špatný adresát nesmí spadnout celý fan-out
     )
 
 
