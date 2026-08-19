@@ -81,7 +81,7 @@ class TemplateSmokeTests(TestCase):
         # HTML-only assertions.
         self.assertIn("icon-192.png", html)  # brand mark
         self.assertIn("Potvrdit", html)  # CTA label
-        self.assertIn("Aplikace olaf", html)  # footer
+        self.assertIn("olaf.events", html)  # footer
 
     def test_password_reset(self) -> None:
         text, html = self._render(
