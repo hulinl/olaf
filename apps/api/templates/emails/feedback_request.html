@@ -1,7 +1,7 @@
 {% extends "emails/_base.html" %}
 {% load czech %}
 
-{% block subject %}Jak to bylo? — {{ event.title }}{% endblock %}
+{% block subject %}Zpětná vazba — {{ event.title }}{% endblock %}
 
 {% block body %}
   <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
@@ -9,24 +9,25 @@
   </p>
 
   <p style="margin:0 0 20px;">
-    díky, že jsi jel/a s námi na <strong>„{{ event.title }}"</strong>. Rádi
-    bychom věděli, jak to bylo — pomůže nám to udělat příští akce ještě lepší.
+    díky, že jsi jel/a s námi na <strong>„{{ event.title }}"</strong>.
+    Jak jsi se měl/a? Pomůže nám to udělat příští akce ještě lepší.
   </p>
 
-  <p style="margin:0 0 24px;">
-    Zabere to <strong>dvě minuty</strong> a nemusíš být přihlášený/á v aplikaci.
-  </p>
-
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:24px 0;">
     <tr>
-      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
-        <a href="{{ feedback_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Vyplnit zpětnou vazbu</a>
+      <td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+          <tr>
+            <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+              <a href="{{ feedback_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Vyplnit zpětnou vazbu</a>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
 
-  <p style="margin:0;font-size:13px;color:#737373;">
-    Odkaz je jen pro tebe — z něj se tvoje odpověď automaticky spojí s tvou
-    registrací, takže víme, ke které akci se to vztahuje.
+  <p style="margin:0;font-size:13px;color:#737373;text-align:center;">
+    Odkaz je jen pro tebe — odpověď se automaticky spojí s tvou registrací.
   </p>
 {% endblock %}

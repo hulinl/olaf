@@ -25,8 +25,9 @@ export default function FeedbackPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<{
     event_title: string;
-    workspace_name: string;
-    user_name: string;
+    event_starts_at: string;
+    event_ends_at: string;
+    event_location: string;
   } | null>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [wentWell, setWentWell] = useState("");
@@ -44,8 +45,9 @@ export default function FeedbackPage({ params }: Props) {
         if (cancelled) return;
         setInfo({
           event_title: r.event_title,
-          workspace_name: r.workspace_name,
-          user_name: r.user_name,
+          event_starts_at: r.event_starts_at,
+          event_ends_at: r.event_ends_at,
+          event_location: r.event_location,
         });
         if (r.existing) {
           setRating(r.existing.rating);
@@ -148,8 +150,8 @@ export default function FeedbackPage({ params }: Props) {
           {info.event_title}
         </h1>
         <p className="mt-2 text-sm text-ink-500">
-          {info.workspace_name}
-          {info.user_name && <span> · {info.user_name}</span>}
+          {formatEventRange(info.event_starts_at, info.event_ends_at)}
+          {info.event_location && <span> · {info.event_location}</span>}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
@@ -188,8 +190,7 @@ export default function FeedbackPage({ params }: Props) {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-ink-500">
-              Vyplnění zabere dvě minuty. Odpověď spojujeme s registrací —
-              organizátor uvidí jméno a e-mail.
+              Odpověď spojujeme s registrací — organizátor uvidí jméno a e-mail.
             </p>
             <Button
               type="submit"
@@ -205,6 +206,29 @@ export default function FeedbackPage({ params }: Props) {
       </div>
     </main>
   );
+}
+
+function formatEventRange(startsIso: string, endsIso: string): string {
+  const s = new Date(startsIso);
+  const e = new Date(endsIso);
+  const sameDay = s.toDateString() === e.toDateString();
+  if (sameDay) {
+    return s.toLocaleDateString("cs-CZ", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
+  const startFmt = s.toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "short",
+  });
+  const endFmt = e.toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return `${startFmt} – ${endFmt}`;
 }
 
 function StarRating({

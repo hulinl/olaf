@@ -291,4 +291,9 @@ urlpatterns = [
         views.event_feedback,
         name="event-feedback",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/feedback.csv",
+        views.event_feedback_csv,
+        name="event-feedback-csv",
+    ),
 ]

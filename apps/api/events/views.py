@@ -3732,8 +3732,11 @@ def feedback_by_token(request: Request, token: str) -> Response:
             {
                 "event_title": event.title,
                 "event_starts_at": event.starts_at.isoformat(),
-                "workspace_name": event.workspace.name,
-                "user_name": rsvp.user.get_full_name() if rsvp.user else "",
+                "event_ends_at": event.ends_at.isoformat(),
+                # Krátká lokalita pro heading — organizátor u pár akcí za
+                # sebou pozná, které se týče. `location_text` je user-
+                # editable free-text (např. „Beskydy, chata Bečva").
+                "event_location": event.location_text or "",
                 "existing": (
                     {
                         "rating": existing.rating,
@@ -3840,3 +3843,47 @@ def event_feedback(
     )
 
     return Response({"sent": sent})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_feedback_csv(
+    request: Request, workspace_slug: str, event_slug: str
+) -> HttpResponse:
+    """CSV export všech zpětných vazeb k akci. Pro follow-up práci mimo
+    app (Excel, AI analýza). Sloupce: datum, jméno, e-mail, rating,
+    Co se povedlo, Co příště jinak."""
+    import csv
+    from io import StringIO
+
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return HttpResponse(status=404)
+
+    buf = StringIO()
+    # BOM aby Excel na Windows rozpoznal UTF-8. Bez toho české znaky
+    # v CSV rozbije Excel na Windows do abrakadabra.
+    buf.write("﻿")
+    writer = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
+    writer.writerow([
+        "Datum",
+        "Jméno",
+        "E-mail",
+        "Hodnocení",
+        "Co se povedlo",
+        "Co příště jinak",
+    ])
+    for fb in EventFeedback.objects.filter(event=event).order_by("-created_at"):
+        writer.writerow([
+            fb.created_at.strftime("%Y-%m-%d %H:%M"),
+            fb.name,
+            fb.email,
+            fb.rating,
+            fb.went_well,
+            fb.could_improve,
+        ])
+
+    resp = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
+    filename = f"zpetne-vazby-{event.slug}.csv"
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp

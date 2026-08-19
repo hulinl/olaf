@@ -1661,8 +1661,8 @@ export const events = {
     apiFetch<{
       event_title: string;
       event_starts_at: string;
-      workspace_name: string;
-      user_name: string;
+      event_ends_at: string;
+      event_location: string;
       existing: {
         rating: number;
         went_well: string;

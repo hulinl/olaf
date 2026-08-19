@@ -87,8 +87,9 @@ class FeedbackByTokenTests(TestCase):
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["event_title"], "Letní kemp")
-        self.assertEqual(resp.data["workspace_name"], "Fbws")
-        self.assertIn("Jana", resp.data["user_name"])
+        self.assertIn("event_starts_at", resp.data)
+        self.assertIn("event_ends_at", resp.data)
+        self.assertIn("event_location", resp.data)
         self.assertIsNone(resp.data["existing"])
 
     def test_post_creates_feedback_with_snapshot(self) -> None:
