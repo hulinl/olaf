@@ -17,6 +17,7 @@ import {
   type RSVPRecord,
   events,
 } from "@/lib/api";
+import { computeRsvpAlerts, type RsvpAlert } from "@/lib/rsvp-alerts";
 
 type Filter = "all" | "yes" | "waitlist" | "pending_approval" | "cancelled";
 
@@ -388,6 +389,11 @@ function AdminEventDetail({ params }: Props) {
                     active={sort}
                     onClick={toggleSort}
                   />
+                  {/* Info — alerts z RSVP dotazníku (alergie, dieta,
+                      photo opt-out, začátečník). Safety-critical, aby
+                      organizátorovi neuniklo, že se s tou přihláškou
+                      musí nějak zabývat. */}
+                  <th className="px-4 py-3 text-left">Info</th>
                   <SortableTh
                     label="Status"
                     sortKey="status"
@@ -691,6 +697,14 @@ function RsvpRow({
           )}
         </div>
       </td>
+      <td className="px-4 py-3 align-top">
+        {(() => {
+          const alerts = computeRsvpAlerts(rsvp.questionnaire_answers);
+          if (alerts.length === 0)
+            return <span className="text-xs text-ink-300">—</span>;
+          return <RsvpAlertBadges rsvp={rsvp} />;
+        })()}
+      </td>
       <td className="whitespace-nowrap px-4 py-3">
         <div className="flex flex-col gap-1.5">
           {rsvp.is_organizer ? (
@@ -828,6 +842,68 @@ function RsvpRow({
       </td>
     </tr>
   );
+}
+
+function RsvpAlertBadges({ rsvp }: { rsvp: RSVPRecord }) {
+  const alerts = computeRsvpAlerts(rsvp.questionnaire_answers);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div className="relative flex flex-wrap gap-1">
+      {alerts.map((a, i) => (
+        <button
+          key={a.kind}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpenIdx(openIdx === i ? null : i);
+          }}
+          title={a.detail}
+          className={[
+            "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium focus-ring",
+            alertToneClass(a.tone),
+          ].join(" ")}
+        >
+          <span aria-hidden>{a.icon}</span>
+          <span>{a.label}</span>
+        </button>
+      ))}
+      {openIdx !== null && (
+        <div
+          role="dialog"
+          className="absolute left-0 top-full z-10 mt-1 max-w-xs rounded-md border border-border bg-surface p-3 text-xs text-ink-900 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="font-medium">{alerts[openIdx].label}</p>
+          <p className="mt-1 whitespace-pre-wrap text-ink-700">
+            {alerts[openIdx].detail}
+          </p>
+          <button
+            type="button"
+            onClick={() => setOpenIdx(null)}
+            className="mt-2 text-[10px] font-medium text-ink-500 hover:text-ink-900"
+          >
+            Zavřít
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function alertToneClass(tone: RsvpAlert["tone"]): string {
+  switch (tone) {
+    case "safety":
+      return "bg-danger-soft text-danger hover:bg-danger/15";
+    case "brand":
+      return "bg-brand/15 text-brand hover:bg-brand/25";
+    case "muted":
+    default:
+      return "bg-surface-muted text-ink-700 hover:bg-surface-muted/80";
+  }
 }
 
 function DuplicateBadge({
@@ -1209,6 +1285,7 @@ function RsvpCard({
               onDismiss={handleDismissDuplicate}
             />
           )}
+          <RsvpAlertBadges rsvp={rsvp} />
         </div>
         {rsvp.is_organizer ? (
           <span className="inline-flex shrink-0 rounded bg-brand/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
