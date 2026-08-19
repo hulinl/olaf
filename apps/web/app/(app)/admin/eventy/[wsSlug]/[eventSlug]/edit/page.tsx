@@ -303,6 +303,24 @@ export default function EventEditCockpitPage({ params }: Props) {
       </section>
 
       <section>
+        <h2 className="text-lg font-semibold text-ink-900">Export akce</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Stáhne ZIP se vším potřebným pro follow-up práci mimo aplikaci
+          (Excel, AI analýza, offline záloha): účastníci + jejich odpovědi
+          na dotazník, zpětné vazby, roadmap úkoly, a JSON s meta + landing
+          bloky akce.
+        </p>
+        <div className="mt-3">
+          <a
+            href={`/api/events/${wsSlug}/${eventSlug}/export.zip`}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            ↓ Stáhnout kompletní export
+          </a>
+        </div>
+      </section>
+
+      <section>
         <h2 className="text-lg font-semibold text-ink-900">Šablona</h2>
         <p className="mt-1 text-sm text-ink-500">
           Pořádáš podobné akce opakovaně? Vytvoř z této akce kopii s novým

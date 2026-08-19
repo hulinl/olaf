@@ -45,8 +45,8 @@ class SendBrandedEmailTests(TestCase):
         # Sunrise amber CTA tlačítko.
         self.assertIn("#f59e0b", html)
         # Email footer.
-        self.assertIn("Aplikace olaf", html)
-        self.assertIn("BIfactory", html)
+        self.assertIn("olaf.events", html)
+        self.assertIn("BI Factory", html)
 
     def test_subject_and_recipient(self) -> None:
         send_branded_email(

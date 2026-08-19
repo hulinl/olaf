@@ -3845,27 +3845,16 @@ def event_feedback(
     return Response({"sent": sent})
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def event_feedback_csv(
-    request: Request, workspace_slug: str, event_slug: str
-) -> HttpResponse:
-    """CSV export všech zpětných vazeb k akci. Pro follow-up práci mimo
-    app (Excel, AI analýza). Sloupce: datum, jméno, e-mail, rating,
-    Co se povedlo, Co příště jinak."""
+def _feedback_csv_bytes(event: Event) -> bytes:
+    """Vygeneruje CSV bytes se zpětnou vazbou k akci — sdílený helper
+    pro /feedback.csv endpoint a full-export ZIP."""
     import csv
     from io import StringIO
 
-    event = _load_published_event(workspace_slug, event_slug)
-    if event is None or not can_manage_event(request.user, event):
-        return HttpResponse(status=404)
-
     buf = StringIO()
-    # BOM aby Excel na Windows rozpoznal UTF-8. Bez toho české znaky
-    # v CSV rozbije Excel na Windows do abrakadabra.
-    buf.write("﻿")
-    writer = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
-    writer.writerow([
+    buf.write("﻿")  # UTF-8 BOM pro Excel na Windows
+    w = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
+    w.writerow([
         "Datum",
         "Jméno",
         "E-mail",
@@ -3874,7 +3863,7 @@ def event_feedback_csv(
         "Co příště jinak",
     ])
     for fb in EventFeedback.objects.filter(event=event).order_by("-created_at"):
-        writer.writerow([
+        w.writerow([
             fb.created_at.strftime("%Y-%m-%d %H:%M"),
             fb.name,
             fb.email,
@@ -3882,8 +3871,194 @@ def event_feedback_csv(
             fb.went_well,
             fb.could_improve,
         ])
+    return buf.getvalue().encode("utf-8")
 
-    resp = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
-    filename = f"zpetne-vazby-{event.slug}.csv"
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+def _participants_csv_bytes(event: Event) -> bytes:
+    """Vygeneruje CSV bytes se seznamem účastníků + odpovědmi na dotazník.
+    Sloupce: id, jméno, e-mail, telefon, status, organizátor, platba,
+    částka, přihlášen_od + dynamické sloupce pro každou otázku dotazníku,
+    kterou má event zapnutou."""
+    import csv
+    from io import StringIO
+
+    from .serializers import SECTION_FIELDS
+
+    enabled = list(event.enabled_questionnaire_sections or [])
+    q_keys: list[str] = []
+    for s in enabled:
+        q_keys.extend(SECTION_FIELDS.get(s, []))
+
+    buf = StringIO()
+    buf.write("﻿")
+    w = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
+    headers = [
+        "ID",
+        "Jméno",
+        "E-mail",
+        "Telefon",
+        "Status",
+        "Organizátor",
+        "Platba",
+        "Částka",
+        "Přihlášen od",
+        *q_keys,
+    ]
+    w.writerow(headers)
+
+    rsvps = RSVP.objects.filter(event=event).select_related("user").order_by(
+        "created_at"
+    )
+    for r in rsvps:
+        full_name = r.user.get_full_name() if r.user else ""
+        email = r.user.email if r.user else ""
+        phone = getattr(r.user, "phone", "") if r.user else ""
+        row = [
+            r.pk,
+            full_name,
+            email,
+            phone,
+            r.status,
+            "ano" if r.is_organizer else "",
+            r.payment_status,
+            str(r.payment_due_amount or ""),
+            r.created_at.strftime("%Y-%m-%d %H:%M"),
+        ]
+        answers = r.questionnaire_answers or {}
+        for k in q_keys:
+            row.append(_stringify_answer(answers.get(k)))
+        w.writerow(row)
+
+    return buf.getvalue().encode("utf-8")
+
+
+def _stringify_answer(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return "ano" if v else "ne"
+    if isinstance(v, list | tuple):
+        return ", ".join(str(x) for x in v)
+    return str(v)
+
+
+def _checklist_csv_bytes(event: Event) -> bytes:
+    """Roadmap úkoly (EventChecklistItem) — CSV pro export."""
+    import csv
+    from io import StringIO
+
+    from .models import EventChecklistItem
+
+    buf = StringIO()
+    buf.write("﻿")
+    w = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
+    w.writerow([
+        "Titul",
+        "Popis",
+        "Kategorie",
+        "Hotovo",
+        "Datum splnění",
+        "Připomínka",
+    ])
+    for item in EventChecklistItem.objects.filter(event=event).order_by(
+        "sort_order", "id"
+    ):
+        w.writerow([
+            item.title,
+            item.description,
+            item.category,
+            "ano" if item.done else "",
+            item.done_at.strftime("%Y-%m-%d") if item.done_at else "",
+            item.remind_at.strftime("%Y-%m-%d %H:%M") if item.remind_at else "",
+        ])
+    return buf.getvalue().encode("utf-8")
+
+
+def _event_json_bytes(event: Event) -> bytes:
+    """Event metadata + landing bloky jako JSON — pro follow-up práci
+    s AI nebo strojové re-použití obsahu akce."""
+    import json
+
+    payload = {
+        "id": event.pk,
+        "slug": event.slug,
+        "title": event.title,
+        "starts_at": event.starts_at.isoformat(),
+        "ends_at": event.ends_at.isoformat(),
+        "tz": event.tz,
+        "status": event.status,
+        "location_text": event.location_text,
+        "location_url": event.location_url,
+        "meeting_point_text": event.meeting_point_text,
+        "description": event.description,
+        "capacity": event.capacity,
+        "price_amount": str(event.price_amount) if event.price_amount else None,
+        "price_currency": event.price_currency,
+        "price_note": event.price_note,
+        "payment_in_cash": event.payment_in_cash,
+        "workspace": {
+            "slug": event.workspace.slug,
+            "name": event.workspace.name,
+        },
+        "blocks": event.blocks or [],
+        "required_documents": event.required_documents or [],
+        "enabled_questionnaire_sections": (
+            event.enabled_questionnaire_sections or []
+        ),
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_export_zip(
+    request: Request, workspace_slug: str, event_slug: str
+) -> HttpResponse:
+    """Komplexní export akce jako ZIP — pro follow-up práci mimo aplikaci
+    (Excel, AI analýza, offline záloha). Obsah:
+    - `event.json` — meta, landing bloky, dotazníkové sekce, required docs
+    - `participants.csv` — seznam RSVPs + odpovědi dotazníku
+    - `feedback.csv` — post-event zpětné vazby
+    - `checklist.csv` — roadmap úkoly
+
+    Vše CSVčka s UTF-8 BOM + `;` delimiter (Excel + česká lokalizace).
+    """
+    import io
+    import zipfile
+
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return HttpResponse(status=404)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("event.json", _event_json_bytes(event))
+        zf.writestr("participants.csv", _participants_csv_bytes(event))
+        zf.writestr("feedback.csv", _feedback_csv_bytes(event))
+        zf.writestr("checklist.csv", _checklist_csv_bytes(event))
+
+    resp = HttpResponse(buf.getvalue(), content_type="application/zip")
+    resp["Content-Disposition"] = (
+        f'attachment; filename="{event.slug}-export.zip"'
+    )
+    return resp
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_feedback_csv(
+    request: Request, workspace_slug: str, event_slug: str
+) -> HttpResponse:
+    """CSV export všech zpětných vazeb k akci. Sdílí builder s
+    komplexním exportem (`_feedback_csv_bytes`)."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return HttpResponse(status=404)
+
+    resp = HttpResponse(
+        _feedback_csv_bytes(event), content_type="text/csv; charset=utf-8"
+    )
+    resp["Content-Disposition"] = (
+        f'attachment; filename="zpetne-vazby-{event.slug}.csv"'
+    )
     return resp

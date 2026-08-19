@@ -196,3 +196,61 @@ class FeedbackFanOutTests(TestCase):
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(resp.data[0]["rating"], 5)
         self.assertEqual(resp.data[0]["email"], "c@fo.com")
+
+
+class EventExportTests(TestCase):
+    """Komplexní ZIP export akce — event.json + 3 CSVčka."""
+
+    def setUp(self) -> None:
+        self.owner = _make_user("o@ex.com", first="Olaf")
+        self.confirmed = _make_user("p@ex.com", first="Jana")
+        self.outsider = _make_user("out@ex.com", first="Cizí")
+        self.ws = _make_workspace(self.owner, slug="exws")
+        self.event = _make_event(self.ws, slug="expedition")
+        RSVP.objects.create(
+            event=self.event,
+            user=self.confirmed,
+            status=RSVP.STATUS_YES,
+            questionnaire_answers={
+                "diet": "vegetarian",
+                "health_notes": "alergie na oříšky",
+            },
+        )
+        self.client = APIClient()
+        self.url = reverse(
+            "events:event-export-zip", args=[self.ws.slug, self.event.slug]
+        )
+
+    def test_owner_downloads_zip(self) -> None:
+        import io
+        import json
+        import zipfile
+
+        self.client.force_authenticate(self.owner)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/zip")
+        self.assertIn("expedition-export.zip", resp["Content-Disposition"])
+
+        zf = zipfile.ZipFile(io.BytesIO(resp.content))
+        self.assertEqual(
+            set(zf.namelist()),
+            {"event.json", "participants.csv", "feedback.csv", "checklist.csv"},
+        )
+
+        meta = json.loads(zf.read("event.json").decode("utf-8"))
+        self.assertEqual(meta["slug"], "expedition")
+        self.assertEqual(meta["workspace"]["slug"], "exws")
+
+        participants = zf.read("participants.csv").decode("utf-8")
+        self.assertTrue(participants.startswith("﻿"))
+        self.assertIn("p@ex.com", participants)
+
+    def test_non_owner_gets_404(self) -> None:
+        self.client.force_authenticate(self.outsider)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_anon_gets_401(self) -> None:
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 401)
