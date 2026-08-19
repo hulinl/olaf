@@ -18,7 +18,7 @@ from accounts.models import User
 from communities.models import Community
 from workspaces.models import Workspace
 
-from .models import RSVP, Event, EventFeedback, EventImage
+from .models import RSVP, Event, EventFeedback, EventImage, EventLink
 from .permissions import (
     can_manage_event,
     is_workspace_owner,
@@ -4007,6 +4007,79 @@ def _event_json_bytes(event: Event) -> bytes:
         ),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+# ------------------------------------------------------------------ links
+
+
+@api_view(["GET", "POST"])
+@permission_classes([AllowAny])
+def event_links(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """GET vrátí odkazy — pro anon jen `is_public=True`, pro owner/co-
+    creator všechny (interní + veřejné). POST vytvoří nový odkaz;
+    owner-only. Krátkodobě dvouúčelový endpoint (list pro obě publika),
+    aby veřejná landing stránka a admin cockpit sdíleli jeden GET a
+    frontend nemusel řešit dva různé URL."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    is_manager = can_manage_event(request.user, event)
+
+    if request.method == "GET":
+        qs = EventLink.objects.filter(event=event).order_by("sort_order", "id")
+        if not is_manager:
+            qs = qs.filter(is_public=True)
+        from .serializers import EventLinkSerializer
+
+        return Response(EventLinkSerializer(qs, many=True).data)
+
+    # POST — vytvoření vyžaduje owner/co-creator
+    if not is_manager:
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    from .serializers import EventLinkSerializer
+
+    ser = EventLinkSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
+    link = EventLink.objects.create(
+        event=event, created_by=request.user, **ser.validated_data
+    )
+    return Response(
+        EventLinkSerializer(link).data, status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def event_link_detail(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    link_id: int,
+) -> Response:
+    """Owner-only update / delete jednoho odkazu."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        link = EventLink.objects.get(pk=link_id, event=event)
+    except EventLink.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        link.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    from .serializers import EventLinkSerializer
+
+    ser = EventLinkSerializer(link, data=request.data, partial=True)
+    ser.is_valid(raise_exception=True)
+    ser.save()
+    return Response(EventLinkSerializer(link).data)
 
 
 @api_view(["GET"])

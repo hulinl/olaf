@@ -246,20 +246,33 @@ function AdminEventDetail({ params }: Props) {
             {event.location_text && ` · ${event.location_text}`}
           </p>
         </div>
+        {/* Sjednocená pill toolbar — všechny nav-item buttons stejný
+            styl (ghost + border), aby vypadaly jako sourozenci. Share
+            je vpravo zvlášť (jiný typ akce). */}
         <div className="flex flex-wrap gap-2">
           <LinkButton
             href={`/admin/eventy/${wsSlug}/${eventSlug}/edit`}
-            variant="secondary"
+            variant="ghost"
             size="md"
+            className="border border-border"
           >
-            Upravit akci →
+            Upravit akci
           </LinkButton>
           <LinkButton
             href={`/admin/eventy/${wsSlug}/${eventSlug}/dokumenty`}
             variant="ghost"
             size="md"
+            className="border border-border"
           >
-            Dokumenty →
+            Dokumenty
+          </LinkButton>
+          <LinkButton
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit#odkazy`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Odkazy
           </LinkButton>
           <a
             href={`/${wsSlug}/e/${eventSlug}`}

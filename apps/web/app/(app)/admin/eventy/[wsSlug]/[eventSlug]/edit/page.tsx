@@ -302,6 +302,8 @@ export default function EventEditCockpitPage({ params }: Props) {
         </div>
       </section>
 
+      <EventLinksSection wsSlug={wsSlug} eventSlug={eventSlug} />
+
       <section>
         <h2 className="text-lg font-semibold text-ink-900">Export akce</h2>
         <p className="mt-1 text-sm text-ink-500">
@@ -724,6 +726,276 @@ function DuplicateButton({
       </button>
       {err && <p className="mt-2 text-sm text-danger">{err}</p>}
     </>
+  );
+}
+
+type EventLinkRow = Awaited<ReturnType<typeof events.listLinks>>[number];
+
+function EventLinksSection({
+  wsSlug,
+  eventSlug,
+}: {
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const [rows, setRows] = useState<EventLinkRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | "new" | null>(null);
+  const confirmDialog = useConfirm();
+
+  async function reload() {
+    try {
+      const list = await events.listLinks(wsSlug, eventSlug);
+      setRows(list);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
+    }
+  }
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsSlug, eventSlug]);
+
+  async function handleDelete(link: EventLinkRow) {
+    const ok = await confirmDialog({
+      title: `Smazat odkaz „${link.title}"?`,
+      description: link.is_public
+        ? "Účastníci ho přestanou vidět ve svém tabu Odkazy."
+        : "Interní odkaz zmizí z cockpitu akce.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await events.deleteLink(wsSlug, eventSlug, link.id);
+      setRows((r) => (r ? r.filter((x) => x.id !== link.id) : r));
+    } catch {
+      /* keep quiet */
+    }
+  }
+
+  async function handleToggle(link: EventLinkRow) {
+    try {
+      const updated = await events.updateLink(wsSlug, eventSlug, link.id, {
+        is_public: !link.is_public,
+      });
+      setRows((r) => (r ? r.map((x) => (x.id === updated.id ? updated : x)) : r));
+    } catch {
+      /* keep quiet */
+    }
+  }
+
+  return (
+    <section id="odkazy" className="scroll-mt-24">
+      <h2 className="text-lg font-semibold text-ink-900">Odkazy</h2>
+      <p className="mt-1 text-sm text-ink-500">
+        Google Sheet, Notion, mapa, foto galerie — vše, s čím u akce
+        pracuješ mimo aplikaci. Přepnutím na <strong>veřejný</strong>
+        se odkaz zobrazí i účastníkům na stránce akce v tabu „Odkazy".
+        Interní odkazy vidí jen ty a spolutvůrci.
+      </p>
+
+      {error && (
+        <div className="mt-3">
+          <Alert variant="danger">{error}</Alert>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-col gap-2">
+        {rows === null ? (
+          <p className="text-sm text-ink-500">Načítám…</p>
+        ) : rows.length === 0 && editingId === null ? (
+          <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+            Zatím žádné odkazy. Přidej první níže.
+          </p>
+        ) : (
+          rows.map((link) =>
+            editingId === link.id ? (
+              <LinkEditor
+                key={link.id}
+                initial={link}
+                onSave={async (values) => {
+                  const updated = await events.updateLink(
+                    wsSlug,
+                    eventSlug,
+                    link.id,
+                    values,
+                  );
+                  setRows((r) =>
+                    r ? r.map((x) => (x.id === updated.id ? updated : x)) : r,
+                  );
+                  setEditingId(null);
+                }}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
+              <div
+                key={link.id}
+                className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+              >
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate font-medium text-ink-900 hover:text-brand hover:underline"
+                  >
+                    {link.title} ↗
+                  </a>
+                  <span className="truncate text-xs text-ink-500">
+                    {link.url}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggle(link)}
+                  className={[
+                    "rounded px-2 py-0.5 text-xs font-medium",
+                    link.is_public
+                      ? "bg-success/15 text-success hover:bg-success/25"
+                      : "bg-surface-muted text-ink-500 hover:bg-surface-muted/80",
+                  ].join(" ")}
+                  title="Přepnout veřejné / interní"
+                >
+                  {link.is_public ? "Veřejný" : "Interní"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(link.id)}
+                  className="text-xs font-medium text-ink-500 hover:text-ink-900"
+                >
+                  Upravit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(link)}
+                  className="text-xs font-medium text-ink-500 hover:text-danger"
+                >
+                  Smazat
+                </button>
+              </div>
+            ),
+          )
+        )}
+
+        {editingId === "new" ? (
+          <LinkEditor
+            initial={null}
+            onSave={async (values) => {
+              const created = await events.createLink(wsSlug, eventSlug, values);
+              setRows((r) => (r ? [...r, created] : [created]));
+              setEditingId(null);
+            }}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingId("new")}
+            className="w-fit rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+          >
+            + Přidat odkaz
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LinkEditor({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: EventLinkRow | null;
+  onSave: (values: {
+    title: string;
+    url: string;
+    is_public: boolean;
+  }) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [url, setUrl] = useState(initial?.url ?? "");
+  const [isPublic, setIsPublic] = useState(initial?.is_public ?? false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !url.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSave({ title: title.trim(), url: url.trim(), is_public: isPublic });
+    } catch (e2) {
+      setErr(
+        e2 instanceof ApiError
+          ? e2.firstFieldError() ?? e2.message
+          : "Uložení selhalo.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-3 rounded-md border border-brand/40 bg-brand/5 p-3"
+    >
+      <Field label="Název" htmlFor="link-title">
+        <Input
+          id="link-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="např. Sdílený sheet s programem"
+          required
+          autoFocus
+        />
+      </Field>
+      <Field label="URL" htmlFor="link-url">
+        <Input
+          id="link-url"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://docs.google.com/..."
+          required
+        />
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-ink-700">
+        <input
+          type="checkbox"
+          checked={isPublic}
+          onChange={(e) => setIsPublic(e.target.checked)}
+          className="h-4 w-4 rounded border-border text-brand focus-ring"
+        />
+        Veřejný — účastníci uvidí v tabu Odkazy na stránce akce
+      </label>
+      {err && <p className="text-sm text-danger">{err}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          loading={busy}
+          disabled={busy || !title.trim() || !url.trim()}
+        >
+          {busy ? "Ukládám…" : "Uložit"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="md"
+          onClick={onCancel}
+          disabled={busy}
+        >
+          Zrušit
+        </Button>
+      </div>
+    </form>
   );
 }
 

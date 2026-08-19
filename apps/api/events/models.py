@@ -1260,6 +1260,53 @@ class EventFeedback(models.Model):
         return f"Feedback #{self.pk} for {self.event.slug} ({self.rating}★)"
 
 
+class EventLink(models.Model):
+    """Externí odkaz svázaný s akcí — Google Sheet, Google Doc, Notion,
+    mapa, cokoli, s čím organizátor a účastníci pracují mimo aplikaci.
+
+    Dva typy podle `is_public`:
+    - `False` (default) — vidí jen organizátor a spolutvůrci v `/admin/*`.
+      Interní pracovní odkazy (bookkeeping sheet, checklist doc, ...).
+    - `True` — zobrazí se i účastníkům na veřejné stránce akce v tabu
+      „Odkazy". Vhodné pro veřejný Google Doc s programem, foto galerii
+      po akci, atd.
+
+    Bez cascade delete na `created_by` — když spolutvůrce odejde,
+    odkaz zůstává (patří akci, ne uživateli).
+    """
+
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="links"
+    )
+    title = models.CharField(max_length=200)
+    url = models.URLField(max_length=2000)
+    is_public = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True → viditelný účastníkům; False → jen organizátor.",
+    )
+    sort_order = models.PositiveIntegerField(default=0, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_event_links",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_event_link"
+        ordering = ["sort_order", "id"]
+        indexes = [
+            models.Index(fields=["event", "is_public"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} → {self.url}"
+
+
 def _maybe_schedule_auto_contract(rsvp: "RSVP") -> None:
     """Po commitu RSVP transakce zaplánuje auto-send Smlouvy přes Celery
     pokud má event smlouvu s `auto_send_after_rsvp=True`.
