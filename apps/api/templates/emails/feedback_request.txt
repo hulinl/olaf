@@ -1,11 +1,10 @@
 {% load czech %}Ahoj {{ user.first_name|czech_vocative }},
 
-díky, že jsi jel/a s námi na „{{ event.title }}". Rádi bychom věděli, jak to bylo — pomůže nám to udělat příští akce ještě lepší.
+díky, že jsi jel/a s námi na „{{ event.title }}". Jak jsi se měl/a? Pomůže nám to udělat příští akce ještě lepší.
 
-Zabere to dvě minuty a nemusíš být přihlášený/á v aplikaci:
-
+Vyplnit zpětnou vazbu:
 {{ feedback_url }}
 
-Odkaz je jen pro tebe — tvoje odpověď se z něj automaticky spojí s tvou registrací.
+Odkaz je jen pro tebe — odpověď se automaticky spojí s tvou registrací.
 
-— Aplikace olaf
+olaf.events · powered by BI Factory

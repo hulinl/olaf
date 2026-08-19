@@ -39,10 +39,16 @@ mobile only since ~2024 and silently fails on older clients.
               {% block body %}{% endblock %}
 
               {% if cta_url and cta_label %}
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 8px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:28px 0 8px;">
                   <tr>
-                    <td align="center" style="background-color:#f59e0b;border-radius:8px;">
-                      <a href="{{ cta_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">{{ cta_label }}</a>
+                    <td align="center">
+                      <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                        <tr>
+                          <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+                            <a href="{{ cta_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">{{ cta_label }}</a>
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
                 </table>
@@ -53,13 +59,10 @@ mobile only since ~2024 and silently fails on older clients.
           {# Footer #}
           <tr>
             <td style="padding:20px 32px 28px;border-top:1px solid #f0ede5;font-size:12px;line-height:1.5;color:#737373;text-align:center;">
-              <div style="margin-bottom:6px;">— Aplikace olaf</div>
-              <div>
-                <a href="{{ site_url|default:'https://olaf.events' }}" style="color:#737373;text-decoration:none;">olaf.events</a>
-                &nbsp;·&nbsp;
-                Powered by
-                <a href="https://bifactory.cz" style="color:#737373;text-decoration:none;">BIfactory</a>
-              </div>
+              <a href="{{ site_url|default:'https://olaf.events' }}" style="color:#737373;text-decoration:none;">olaf.events</a>
+              &nbsp;·&nbsp;
+              powered by
+              <a href="https://bifactory.cz" style="color:#737373;text-decoration:none;">BI Factory</a>
             </td>
           </tr>
         </table>

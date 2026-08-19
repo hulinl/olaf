@@ -151,7 +151,7 @@ def send_feedback_request(rsvp: RSVP) -> None:
         return
     event = rsvp.event
     send_branded_email(
-        subject=f"Jak to bylo? — {event.title}",
+        subject=f"Zpětná vazba — {event.title}",
         template_base="emails/feedback_request",
         context={
             "user": rsvp.user,
