@@ -1704,6 +1704,60 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/feedback/`,
       { method: "POST" },
     ),
+  /** Externí odkazy k akci (Google Sheet, Notion, mapa, ...). GET
+   *  vrátí anonu jen `is_public=True`, owner/co-creator všechno. */
+  listLinks: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<
+      Array<{
+        id: number;
+        title: string;
+        url: string;
+        is_public: boolean;
+        sort_order: number;
+        created_at: string;
+        updated_at: string;
+      }>
+    >(`/api/events/${workspaceSlug}/${eventSlug}/links/`),
+  createLink: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: { title: string; url: string; is_public: boolean; sort_order?: number },
+  ) =>
+    apiFetch<{
+      id: number;
+      title: string;
+      url: string;
+      is_public: boolean;
+      sort_order: number;
+      created_at: string;
+      updated_at: string;
+    }>(`/api/events/${workspaceSlug}/${eventSlug}/links/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateLink: (
+    workspaceSlug: string,
+    eventSlug: string,
+    linkId: number,
+    payload: Partial<{ title: string; url: string; is_public: boolean; sort_order: number }>,
+  ) =>
+    apiFetch<{
+      id: number;
+      title: string;
+      url: string;
+      is_public: boolean;
+      sort_order: number;
+      created_at: string;
+      updated_at: string;
+    }>(`/api/events/${workspaceSlug}/${eventSlug}/links/${linkId}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteLink: (workspaceSlug: string, eventSlug: string, linkId: number) =>
+    apiFetch<void>(
+      `/api/events/${workspaceSlug}/${eventSlug}/links/${linkId}/`,
+      { method: "DELETE" },
+    ),
   mine: () => apiFetch<EventSummary[]>("/api/events/mine/"),
   owner: () => apiFetch<EventSummary[]>("/api/events/owner/"),
   rsvpList: (workspaceSlug: string, eventSlug: string) =>

@@ -301,4 +301,14 @@ urlpatterns = [
         views.event_export_zip,
         name="event-export-zip",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/links/",
+        views.event_links,
+        name="event-links",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/links/<int:link_id>/",
+        views.event_link_detail,
+        name="event-link-detail",
+    ),
 ]

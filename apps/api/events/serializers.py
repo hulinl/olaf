@@ -948,7 +948,24 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-from .models import EventFeedback  # noqa: E402
+from .models import EventFeedback, EventLink  # noqa: E402
+
+
+class EventLinkSerializer(serializers.ModelSerializer):
+    """Externí odkaz svázaný s akcí (Google Sheet, Notion, mapa, ...)."""
+
+    class Meta:
+        model = EventLink
+        fields = (
+            "id",
+            "title",
+            "url",
+            "is_public",
+            "sort_order",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
 
 
 class EventFeedbackSerializer(serializers.ModelSerializer):

@@ -42,7 +42,9 @@ const RSVP_STATUS_TONE: Record<string, string> = {
   no: "bg-surface-muted text-ink-500",
 };
 
-type TabKey = "nastenka" | "registrace" | "vybaveni";
+type TabKey = "nastenka" | "registrace" | "vybaveni" | "odkazy";
+
+type EventLinkRow = Awaited<ReturnType<typeof events.listLinks>>[number];
 type RegSubTab = "platba" | "dokumenty" | "faktura";
 
 const REG_SUBTABS_FROM_HASH: Record<string, RegSubTab> = {
@@ -70,6 +72,7 @@ export default function MyEventPage({ params }: Props) {
   const user = useUser();
   const [event, setEvent] = useState<OlafEvent | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [links, setLinks] = useState<EventLinkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const initialTab: TabKey =
@@ -87,6 +90,15 @@ export default function MyEventPage({ params }: Props) {
         try {
           const inv = await events.myInvoice(wsSlug, eventSlug);
           if (!cancelled) setInvoice(inv);
+        } catch {
+          // ignore
+        }
+        // Externí odkazy — anon uvidí jen `is_public=True`, owner
+        // všechny. Volitelné; když endpoint chybí (starší backend),
+        // prostě žádné linky.
+        try {
+          const list = await events.listLinks(wsSlug, eventSlug);
+          if (!cancelled) setLinks(list);
         } catch {
           // ignore
         }
@@ -202,6 +214,7 @@ export default function MyEventPage({ params }: Props) {
             !!event.recommended_gear_list &&
             event.recommended_gear_list.entries.length > 0
           }
+          hasLinks={links.length > 0}
         />
 
         {/* The participant zone used to wrap every tab in a canvas card
@@ -274,6 +287,31 @@ export default function MyEventPage({ params }: Props) {
               ) : (
                 <p className="text-sm text-ink-500">Žádný gear list není přiřazen.</p>
               )
+            ) : tab === "odkazy" ? (
+              <ul className="flex flex-col gap-2">
+                {links.map((l) => (
+                  <li key={l.id}>
+                    <a
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-4 py-3 text-sm hover:border-brand hover:bg-brand/5 focus-ring"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <span className="font-medium text-ink-900">
+                          {l.title}
+                        </span>
+                        <span className="truncate text-xs text-ink-500">
+                          {l.url}
+                        </span>
+                      </div>
+                      <span className="text-ink-500" aria-hidden>
+                        ↗
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
             ) : (
               <MyReservationPanel
                 event={event}
@@ -416,10 +454,12 @@ function TabBar({
   tab,
   onChange,
   hasGear,
+  hasLinks,
 }: {
   tab: TabKey;
   onChange: (next: TabKey) => void;
   hasGear: boolean;
+  hasLinks: boolean;
 }) {
   // Free-floating pill buttons (no surrounding panel) — matches the
   // workspace-landing tab style the user explicitly liked
@@ -447,6 +487,13 @@ function TabBar({
           active={tab === "vybaveni"}
           onClick={() => onChange("vybaveni")}
           label="Vybavení"
+        />
+      )}
+      {hasLinks && (
+        <TabButton
+          active={tab === "odkazy"}
+          onClick={() => onChange("odkazy")}
+          label="Odkazy"
         />
       )}
     </div>
