@@ -296,4 +296,9 @@ urlpatterns = [
         views.event_feedback_csv,
         name="event-feedback-csv",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/export.zip",
+        views.event_export_zip,
+        name="event-export-zip",
+    ),
 ]
