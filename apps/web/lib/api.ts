@@ -434,7 +434,7 @@ export interface ChecklistAutoItem {
   action_href: string;
 }
 
-export type ChecklistRemindAudience = "creator" | "participants";
+export type ChecklistRemindAudience = "creator" | "participants" | "assignee";
 
 export interface ChecklistManualItem {
   id: number;
@@ -444,11 +444,23 @@ export interface ChecklistManualItem {
   done: boolean;
   done_at: string | null;
   sort_order: number;
+  assignee: number | null;
+  assignee_name: string;
+  assignee_email: string;
+  due_at: string | null;
   remind_at: string | null;
   remind_audience: ChecklistRemindAudience;
   remind_sent_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Rozšířená verze pro dashboard „Mé úkoly" — nese i navigační
+ *  info o akci, aby dashboard mohl vykreslit řádek s odkazem. */
+export interface ChecklistItemRow extends ChecklistManualItem {
+  event_title: string;
+  event_slug: string;
+  workspace_slug: string;
 }
 
 export interface ChecklistPreset {
@@ -1758,6 +1770,14 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/links/${linkId}/`,
       { method: "DELETE" },
     ),
+  /** „Mé úkoly" dashboard — přiřazené mně napříč všemi akcemi +
+   *  úkoly na akcích, kde jsem owner/co-creator, přiřazené někomu
+   *  jinému. Vše non-done, řazeno podle due_at ASC (NULLS LAST). */
+  myTasks: () =>
+    apiFetch<{
+      assigned_to_me: ChecklistItemRow[];
+      on_events_i_manage: ChecklistItemRow[];
+    }>("/api/events/my-tasks/"),
   mine: () => apiFetch<EventSummary[]>("/api/events/mine/"),
   owner: () => apiFetch<EventSummary[]>("/api/events/owner/"),
   rsvpList: (workspaceSlug: string, eventSlug: string) =>
@@ -2127,7 +2147,13 @@ export const events = {
   addChecklistItem: (
     workspaceSlug: string,
     eventSlug: string,
-    payload: { title: string; description?: string; category?: string },
+    payload: {
+      title: string;
+      description?: string;
+      category?: string;
+      assignee?: number | null;
+      due_at?: string | null;
+    },
   ) =>
     apiFetch<ChecklistManualItem>(
       `/api/events/${workspaceSlug}/${eventSlug}/checklist/items/`,
@@ -2145,6 +2171,8 @@ export const events = {
       sort_order: number;
       remind_at: string | null;
       remind_audience: ChecklistRemindAudience;
+      assignee: number | null;
+      due_at: string | null;
     }>,
   ) =>
     apiFetch<ChecklistManualItem>(

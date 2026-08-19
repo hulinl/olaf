@@ -34,6 +34,18 @@ def _audience_for_item(item: EventChecklistItem) -> list[User]:
     event = item.event
     user_ids: set[int] = set()
 
+    # ASSIGNEE audience — jen přiřazený uživatel dostane mail. Když
+    # assignee zmizel (SET_NULL po odchodu spolutvůrce), fallback na
+    # owner audience — deadline je stále platný, chceme aby na to
+    # aspoň někdo dostal upozornění.
+    if (
+        item.remind_audience == EventChecklistItem.REMIND_AUDIENCE_ASSIGNEE
+        and item.assignee_id
+    ):
+        user_ids.add(item.assignee_id)
+        return list(User.objects.filter(id__in=user_ids))
+    # fall through do creator fallback
+
     owner_ids = WorkspaceMember.objects.filter(
         workspace=event.workspace,
     ).values_list("user_id", flat=True)

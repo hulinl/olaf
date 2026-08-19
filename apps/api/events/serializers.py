@@ -913,6 +913,16 @@ from .models import EventChecklistItem  # noqa: E402
 class EventChecklistItemSerializer(serializers.ModelSerializer):
     """Manual checklist item — owner-created task on an event."""
 
+    assignee_name = serializers.SerializerMethodField()
+    assignee_email = serializers.EmailField(
+        source="assignee.email", read_only=True
+    )
+    event_title = serializers.CharField(source="event.title", read_only=True)
+    event_slug = serializers.CharField(source="event.slug", read_only=True)
+    workspace_slug = serializers.CharField(
+        source="event.workspace.slug", read_only=True
+    )
+
     class Meta:
         model = EventChecklistItem
         fields = (
@@ -923,9 +933,16 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
             "done",
             "done_at",
             "sort_order",
+            "assignee",
+            "assignee_name",
+            "assignee_email",
+            "due_at",
             "remind_at",
             "remind_audience",
             "remind_sent_at",
+            "event_title",
+            "event_slug",
+            "workspace_slug",
             "created_at",
             "updated_at",
         )
@@ -933,9 +950,17 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
             "id",
             "done_at",
             "remind_sent_at",
+            "event_title",
+            "event_slug",
+            "workspace_slug",
+            "assignee_name",
+            "assignee_email",
             "created_at",
             "updated_at",
         )
+
+    def get_assignee_name(self, obj: EventChecklistItem) -> str:
+        return obj.assignee.get_full_name() if obj.assignee else ""
 
     def update(self, instance, validated_data):
         # If owner changes remind_at, clear the "already sent" stamp so the
@@ -944,6 +969,15 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
             "remind_at" in validated_data
             and validated_data["remind_at"] != instance.remind_at
         ):
+            instance.remind_sent_at = None
+        # Když owner mění due_at, taky zresetujeme remind_at aby se
+        # auto-derived (due-24h) přepočítalo v Model.save().
+        if (
+            "due_at" in validated_data
+            and validated_data["due_at"] != instance.due_at
+            and "remind_at" not in validated_data
+        ):
+            instance.remind_at = None
             instance.remind_sent_at = None
         return super().update(instance, validated_data)
 

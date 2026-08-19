@@ -93,7 +93,11 @@ def auto_items_for_event(event: Event) -> list[AutoChecklistItem]:
         )
     )
 
-    if event.price_amount:
+    # Když je akce hrazená hotově na místě, fakturační profil ani IBAN
+    # nedávají smysl (nevystavují se online faktury, žádná QR Platba).
+    # User feedback 2026-08-19: „nastavení té akce je tak že se ta akce
+    # bude hradit hotově, tady nám to uniklo, mělo by to zmizet."
+    if event.price_amount and not event.payment_in_cash:
         items.append(
             AutoChecklistItem(
                 key="payment_profile",
@@ -105,17 +109,16 @@ def auto_items_for_event(event: Event) -> list[AutoChecklistItem]:
                 action_href=detaily,
             )
         )
-        if not event.payment_in_cash:
-            items.append(
-                AutoChecklistItem(
-                    key="payment_iban",
-                    title="Nastav IBAN v komunitě",
-                    description="Bez IBANu nelze vygenerovat QR Platbu.",
-                    done=_workspace_has_iban(event),
-                    category="payment",
-                    action_href=komunita_edit,
-                )
+        items.append(
+            AutoChecklistItem(
+                key="payment_iban",
+                title="Nastav IBAN v komunitě",
+                description="Bez IBANu nelze vygenerovat QR Platbu.",
+                done=_workspace_has_iban(event),
+                category="payment",
+                action_href=komunita_edit,
             )
+        )
 
     items.append(
         AutoChecklistItem(
