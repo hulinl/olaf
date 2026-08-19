@@ -14,7 +14,9 @@ import {
   type ChecklistPreset,
   type ChecklistRemindAudience,
   type EventChecklist,
+  type WorkspaceMemberSummary,
   events,
+  workspaces,
 } from "@/lib/api";
 
 interface Props {
@@ -368,6 +370,7 @@ function ManualRow({
               </span>
             )}
             <ReminderBadge item={item} />
+            <AssigneeDueBadges item={item} />
           </div>
           {item.description && (
             <p className="mt-1 text-xs text-ink-500">{item.description}</p>
@@ -379,7 +382,9 @@ function ManualRow({
             onClick={() => setReminderOpen((v) => !v)}
             className="text-xs text-ink-500 hover:text-brand"
           >
-            {item.remind_at ? "Upravit připomínku" : "Připomenout"}
+            {item.assignee || item.due_at || item.remind_at
+              ? "Upravit"
+              : "Nastavit"}
           </button>
           <button
             type="button"
@@ -403,6 +408,45 @@ function ManualRow({
       )}
     </div>
   );
+}
+
+function AssigneeDueBadges({ item }: { item: ChecklistManualItem }) {
+  const parts: React.ReactNode[] = [];
+  if (item.assignee_name) {
+    parts.push(
+      <span
+        key="assignee"
+        className="inline-flex items-center gap-1 rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
+        title={item.assignee_email}
+      >
+        👤 {item.assignee_name}
+      </span>,
+    );
+  }
+  if (item.due_at) {
+    const d = new Date(item.due_at);
+    const now = new Date();
+    const overdue = d < now && !item.done;
+    const formatted = d.toLocaleDateString("cs-CZ", {
+      day: "numeric",
+      month: "short",
+      year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    });
+    parts.push(
+      <span
+        key="due"
+        className={[
+          "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+          overdue
+            ? "bg-danger-soft text-danger"
+            : "bg-surface-muted text-ink-700",
+        ].join(" ")}
+      >
+        ⏰ do {formatted}
+      </span>,
+    );
+  }
+  return <>{parts}</>;
 }
 
 function ReminderBadge({ item }: { item: ChecklistManualItem }) {
@@ -448,13 +492,29 @@ function ReminderEditor({
 }) {
   const initial = item.remind_at
     ? toLocalDateTimeInput(item.remind_at)
-    : defaultReminderTime();
+    : "";
   const [when, setWhen] = useState(initial);
   const [audience, setAudience] = useState<ChecklistRemindAudience>(
     item.remind_audience,
   );
+  const [assigneeId, setAssigneeId] = useState<number | null>(item.assignee);
+  const [dueAt, setDueAt] = useState(
+    item.due_at ? toLocalDateInput(item.due_at) : "",
+  );
+  const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await workspaces.members(workspaceSlug);
+        setMembers(list);
+      } catch {
+        setMembers([]);
+      }
+    })();
+  }, [workspaceSlug]);
 
   async function save(action: "save" | "clear" | "now") {
     setBusy(true);
@@ -463,6 +523,8 @@ function ReminderEditor({
       if (action === "clear") {
         await events.updateChecklistItem(workspaceSlug, eventSlug, item.id, {
           remind_at: null,
+          due_at: null,
+          assignee: null,
         });
       } else if (action === "now") {
         await events.sendChecklistReminderNow(
@@ -471,14 +533,27 @@ function ReminderEditor({
           item.id,
         );
       } else {
-        if (!when) {
-          setErr("Vyber datum a čas.");
-          return;
+        // Když je zadaný due_at, backend auto-derivuje remind_at
+        // (due - 24h) — pokud user nenastavil explicit remind_at.
+        const payload: Parameters<typeof events.updateChecklistItem>[3] = {
+          assignee: assigneeId,
+          due_at: dueAt
+            ? new Date(dueAt + "T09:00:00").toISOString()
+            : null,
+        };
+        if (when) {
+          payload.remind_at = new Date(when).toISOString();
+          payload.remind_audience = audience;
+        } else if (!dueAt) {
+          // Bez due i bez remind → smaž reminder úplně
+          payload.remind_at = null;
         }
-        await events.updateChecklistItem(workspaceSlug, eventSlug, item.id, {
-          remind_at: new Date(when).toISOString(),
-          remind_audience: audience,
-        });
+        await events.updateChecklistItem(
+          workspaceSlug,
+          eventSlug,
+          item.id,
+          payload,
+        );
       }
       await onSaved();
       onClose();
@@ -492,10 +567,41 @@ function ReminderEditor({
   return (
     <div className="mt-1 rounded-md border border-border bg-surface-muted/30 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-        Připomínka emailem
+        Nastavení úkolu
       </p>
-      <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <Field label="Kdy" htmlFor={`when-${item.id}`}>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Přiřadit komu" htmlFor={`assignee-${item.id}`}>
+          <select
+            id={`assignee-${item.id}`}
+            value={assigneeId ?? ""}
+            onChange={(e) =>
+              setAssigneeId(e.target.value ? Number(e.target.value) : null)
+            }
+            className="h-11 rounded-md border border-border bg-surface px-3 text-sm focus-ring"
+          >
+            <option value="">— nikomu —</option>
+            {(members ?? []).map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name || m.email}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field
+          label="Deadline"
+          hint="Připomínka se pošle den před termínem (pokud níže nenastavíš jinak)."
+          htmlFor={`due-${item.id}`}
+        >
+          <Input
+            id={`due-${item.id}`}
+            type="date"
+            value={dueAt}
+            onChange={(e) => setDueAt(e.target.value)}
+          />
+        </Field>
+      </div>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <Field label="Vlastní čas připomínky (volitelné)" htmlFor={`when-${item.id}`}>
           <Input
             id={`when-${item.id}`}
             type="datetime-local"
@@ -504,7 +610,18 @@ function ReminderEditor({
           />
         </Field>
         <div className="flex flex-col gap-1 text-sm">
-          <span className="text-xs font-medium text-ink-700">Komu</span>
+          <span className="text-xs font-medium text-ink-700">Komu poslat</span>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={`aud-${item.id}`}
+              checked={audience === "assignee"}
+              onChange={() => setAudience("assignee")}
+              className="accent-brand"
+              disabled={!assigneeId}
+            />
+            <span>Přiřazenému {!assigneeId && "(nejdřív vyber)"}</span>
+          </label>
           <label className="inline-flex items-center gap-2 text-sm">
             <input
               type="radio"
@@ -513,7 +630,7 @@ function ReminderEditor({
               onChange={() => setAudience("creator")}
               className="accent-brand"
             />
-            <span>Jen mně (organizátorovi)</span>
+            <span>Mně (organizátorovi)</span>
           </label>
           <label className="inline-flex items-center gap-2 text-sm">
             <input
@@ -579,6 +696,12 @@ function toLocalDateTimeInput(iso: string): string {
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T` +
     `${pad(d.getHours())}:${pad(d.getMinutes())}`
   );
+}
+
+function toLocalDateInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function defaultReminderTime(): string {

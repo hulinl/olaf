@@ -4009,6 +4009,84 @@ def _event_json_bytes(event: Event) -> bytes:
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
 
+# ------------------------------------------------------------------ my tasks
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_tasks(request: Request) -> Response:
+    """Dashboard „Mé úkoly" pro Tvůrce shell.
+
+    Vrací dvě sekce:
+    - `assigned_to_me` — úkoly, kde jsem assignee (napříč všemi akcemi).
+    - `on_events_i_manage` — úkoly z akcí, kde jsem owner/co-creator,
+      s assignee != já (přehled, co ostatní na mých akcích řeší).
+
+    Vše jen `done=False`, řazené podle `due_at ASC NULLS LAST`
+    (nejbližší deadline nahoře, unassigned deadline dole).
+    """
+    from django.db.models import Q
+    from django.db.models.expressions import Case, Value, When
+
+    from .models import EventChecklistItem, EventCollaborator
+
+    user = request.user
+
+    # Akce, kde je user owner/admin komunity nebo explicit co-creator.
+    from workspaces.models import WorkspaceMember
+
+    admin_ws_ids = list(
+        WorkspaceMember.objects.filter(
+            user=user,
+            role__in=[
+                WorkspaceMember.ROLE_OWNER,
+                WorkspaceMember.ROLE_ADMIN,
+            ],
+        ).values_list("workspace_id", flat=True)
+    )
+    collab_event_ids = list(
+        EventCollaborator.objects.filter(user=user).values_list(
+            "event_id", flat=True
+        )
+    )
+
+    base = (
+        EventChecklistItem.objects.select_related(
+            "event", "event__workspace", "assignee"
+        )
+        .filter(done=False)
+        # NULLS LAST — Postgres dependency, ale celý stack běží na PG.
+        .annotate(
+            _due_null=Case(
+                When(due_at__isnull=True, then=Value(1)),
+                default=Value(0),
+            )
+        )
+        .order_by("_due_null", "due_at", "id")
+    )
+
+    assigned = list(base.filter(assignee=user))
+    on_mine = list(
+        base.filter(
+            Q(event__workspace_id__in=admin_ws_ids)
+            | Q(event_id__in=collab_event_ids)
+        )
+        .exclude(assignee=user)
+        .exclude(assignee__isnull=True)  # unassigned = organizer's own worry
+    )
+
+    from .serializers import EventChecklistItemSerializer
+
+    return Response(
+        {
+            "assigned_to_me": EventChecklistItemSerializer(assigned, many=True).data,
+            "on_events_i_manage": EventChecklistItemSerializer(
+                on_mine, many=True
+            ).data,
+        }
+    )
+
+
 # ------------------------------------------------------------------ links
 
 

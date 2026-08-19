@@ -16,6 +16,7 @@ interface NavItem {
 // stays consistent across surfaces.
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/eventy", label: "Akce" },
+  { href: "/admin/ukoly", label: "Úkoly" },
   { href: "/admin/komunity", label: "Komunity" },
   { href: "/admin/lide", label: "Lidé" },
   { href: "/admin/vybaveni", label: "Vybavení" },

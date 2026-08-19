@@ -1130,9 +1130,11 @@ class EventChecklistItem(models.Model):
 
     REMIND_AUDIENCE_CREATOR = "creator"
     REMIND_AUDIENCE_PARTICIPANTS = "participants"
+    REMIND_AUDIENCE_ASSIGNEE = "assignee"
     REMIND_AUDIENCE_CHOICES = [
         (REMIND_AUDIENCE_CREATOR, "Creator (owner-only e-mail)"),
         (REMIND_AUDIENCE_PARTICIPANTS, "Participants (RSVP'd users + owner)"),
+        (REMIND_AUDIENCE_ASSIGNEE, "Assignee (jen přiřazený uživatel)"),
     ]
     remind_at = models.DateTimeField(
         null=True,
@@ -1149,6 +1151,23 @@ class EventChecklistItem(models.Model):
         blank=True,
         help_text="Stamped after dispatch_due_reminders sends the mail.",
     )
+
+    # Přiřazený spolutvůrce / tvůrce. Když je set, mail o připomínce
+    # jde jen na něj (nezaplavuje ostatní). Nullable — legacy úkoly
+    # bez assignee zůstávají „vzdušné" a chodí creatorovi.
+    assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_checklist_items",
+        db_index=True,
+    )
+    # Kdy má být úkol hotový. `due_at` je user-facing deadline; při
+    # save-u derivujeme `remind_at = due_at - 24h` pokud remind_at
+    # nebyl explicitně nastaven. Tak organizátor jen zadá "do 15.9."
+    # a mail se automaticky pošle den předem.
+    due_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "events_checklist_item"
@@ -1170,6 +1189,17 @@ class EventChecklistItem(models.Model):
             self.done_at = timezone.now()
         elif not self.done:
             self.done_at = None
+
+        # Auto-derive remind_at = due_at - 24h když user zadal deadline
+        # ale explicitně nenastavil remind. Když nastaví oba, respektujeme
+        # jeho volbu (může chtít reminder týden předem apod.).
+        if self.due_at and self.remind_at is None:
+            from datetime import timedelta
+
+            self.remind_at = self.due_at - timedelta(hours=24)
+            # Když je assignee set, ať mail chodí jen jemu.
+            if self.assignee_id:
+                self.remind_audience = self.REMIND_AUDIENCE_ASSIGNEE
         super().save(*args, **kwargs)
 
 
