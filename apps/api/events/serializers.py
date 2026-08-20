@@ -982,7 +982,44 @@ class EventChecklistItemSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-from .models import EventFeedback, EventLink  # noqa: E402
+from .models import (  # noqa: E402
+    EventCosting,
+    EventCostItem,
+    EventFeedback,
+    EventLink,
+)
+
+
+class EventCostItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventCostItem
+        fields = (
+            "id",
+            "name",
+            "kind",
+            "planned_amount",
+            "actual_amount",
+            "sort_order",
+            "notes",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
+
+
+class EventCostingSerializer(serializers.ModelSerializer):
+    """Meta pro kalkulaci — enabled flag, očekávaný počet, marže."""
+
+    class Meta:
+        model = EventCosting
+        fields = (
+            "enabled",
+            "expected_paying_count",
+            "margin_pct",
+            "notes",
+            "updated_at",
+        )
+        read_only_fields = ("updated_at",)
 
 
 class EventLinkSerializer(serializers.ModelSerializer):

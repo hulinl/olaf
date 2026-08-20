@@ -312,4 +312,24 @@ urlpatterns = [
         views.event_link_detail,
         name="event-link-detail",
     ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/costing/",
+        views.event_costing,
+        name="event-costing",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/costing/items/",
+        views.event_cost_items,
+        name="event-cost-items",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/costing/items/<int:item_id>/",
+        views.event_cost_item_detail,
+        name="event-cost-item-detail",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/costing.csv",
+        views.event_costing_csv,
+        name="event-costing-csv",
+    ),
 ]

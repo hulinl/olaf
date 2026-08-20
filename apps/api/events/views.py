@@ -18,7 +18,15 @@ from accounts.models import User
 from communities.models import Community
 from workspaces.models import Workspace
 
-from .models import RSVP, Event, EventFeedback, EventImage, EventLink
+from .models import (
+    RSVP,
+    Event,
+    EventCosting,
+    EventCostItem,
+    EventFeedback,
+    EventImage,
+    EventLink,
+)
 from .permissions import (
     can_manage_event,
     is_workspace_owner,
@@ -4211,5 +4219,254 @@ def event_feedback_csv(
     )
     resp["Content-Disposition"] = (
         f'attachment; filename="zpetne-vazby-{event.slug}.csv"'
+    )
+    return resp
+
+
+# ------------------------------------------------------------------ costing
+
+
+def _summarize_costing(event: Event, costing: EventCosting) -> dict:
+    """Spočte plán vs skutečnost, break-even, doporučenou cenu, výnosy
+    a zisk. Pure function — žádné DB writes; jen čte řádky costing +
+    RSVP county + `event.price_amount`.
+
+    Když `expected_paying_count` nebo `paid_count` je 0/None, per-person
+    total pro danou stranu vrátí None (dashboard pak ukáže „N/A" místo
+    ZeroDivisionError)."""
+    from decimal import Decimal
+
+    items = list(costing.items.all())
+    expected_n = costing.expected_paying_count or 0
+    paid_n = (
+        RSVP.objects.filter(
+            event=event, status=RSVP.STATUS_YES, is_organizer=False,
+            payment_status=RSVP.PAYMENT_PAID,
+        ).count()
+    )
+    confirmed_n = (
+        RSVP.objects.filter(
+            event=event, status=RSVP.STATUS_YES, is_organizer=False,
+        ).count()
+    )
+
+    def _side_total(field: str, n_persons: int) -> Decimal | None:
+        # None = pro tuto stranu chybí data (nemá cenu per-person bez N).
+        any_present = False
+        total = Decimal("0")
+        for it in items:
+            amt = getattr(it, field)
+            if amt is None:
+                continue
+            any_present = True
+            if it.kind == EventCostItem.KIND_PER_PERSON:
+                if n_persons <= 0:
+                    # Per-person řádek bez N → nemůžu spočítat spolehlivě
+                    return None
+                total += amt * n_persons
+            else:
+                total += amt
+        return total if any_present else None
+
+    plan_total = _side_total("planned_amount", expected_n)
+    actual_total = _side_total("actual_amount", paid_n)
+
+    def _break_even(total: Decimal | None, n: int) -> Decimal | None:
+        if total is None or n <= 0:
+            return None
+        return (total / n).quantize(Decimal("0.01"))
+
+    break_even_plan = _break_even(plan_total, expected_n)
+    break_even_actual = _break_even(actual_total, paid_n)
+
+    suggested_price = None
+    if break_even_plan is not None and costing.margin_pct is not None:
+        suggested_price = (
+            break_even_plan * (Decimal("1") + costing.margin_pct / Decimal("100"))
+        ).quantize(Decimal("0.01"))
+
+    # Očekávané výnosy = event.price_amount * expected_paying_count.
+    price = event.price_amount
+    expected_revenue = None
+    if price and expected_n > 0:
+        expected_revenue = (price * expected_n).quantize(Decimal("0.01"))
+
+    # Skutečné výnosy = součet payment_due_amount za paid RSVPs.
+    from django.db.models import Sum
+
+    actual_revenue = (
+        RSVP.objects.filter(
+            event=event, status=RSVP.STATUS_YES, is_organizer=False,
+            payment_status=RSVP.PAYMENT_PAID,
+        ).aggregate(s=Sum("payment_due_amount"))["s"]
+    )
+    if actual_revenue is None:
+        actual_revenue = Decimal("0")
+    actual_revenue = actual_revenue.quantize(Decimal("0.01"))
+
+    def _profit(rev: Decimal | None, cost: Decimal | None) -> Decimal | None:
+        if rev is None or cost is None:
+            return None
+        return (rev - cost).quantize(Decimal("0.01"))
+
+    return {
+        "currency": event.price_currency or "CZK",
+        "expected_paying_count": expected_n,
+        "confirmed_count": confirmed_n,
+        "paid_count": paid_n,
+        "plan_total": str(plan_total) if plan_total is not None else None,
+        "actual_total": str(actual_total) if actual_total is not None else None,
+        "break_even_per_person_plan": (
+            str(break_even_plan) if break_even_plan is not None else None
+        ),
+        "break_even_per_person_actual": (
+            str(break_even_actual) if break_even_actual is not None else None
+        ),
+        "current_price": str(price) if price else None,
+        "suggested_price": (
+            str(suggested_price) if suggested_price is not None else None
+        ),
+        "expected_revenue": (
+            str(expected_revenue) if expected_revenue is not None else None
+        ),
+        "actual_revenue": str(actual_revenue),
+        "profit_plan": (
+            str(_profit(expected_revenue, plan_total))
+            if _profit(expected_revenue, plan_total) is not None
+            else None
+        ),
+        "profit_actual": (
+            str(_profit(actual_revenue, actual_total))
+            if _profit(actual_revenue, actual_total) is not None
+            else None
+        ),
+    }
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([IsAuthenticated])
+def event_costing(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """Meta (enabled/expected/margin/notes) + spočítaný dashboard.
+
+    GET vrací kompletní payload: `meta`, `items`, `summary`.
+    PUT upsert meta (bez řádků — ty mají vlastní endpoint)."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    costing, _ = EventCosting.objects.get_or_create(event=event)
+
+    from .serializers import EventCostingSerializer, EventCostItemSerializer
+
+    if request.method == "PUT":
+        ser = EventCostingSerializer(costing, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+
+    return Response(
+        {
+            "meta": EventCostingSerializer(costing).data,
+            "items": EventCostItemSerializer(
+                costing.items.all().order_by("sort_order", "id"), many=True
+            ).data,
+            "summary": _summarize_costing(event, costing),
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def event_cost_items(
+    request: Request, workspace_slug: str, event_slug: str
+) -> Response:
+    """POST vytvoří nový řádek kalkulace."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    costing, _ = EventCosting.objects.get_or_create(event=event)
+
+    from .serializers import EventCostItemSerializer
+
+    ser = EventCostItemSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
+    item = EventCostItem.objects.create(costing=costing, **ser.validated_data)
+    return Response(
+        EventCostItemSerializer(item).data, status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def event_cost_item_detail(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    item_id: int,
+) -> Response:
+    """PATCH / DELETE jednoho řádku kalkulace."""
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    try:
+        item = EventCostItem.objects.get(pk=item_id, costing__event=event)
+    except EventCostItem.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    from .serializers import EventCostItemSerializer
+
+    ser = EventCostItemSerializer(item, data=request.data, partial=True)
+    ser.is_valid(raise_exception=True)
+    ser.save()
+    return Response(EventCostItemSerializer(item).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def event_costing_csv(
+    request: Request, workspace_slug: str, event_slug: str
+) -> HttpResponse:
+    """CSV export kalkulace — pro follow-up práci v Excelu."""
+    import csv
+    from io import StringIO
+
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return HttpResponse(status=404)
+    try:
+        costing = EventCosting.objects.get(event=event)
+    except EventCosting.DoesNotExist:
+        return HttpResponse(status=404)
+
+    buf = StringIO()
+    buf.write("﻿")  # UTF-8 BOM pro Excel Windows
+    w = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
+    w.writerow([
+        "Název",
+        "Typ",
+        "Plánovaná částka",
+        "Skutečná částka",
+        "Poznámka",
+    ])
+    kind_labels = {
+        EventCostItem.KIND_FIXED: "Fixní",
+        EventCostItem.KIND_PER_PERSON: "Na osobu",
+    }
+    for it in costing.items.all().order_by("sort_order", "id"):
+        w.writerow([
+            it.name,
+            kind_labels.get(it.kind, it.kind),
+            str(it.planned_amount) if it.planned_amount is not None else "",
+            str(it.actual_amount) if it.actual_amount is not None else "",
+            it.notes,
+        ])
+    resp = HttpResponse(buf.getvalue(), content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = (
+        f'attachment; filename="kalkulace-{event.slug}.csv"'
     )
     return resp
