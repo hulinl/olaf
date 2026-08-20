@@ -274,6 +274,14 @@ function AdminEventDetail({ params }: Props) {
           >
             Odkazy
           </LinkButton>
+          <LinkButton
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/kalkulace`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Kalkulace
+          </LinkButton>
           <a
             href={`/${wsSlug}/e/${eventSlug}`}
             target="_blank"

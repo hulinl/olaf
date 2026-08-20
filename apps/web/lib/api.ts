@@ -463,6 +463,49 @@ export interface ChecklistItemRow extends ChecklistManualItem {
   workspace_slug: string;
 }
 
+export interface CostItemRow {
+  id: number;
+  name: string;
+  kind: "fixed" | "per_person";
+  planned_amount: string | null;
+  actual_amount: string | null;
+  sort_order: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CostingMeta {
+  enabled: boolean;
+  expected_paying_count: number | null;
+  margin_pct: string | null;
+  notes: string;
+  updated_at: string;
+}
+
+export interface CostingSummary {
+  currency: string;
+  expected_paying_count: number;
+  confirmed_count: number;
+  paid_count: number;
+  plan_total: string | null;
+  actual_total: string | null;
+  break_even_per_person_plan: string | null;
+  break_even_per_person_actual: string | null;
+  current_price: string | null;
+  suggested_price: string | null;
+  expected_revenue: string | null;
+  actual_revenue: string;
+  profit_plan: string | null;
+  profit_actual: string | null;
+}
+
+export interface CostingResponse {
+  meta: CostingMeta;
+  items: CostItemRow[];
+  summary: CostingSummary;
+}
+
 export interface ChecklistPreset {
   key: string;
   title: string;
@@ -1768,6 +1811,68 @@ export const events = {
   deleteLink: (workspaceSlug: string, eventSlug: string, linkId: number) =>
     apiFetch<void>(
       `/api/events/${workspaceSlug}/${eventSlug}/links/${linkId}/`,
+      { method: "DELETE" },
+    ),
+  /** Event costing (kalkulace) — meta, řádky, spočítaný P&L summary.
+   *  Owner-only. Opt-in per akci (`meta.enabled`). */
+  getCosting: (workspaceSlug: string, eventSlug: string) =>
+    apiFetch<CostingResponse>(
+      `/api/events/${workspaceSlug}/${eventSlug}/costing/`,
+    ),
+  updateCostingMeta: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: Partial<{
+      enabled: boolean;
+      expected_paying_count: number | null;
+      margin_pct: string | null;
+      notes: string;
+    }>,
+  ) =>
+    apiFetch<CostingResponse>(
+      `/api/events/${workspaceSlug}/${eventSlug}/costing/`,
+      { method: "PUT", body: JSON.stringify(payload) },
+    ),
+  createCostItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    payload: {
+      name: string;
+      kind: "fixed" | "per_person";
+      planned_amount?: string | null;
+      actual_amount?: string | null;
+      sort_order?: number;
+      notes?: string;
+    },
+  ) =>
+    apiFetch<CostItemRow>(
+      `/api/events/${workspaceSlug}/${eventSlug}/costing/items/`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  updateCostItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+    payload: Partial<{
+      name: string;
+      kind: "fixed" | "per_person";
+      planned_amount: string | null;
+      actual_amount: string | null;
+      sort_order: number;
+      notes: string;
+    }>,
+  ) =>
+    apiFetch<CostItemRow>(
+      `/api/events/${workspaceSlug}/${eventSlug}/costing/items/${itemId}/`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  deleteCostItem: (
+    workspaceSlug: string,
+    eventSlug: string,
+    itemId: number,
+  ) =>
+    apiFetch<void>(
+      `/api/events/${workspaceSlug}/${eventSlug}/costing/items/${itemId}/`,
       { method: "DELETE" },
     ),
   /** „Mé úkoly" dashboard — přiřazené mně napříč všemi akcemi +

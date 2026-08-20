@@ -1337,6 +1337,83 @@ class EventLink(models.Model):
         return f"{self.title} → {self.url}"
 
 
+class EventCosting(models.Model):
+    """Kalkulace ekonomiky akce — plán vs skutečnost, break-even, marže.
+
+    Opt-in per akci (`enabled=False` default). Organizátor některých
+    akcí (bežecký kemp, expedice) potřebuje vidět P&L, jiné (běžný
+    workshop) ne. Když je disabled, endpointy dostupné jsou (aby user
+    mohl feature zapnout), ale UI ji nedává na oči.
+
+    Měna se dědí z `event.price_currency`. Multi-currency = V2.
+    """
+
+    event = models.OneToOneField(
+        Event, on_delete=models.CASCADE, related_name="costing"
+    )
+    enabled = models.BooleanField(default=False)
+    expected_paying_count = models.PositiveIntegerField(null=True, blank=True)
+    margin_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    notes = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_event_costing"
+
+    def __str__(self) -> str:
+        return f"Costing for {self.event.slug}"
+
+
+class EventCostItem(models.Model):
+    """Jeden nákladový řádek v kalkulaci akce.
+
+    `kind='fixed'` = fixní částka (chata, doprava). `kind='per_person'`
+    = amount x N účastníků (jídlo, vstupné).
+
+    `planned_amount` a `actual_amount` jsou obě volitelné:
+    - Jen `planned` = položka v plánu, ještě nerealizovaná.
+    - Jen `actual` = extra po plánu, se kterým se nepočítalo.
+    - Oba = normální plán vs skutečnost s odchylkou.
+    """
+
+    KIND_FIXED = "fixed"
+    KIND_PER_PERSON = "per_person"
+    KIND_CHOICES = [
+        (KIND_FIXED, "Fixní částka"),
+        (KIND_PER_PERSON, "Na osobu"),
+    ]
+
+    costing = models.ForeignKey(
+        EventCosting, on_delete=models.CASCADE, related_name="items"
+    )
+    name = models.CharField(max_length=200)
+    kind = models.CharField(
+        max_length=20, choices=KIND_CHOICES, default=KIND_FIXED
+    )
+    planned_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    actual_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    notes = models.CharField(max_length=400, blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "events_event_cost_item"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.kind})"
+
+
 def _maybe_schedule_auto_contract(rsvp: "RSVP") -> None:
     """Po commitu RSVP transakce zaplánuje auto-send Smlouvy přes Celery
     pokud má event smlouvu s `auto_send_after_rsvp=True`.
