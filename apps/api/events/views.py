@@ -2139,6 +2139,26 @@ def participant_profile(
                 "phone": user.emergency_contact_phone,
                 "relationship": user.emergency_contact_relationship,
             },
+            # RSVP-scoped data — status, platba, odpovědi z dotazníku.
+            # Organizátor tak vidí kompletní „vyplněnou přihlášku" bez
+            # skákání mezi rosterem a někam jinam.
+            "rsvp": {
+                "status": rsvp.status,
+                "is_organizer": rsvp.is_organizer,
+                "waitlist_position": rsvp.waitlist_position,
+                "payment_status": rsvp.payment_status,
+                "payment_due_amount": (
+                    str(rsvp.payment_due_amount)
+                    if rsvp.payment_due_amount is not None
+                    else None
+                ),
+                "payment_currency": rsvp.payment_currency,
+                "created_at": rsvp.created_at.isoformat(),
+                "questionnaire_answers": rsvp.questionnaire_answers or {},
+                "enabled_questionnaire_sections": (
+                    event.effective_questionnaire_sections
+                ),
+            },
         }
     )
 

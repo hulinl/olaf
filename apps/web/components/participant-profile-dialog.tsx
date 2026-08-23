@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { ApiError, type ParticipantProfile, events } from "@/lib/api";
+import { ApiError, type ParticipantProfile, type RSVPAnswers, events } from "@/lib/api";
 
 interface Props {
   workspaceSlug: string;
@@ -164,6 +164,8 @@ export function ParticipantProfileDialog({
                 </section>
               )}
 
+              <RsvpFormSection profile={profile} />
+
               <section>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
                   Nouzový kontakt
@@ -203,5 +205,137 @@ export function ParticipantProfileDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- RSVP form
+
+const DIET_LABEL: Record<string, string> = {
+  omnivore: "Bez omezení",
+  vegetarian: "Vegetariánská",
+  vegan: "Veganská",
+  other: "Jiná",
+};
+
+const FITNESS_LABEL: Record<string, string> = {
+  beginner: "Začátečník",
+  intermediate: "Středně pokročilý",
+  advanced: "Pokročilý",
+};
+
+const PAYMENT_LABEL: Record<string, string> = {
+  pending: "Čeká na zaplacení",
+  paid: "Zaplaceno",
+  refunded: "Vráceno",
+  waived: "Bez platby",
+};
+
+const RSVP_STATUS_LABEL: Record<string, string> = {
+  yes: "Potvrzeno",
+  maybe: "Možná",
+  no: "Odmítl",
+  waitlist: "Waitlist",
+  pending_approval: "Čeká na schválení",
+  cancelled: "Zrušeno",
+};
+
+function RsvpFormSection({ profile }: { profile: ParticipantProfile }) {
+  const { rsvp } = profile;
+  const answers = rsvp.questionnaire_answers as RSVPAnswers;
+  const sections = new Set(rsvp.enabled_questionnaire_sections);
+
+  const rows: Array<[string, React.ReactNode]> = [];
+
+  rows.push([
+    "Status",
+    RSVP_STATUS_LABEL[rsvp.status] ?? rsvp.status,
+  ]);
+  if (rsvp.is_organizer) {
+    rows.push(["Role", "Organizátor"]);
+  }
+  if (rsvp.payment_due_amount !== null) {
+    rows.push([
+      "Platba",
+      `${PAYMENT_LABEL[rsvp.payment_status] ?? rsvp.payment_status} · ${rsvp.payment_due_amount} ${rsvp.payment_currency}`,
+    ]);
+  } else if (rsvp.payment_status !== "waived") {
+    rows.push(["Platba", PAYMENT_LABEL[rsvp.payment_status] ?? rsvp.payment_status]);
+  }
+  rows.push([
+    "Přihlášen",
+    new Date(rsvp.created_at).toLocaleString("cs-CZ", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  ]);
+
+  if (sections.has("tshirt_size") && answers.tshirt_size) {
+    rows.push(["Velikost trička", answers.tshirt_size]);
+  }
+  if (sections.has("diet")) {
+    if (answers.diet) {
+      rows.push(["Strava", DIET_LABEL[answers.diet] ?? answers.diet]);
+    }
+    if (answers.diet_note) {
+      rows.push(["Poznámka ke stravě", answers.diet_note]);
+    }
+  }
+  if (sections.has("fitness")) {
+    if (answers.fitness_level) {
+      rows.push([
+        "Kondice",
+        FITNESS_LABEL[answers.fitness_level] ?? answers.fitness_level,
+      ]);
+    }
+    if (answers.fitness_note) {
+      rows.push(["Poznámka ke kondici", answers.fitness_note]);
+    }
+    if (answers.pace_10k) rows.push(["Tempo na 10 km", answers.pace_10k]);
+    if (answers.weekly_km != null && answers.weekly_km !== 0) {
+      rows.push(["Kilometrů týdně", String(answers.weekly_km)]);
+    }
+    if (answers.longest_run) {
+      rows.push(["Nejdelší běh", answers.longest_run]);
+    }
+  }
+  if (sections.has("health_notes") && answers.health_notes) {
+    rows.push(["Zdravotní poznámky", answers.health_notes]);
+  }
+  if (sections.has("photo_consent")) {
+    rows.push([
+      "Souhlas s fotkami",
+      answers.photo_consent ? "Ano" : "Ne",
+    ]);
+  }
+
+  return (
+    <section>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+        Přihláška
+      </p>
+      <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-sm">
+        {rows.map(([label, value]) => (
+          <FormRow key={label} label={label} value={value} />
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function FormRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <>
+      <dt className="text-ink-500">{label}</dt>
+      <dd className="whitespace-pre-wrap text-ink-900">{value}</dd>
+    </>
   );
 }
