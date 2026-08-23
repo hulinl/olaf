@@ -414,7 +414,13 @@ function AdminEventDetail({ params }: Props) {
                       photo opt-out, začátečník). Safety-critical, aby
                       organizátorovi neuniklo, že se s tou přihláškou
                       musí nějak zabývat. */}
-                  <th className="px-4 py-3 text-left">Info</th>
+                  <th
+                    className="px-3 py-3 text-left"
+                    aria-label="Alerty z RSVP dotazníku"
+                    title="Alerty z RSVP dotazníku (najeď na ikonku pro detail)"
+                  >
+                    Info
+                  </th>
                   <SortableTh
                     label="Status"
                     sortKey="status"
@@ -718,12 +724,12 @@ function RsvpRow({
           )}
         </div>
       </td>
-      <td className="px-4 py-3 align-top">
+      <td className="px-3 py-3 align-top">
         {(() => {
           const alerts = computeRsvpAlerts(rsvp.questionnaire_answers);
           if (alerts.length === 0)
             return <span className="text-xs text-ink-300">—</span>;
-          return <RsvpAlertBadges rsvp={rsvp} />;
+          return <RsvpAlertBadges rsvp={rsvp} compact />;
         })()}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
@@ -865,11 +871,42 @@ function RsvpRow({
   );
 }
 
-function RsvpAlertBadges({ rsvp }: { rsvp: RSVPRecord }) {
+function RsvpAlertBadges({
+  rsvp,
+  compact = false,
+}: {
+  rsvp: RSVPRecord;
+  /** Compact = jen ikony s native `title` tooltipem, žádný popover.
+   *  Používáme v desktop tabulce, kde jsme přišli o horizontální
+   *  prostor a floating popovery se stackovaly ("můžu klikat na
+   *  další a zůstávají všechny otevřené"). Full mode zůstává na
+   *  mobile kartách, kde je místo. */
+  compact?: boolean;
+}) {
   const alerts = computeRsvpAlerts(rsvp.questionnaire_answers);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   if (alerts.length === 0) return null;
+
+  if (compact) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {alerts.map((a) => (
+          <span
+            key={a.kind}
+            title={`${a.label}: ${a.detail}`}
+            aria-label={`${a.label}: ${a.detail}`}
+            className={[
+              "inline-flex h-6 w-6 items-center justify-center rounded text-sm",
+              alertToneClass(a.tone),
+            ].join(" ")}
+          >
+            <span aria-hidden>{a.icon}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-wrap gap-1">
