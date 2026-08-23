@@ -920,6 +920,23 @@ export interface ParticipantProfile {
     phone: string;
     relationship: string;
   };
+  /** RSVP-scoped data — status akce + platba + odpovědi z dotazníku,
+   *  které organizátorovi umožňují vidět „celou přihlášku" bez
+   *  přepínání do jiné části aplikace. */
+  rsvp: {
+    status: MyRSVP["status"];
+    is_organizer: boolean;
+    waitlist_position: number | null;
+    payment_status: MyRSVP["payment_status"];
+    payment_due_amount: string | null;
+    payment_currency: string;
+    created_at: string;
+    questionnaire_answers: RSVPAnswers | Record<string, never>;
+    /** Které sekce dotazníku byly u akce zapnuté v době vyplnění.
+     *  Dialog dle toho ví, co má vůbec zobrazit (skryjeme sekce,
+     *  na které se neptali). */
+    enabled_questionnaire_sections: string[];
+  };
 }
 
 function findFirstError(value: unknown, path: string): string | null {
