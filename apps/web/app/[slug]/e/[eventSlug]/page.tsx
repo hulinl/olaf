@@ -148,7 +148,7 @@ export default async function EventLandingPage({ params }: Props) {
         ) : null}
         {event.blocks && event.blocks.length > 0 && (() => {
           const heroBadge = cancelled ? (
-            <span className="mb-4 inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
+            <span className="inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
               ZRUŠENO
             </span>
           ) : event.is_open_for_rsvp && event.capacity != null ? (
@@ -156,14 +156,14 @@ export default async function EventLandingPage({ params }: Props) {
               const remaining = event.remaining_capacity ?? 0;
               if (remaining === 0) {
                 return (
-                  <span className="mb-4 inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
+                  <span className="inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
                     VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
                   </span>
                 );
               }
               if (remaining <= 3) {
                 return (
-                  <span className="mb-4 inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
+                  <span className="inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
                     POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
                   </span>
                 );
@@ -173,7 +173,7 @@ export default async function EventLandingPage({ params }: Props) {
               // stav VYPRODÁNO / POSLEDNÍ. Ink-tone badge, aby nekřičel
               // stejně jako alarming brand-orange verze.
               return (
-                <span className="mb-4 inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
+                <span className="inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
                   {formatSpotsRemaining(remaining)}
                 </span>
               );

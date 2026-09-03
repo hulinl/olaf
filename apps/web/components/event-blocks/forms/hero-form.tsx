@@ -292,26 +292,24 @@ function FocalPointPicker({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex flex-1 items-center gap-2 text-xs text-ink-500">
-            <span className="w-10 shrink-0 font-mono text-ink-700">Zoom</span>
-            <input
-              type="range"
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={5}
-              value={Math.round(zoom)}
-              onChange={(e) =>
-                update({ zoom: clamp(Number(e.target.value), ZOOM_MIN, ZOOM_MAX) })
-              }
-              className="flex-1 accent-brand"
-              aria-label="Zoom fotky"
-            />
-            <span className="w-12 shrink-0 text-right font-mono tabular-nums text-ink-700">
-              {Math.round(zoom)} %
-            </span>
-          </label>
-        </div>
+        <label className="flex w-full max-w-xs items-center gap-2 text-xs text-ink-500">
+          <span className="w-10 shrink-0 font-mono text-ink-700">Zoom</span>
+          <input
+            type="range"
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={5}
+            value={Math.round(zoom)}
+            onChange={(e) =>
+              update({ zoom: clamp(Number(e.target.value), ZOOM_MIN, ZOOM_MAX) })
+            }
+            className="flex-1 accent-brand"
+            aria-label="Zoom fotky"
+          />
+          <span className="w-12 shrink-0 text-right font-mono tabular-nums text-ink-700">
+            {Math.round(zoom)} %
+          </span>
+        </label>
 
         <div className="flex flex-wrap items-center gap-3 text-xs text-ink-500">
           <span>

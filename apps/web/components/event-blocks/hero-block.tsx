@@ -84,44 +84,48 @@ export function HeroBlock({
           cover ? "pb-14 pt-24 sm:pb-16 sm:pt-32" : "py-20 sm:py-24",
         ].join(" ")}
       >
-        {badge}
-
-        {payload.eyebrow &&
-          (cover ? (
-            <span
-              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.12] px-4 py-1.5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md"
-            >
-              <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
-                ●
+        {/* Tight header group: badge → eyebrow → title s malým gap-3 (12px)
+            místo hlavního gap-6, aby "20 volných míst" sedělo blízko
+            nadpisu. User feedback 2026-09-03: velké mezery vypadaly
+            odpojené od titulu. */}
+        <div className="flex flex-col items-start gap-3">
+          {badge}
+          {payload.eyebrow &&
+            (cover ? (
+              <span
+                className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.12] px-4 py-1.5 text-[13px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md"
+              >
+                <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+                  ●
+                </span>
+                {payload.eyebrow}
               </span>
-              {payload.eyebrow}
-            </span>
-          ) : (
-            <p
-              className={[
-                "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em]",
-                tone === "ink" ? "text-white/85" : "text-ink-900",
-              ].join(" ")}
-            >
-              <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
-                ●
-              </span>
-              {payload.eyebrow}
-            </p>
-          ))}
-
-        <h1
-          className={[
-            "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
-            onDark ? "text-ink-inverse" : "text-ink-900",
-          ].join(" ")}
-          style={{
-            letterSpacing: "-0.035em",
-            textShadow: cover ? "0 2px 24px rgba(0,0,0,0.45)" : undefined,
-          }}
-        >
-          {title}
-        </h1>
+            ) : (
+              <p
+                className={[
+                  "inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.2em]",
+                  tone === "ink" ? "text-white/85" : "text-ink-900",
+                ].join(" ")}
+              >
+                <span aria-hidden className="text-brand" style={{ fontSize: "0.85em", lineHeight: 1 }}>
+                  ●
+                </span>
+                {payload.eyebrow}
+              </p>
+            ))}
+          <h1
+            className={[
+              "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
+              onDark ? "text-ink-inverse" : "text-ink-900",
+            ].join(" ")}
+            style={{
+              letterSpacing: "-0.035em",
+              textShadow: cover ? "0 2px 24px rgba(0,0,0,0.45)" : undefined,
+            }}
+          >
+            {title}
+          </h1>
+        </div>
 
         {payload.subtitle && (
           <p
