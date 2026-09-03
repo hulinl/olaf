@@ -31,6 +31,10 @@ export interface BlockDay {
 
 export interface HeroBlockPayload {
   cover_url?: string;
+  /** Focal point 0–100 (obrázek zůstává celý, jen se posune uvnitř
+   *  hero-rámu). Default 50/50 = střed. */
+  focal_x?: number;
+  focal_y?: number;
   eyebrow?: string;
   title_override?: string;
   subtitle?: string;

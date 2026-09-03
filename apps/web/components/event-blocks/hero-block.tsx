@@ -55,7 +55,7 @@ export function HeroBlock({
           style={{
             backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.85) 100%), url(${cover})`,
             backgroundSize: "cover",
-            backgroundPosition: "center",
+            backgroundPosition: `${payload.focal_x ?? 50}% ${payload.focal_y ?? 50}%`,
           }}
         />
       )}

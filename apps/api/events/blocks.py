@@ -55,6 +55,14 @@ def _validate_hero(payload: dict) -> None:
     _expect_str(payload.get("subtitle", ""), "subtitle")
     _expect_str(payload.get("cta_label", ""), "cta_label")
     _expect_str(payload.get("cta_href", ""), "cta_href")
+    for key in ("focal_x", "focal_y"):
+        val = payload.get(key)
+        if val is None:
+            continue
+        if not isinstance(val, (int, float)) or isinstance(val, bool):
+            raise ValueError(f"'{key}' must be a number")
+        if not 0 <= float(val) <= 100:
+            raise ValueError(f"'{key}' must be between 0 and 100")
     meta = _expect_list(payload.get("meta", []), "meta")
     for i, tile in enumerate(meta):
         item = _expect_dict(tile, f"meta[{i}]")

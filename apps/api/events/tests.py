@@ -1387,6 +1387,52 @@ class ConfigurableQuestionnaireTests(TestCase):
         self.assertEqual(len(body["blocks"]), 2)
         self.assertEqual(body["blocks"][0]["type"], "hero")
 
+    def test_hero_focal_point_accepts_in_range_and_missing(self) -> None:
+        from events.blocks import validate_blocks
+
+        validate_blocks(
+            [
+                {
+                    "id": "h1",
+                    "type": "hero",
+                    "payload": {
+                        "cover_url": "https://x/a.jpg",
+                        "focal_x": 0,
+                        "focal_y": 100,
+                    },
+                },
+                {"id": "h2", "type": "hero", "payload": {}},  # no focal — OK
+            ]
+        )
+
+    def test_hero_focal_point_rejects_out_of_range(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [
+                    {
+                        "id": "h",
+                        "type": "hero",
+                        "payload": {"focal_x": 150},
+                    }
+                ]
+            )
+
+    def test_hero_focal_point_rejects_non_numeric(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [
+                    {
+                        "id": "h",
+                        "type": "hero",
+                        "payload": {"focal_y": "50"},
+                    }
+                ]
+            )
+
     def test_block_validator_rejects_unknown_type(self) -> None:
         from events.blocks import BlockValidationError, validate_blocks
 
