@@ -16,7 +16,10 @@ export const SITE = {
   tagline: "Kde začíná dobrodružství.",
   description:
     "olaf je platforma pro outdoor party, sportovní komunity a firemní akce. Komunita má profil, akce mají landing page, přihlášky mají pořádek a tvůrce má cockpit, kde to všechno řídí.",
-  ogImage: "/og.png",
+  // og:image se generuje dynamicky přes `app/opengraph-image.tsx` (marketing)
+  // a `app/[slug]/e/[eventSlug]/opengraph-image.tsx` (per-event card).
+  // Nevystavujeme statický fallback URL, aby socialy nechytly neexistující
+  // soubor jako preferred image.
   twitter: "@olafevents",
   locale: "cs_CZ",
 } as const;

@@ -2,7 +2,12 @@ import { ImageResponse } from "next/og";
 
 import { SITE } from "@/lib/site-config";
 
-export const runtime = "edge";
+// Node runtime — Azure SWA's Next.js integration doesn't guarantee edge
+// availability. Node works everywhere Next runs.
+export const runtime = "nodejs";
+// Cached 1 hour — social platforms cache OG data for days-to-weeks anyway,
+// so this just avoids regenerating on hot reload while dev.
+export const revalidate = 3600;
 export const alt = `${SITE.name} — ${SITE.tagline}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

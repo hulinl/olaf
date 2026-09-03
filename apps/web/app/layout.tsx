@@ -49,20 +49,18 @@ export const metadata: Metadata = {
     siteName: SITE.name,
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: [
-      {
-        url: SITE.ogImage,
-        width: 1200,
-        height: 630,
-        alt: `${SITE.name} — ${SITE.tagline}`,
-      },
-    ],
+    // og:image intentionally omitted — the colocated
+    // `app/opengraph-image.tsx` file-convention wins and generates a
+    // fresh branded PNG. Previously `SITE.ogImage = "/og.png"` was
+    // referenced here but that file never existed → dead preview on
+    // WhatsApp/Facebook/etc.
   },
   twitter: {
     card: "summary_large_image",
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: [SITE.ogImage],
+    // Same story — twitter-image.tsx (or opengraph-image.tsx as fallback)
+    // takes over via file convention.
   },
   // Lets iOS Safari treat Add-to-Home-Screen as a real PWA: launches
   // standalone, dark status bar matches the brand. Without this the

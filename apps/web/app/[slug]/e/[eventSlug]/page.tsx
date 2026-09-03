@@ -49,20 +49,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  // Cover preferenčně z event-level pole, jinak z hero bloku payload-u
-  // (kde Notion ingest typicky položí fotku), nakonec workspace logo.
-  // Bez hero-block fallback-u dříve OG image padal na logo i když měl
-  // event hero fotku — share card vypadal generický.
-  const heroBlock = (event.blocks ?? []).find((b) => b.type === "hero");
-  const heroCoverUrl =
-    heroBlock?.type === "hero"
-      ? assetUrl(heroBlock.payload.cover_url)
-      : undefined;
-  const cover =
-    assetUrl(event.cover_url) ??
-    heroCoverUrl ??
-    assetUrl(event.workspace_logo_url);
-
   // Description fallback: dřív padal rovnou na `event.title`, což u
   // event-ů bez description vedlo k OG card-u s titulem dvakrát (jednou
   // og:title, jednou og:description). User report 2026-06-25. Místo
@@ -82,20 +68,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // "${event.title} — ${event.workspace_name}", což user explicitně
   // odmítl (každá akce má být svá, workspace je jen container, ne
   // prefix v browser tabu nebo OG titulu).
+  //
+  // og:image se generuje dynamicky přes colocated `opengraph-image.tsx`
+  // (Next file convention). Vlastní branded card s title + termín +
+  // komunita overlaid na cover fotce — konzistentní i pro eventy bez
+  // uploadu (kde předtím WhatsApp share vypadal jako naked URL).
   return {
     title: event.title,
     description,
     openGraph: {
       title: event.title,
       description,
-      images: cover ? [cover] : undefined,
       type: "website",
     },
     twitter: {
-      card: cover ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: event.title,
       description,
-      images: cover ? [cover] : undefined,
     },
   };
 }
