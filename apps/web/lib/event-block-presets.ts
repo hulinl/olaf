@@ -82,7 +82,7 @@ const WEEKEND_CAMP_BLOCKS = (): EventBlock[] => [
       title_override: "",
       subtitle: "",
       cta_label: "Přihlásit se",
-      cta_href: "#rsvp",
+      cta_href: "",
       meta: [
         { k: "Termín", v: "doplň termín" },
         { k: "Místo", v: "doplň místo" },
@@ -158,7 +158,7 @@ const LOCAL_DAYTRIP_BLOCKS = (): EventBlock[] => [
       title_override: "",
       subtitle: "Krátký claim — jedna věta, max 12 slov.",
       cta_label: "Přihlásit se",
-      cta_href: "#rsvp",
+      cta_href: "",
       meta: [
         { k: "Termín", v: "doplň datum" },
         { k: "Sraz", v: "doplň místo srazu" },

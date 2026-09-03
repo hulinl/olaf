@@ -25,7 +25,14 @@ export function HeroBlock({
   const cover = assetUrl(payload.cover_url);
   const title = payload.title_override || fallbackTitle;
   const ctaLabel = payload.cta_label || fallbackCtaLabel;
-  const ctaHref = payload.cta_href || fallbackCtaHref;
+  // Ignore anchor-only cta_href (e.g. "#rsvp") — landing has no such
+  // section, so the click would just mutate the URL hash and dead-end.
+  // Older presets used to seed "#rsvp" here; existing events keep that
+  // value in DB and this guard makes the CTA jump to the real RSVP page.
+  const payloadCta = payload.cta_href?.trim() ?? "";
+  const ctaHref = payloadCta && !payloadCta.startsWith("#")
+    ? payloadCta
+    : fallbackCtaHref;
   // A cover photo always renders as dark surface (overlay). Otherwise the
   // `tone` decides — `ink` paints a solid dark hero, `canvas` is the
   // original light hero.

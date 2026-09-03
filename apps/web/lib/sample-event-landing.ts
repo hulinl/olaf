@@ -31,7 +31,7 @@ export const SAMPLE_HERO: HeroBlockPayload = {
   title_override: "Pitztal — přechod po chatách",
   subtitle: "Tři chaty, dva ledovce, žádné ferraty. Pro sportovce bez alpské zkušenosti.",
   cta_label: "Přihlásit se",
-  cta_href: "#rsvp",
+  cta_href: "",
   meta: [
     { k: "Termín", v: "21.–24. 8. 2026" },
     { k: "Sraz", v: "Mandarfen, Pitztal" },
