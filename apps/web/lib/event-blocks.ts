@@ -35,6 +35,9 @@ export interface HeroBlockPayload {
    *  hero-rámu). Default 50/50 = střed. */
   focal_x?: number;
   focal_y?: number;
+  /** Zoom v procentech, 100 = cover-fit (default), max 300. Škáluje
+   *  obrázek kolem focal-point-u — po zoomu zůstává focal bod fixní. */
+  zoom?: number;
   eyebrow?: string;
   title_override?: string;
   subtitle?: string;

@@ -1433,6 +1433,29 @@ class ConfigurableQuestionnaireTests(TestCase):
                 ]
             )
 
+    def test_hero_zoom_accepts_in_range_and_missing(self) -> None:
+        from events.blocks import validate_blocks
+
+        validate_blocks(
+            [
+                {"id": "a", "type": "hero", "payload": {"zoom": 100}},
+                {"id": "b", "type": "hero", "payload": {"zoom": 250.5}},
+                {"id": "c", "type": "hero", "payload": {}},  # zoom absent — OK
+            ]
+        )
+
+    def test_hero_zoom_rejects_below_or_above_range(self) -> None:
+        from events.blocks import BlockValidationError, validate_blocks
+
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [{"id": "x", "type": "hero", "payload": {"zoom": 99}}]
+            )
+        with self.assertRaises(BlockValidationError):
+            validate_blocks(
+                [{"id": "y", "type": "hero", "payload": {"zoom": 400}}]
+            )
+
     def test_block_validator_rejects_unknown_type(self) -> None:
         from events.blocks import BlockValidationError, validate_blocks
 

@@ -63,6 +63,12 @@ def _validate_hero(payload: dict) -> None:
             raise ValueError(f"'{key}' must be a number")
         if not 0 <= float(val) <= 100:
             raise ValueError(f"'{key}' must be between 0 and 100")
+    zoom = payload.get("zoom")
+    if zoom is not None:
+        if not isinstance(zoom, (int, float)) or isinstance(zoom, bool):
+            raise ValueError("'zoom' must be a number")
+        if not 100 <= float(zoom) <= 300:
+            raise ValueError("'zoom' must be between 100 and 300")
     meta = _expect_list(payload.get("meta", []), "meta")
     for i, tile in enumerate(meta):
         item = _expect_dict(tile, f"meta[{i}]")

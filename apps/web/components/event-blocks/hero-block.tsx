@@ -41,29 +41,47 @@ export function HeroBlock({
   return (
     <section
       className={[
-        "relative isolate overflow-hidden",
+        "relative isolate flex flex-col overflow-hidden",
+        // S coverem tlačíme content do spodní třetiny — fotka pak dýchá,
+        // gradient dole udrží čitelnost textu. Bez coveru zůstává původní
+        // top-flow (nemá smysl anchor-ovat text ke dnu když není pozadí).
         cover
-          ? "min-h-[440px] sm:min-h-[520px]"
+          ? "min-h-[440px] justify-end sm:min-h-[520px]"
           : tone === "ink"
             ? "bg-ink-900 text-ink-inverse"
             : "border-b border-border",
       ].join(" ")}
     >
       {cover && (
-        <div
-          className="absolute inset-0 -z-10"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.85) 100%), url(${cover})`,
-            backgroundSize: "cover",
-            backgroundPosition: `${payload.focal_x ?? 50}% ${payload.focal_y ?? 50}%`,
-          }}
-        />
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cover}
+            alt=""
+            className="h-full w-full object-cover"
+            style={{
+              objectPosition: `${payload.focal_x ?? 50}% ${payload.focal_y ?? 50}%`,
+              transform: `scale(${(payload.zoom ?? 100) / 100})`,
+              transformOrigin: `${payload.focal_x ?? 50}% ${payload.focal_y ?? 50}%`,
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.85) 100%)",
+            }}
+          />
+        </div>
       )}
 
       <div
         className={[
-          "mx-auto flex max-w-5xl flex-col items-start gap-6 px-4",
-          cover ? "py-24 sm:py-32" : "py-20 sm:py-24",
+          "mx-auto flex w-full max-w-5xl flex-col items-start gap-6 px-4",
+          // Cover verze: menší bottom-padding, větší top-padding = ukotveno
+          // ke dnu, ale zůstává vzduch nad heroem (badge nesedí těsně na
+          // hlavičce). Bez coveru: symetrický padding jako předtím.
+          cover ? "pb-14 pt-24 sm:pb-16 sm:pt-32" : "py-20 sm:py-24",
         ].join(" ")}
       >
         {badge}

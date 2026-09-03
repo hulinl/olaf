@@ -51,7 +51,8 @@ export function HeroForm({
           coverUrl={payload.cover_url}
           focalX={payload.focal_x ?? 50}
           focalY={payload.focal_y ?? 50}
-          onChange={(x, y) => onChange({ ...payload, focal_x: x, focal_y: y })}
+          zoom={payload.zoom ?? 100}
+          onChange={(next) => onChange({ ...payload, ...next })}
         />
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -156,16 +157,23 @@ interface FocalPointPickerProps {
   coverUrl: string;
   focalX: number;
   focalY: number;
-  onChange: (x: number, y: number) => void;
+  zoom: number;
+  onChange: (next: { focal_x: number; focal_y: number; zoom: number }) => void;
 }
 
-/** Notion-style cover reposition. User grabs the image and drags — like moving
- *  a paper photo behind a window. Preview aspect matches the real hero (~16:9)
- *  so what you see IS what participants see. */
+const ZOOM_MIN = 100;
+const ZOOM_MAX = 300;
+
+/** Notion-style cover reposition + zoom. User grabs the image and drags to
+ *  reposition; slider or scroll-wheel zooms in on the focal point. Preview
+ *  aspect matches desktop hero (~16:9). Mobile hero is taller, but focal
+ *  point translates to CSS object-position so the same "important bit"
+ *  stays centered regardless of viewport aspect. */
 function FocalPointPicker({
   coverUrl,
   focalX,
   focalY,
+  zoom,
   onChange,
 }: FocalPointPickerProps) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -176,14 +184,21 @@ function FocalPointPicker({
   const preview = assetUrl(coverUrl);
   if (!preview) return null;
 
-  function clamp(v: number): number {
-    return Math.max(0, Math.min(100, v));
+  function clamp(v: number, lo: number, hi: number): number {
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  function update(next: Partial<{ focal_x: number; focal_y: number; zoom: number }>) {
+    onChange({
+      focal_x: next.focal_x ?? focalX,
+      focal_y: next.focal_y ?? focalY,
+      zoom: next.zoom ?? zoom,
+    });
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const box = boxRef.current;
     if (!box) return;
-    // Only primary button (mouse) / any touch/pen contact.
     if (e.pointerType === "mouse" && e.button !== 0) return;
     box.setPointerCapture(e.pointerId);
     dragOriginRef.current = {
@@ -201,15 +216,15 @@ function FocalPointPicker({
     const box = boxRef.current;
     if (!origin || !box || origin.pointerId !== e.pointerId) return;
     const rect = box.getBoundingClientRect();
-    const dxPct = ((e.clientX - origin.startX) / rect.width) * 100;
-    const dyPct = ((e.clientY - origin.startY) / rect.height) * 100;
-    // Drag-right reveals more of the LEFT of the photo → focal_x moves LEFT
-    // (decreases). Same for vertical. Matches "drag the paper behind a
-    // window" intuition — the underlying image tracks the pointer.
-    onChange(
-      Math.round(clamp(origin.baseX - dxPct)),
-      Math.round(clamp(origin.baseY - dyPct)),
-    );
+    // Zoomované fotce odpovídá menší % pohyb za pixel — kompenzujeme,
+    // aby drag vždycky sledoval kurzor 1:1 bez ohledu na zoom.
+    const zoomFactor = zoom / 100;
+    const dxPct = ((e.clientX - origin.startX) / rect.width) * 100 / zoomFactor;
+    const dyPct = ((e.clientY - origin.startY) / rect.height) * 100 / zoomFactor;
+    update({
+      focal_x: Math.round(clamp(origin.baseX - dxPct, 0, 100)),
+      focal_y: Math.round(clamp(origin.baseY - dyPct, 0, 100)),
+    });
   }
 
   function handlePointerEnd(e: React.PointerEvent<HTMLDivElement>) {
@@ -223,33 +238,50 @@ function FocalPointPicker({
     setDragging(false);
   }
 
+  function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
+    // Kolečko myši = přiblížit/oddálit kolem focal-pointu. Nepředáváme
+    // dál (preventDefault v React WheelEvent-u), ať se stránka nescrolluje
+    // když user zoomuje v pickeru.
+    e.preventDefault();
+    const step = e.deltaY < 0 ? 10 : -10;
+    update({ zoom: clamp(Math.round(zoom + step), ZOOM_MIN, ZOOM_MAX) });
+  }
+
   return (
     <Field
       label="Výřez / pozice"
-      hint="Přetáhni fotku, aby v hero rámu seděl ten pravý výřez. Nic se nekropuje — celá fotka zůstává v úložišti (share card i mail používají originál)."
+      hint="Přetáhni fotku a slider dole zoomni. Nic se nekropuje — celá fotka zůstává v úložišti (share card i mail používají originál)."
     >
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <div
           ref={boxRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
-          onDoubleClick={() => onChange(50, 50)}
+          onDoubleClick={() => update({ focal_x: 50, focal_y: 50, zoom: 100 })}
+          onWheel={handleWheel}
           className={[
             "relative aspect-[16/9] w-full max-w-lg touch-none select-none overflow-hidden rounded-md border border-border bg-surface-muted",
             dragging ? "cursor-grabbing" : "cursor-grab",
           ].join(" ")}
-          style={{
-            backgroundImage: `url(${preview})`,
-            backgroundSize: "cover",
-            backgroundPosition: `${focalX}% ${focalY}%`,
-          }}
           role="slider"
-          aria-label="Přetáhni fotku pro úpravu pozice"
-          aria-valuetext={`Střed ${Math.round(focalX)} % × ${Math.round(focalY)} %`}
+          aria-label="Přetáhni fotku pro úpravu pozice, kolečkem zoomni"
+          aria-valuetext={`Střed ${Math.round(focalX)} % × ${Math.round(focalY)} %, zoom ${Math.round(zoom)} %`}
         >
-          {/* Rule-of-thirds guides — zapnuté jen během dragu, ať to nerušilo statický náhled. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt=""
+            draggable={false}
+            className="pointer-events-none h-full w-full object-cover"
+            style={{
+              objectPosition: `${focalX}% ${focalY}%`,
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: `${focalX}% ${focalY}%`,
+            }}
+          />
+          {/* Rule-of-thirds guides — zapnuté jen během dragu, ať nerušily statický náhled. */}
           {dragging && (
             <div aria-hidden className="pointer-events-none absolute inset-0">
               <div className="absolute inset-y-0 left-1/3 w-px bg-white/40" />
@@ -259,18 +291,42 @@ function FocalPointPicker({
             </div>
           )}
         </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex flex-1 items-center gap-2 text-xs text-ink-500">
+            <span className="w-10 shrink-0 font-mono text-ink-700">Zoom</span>
+            <input
+              type="range"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step={5}
+              value={Math.round(zoom)}
+              onChange={(e) =>
+                update({ zoom: clamp(Number(e.target.value), ZOOM_MIN, ZOOM_MAX) })
+              }
+              className="flex-1 accent-brand"
+              aria-label="Zoom fotky"
+            />
+            <span className="w-12 shrink-0 text-right font-mono tabular-nums text-ink-700">
+              {Math.round(zoom)} %
+            </span>
+          </label>
+        </div>
+
         <div className="flex flex-wrap items-center gap-3 text-xs text-ink-500">
           <span>
             Střed: {Math.round(focalX)} % × {Math.round(focalY)} %
           </span>
           <button
             type="button"
-            onClick={() => onChange(50, 50)}
+            onClick={() => update({ focal_x: 50, focal_y: 50, zoom: 100 })}
             className="rounded-md border border-border bg-surface px-2 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
           >
-            Vycentrovat
+            Resetovat
           </button>
-          <span className="text-ink-400">Dvojklikem taky vycentruješ.</span>
+          <span className="text-ink-400">
+            Přetáhni pro posun · kolečkem / sliderem přiblíž · dvojklik = reset.
+          </span>
         </div>
       </div>
     </Field>
