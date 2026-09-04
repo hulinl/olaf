@@ -115,6 +115,17 @@ def notify_event_updated(event: Event, changed_fields: list[str], *, actor=None)
         for uid in recipient_ids
     ]
     Notification.objects.bulk_create(notifs)
+
+    # Branded e-mail vedle bell notifikace. Přítelkyně-tester 2026-09-04:
+    # bell v aplikaci nestačí, chce aby účastníci na PATCH klíčových polí
+    # (Termín / Místo / Cena / …) dostali normální e-mail. Task se v prod
+    # spouští EAGER (žádný Celery worker) — dopad na PATCH latency je
+    # ~300 ms × počet recipients. Owner úprava akce není hot-path RSVP,
+    # takže zpomalení akceptovatelné; při větších komunitách zvážit
+    # thread-defer patern (viz project_olaf_perf_celery_eager memory).
+    from .tasks import fan_out_event_update_task
+
+    fan_out_event_update_task.delay(event.pk, recipient_ids, labels)
     return len(notifs)
 
 

@@ -140,32 +140,47 @@ export default async function EventLandingPage({ params }: Props) {
             <span className="inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
               ZRUŠENO
             </span>
-          ) : event.is_open_for_rsvp && event.capacity != null ? (
+          ) : event.is_open_for_rsvp ? (
             (() => {
+              // Přítelkyně-tester 2026-09-04: chce v hero prominentně
+              // vidět kolik lidí je aktuálně přihlášeno (social proof
+              // + urgency zároveň). Předtím badge ukazoval jen „N
+              // volných míst", takže owner ani sdílející kamarád
+              // nevěděl kolik už jich tam je. Nová logika vždy vede
+              // s confirmed count, urgency stavy (POSLEDNÍ / VYPRODÁNO)
+              // to jen doplňují.
+              const confirmed = event.confirmed_count ?? 0;
+              const capacity = event.capacity;
               const remaining = event.remaining_capacity ?? 0;
-              if (remaining === 0) {
+              if (capacity != null && remaining === 0) {
                 return (
                   <span className="inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
                     VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
                   </span>
                 );
               }
-              if (remaining <= 3) {
+              if (capacity != null && remaining <= 3) {
                 return (
                   <span className="inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
-                    POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
+                    {confirmed}/{capacity} přihlášeno · POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
                   </span>
                 );
               }
-              // Neutral „ještě je místo" indikátor. Tester chtěl vidět, jak
-              // se počet volných míst reálně odpočítává, ne jen extrémní
-              // stav VYPRODÁNO / POSLEDNÍ. Ink-tone badge, aby nekřičel
-              // stejně jako alarming brand-orange verze.
-              return (
-                <span className="inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
-                  {formatSpotsRemaining(remaining)}
-                </span>
-              );
+              if (capacity != null) {
+                return (
+                  <span className="inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
+                    {confirmed} z {capacity} přihlášeno
+                  </span>
+                );
+              }
+              if (confirmed > 0) {
+                return (
+                  <span className="inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
+                    {confirmed} přihlášeno
+                  </span>
+                );
+              }
+              return null;
             })()
           ) : null;
           const heroIndex = event.blocks.findIndex((b) => b.type === "hero");

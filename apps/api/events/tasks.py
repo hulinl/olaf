@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from .emails import (
     send_event_cancellation,
+    send_event_update_notification,
     send_rsvp_confirmation,
     send_waitlist_promotion,
 )
@@ -47,6 +48,29 @@ def fan_out_event_cancellation_task(event_id: int, reason: str = "") -> None:
     )
     for rsvp in affected:
         send_event_cancellation(rsvp, reason)
+
+
+@shared_task(name="events.fan_out_event_update")
+def fan_out_event_update_task(
+    event_id: int, recipient_ids: list[int], changed_labels: list[str]
+) -> None:
+    """Email every opted-in RSVPed user that the event they registered
+    for was updated. Recipient list + labels are computed by the caller
+    (`notify_event_updated`) — this task only handles the send loop so
+    it can be enqueued and (in prod's EAGER mode) run inside the write
+    request without duplicating the eligibility logic.
+    """
+    if not recipient_ids or not changed_labels:
+        return
+    try:
+        event = Event.objects.select_related("workspace").get(pk=event_id)
+    except Event.DoesNotExist:
+        return
+    from accounts.models import User
+
+    users = User.objects.filter(id__in=recipient_ids)
+    for user in users:
+        send_event_update_notification(user, event, changed_labels)
 
 
 @shared_task(name="events.dispatch_due_reminders")

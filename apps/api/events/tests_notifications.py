@@ -151,6 +151,37 @@ class EventUpdateNotificationTests(TestCase):
             Notification.objects.filter(recipient=self.participant).exists()
         )
 
+    def test_email_sent_to_active_participant(self) -> None:
+        # Vedle bell notifikace posíláme i branded e-mail (přítelkyně-tester
+        # 2026-09-04). Test běží v EAGER Celery módu (TESTING=True), takže
+        # `.delay()` běží synchronně a mail.outbox se naplní hned.
+        from django.core import mail
+
+        mail.outbox = []
+        notify_event_updated(
+            self.event, ["location_text", "price_amount"], actor=self.owner
+        )
+        # Bell notifikace + jeden e-mail účastníkovi.
+        self.assertEqual(Notification.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, [self.participant.email])
+        self.assertIn("Změna v akci", msg.subject)
+        self.assertIn(self.event.title, msg.subject)
+        # Deduplicated labels appear in body (Termín, Místo, Cena — mapping
+        # ze location_text+price_amount = 2 labely).
+        self.assertIn("Místo", msg.body)
+        self.assertIn("Cena", msg.body)
+
+    def test_opted_out_participant_receives_no_email(self) -> None:
+        from django.core import mail
+
+        self.participant.notify_on_event_update = False
+        self.participant.save()
+        mail.outbox = []
+        notify_event_updated(self.event, ["location_text"], actor=self.owner)
+        self.assertEqual(len(mail.outbox), 0)
+
 
 class RsvpApproveRejectNotificationTests(TestCase):
     def setUp(self) -> None:

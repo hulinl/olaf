@@ -68,7 +68,7 @@ export default function GearSettingsPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-ink-500">
           Osobní katalog vybavení — z těchto položek skládáš seznamy pro
-          konkrétní akce (např. „Beskická 7"). Každý seznam jde sdílet
+          konkrétní akce (např. „Beskydská 7"). Každý seznam jde sdílet
           odkazem a v budoucnu připojit k eventu.
         </p>
       </header>

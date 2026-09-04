@@ -133,6 +133,38 @@ def send_event_cancellation(rsvp: RSVP, reason: str = "") -> None:
     )
 
 
+def send_event_update_notification(user, event: Event, changed_labels: list[str]) -> None:
+    """Notify a single participant that owner-visible fields of an event
+    were changed. `changed_labels` is the deduplicated list of human
+    labels — same values that appear on the bell notification
+    (Termín, Místo, Cena, …). The template renders each with the
+    corresponding CURRENT value pulled off `event`, so the participant
+    sees not just „změněn Termín" but also new starts_at + ends_at.
+
+    Best-effort: fail_silently=True so a single bad address doesn't
+    block the fan-out loop upstream.
+    """
+    if user is None or not user.email:
+        return
+    event_url = _frontend_event_url(event)
+    send_branded_email(
+        subject=f"Změna v akci: {event.title}",
+        template_base="emails/event_updated",
+        context={
+            "user": user,
+            "event": event,
+            "workspace": event.workspace,
+            "event_url": event_url,
+            "changed_labels": changed_labels,
+            "event_when": format_event_dt(event.starts_at, event.tz),
+            "cta_url": event_url,
+            "cta_label": "Zkontrolovat akci",
+        },
+        recipient_list=[user.email],
+        fail_silently=True,
+    )
+
+
 def send_feedback_request(rsvp: RSVP) -> None:
     """Pošle jednomu účastníkovi mail s magic-linkem na feedback form.
     Best-effort — pokud user nemá usable e-mail, ticho ven; caller (fan-

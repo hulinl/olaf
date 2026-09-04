@@ -1,0 +1,18 @@
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
+
+pořadatel upravil akci „{{ event.title }}", na kterou jsi přihlášen{{ user.first_name|yesno:"a," }}. Změnilo se:
+
+{% for label in changed_labels %}- {{ label }}
+{% endfor %}
+
+Aktuální stav:
+{% if event_when %}Termín: {{ event_when }}
+{% endif %}{% if event.location_text %}Místo: {{ event.location_text }}
+{% endif %}{% if event.meeting_point_text %}Sraz: {{ event.meeting_point_text }}
+{% endif %}{% if event.price_amount %}Cena: {{ event.price_amount }} {{ event.price_currency }}
+{% endif %}{% if event.capacity %}Kapacita: {{ event.capacity }} lidí
+{% endif %}
+
+Podrobnosti akce: {{ event_url }}
+
+— Aplikace olaf

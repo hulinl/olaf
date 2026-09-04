@@ -1,0 +1,38 @@
+{% extends "emails/_base.html" %}
+{% load czech %}
+
+{% block subject %}Změna v akci — {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name|czech_vocative }},
+  </p>
+  <p style="margin:0 0 20px;">
+    pořadatel upravil akci <strong>„{{ event.title }}"</strong>, na kterou jsi přihlášen{{ user.first_name|yesno:"a," }}. Změnilo se:
+  </p>
+
+  <ul style="margin:0 0 20px;padding:0;list-style:none;">
+    {% for label in changed_labels %}
+      <li style="padding:10px 14px;margin-bottom:6px;background-color:#faf8f4;border-left:3px solid #f59e0b;border-radius:6px;font-size:14px;">
+        <strong style="color:#1a1a1a;">{{ label }}</strong>
+      </li>
+    {% endfor %}
+  </ul>
+
+  {# Aktuální snapshot klíčových polí — účastník má aktuální info přímo v mailu, nemusí klikat pro každý drobný check. #}
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 20px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+    <tr>
+      <td style="padding:14px 18px;font-size:13px;color:#737373;">
+        {% if event_when %}<div style="margin-bottom:4px;">Termín: <span style="color:#1a1a1a;font-weight:500;">{{ event_when }}</span></div>{% endif %}
+        {% if event.location_text %}<div style="margin-bottom:4px;">Místo: <span style="color:#1a1a1a;font-weight:500;">{{ event.location_text }}</span></div>{% endif %}
+        {% if event.meeting_point_text %}<div style="margin-bottom:4px;">Sraz: <span style="color:#1a1a1a;font-weight:500;">{{ event.meeting_point_text }}</span></div>{% endif %}
+        {% if event.price_amount %}<div style="margin-bottom:4px;">Cena: <span style="color:#1a1a1a;font-weight:500;">{{ event.price_amount }} {{ event.price_currency }}</span></div>{% endif %}
+        {% if event.capacity %}<div>Kapacita: <span style="color:#1a1a1a;font-weight:500;">{{ event.capacity }} lidí</span></div>{% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0 0 20px;">
+    Otevři si akci a mrkni na detaily — bude tam vždycky ta poslední verze.
+  </p>
+{% endblock %}
