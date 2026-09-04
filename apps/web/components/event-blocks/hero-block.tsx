@@ -11,6 +11,8 @@ interface Props {
   fallbackCtaLabel?: string;
   /** Status badge from the public landing — passed through here so it sits on the hero. */
   badge?: React.ReactNode;
+  /** Subtle count text („4 z 20 přihlášeno") shown next to the CTA button. */
+  countLabel?: string | null;
   tone?: BlockTone;
 }
 
@@ -20,6 +22,7 @@ export function HeroBlock({
   fallbackCtaHref,
   fallbackCtaLabel = "Přihlásit na akci",
   badge,
+  countLabel,
   tone = "canvas",
 }: Props) {
   const cover = assetUrl(payload.cover_url);
@@ -144,13 +147,26 @@ export function HeroBlock({
           </p>
         )}
 
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Link
             href={ctaHref}
             className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-6 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
           >
             {ctaLabel}
           </Link>
+          {countLabel && (
+            <span
+              className={[
+                "text-sm font-medium",
+                onDark ? "text-white/85" : "text-ink-500",
+              ].join(" ")}
+              style={{
+                textShadow: cover ? "0 1px 8px rgba(0,0,0,0.45)" : undefined,
+              }}
+            >
+              {countLabel}
+            </span>
+          )}
         </div>
 
         {payload.meta && payload.meta.length > 0 && (

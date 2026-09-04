@@ -24,6 +24,10 @@ interface Props {
   fallbackCtaHref: string;
   /** Optional status badge — rendered inside hero block only. */
   heroBadge?: React.ReactNode;
+  /** Subtle count text („4 z 20 přihlášeno") rendered next to hero CTA.
+   *  Předtím žilo jako badge nad titulem, ale visual byl přeplácaný;
+   *  přesun k CTA drží layout klidný a informaci k akční zóně. */
+  heroCountLabel?: string | null;
   /** Event images — needed by the gallery block (pulls from event.images). */
   images?: EventImage[];
   /** Visual tone for this block — assigned by the page based on position. */
@@ -47,6 +51,7 @@ export function BlockRenderer({
   fallbackTitle,
   fallbackCtaHref,
   heroBadge,
+  heroCountLabel,
   images = [],
   tone = "canvas",
   eventPrice,
@@ -61,6 +66,7 @@ export function BlockRenderer({
           fallbackTitle={fallbackTitle}
           fallbackCtaHref={fallbackCtaHref}
           badge={heroBadge}
+          countLabel={heroCountLabel}
           tone={tone}
         />
       );

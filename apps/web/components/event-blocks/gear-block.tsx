@@ -53,7 +53,7 @@ export function GearBlock({ payload, list, tone = "canvas" }: Props) {
 
   return (
     <section className={dark ? "bg-ink-900" : "bg-canvas"}>
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:py-12">
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:py-12">
         <SectionHead
           eyebrow={eyebrow}
           title={title}

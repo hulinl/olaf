@@ -136,53 +136,39 @@ export default async function EventLandingPage({ params }: Props) {
           <FallbackHero event={event} ctaHref={cta_href} />
         ) : null}
         {event.blocks && event.blocks.length > 0 && (() => {
+          // Badge se drží JEN pro true status markery (VYPRODÁNO,
+          // POSLEDNÍ N MÍST, ZRUŠENO). Neurgentní count teče do
+          // heroCountLabel a renderuje se subtilně vedle CTA — přítelkyně-
+          // tester 2026-09-04 řekla, že bublina „N přihlášeno" nad
+          // titulem + eyebrow bublina + titulek vypadalo přeplácaně.
+          const confirmed = event.confirmed_count ?? 0;
+          const capacity = event.capacity;
+          const remaining = event.remaining_capacity ?? 0;
           const heroBadge = cancelled ? (
             <span className="inline-flex items-center rounded-md bg-danger px-3 py-1 text-xs font-semibold text-white">
               ZRUŠENO
             </span>
-          ) : event.is_open_for_rsvp ? (
-            (() => {
-              // Přítelkyně-tester 2026-09-04: chce v hero prominentně
-              // vidět kolik lidí je aktuálně přihlášeno (social proof
-              // + urgency zároveň). Předtím badge ukazoval jen „N
-              // volných míst", takže owner ani sdílející kamarád
-              // nevěděl kolik už jich tam je. Nová logika vždy vede
-              // s confirmed count, urgency stavy (POSLEDNÍ / VYPRODÁNO)
-              // to jen doplňují.
-              const confirmed = event.confirmed_count ?? 0;
-              const capacity = event.capacity;
-              const remaining = event.remaining_capacity ?? 0;
-              if (capacity != null && remaining === 0) {
-                return (
-                  <span className="inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
-                    VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
-                  </span>
-                );
-              }
-              if (capacity != null && remaining <= 3) {
-                return (
-                  <span className="inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
-                    {confirmed}/{capacity} přihlášeno · POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
-                  </span>
-                );
-              }
-              if (capacity != null) {
-                return (
-                  <span className="inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
-                    {confirmed} z {capacity} přihlášeno
-                  </span>
-                );
-              }
-              if (confirmed > 0) {
-                return (
-                  <span className="inline-flex items-center rounded-md bg-surface-muted px-3 py-1 text-xs font-semibold text-ink-700">
-                    {confirmed} přihlášeno
-                  </span>
-                );
-              }
-              return null;
-            })()
+          ) : event.is_open_for_rsvp && capacity != null && remaining === 0 ? (
+            <span className="inline-flex items-center rounded-md bg-ink-900 px-3 py-1 text-xs font-semibold text-ink-inverse">
+              VYPRODÁNO{event.waitlist_enabled ? " · waitlist otevřený" : ""}
+            </span>
+          ) : event.is_open_for_rsvp && capacity != null && remaining <= 3 ? (
+            <span className="inline-flex items-center rounded-md bg-brand px-3 py-1 text-xs font-semibold text-brand-ink">
+              POSLEDNÍ {remaining} MÍST{remaining === 1 ? "O" : "A"}
+            </span>
           ) : null;
+          // Count řádek vedle CTA — vždy když je akce otevřená pro RSVP
+          // a máme co ukázat. Skryto pro cancelled event (irelevantní)
+          // a pro 0/0 (bez kapacity + 0 přihlášených = negativní social
+          // proof, radši nic než "0 přihlášeno").
+          const heroCountLabel =
+            !cancelled && event.is_open_for_rsvp
+              ? capacity != null
+                ? `${confirmed} z ${capacity} přihlášeno`
+                : confirmed > 0
+                  ? `${confirmed} přihlášeno`
+                  : null
+              : null;
           const heroIndex = event.blocks.findIndex((b) => b.type === "hero");
           return (
             <>
@@ -197,6 +183,7 @@ export default async function EventLandingPage({ params }: Props) {
                   fallbackTitle={event.title}
                   fallbackCtaHref={cta_href}
                   heroBadge={i === heroIndex ? heroBadge : undefined}
+                  heroCountLabel={i === heroIndex ? heroCountLabel : undefined}
                   images={event.images}
                   eventPrice={{
                     amount: event.price_amount,
