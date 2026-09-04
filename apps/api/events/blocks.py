@@ -59,13 +59,13 @@ def _validate_hero(payload: dict) -> None:
         val = payload.get(key)
         if val is None:
             continue
-        if not isinstance(val, (int, float)) or isinstance(val, bool):
+        if not isinstance(val, int | float) or isinstance(val, bool):
             raise ValueError(f"'{key}' must be a number")
         if not 0 <= float(val) <= 100:
             raise ValueError(f"'{key}' must be between 0 and 100")
     zoom = payload.get("zoom")
     if zoom is not None:
-        if not isinstance(zoom, (int, float)) or isinstance(zoom, bool):
+        if not isinstance(zoom, int | float) or isinstance(zoom, bool):
             raise ValueError("'zoom' must be a number")
         if not 100 <= float(zoom) <= 300:
             raise ValueError("'zoom' must be between 100 and 300")

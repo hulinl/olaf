@@ -120,7 +120,7 @@ def notify_event_updated(event: Event, changed_fields: list[str], *, actor=None)
     # bell v aplikaci nestačí, chce aby účastníci na PATCH klíčových polí
     # (Termín / Místo / Cena / …) dostali normální e-mail. Task se v prod
     # spouští EAGER (žádný Celery worker) — dopad na PATCH latency je
-    # ~300 ms × počet recipients. Owner úprava akce není hot-path RSVP,
+    # ~300 ms krát počet recipients. Owner úprava akce není hot-path RSVP,
     # takže zpomalení akceptovatelné; při větších komunitách zvážit
     # thread-defer patern (viz project_olaf_perf_celery_eager memory).
     from .tasks import fan_out_event_update_task
