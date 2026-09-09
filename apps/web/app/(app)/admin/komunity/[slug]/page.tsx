@@ -74,7 +74,18 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         if (ws.my_role !== "owner") {
           try {
             await auth.me();
-            router.replace(`/${slug}`);
+            // Member (nebo admin) tady nemá co dělat — /admin/komunity je
+            // pro ownera. Redirect na in-app member landing (má tab
+            // Nástěnka i seznam akcí), NE na public /<slug>, kde
+            // nástěnka není a member by přišel o kontext komunity.
+            // Non-member skončí na public landing. User report
+            // 2026-09-09: starý e-mail vedl na /admin/… a member byl
+            // odkloněn na public view bez nástěnky.
+            const target =
+              ws.my_role === "admin" || ws.my_role === "member"
+                ? `/workspaces/${slug}`
+                : `/${slug}`;
+            router.replace(target);
           } catch {
             router.replace(`/login?next=/admin/komunity/${slug}`);
           }

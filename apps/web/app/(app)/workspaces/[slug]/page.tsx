@@ -199,6 +199,10 @@ export default function WorkspaceDetailPage({ params }: Props) {
           upcoming={upcoming}
           past={past}
           isOwner={isOwner}
+          isMember={workspace.my_role != null}
+          isModerator={
+            workspace.my_role === "owner" || workspace.my_role === "admin"
+          }
           slug={slug}
           userId={user.id}
         />
@@ -217,6 +221,8 @@ function WorkspaceTabs({
   upcoming,
   past,
   isOwner,
+  isMember,
+  isModerator,
   slug,
   userId,
 }: {
@@ -224,12 +230,19 @@ function WorkspaceTabs({
   upcoming: EventSummary[];
   past: EventSummary[];
   isOwner: boolean;
+  /** True pro každého, kdo je součástí komunity (owner/admin/member).
+   *  Backend can_access_workspace_wall povoluje read+write všem
+   *  WorkspaceMemberům, gate na isOwner byl zbytek z V1, kdy komunita
+   *  ještě neměla explicitní členy. User report 2026-09-09: přítelkyně
+   *  přidala příspěvek na nástěnku, e-mail dorazil, ale příjemce
+   *  (member, ne owner) nástěnku vůbec neviděl. */
+  isMember: boolean;
+  /** Owner nebo admin. Zapíná pin/moderate/delete-any akce v
+   *  DiscussionWall/TopicComposer. */
+  isModerator: boolean;
   slug: string;
   userId: number;
 }) {
-  // Owner-only viewers get the wall tab; visitors w/o access only see
-  // Akce, so hiding the tab strip entirely would be confusing — keep
-  // a single visible tab so the page structure feels intentional.
   type Tab = "akce" | "nastenka";
   const [tab, setTab] = useState<Tab>("akce");
 
@@ -243,7 +256,7 @@ function WorkspaceTabs({
         <TabButton active={tab === "akce"} onClick={() => setTab("akce")}>
           Nadcházející akce
         </TabButton>
-        {isOwner && (
+        {isMember && (
           <TabButton
             active={tab === "nastenka"}
             onClick={() => setTab("nastenka")}
@@ -326,10 +339,10 @@ function WorkspaceTabs({
         </>
       )}
 
-      {tab === "nastenka" && isOwner && (
+      {tab === "nastenka" && isMember && (
         <section className="mt-8">
           <DiscussionWall
-            scope={{ kind: "workspace", slug, isModerator: isOwner }}
+            scope={{ kind: "workspace", slug, isModerator }}
             currentUserId={userId}
             topicHref={(topicId) =>
               `/workspaces/${slug}/nastenka/${topicId}`
