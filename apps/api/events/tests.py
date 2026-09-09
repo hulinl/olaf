@@ -121,6 +121,60 @@ class EventModelTests(TestCase):
         r = RSVP.create_for_event(event=self.event, user=u, questionnaire_answers={})
         self.assertEqual(r.status, RSVP.STATUS_PENDING_APPROVAL)
 
+    def test_resubmit_does_not_reset_confirmed_rsvp_to_pending(self) -> None:
+        # Regression 2026-09-09: user submits RSVP → organizer approves
+        # (STATUS_YES) → user clicks the event link from a share and
+        # resubmits. Approval-required event used to knock the status
+        # back to PENDING_APPROVAL, forcing the organizer to re-approve.
+        self.event.requires_approval = True
+        self.event.save()
+        u = User.objects.create_user(
+            email="ureapp@example.com", password="pass-abcdef-1234",
+            first_name="R", last_name="Sub",
+        )
+        first = RSVP.create_for_event(
+            event=self.event, user=u, questionnaire_answers={"note": "první"},
+        )
+        self.assertEqual(first.status, RSVP.STATUS_PENDING_APPROVAL)
+        first.status = RSVP.STATUS_YES
+        first.save(update_fields=["status"])
+
+        second = RSVP.create_for_event(
+            event=self.event, user=u, questionnaire_answers={"note": "druhý"},
+        )
+        self.assertEqual(second.pk, first.pk)
+        self.assertEqual(second.status, RSVP.STATUS_YES)
+        self.assertEqual(second.questionnaire_answers, {"note": "druhý"})
+
+    def test_resubmit_keeps_waitlist_position_when_approval_required(self) -> None:
+        self.event.requires_approval = True
+        self.event.capacity = 1
+        self.event.waitlist_enabled = True
+        self.event.save()
+        confirmed = User.objects.create_user(
+            email="conf@example.com", password="pass-abcdef-1234",
+            first_name="C", last_name="X",
+        )
+        r1 = RSVP.create_for_event(event=self.event, user=confirmed, questionnaire_answers={})
+        r1.status = RSVP.STATUS_YES
+        r1.save(update_fields=["status"])
+
+        waiter = User.objects.create_user(
+            email="wait@example.com", password="pass-abcdef-1234",
+            first_name="W", last_name="X",
+        )
+        r2 = RSVP.create_for_event(event=self.event, user=waiter, questionnaire_answers={})
+        # Approval-required event routes new RSVPs to pending first; simulate
+        # the organizer moving them to the waitlist explicitly.
+        self.assertEqual(r2.status, RSVP.STATUS_PENDING_APPROVAL)
+        r2.status = RSVP.STATUS_WAITLIST
+        r2.waitlist_position = 1
+        r2.save(update_fields=["status", "waitlist_position"])
+
+        r2_again = RSVP.create_for_event(event=self.event, user=waiter, questionnaire_answers={"x": 1})
+        self.assertEqual(r2_again.status, RSVP.STATUS_WAITLIST)
+        self.assertEqual(r2_again.waitlist_position, 1)
+
 
 class PublicEventEndpointTests(TestCase):
     def setUp(self) -> None:

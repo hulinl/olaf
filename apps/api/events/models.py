@@ -654,15 +654,23 @@ class RSVP(models.Model):
             rsvp.is_organizer = True
             rsvp.payment_status = cls.PAYMENT_WAIVED
 
-        if locked_event.requires_approval and not is_workspace_admin:
-            rsvp.status = cls.STATUS_PENDING_APPROVAL
-            rsvp.waitlist_position = None
-        elif previous_status == cls.STATUS_YES:
-            # Already confirmed; idempotent re-submit just refreshes answers.
+        # Idempotent re-submit: an already-confirmed / waitlisted / pending
+        # RSVP must not be knocked back to `pending_approval` when the user
+        # opens the RSVP form a second time (e.g. clicks the event link from
+        # a different share and re-submits). Without this early return an
+        # approval-required event forced the organizer to re-approve every
+        # re-visit. User report 2026-09-09.
+        if previous_status == cls.STATUS_YES:
             rsvp.waitlist_position = None
         elif previous_status == cls.STATUS_WAITLIST:
             # Keep them on the waitlist at their current position.
             pass
+        elif previous_status == cls.STATUS_PENDING_APPROVAL:
+            # Still waiting on the organizer — don't reset the timer.
+            rsvp.waitlist_position = None
+        elif locked_event.requires_approval and not is_workspace_admin:
+            rsvp.status = cls.STATUS_PENDING_APPROVAL
+            rsvp.waitlist_position = None
         elif locked_event.is_at_capacity and locked_event.waitlist_enabled:
             rsvp.status = cls.STATUS_WAITLIST
             rsvp.waitlist_position = cls._next_waitlist_position(locked_event)

@@ -23,11 +23,18 @@ def _frontend_url(path: str) -> str:
 
 
 def _topic_url(topic: Topic) -> str:
+    # Deep-link to the topic itself, not the parent surface. Member-facing
+    # routes are used so a plain community member isn't sent to an
+    # organizer-only URL (`/admin/komunity/...`) and dumped on a stripped
+    # public view. Owners can still hit these routes — the DiscussionThread
+    # component enables moderator actions based on `my_role`. User report
+    # 2026-09-09: e-mail o novém tématu vedlo membera do /admin/... a
+    # nástěnku vůbec neviděl.
     if topic.parent_type == Topic.PARENT_WORKSPACE:
         ws = Workspace.objects.filter(pk=topic.parent_id).first()
         if not ws:
             return _frontend_url("/")
-        return _frontend_url(f"/admin/komunity/{ws.slug}")
+        return _frontend_url(f"/workspaces/{ws.slug}/nastenka/{topic.pk}")
     event = Event.objects.select_related("workspace").filter(
         pk=topic.parent_id
     ).first()

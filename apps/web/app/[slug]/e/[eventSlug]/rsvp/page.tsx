@@ -13,12 +13,32 @@ import { Logo } from "@/components/ui/logo";
 import {
   ApiError,
   type Event as OlafEvent,
+  type MyRSVP,
   type QuestionnaireSection,
   type RSVPAnswers,
   type User,
   auth,
   events,
 } from "@/lib/api";
+
+// „Aktivní" RSVP = user už je součástí akce (yes/waitlist/čeká na
+// schválení). Cancelled nebo maybe/no bereme jako „může se přihlásit
+// znovu", takže se formulář ukáže normálně. Backend re-submit
+// každopádně nepřepíše potvrzený status zpátky na pending (viz
+// RSVP.create_for_event), tohle je jen UX pojistka aby user neviděl
+// prázdný formulář místo své přihlášky.
+type ActiveRsvpStatus = "yes" | "waitlist" | "pending_approval";
+function activeRsvpStatus(rsvp: MyRSVP | null | undefined): ActiveRsvpStatus | null {
+  if (!rsvp) return null;
+  if (
+    rsvp.status === "yes" ||
+    rsvp.status === "waitlist" ||
+    rsvp.status === "pending_approval"
+  ) {
+    return rsvp.status;
+  }
+  return null;
+}
 
 interface Props {
   params: Promise<{ slug: string; eventSlug: string }>;
@@ -63,6 +83,12 @@ export default function RSVPPage({ params }: Props) {
   const [submitted, setSubmitted] = useState<
     "yes" | "waitlist" | "pending_approval" | null
   >(null);
+  // User už má na akci aktivní RSVP (jiný než právě odeslaný). Sedí,
+  // když někdo klikne na jiný sdílený link na akci, ke které je už
+  // přihlášený — místo prázdného formuláře mu ukážeme banner s odkazem
+  // do jeho účasti. User report 2026-09-09.
+  const [existingStatus, setExistingStatus] =
+    useState<ActiveRsvpStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Když backend vrátí 409 + code=email_has_account, místo generického
   // erroru ukážeme dedicated alert s "Přihlásit se" tlačítkem; user se
@@ -134,6 +160,7 @@ export default function RSVPPage({ params }: Props) {
         setEvent(ev);
         if (me) {
           prefillFromUser(me);
+          setExistingStatus(activeRsvpStatus(ev.my_rsvp));
         }
       } catch (err) {
         if (cancelled) return;
@@ -233,6 +260,21 @@ export default function RSVPPage({ params }: Props) {
     setLoginDialogOpen(false);
     setJustLoggedIn(true);
     setError(null);
+    // Refetch tady musí být — event.my_rsvp se počítá per-viewer, po
+    // login-in-place ho backend najednou vidí. Bez refetche bychom
+    // ukázali prázdný formulář i uživateli, který na akci už je
+    // přihlášený a jen se právě prokázal.
+    events
+      .publicEvent(slug, eventSlug)
+      .then((ev) => {
+        setEvent(ev);
+        setExistingStatus(activeRsvpStatus(ev.my_rsvp));
+      })
+      .catch(() => {
+        // Sekundární chyba refetche neblokuje login — pokud tu je
+        // stale event bez my_rsvp, backend re-submit stejně nezpůsobí
+        // duplikát (idempotent).
+      });
   }
 
   if (loading) {
@@ -313,6 +355,47 @@ export default function RSVPPage({ params }: Props) {
           <LinkButton
             href={`/${slug}/e/${eventSlug}`}
             variant={user ? "secondary" : "primary"}
+            size="lg"
+          >
+            Zpět na stránku akce
+          </LinkButton>
+        </div>
+      </main>
+    );
+  }
+
+  if (existingStatus && user) {
+    const headline =
+      existingStatus === "yes"
+        ? "Už jsi přihlášen/á"
+        : existingStatus === "waitlist"
+          ? "Už jsi na waitlistu"
+          : "Přihláška už čeká na schválení";
+    const body =
+      existingStatus === "yes"
+        ? "Na tuhle akci jsi zaregistrovaný/á. Nemusíš přihlášku vyplňovat znovu — detaily a odpovědi upravíš ve své účasti."
+        : existingStatus === "waitlist"
+          ? "Držíme ti místo na waitlistu. Jakmile se uvolní kapacita, dáme ti vědět e-mailem."
+          : "Přihlášku máme, jen čeká na potvrzení od pořadatele. Až rozhodne, pošleme ti mail.";
+    return (
+      <main className="flex flex-1 flex-col items-center px-4 py-16">
+        <div className="w-full max-w-xl text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
+            {headline}
+          </h1>
+          <p className="mt-3 text-ink-700">{body}</p>
+        </div>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <LinkButton
+            href={`/events/${slug}/${eventSlug}`}
+            variant="primary"
+            size="lg"
+          >
+            Moje účast →
+          </LinkButton>
+          <LinkButton
+            href={`/${slug}/e/${eventSlug}`}
+            variant="secondary"
             size="lg"
           >
             Zpět na stránku akce

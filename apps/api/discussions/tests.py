@@ -506,3 +506,40 @@ class EventWallPendingApprovalTests(TestCase):
         )
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, drf_status.HTTP_403_FORBIDDEN)
+
+
+# ---------------------------------------------------------------------------
+# _topic_url — member deep-link, not the owner-only /admin/... route
+# ---------------------------------------------------------------------------
+
+
+class TopicUrlTests(TestCase):
+    """Regression 2026-09-09: community topic e-mails were routing all
+    recipients (including plain members) to `/admin/komunity/<slug>`,
+    which is organizer-only. Members ended up on the stripped public
+    view without the wall. The URL must be the member deep-link that
+    both roles can open."""
+
+    def test_workspace_topic_url_uses_member_route(self):
+        from discussions.emails import _topic_url
+        from discussions.models import Topic
+
+        ws = Workspace.objects.create(slug="running-club", name="Running Club")
+        owner = User.objects.create_user(
+            email="rc-owner@example.com",
+            password="pass-abcdef-1234",
+            email_verified=True,
+        )
+        WorkspaceMember.objects.create(
+            workspace=ws, user=owner, role=WorkspaceMember.ROLE_OWNER
+        )
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=ws.pk,
+            author=owner,
+            title="První společný výběh",
+            body="…",
+        )
+        url = _topic_url(topic)
+        self.assertIn(f"/workspaces/running-club/nastenka/{topic.pk}", url)
+        self.assertNotIn("/admin/komunity/", url)
