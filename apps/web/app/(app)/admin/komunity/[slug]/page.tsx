@@ -275,10 +275,7 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
         <section>
           <DiscussionWall
             scope={{ kind: "workspace", slug, isModerator: true }}
-            currentUserId={user.id}
-            topicHref={(topicId) =>
-              `/admin/komunity/${slug}/nastenka/${topicId}`
-            }
+            currentUser={user}
           />
         </section>
       )}

@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
-import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -15,35 +13,45 @@ import {
   discussions,
 } from "@/lib/api";
 
-type Scope =
-  | { kind: "workspace"; slug: string; isModerator: boolean }
-  | {
-      kind: "event";
-      workspaceSlug: string;
-      eventSlug: string;
-      isModerator: boolean;
-    };
+import { TopicCard, type TopicScope } from "./discussion/topic-card";
 
 interface Props {
-  scope: Scope;
-  /** Current user id — used to gate "smazat mé téma". */
-  currentUserId: number;
-  /** Builds the dedicated-thread URL for a given topic id. The wall is
-   *  card-only now (Trello-style); clicking a card navigates here. */
-  topicHref: (topicId: number) => string;
+  scope: TopicScope;
+  currentUser: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    avatar_url?: string;
+    avatar_focal_x?: number;
+    avatar_focal_y?: number;
+    avatar_zoom?: number;
+  };
+  /** Optional deep-link: id topicu, který má být rozbalený po mount
+   *  (typicky z ?t=<id> query paramu). Karta se sama scrollne do view. */
+  expandTopicId?: number | null;
+  /** #comment-<id> hash — když je set spolu s expandTopicId, karta
+   *  po načtení detailu scrollne přímo na komentář. */
+  scrollToCommentId?: number | null;
 }
 
 /**
- * The wall is now strictly a list of topic cards. Each card links to a
- * dedicated thread page (DiscussionThread) where the full body +
- * comments + composer live. The wall stops being a giant nested
- * accordion — easier to scan, makes room for V2 replies / photo uploads
- * on the thread page without crushing the layout.
+ * Feed diskuze — Facebook-style zeď. 2026-09-10 přepis z původního
+ * card-only listu (klik vedl na thread page) na inline feed —
+ * všechny komentáře, composer + like/reply akce se dějou přímo
+ * v kartě. Thread page routes zůstávají alive jen jako redirect na
+ * ?t=<id> deep-link, ať staré e-mail/bookmark linky nepadají do
+ * 404.
  *
- * Composer at the top stays inline so creating a new topic is one
- * click + write + publish, no extra navigation.
+ * Karty jsou samostatné a řídí si vlastní expand state. Wall drží
+ * `topics[]` (zdroj pravdy pro listování + pinning) a mutate-callbacky
+ * (delete, toggle-pin, comment_count optimistic).
  */
-export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
+export function DiscussionWall({
+  scope,
+  currentUser,
+  expandTopicId,
+  scrollToCommentId,
+}: Props) {
   const [topics, setTopics] = useState<DiscussionTopic[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -62,7 +70,7 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
   }
 
   useEffect(() => {
-    listTopics();
+    void listTopics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scope.kind,
@@ -112,7 +120,7 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
           topicId,
         );
       }
-      await listTopics();
+      setTopics((prev) => (prev ? prev.filter((t) => t.id !== topicId) : prev));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Smazání selhalo.");
     }
@@ -137,11 +145,18 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
     }
   }
 
+  function handleLocalUpdate(
+    topicId: number,
+    patch: Partial<DiscussionTopic>,
+  ) {
+    setTopics((prev) =>
+      prev
+        ? prev.map((t) => (t.id === topicId ? { ...t, ...patch } : t))
+        : prev,
+    );
+  }
+
   return (
-    // Borderless wrapper — each topic card already has its own outer
-    // border, so wrapping the whole wall in another card border just
-    // doubled up. The page section (workspace landing / event detail /
-    // Tvůrce komunita tab) is the container.
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-semibold text-ink-900">Nástěnka</h3>
@@ -171,32 +186,38 @@ export function DiscussionWall({ scope, currentUserId, topicHref }: Props) {
         />
       )}
 
-      <TopicGrid
+      <TopicFeed
         topics={topics}
-        topicHref={topicHref}
-        canModerate={scope.isModerator}
-        currentUserId={currentUserId}
+        scope={scope}
+        currentUser={currentUser}
+        expandTopicId={expandTopicId}
+        scrollToCommentId={scrollToCommentId}
+        onDelete={handleDeleteTopic}
         onTogglePin={handleTogglePin}
-        onDeleteTopic={handleDeleteTopic}
+        onLocalUpdate={handleLocalUpdate}
       />
     </section>
   );
 }
 
-function TopicGrid({
+function TopicFeed({
   topics,
-  topicHref,
-  canModerate,
-  currentUserId,
+  scope,
+  currentUser,
+  expandTopicId,
+  scrollToCommentId,
+  onDelete,
   onTogglePin,
-  onDeleteTopic,
+  onLocalUpdate,
 }: {
   topics: DiscussionTopic[] | null;
-  topicHref: (topicId: number) => string;
-  canModerate: boolean;
-  currentUserId: number;
+  scope: TopicScope;
+  currentUser: Props["currentUser"];
+  expandTopicId?: number | null;
+  scrollToCommentId?: number | null;
+  onDelete: (id: number) => Promise<void>;
   onTogglePin: (t: DiscussionTopic) => Promise<void>;
-  onDeleteTopic: (id: number) => Promise<void>;
+  onLocalUpdate: (id: number, patch: Partial<DiscussionTopic>) => void;
 }) {
   if (topics === null) {
     return (
@@ -216,22 +237,24 @@ function TopicGrid({
   const pinned = topics.filter((t) => t.pinned);
   const rest = topics.filter((t) => !t.pinned);
 
-  const renderCard = (t: DiscussionTopic) => (
-    <TopicCard
-      key={t.id}
-      topic={t}
-      href={topicHref(t.id)}
-      canDelete={canModerate || t.author_id === currentUserId}
-      canModerate={canModerate}
-      onTogglePin={() => onTogglePin(t)}
-      onDelete={() => onDeleteTopic(t.id)}
-    />
-  );
+  function renderCard(t: DiscussionTopic) {
+    return (
+      <TopicCard
+        key={t.id}
+        topic={t}
+        scope={scope}
+        currentUser={currentUser}
+        initiallyExpanded={expandTopicId === t.id}
+        scrollToCommentId={
+          expandTopicId === t.id ? scrollToCommentId ?? null : null
+        }
+        onDelete={onDelete}
+        onTogglePin={onTogglePin}
+        onLocalUpdate={onLocalUpdate}
+      />
+    );
+  }
 
-  // Feed layout (2026-09-10, user request): jeden sloupec pod sebou,
-  // full-width v rámci stránkového kontejneru (rodič má max-w-5xl),
-  // fixní preview výška, "Zobrazit více" toggle. Připnuté zůstávají
-  // nahoře jako samostatná sekce.
   return (
     <div className="mt-5 flex w-full flex-col gap-6">
       {pinned.length > 0 && (
@@ -253,244 +276,6 @@ function TopicGrid({
         </div>
       )}
     </div>
-  );
-}
-
-/** "Před N dny" / "Dnes" / "Včera" / absolute datum pro starší.
- *  Zobrazuje se v hlavičce karty vedle absolutního data — user na
- *  první pohled vidí, jak čerstvý příspěvek je. */
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffDays = Math.floor((now - then) / (24 * 3600 * 1000));
-  if (diffDays < 1) return "dnes";
-  if (diffDays === 1) return "včera";
-  if (diffDays < 7) return `před ${diffDays} dny`;
-  if (diffDays < 14) return "před týdnem";
-  if (diffDays < 30) return `před ${Math.floor(diffDays / 7)} týdny`;
-  if (diffDays < 60) return "před měsícem";
-  if (diffDays < 365) return `před ${Math.floor(diffDays / 30)} měsíci`;
-  return `před ${Math.floor(diffDays / 365)} lety`;
-}
-
-/** Iniciála z celého jména autora — první písmeno prvního slova,
- *  fallback "?" pro prázdný string / smazané autory. */
-function initialOf(name: string): string {
-  const first = name.trim().split(/\s+/)[0] ?? "";
-  return first.charAt(0).toUpperCase() || "?";
-}
-
-/** Deterministický pastel avatar background z author_name — každý
- *  autor má konzistentní barvu napříč posty, aniž bychom potřebovali
- *  avatar URL z API. HSL s pevnou saturací + lightness = pastel. */
-function avatarBg(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 55%, 82%)`;
-}
-
-function TopicCard({
-  topic,
-  href,
-  canDelete,
-  canModerate,
-  onTogglePin,
-  onDelete,
-}: {
-  topic: DiscussionTopic;
-  href: string;
-  canDelete: boolean;
-  canModerate: boolean;
-  onTogglePin: () => Promise<void>;
-  onDelete: () => Promise<void>;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  // Absolute datum + relativní hint ("před 2 dny") — user 2026-09-10:
-  // chce vidět jak staré posty jsou na první pohled.
-  const created = new Date(topic.created_at);
-  const absoluteDate = created.toLocaleDateString("cs-CZ", {
-    day: "numeric",
-    month: "long",
-    year:
-      created.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
-  });
-  const relative = formatRelative(topic.created_at);
-  // Line clamp threshold — když je body ≤ 4 řádky-ish (heuristika:
-  // 280 znaků / 4 newliny), nemá cenu ukazovat „Zobrazit více".
-  const needsExpand =
-    topic.body.length > 280 || topic.body.split("\n").length > 4;
-
-  return (
-    <article
-      className={[
-        "group relative flex flex-col overflow-hidden rounded-xl border bg-surface shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-brand/40 hover:shadow-md",
-        topic.pinned ? "border-brand/40" : "border-border",
-      ].join(" ")}
-    >
-      {/* Header pruh s pastel tintem — vizuálně oddělí "kdo + kdy" od
-          samotného postu. Kompaktnější než původní verze (user
-          2026-09-10 report: „bloky jsou dost velké"). */}
-      <header className="flex items-start justify-between gap-3 border-b border-border bg-surface-muted/40 px-3 py-2 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {topic.author_avatar.url ? (
-            <span className="ring-1 ring-white/60 rounded-full">
-              <Avatar
-                firstName={initialOf(topic.author_name)}
-                lastName=""
-                avatarUrl={topic.author_avatar.url}
-                focalX={topic.author_avatar.focal_x}
-                focalY={topic.author_avatar.focal_y}
-                zoom={topic.author_avatar.zoom}
-                size={32}
-              />
-            </span>
-          ) : (
-            <span
-              aria-hidden
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
-              style={{ backgroundColor: avatarBg(topic.author_name) }}
-            >
-              {initialOf(topic.author_name)}
-            </span>
-          )}
-          <div className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate text-sm font-semibold text-ink-900">
-              {topic.author_name}
-            </span>
-            <span className="text-[11px] text-ink-500">
-              <time dateTime={topic.created_at} title={created.toLocaleString("cs-CZ")}>
-                {absoluteDate}
-              </time>
-              <span aria-hidden> · </span>
-              <span>{relative}</span>
-            </span>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {topic.pinned && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
-              <span aria-hidden>📌</span>
-              <span className="hidden sm:inline">Připnuto</span>
-            </span>
-          )}
-          {topic.locked && (
-            <span className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-              Zamčeno
-            </span>
-          )}
-          {(canModerate || canDelete) && (
-            <div className="ml-0.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-              {/* Na dotykových zařízeních není hover, akce musí být vidět
-                  hned. Na desktopu je hide-until-hover, aby netahaly oči. */}
-              {canModerate && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onTogglePin();
-                  }}
-                  title={topic.pinned ? "Odepnout" : "Připnout"}
-                  aria-label={topic.pinned ? "Odepnout" : "Připnout"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:bg-surface-muted hover:text-ink-900 focus-ring"
-                >
-                  <span aria-hidden>{topic.pinned ? "📌" : "📍"}</span>
-                </button>
-              )}
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                  title="Smazat téma"
-                  aria-label="Smazat téma"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:text-danger focus-ring"
-                >
-                  <span aria-hidden>×</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </header>
-
-      <div className="flex flex-col gap-2 px-3 py-3 sm:px-4">
-        <Link
-          href={href}
-          className="flex flex-col gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-        >
-          <h4
-            className="text-[15px] font-semibold text-ink-900 sm:text-base"
-            style={{ letterSpacing: "-0.015em" }}
-          >
-            {topic.title}
-          </h4>
-          {topic.body && (
-            <p
-              className={[
-                "whitespace-pre-wrap break-words text-sm leading-snug text-ink-700",
-                expanded ? "" : "line-clamp-3",
-              ].join(" ")}
-            >
-              {topic.body}
-            </p>
-          )}
-        </Link>
-
-        {topic.body && needsExpand && (
-          // Standalone toggle — nesmí propagate do Link parenta (jinak
-          // by kliknutí na "Zobrazit více" navigovalo do threadu místo
-          // expandu). preventDefault + stopPropagation.
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setExpanded((v) => !v);
-            }}
-            className="self-start text-xs font-medium text-brand hover:underline focus-ring"
-            aria-expanded={expanded}
-          >
-            {expanded ? "Zobrazit méně" : "Zobrazit více"}
-          </button>
-        )}
-
-        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border pt-2 text-[11px] text-ink-500">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            <span className="inline-flex items-center gap-1">
-              <span aria-hidden>💬</span>
-              <strong className="text-ink-900 tabular-nums">
-                {topic.comment_count}
-              </strong>
-            </span>
-            {topic.like_count > 0 && (
-              <span
-                className={[
-                  "inline-flex items-center gap-1",
-                  topic.i_liked ? "font-medium text-brand" : "text-ink-500",
-                ].join(" ")}
-              >
-                <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
-                <span className="tabular-nums">{topic.like_count}</span>
-              </span>
-            )}
-          </div>
-          <Link
-            href={href}
-            className="inline-flex items-center gap-1 font-medium text-ink-700 hover:text-brand focus-ring"
-          >
-            Otevřít diskuzi
-            <span aria-hidden>→</span>
-          </Link>
-        </div>
-      </div>
-    </article>
   );
 }
 

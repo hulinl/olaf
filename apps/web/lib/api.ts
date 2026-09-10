@@ -555,6 +555,10 @@ export interface DiscussionTopic {
   comment_count: number;
   like_count: number;
   i_liked: boolean;
+  /** Preview 2 posledních top-level komentářů pro feed layout —
+   *  frontend expand button dohledává zbytek přes topic detail
+   *  endpoint. Chronologicky (starší -> novější). */
+  recent_comments: DiscussionComment[];
   last_activity_at: string;
   created_at: string;
   updated_at: string;

@@ -541,5 +541,7 @@ class TopicUrlTests(TestCase):
             body="…",
         )
         url = _topic_url(topic)
-        self.assertIn(f"/workspaces/running-club/nastenka/{topic.pk}", url)
+        # Feed rework 2026-09-10: URL vede na wall page s ?t=<id>
+        # deep-linkem místo standalone thread page routy.
+        self.assertIn(f"/workspaces/running-club?tab=nastenka&t={topic.pk}", url)
         self.assertNotIn("/admin/komunity/", url)

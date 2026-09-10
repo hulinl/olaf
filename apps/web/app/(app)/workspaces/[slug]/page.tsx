@@ -215,7 +215,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
             workspace.my_role === "owner" || workspace.my_role === "admin"
           }
           slug={slug}
-          userId={user.id}
+          currentUser={user}
         />
       </section>
     </main>
@@ -235,7 +235,7 @@ function WorkspaceTabs({
   isMember,
   isModerator,
   slug,
-  userId,
+  currentUser,
 }: {
   workspace: Workspace;
   upcoming: EventSummary[];
@@ -252,7 +252,17 @@ function WorkspaceTabs({
    *  DiscussionWall/TopicComposer. */
   isModerator: boolean;
   slug: string;
-  userId: number;
+  /** Celý user object — DiscussionWall potřebuje avatar_url + focal
+   *  pro composer avatar. */
+  currentUser: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    avatar_url?: string;
+    avatar_focal_x?: number;
+    avatar_focal_y?: number;
+    avatar_zoom?: number;
+  };
 }) {
   type Tab = "akce" | "nastenka";
   const router = useRouter();
@@ -275,12 +285,32 @@ function WorkspaceTabs({
     const params = new URLSearchParams(searchParams.toString());
     if (next === "akce") {
       params.delete("tab");
+      params.delete("t");
     } else {
       params.set("tab", next);
     }
     const qs = params.toString();
     router.replace(qs ? `?${qs}` : "?", { scroll: false });
   }
+
+  // Deep-link z e-mailu / notifikace: ?t=<topicId>#comment-<id> otevře
+  // konkrétní topic ve feedu (auto-expand + scroll). `t` bereme
+  // z query params, comment id z URL hashe (parsujeme až v effectu,
+  // useSearchParams nedává window.location.hash).
+  const expandTopicIdRaw = searchParams.get("t");
+  const expandTopicId = expandTopicIdRaw
+    ? Number.parseInt(expandTopicIdRaw, 10) || null
+    : null;
+  const [scrollToCommentId, setScrollToCommentId] = useState<number | null>(
+    null,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    const m = hash.match(/^#comment-(\d+)$/);
+    if (m) setScrollToCommentId(Number.parseInt(m[1], 10));
+    else setScrollToCommentId(null);
+  }, [expandTopicId]);
 
   return (
     <>
@@ -379,10 +409,9 @@ function WorkspaceTabs({
         <section className="mt-8">
           <DiscussionWall
             scope={{ kind: "workspace", slug, isModerator }}
-            currentUserId={userId}
-            topicHref={(topicId) =>
-              `/workspaces/${slug}/nastenka/${topicId}`
-            }
+            currentUser={currentUser}
+            expandTopicId={expandTopicId}
+            scrollToCommentId={scrollToCommentId}
           />
         </section>
       )}

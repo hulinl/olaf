@@ -31,24 +31,27 @@ def _comment_url(comment: Comment) -> str:
 
 
 def _topic_url(topic: Topic) -> str:
-    # Deep-link to the topic itself, not the parent surface. Member-facing
-    # routes are used so a plain community member isn't sent to an
-    # organizer-only URL (`/admin/komunity/...`) and dumped on a stripped
-    # public view. Owners can still hit these routes — the DiscussionThread
-    # component enables moderator actions based on `my_role`. User report
-    # 2026-09-09: e-mail o novém tématu vedlo membera do /admin/... a
-    # nástěnku vůbec neviděl.
+    # Deep-link do feedu s expanded target topic. Feed rework 2026-09-10
+    # sloučil topic detail do wall feedu (inline diskuze v kartě) —
+    # `?t=<id>` říká wall komponentě, aby kartu auto-expandla a
+    # scrollnula ji do view. Legacy `/nastenka/<topicId>` routes
+    # redirectují sem, aby staré e-mail/bookmark linky nespadly do
+    # 404.
     if topic.parent_type == Topic.PARENT_WORKSPACE:
         ws = Workspace.objects.filter(pk=topic.parent_id).first()
         if not ws:
             return _frontend_url("/")
-        return _frontend_url(f"/workspaces/{ws.slug}/nastenka/{topic.pk}")
+        return _frontend_url(
+            f"/workspaces/{ws.slug}?tab=nastenka&t={topic.pk}"
+        )
     event = Event.objects.select_related("workspace").filter(
         pk=topic.parent_id
     ).first()
     if not event:
         return _frontend_url("/")
-    return _frontend_url(f"/events/{event.workspace.slug}/{event.slug}")
+    return _frontend_url(
+        f"/events/{event.workspace.slug}/{event.slug}?tab=nastenka&t={topic.pk}"
+    )
 
 
 def _parent_label(topic: Topic) -> str:

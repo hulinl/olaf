@@ -105,6 +105,12 @@ class TopicSerializer(serializers.ModelSerializer):
     author_avatar = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
     i_liked = serializers.SerializerMethodField()
+    # Inline preview posledních 2 top-level komentářů pro feed layout
+    # 2026-09-10 (FB-style — nemusí se proklikávat do threadu). Frontend
+    # feed karta zobrazuje tyto komentáře pod post body; expand button
+    # dohledává zbytek přes TopicDetailSerializer. Chronologicky
+    # (nejstarší -> nejnovější) pro přirozený feed čtení.
+    recent_comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Topic
@@ -122,6 +128,7 @@ class TopicSerializer(serializers.ModelSerializer):
             "comment_count",
             "like_count",
             "i_liked",
+            "recent_comments",
             "last_activity_at",
             "created_at",
             "updated_at",
@@ -136,10 +143,22 @@ class TopicSerializer(serializers.ModelSerializer):
             "comment_count",
             "like_count",
             "i_liked",
+            "recent_comments",
             "last_activity_at",
             "created_at",
             "updated_at",
         )
+
+    def get_recent_comments(self, obj: Topic) -> list[dict]:
+        qs = (
+            obj.comments.filter(parent__isnull=True)
+            .select_related("author")
+            .order_by("-created_at")[:2]
+        )
+        ordered = list(qs)[::-1]
+        return CommentSerializer(
+            ordered, many=True, context=self.context
+        ).data
 
     def get_author_avatar(self, obj: Topic) -> dict:
         return _author_avatar_payload(obj.author, self.context.get("request"))

@@ -75,9 +75,27 @@ export default function MyEventPage({ params }: Props) {
   const [links, setLinks] = useState<EventLinkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Deep-link ?t=<topicId>#comment-<id> pro feed kartu z e-mailu.
+  // Když je set, chceme nástěnkový tab — přebije management default
+  // co se nastavuje níž pokud viewer nemá RSVP.
+  const expandTopicIdRaw = searchParams.get("t");
+  const expandTopicId = expandTopicIdRaw
+    ? Number.parseInt(expandTopicIdRaw, 10) || null
+    : null;
   const initialTab: TabKey =
-    searchParams.get("tab") === "registrace" ? "registrace" : "nastenka";
+    searchParams.get("tab") === "registrace" && !expandTopicId
+      ? "registrace"
+      : "nastenka";
   const [tab, setTab] = useState<TabKey>(initialTab);
+  const [scrollToCommentId, setScrollToCommentId] = useState<number | null>(
+    null,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    const m = hash.match(/^#comment-(\d+)$/);
+    setScrollToCommentId(m ? Number.parseInt(m[1], 10) : null);
+  }, [expandTopicId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,10 +263,9 @@ export default function MyEventPage({ params }: Props) {
                     eventSlug,
                     isModerator: !!event.i_am_owner,
                   }}
-                  currentUserId={user.id}
-                  topicHref={(topicId) =>
-                    `/events/${wsSlug}/${eventSlug}/nastenka/${topicId}`
-                  }
+                  currentUser={user}
+                  expandTopicId={expandTopicId}
+                  scrollToCommentId={scrollToCommentId}
                 />
               ) : my?.status === "pending_approval" ? (
                 <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center">
