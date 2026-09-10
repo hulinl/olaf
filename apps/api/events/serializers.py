@@ -372,6 +372,9 @@ class EventPublicSerializer(serializers.ModelSerializer):
                 "last_name": u.last_name,
                 "bio": u.bio,
                 "avatar_url": avatar_url,
+                "avatar_focal_x": u.avatar_focal_x,
+                "avatar_focal_y": u.avatar_focal_y,
+                "avatar_zoom": u.avatar_zoom,
             }
         return result
 

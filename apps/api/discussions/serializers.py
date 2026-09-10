@@ -6,12 +6,31 @@ from rest_framework import serializers
 from .models import Comment, Topic
 
 
+def _author_avatar_payload(author, request) -> dict:
+    """Common {url, focal_x, focal_y, zoom} block for author avatar.
+    Returned inline v Topic/Comment serializerech aby frontend Avatar
+    komponenta mohla renderovat bez zvláštního fetch. Prázdné pole
+    (url="") = user nemá nahranou fotku → fallback na iniciály."""
+    if author is None or not author.avatar:
+        return {"url": "", "focal_x": 50.0, "focal_y": 50.0, "zoom": 100.0}
+    url = author.avatar.url
+    if request and url.startswith("/"):
+        url = request.build_absolute_uri(url)
+    return {
+        "url": url,
+        "focal_x": author.avatar_focal_x,
+        "focal_y": author.avatar_focal_y,
+        "zoom": author.avatar_zoom,
+    }
+
+
 class CommentSerializer(serializers.ModelSerializer):
     author_id = serializers.IntegerField(source="author.id", read_only=True)
     author_name = serializers.SerializerMethodField()
     author_email = serializers.CharField(
         source="author.email", read_only=True, default=""
     )
+    author_avatar = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
     i_liked = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
@@ -29,6 +48,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_id",
             "author_name",
             "author_email",
+            "author_avatar",
             "like_count",
             "i_liked",
             "created_at",
@@ -42,11 +62,15 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_id",
             "author_name",
             "author_email",
+            "author_avatar",
             "like_count",
             "i_liked",
             "created_at",
             "updated_at",
         )
+
+    def get_author_avatar(self, obj: Comment) -> dict:
+        return _author_avatar_payload(obj.author, self.context.get("request"))
 
     def get_attachment_url(self, obj: Comment) -> str | None:
         return obj.image.url if obj.image else None
@@ -78,6 +102,7 @@ class CommentSerializer(serializers.ModelSerializer):
 class TopicSerializer(serializers.ModelSerializer):
     author_id = serializers.IntegerField(source="author.id", read_only=True)
     author_name = serializers.SerializerMethodField()
+    author_avatar = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
     i_liked = serializers.SerializerMethodField()
 
@@ -93,6 +118,7 @@ class TopicSerializer(serializers.ModelSerializer):
             "locked",
             "author_id",
             "author_name",
+            "author_avatar",
             "comment_count",
             "like_count",
             "i_liked",
@@ -106,6 +132,7 @@ class TopicSerializer(serializers.ModelSerializer):
             "parent_id",
             "author_id",
             "author_name",
+            "author_avatar",
             "comment_count",
             "like_count",
             "i_liked",
@@ -113,6 +140,9 @@ class TopicSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def get_author_avatar(self, obj: Topic) -> dict:
+        return _author_avatar_payload(obj.author, self.context.get("request"))
 
     def get_author_name(self, obj: Topic) -> str:
         if obj.author is None:

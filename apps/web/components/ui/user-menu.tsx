@@ -15,6 +15,10 @@ interface UserMenuProps {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string;
+    avatar_focal_x?: number;
+    avatar_focal_y?: number;
+    avatar_zoom?: number;
     profile_completion?: ProfileCompletion;
   };
   onSignOut: () => void;
@@ -70,6 +74,10 @@ export function UserMenu({ user, onSignOut, signingOut }: UserMenuProps) {
         <Avatar
           firstName={user.first_name}
           lastName={user.last_name}
+          avatarUrl={user.avatar_url}
+          focalX={user.avatar_focal_x}
+          focalY={user.avatar_focal_y}
+          zoom={user.avatar_zoom}
           size={36}
         />
         {user.profile_completion &&

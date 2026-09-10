@@ -8,6 +8,7 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CountryPicker } from "@/components/ui/country-picker";
 import { Field, Input } from "@/components/ui/field";
+import { PhotoEditor } from "@/components/ui/photo-editor";
 import { ApiError, type User, auth } from "@/lib/api";
 import { applyDialPrefix } from "@/lib/countries";
 import { useUser } from "@/lib/user-context";
@@ -38,6 +39,15 @@ export default function ProfileSettingsPage() {
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const confirmDialog = useConfirm();
+  // Editor otevřený po uploadu nebo přes „Upravit rámování" tlačítko.
+  // Držíme lokální kopii focal/zoom, aby drag/zoom byl responzivní bez
+  // per-tick round-tripu na server; save flushne do UserSerializer PATCH.
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorFocal, setEditorFocal] = useState({
+    x: 50,
+    y: 50,
+    zoom: 100,
+  });
 
   function update<K extends keyof User>(key: K, value: User[K]) {
     setUser((u) => ({ ...u, [key]: value }));
@@ -52,6 +62,15 @@ export default function ProfileSettingsPage() {
     try {
       const updated = await auth.uploadAvatar(file);
       setUser(updated);
+      // Backend resetnul focal na defaults po uploadu — hned otevřeme
+      // editor, ať si user rámuje na čerstvé fotce. Bez tohohle by se
+      // fotka „ořízla" doprostřed a user nevěděl, kde upravit.
+      setEditorFocal({
+        x: updated.avatar_focal_x,
+        y: updated.avatar_focal_y,
+        zoom: updated.avatar_zoom,
+      });
+      setEditorOpen(true);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -61,6 +80,37 @@ export default function ProfileSettingsPage() {
     } finally {
       setAvatarBusy(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function openEditor() {
+    setEditorFocal({
+      x: user.avatar_focal_x,
+      y: user.avatar_focal_y,
+      zoom: user.avatar_zoom,
+    });
+    setEditorOpen(true);
+  }
+
+  async function saveEditor() {
+    setAvatarBusy(true);
+    setError(null);
+    try {
+      const updated = await auth.updateMe({
+        avatar_focal_x: editorFocal.x,
+        avatar_focal_y: editorFocal.y,
+        avatar_zoom: editorFocal.zoom,
+      });
+      setUser(updated);
+      setEditorOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Uložení rámování se nepodařilo.",
+      );
+    } finally {
+      setAvatarBusy(false);
     }
   }
 
@@ -211,21 +261,16 @@ export default function ProfileSettingsPage() {
           </p>
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
             <div className="flex flex-col items-center gap-3">
-              {user.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.avatar_url}
-                  alt=""
-                  className="h-24 w-24 rounded-full object-cover"
-                />
-              ) : (
-                <Avatar
-                  firstName={user.first_name}
-                  lastName={user.last_name}
-                  size={96}
-                />
-              )}
-              <div className="flex gap-2">
+              <Avatar
+                firstName={user.first_name}
+                lastName={user.last_name}
+                avatarUrl={user.avatar_url}
+                focalX={user.avatar_focal_x}
+                focalY={user.avatar_focal_y}
+                zoom={user.avatar_zoom}
+                size={96}
+              />
+              <div className="flex flex-wrap justify-center gap-2">
                 <Button
                   type="button"
                   variant="secondary"
@@ -234,6 +279,16 @@ export default function ProfileSettingsPage() {
                 >
                   {user.avatar_url ? "Vyměnit" : "Nahrát fotku"}
                 </Button>
+                {user.avatar_url && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={openEditor}
+                    disabled={avatarBusy}
+                  >
+                    Upravit rámování
+                  </Button>
+                )}
                 {user.avatar_url && (
                   <Button
                     type="button"
@@ -608,6 +663,108 @@ export default function ProfileSettingsPage() {
           {submitting ? "Ukládám…" : "Uložit profil"}
         </Button>
       </div>
+
+      {editorOpen && user.avatar_url && (
+        <AvatarEditorModal
+          imageUrl={user.avatar_url}
+          focalX={editorFocal.x}
+          focalY={editorFocal.y}
+          zoom={editorFocal.zoom}
+          onChange={(next) =>
+            setEditorFocal({
+              x: next.focal_x,
+              y: next.focal_y,
+              zoom: next.zoom,
+            })
+          }
+          onCancel={() => setEditorOpen(false)}
+          onSave={saveEditor}
+          busy={avatarBusy}
+        />
+      )}
     </form>
+  );
+}
+
+/** Fixed-viewport modal se sdíleným PhotoEditorem v 1:1 aspektu +
+ *  circle preview. Backdrop click a Esc zavírají; save flushne
+ *  focal+zoom přes UserSerializer PATCH. */
+function AvatarEditorModal({
+  imageUrl,
+  focalX,
+  focalY,
+  zoom,
+  onChange,
+  onCancel,
+  onSave,
+  busy,
+}: {
+  imageUrl: string;
+  focalX: number;
+  focalY: number;
+  zoom: number;
+  onChange: (next: {
+    focal_x: number;
+    focal_y: number;
+    zoom: number;
+  }) => void;
+  onCancel: () => void;
+  onSave: () => Promise<void>;
+  busy: boolean;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upravit rámování profilové fotky"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 px-4 py-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-lg">
+        <h3 className="text-lg font-semibold text-ink-900">
+          Upravit rámování
+        </h3>
+        <p className="mt-1 text-sm text-ink-500">
+          Přetáhni fotku a přiblíž, jak má být vidět v kruhovém rámečku.
+        </p>
+        <div className="mt-4">
+          <PhotoEditor
+            imageUrl={imageUrl}
+            focalX={focalX}
+            focalY={focalY}
+            zoom={zoom}
+            aspectRatio="1/1"
+            previewShape="circle"
+            maxWidthClass="max-w-xs"
+            label=""
+            hint=""
+            onChange={onChange}
+          />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            Zrušit
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => void onSave()}
+            loading={busy}
+          >
+            Uložit
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

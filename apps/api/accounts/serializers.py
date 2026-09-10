@@ -69,6 +69,12 @@ class UserSerializer(serializers.ModelSerializer):
     # `/media/avatars/...`, v prod absolutní Azure Blob URL. Read-only —
     # upload jede přes separátní multipart endpoint `/api/auth/me/avatar/`.
     avatar_url = serializers.SerializerMethodField()
+    # Focal + zoom clampneme na serverem přijaté rozsahy — frontend
+    # PhotoEditor zaručuje 0-100 %/100-300 %, ale rogue klient by mohl
+    # poslat cokoli. Serializer validators drží data v mezích.
+    avatar_focal_x = serializers.FloatField(min_value=0, max_value=100, required=False)
+    avatar_focal_y = serializers.FloatField(min_value=0, max_value=100, required=False)
+    avatar_zoom = serializers.FloatField(min_value=100, max_value=300, required=False)
 
     def get_avatar_url(self, obj) -> str:
         if not obj.avatar:
@@ -93,6 +99,9 @@ class UserSerializer(serializers.ModelSerializer):
             "dob",
             "avatar_blob_id",
             "avatar_url",
+            "avatar_focal_x",
+            "avatar_focal_y",
+            "avatar_zoom",
             "address",
             # Structured address (V1 invoice prep)
             "address_street",

@@ -66,22 +66,15 @@ export function OrganizersBlock({ payload, lookup, tone = "canvas" }: Props) {
                   : "border border-border bg-surface",
               ].join(" ")}
             >
-              {u.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={u.avatar_url}
-                  alt=""
-                  className="h-20 w-20 rounded-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <Avatar
-                  firstName={u.first_name}
-                  lastName={u.last_name}
-                  size={80}
-                />
-              )}
+              <Avatar
+                firstName={u.first_name}
+                lastName={u.last_name}
+                avatarUrl={u.avatar_url}
+                focalX={u.avatar_focal_x}
+                focalY={u.avatar_focal_y}
+                zoom={u.avatar_zoom}
+                size={80}
+              />
               <div>
                 <p
                   className={[

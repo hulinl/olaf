@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -334,13 +335,27 @@ function TopicCard({
           2026-09-10 report: „bloky jsou dost velké"). */}
       <header className="flex items-start justify-between gap-3 border-b border-border bg-surface-muted/40 px-3 py-2 sm:px-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            aria-hidden
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
-            style={{ backgroundColor: avatarBg(topic.author_name) }}
-          >
-            {initialOf(topic.author_name)}
-          </span>
+          {topic.author_avatar.url ? (
+            <span className="ring-1 ring-white/60 rounded-full">
+              <Avatar
+                firstName={initialOf(topic.author_name)}
+                lastName=""
+                avatarUrl={topic.author_avatar.url}
+                focalX={topic.author_avatar.focal_x}
+                focalY={topic.author_avatar.focal_y}
+                zoom={topic.author_avatar.zoom}
+                size={32}
+              />
+            </span>
+          ) : (
+            <span
+              aria-hidden
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
+              style={{ backgroundColor: avatarBg(topic.author_name) }}
+            >
+              {initialOf(topic.author_name)}
+            </span>
+          )}
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-sm font-semibold text-ink-900">
               {topic.author_name}

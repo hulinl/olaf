@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
 import { RichText } from "@/components/rich-text";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -367,7 +368,18 @@ export function DiscussionThread({
             {detail.title}
           </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-500">
-            <span>{detail.author_name}</span>
+            <span className="inline-flex items-center gap-2">
+              <Avatar
+                firstName={detail.author_name}
+                lastName=""
+                avatarUrl={detail.author_avatar.url}
+                focalX={detail.author_avatar.focal_x}
+                focalY={detail.author_avatar.focal_y}
+                zoom={detail.author_avatar.zoom}
+                size={24}
+              />
+              <span>{detail.author_name}</span>
+            </span>
             <span aria-hidden>·</span>
             <span>
               {new Date(detail.created_at).toLocaleString("cs-CZ", {
@@ -626,8 +638,19 @@ function CommentCard({
         nested ? "ml-6 border-l-2 border-l-brand/30 sm:ml-10" : "",
       ].join(" ")}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-ink-900">{c.author_name}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Avatar
+            firstName={c.author_name}
+            lastName=""
+            avatarUrl={c.author_avatar.url}
+            focalX={c.author_avatar.focal_x}
+            focalY={c.author_avatar.focal_y}
+            zoom={c.author_avatar.zoom}
+            size={28}
+          />
+          <p className="text-sm font-semibold text-ink-900">{c.author_name}</p>
+        </div>
         <p className="text-xs text-ink-500">
           {new Date(c.created_at).toLocaleString("cs-CZ", {
             day: "numeric",

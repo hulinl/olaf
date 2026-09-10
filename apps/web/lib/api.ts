@@ -87,6 +87,13 @@ export interface User {
    *  fotku nenahrál. Read-only z UserSerializer; upload jede přes
    *  multipart POST na /api/auth/me/avatar/. */
   avatar_url: string;
+  /** Focal point + zoom uložené z PhotoEditor komponenty. Frontend
+   *  Avatar komponenta rendruje přes object-position + transform:scale.
+   *  Defaults 50/50/100 = centrovaná fotka bez zoomu (chová se jako
+   *  před přidáním tohoto pole). */
+  avatar_focal_x: number;
+  avatar_focal_y: number;
+  avatar_zoom: number;
   address: string;
   // Structured address (Slice 4 — for invoices)
   address_street: string;
@@ -519,6 +526,16 @@ export interface EventChecklist {
   presets: ChecklistPreset[];
 }
 
+/** Avatar snapshot inline v Topic/Comment/... payloadech, aby frontend
+ *  Avatar komponenta mohla renderovat bez zvláštního user fetch.
+ *  `url: ""` = user avatar nemá → fallback na iniciály. */
+export interface AuthorAvatar {
+  url: string;
+  focal_x: number;
+  focal_y: number;
+  zoom: number;
+}
+
 export interface DiscussionTopic {
   id: number;
   parent_type: "workspace" | "event";
@@ -529,6 +546,7 @@ export interface DiscussionTopic {
   locked: boolean;
   author_id: number | null;
   author_name: string;
+  author_avatar: AuthorAvatar;
   comment_count: number;
   like_count: number;
   i_liked: boolean;
@@ -558,6 +576,7 @@ export interface DiscussionComment {
   author_id: number | null;
   author_name: string;
   author_email: string;
+  author_avatar: AuthorAvatar;
   like_count: number;
   i_liked: boolean;
   created_at: string;
@@ -897,6 +916,9 @@ export interface OrganizerPoolEntry {
   email: string;
   bio: string;
   avatar_url: string;
+  avatar_focal_x: number;
+  avatar_focal_y: number;
+  avatar_zoom: number;
   role: "owner" | "admin" | "collaborator";
 }
 

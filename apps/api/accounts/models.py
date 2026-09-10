@@ -47,6 +47,14 @@ class User(AbstractBaseUser, PermissionsMixin):
             "pokud je user vybraný jako organizátor."
         ),
     )
+    # Notion-like focal-point + zoom pro avatar (2026-09-10). Stejná
+    # konvence jako hero editor: focal 0-100 % (CSS object-position),
+    # zoom 100-300 % (transform:scale). PhotoEditor komponenta ukládá,
+    # frontend Avatar komponenta renderuje. Defaults = centrovaný
+    # obrázek bez zoomu -> shodné s chováním před tímhle feature.
+    avatar_focal_x = models.FloatField(default=50.0)
+    avatar_focal_y = models.FloatField(default=50.0)
+    avatar_zoom = models.FloatField(default=100.0)
     # Legacy single-line address — kept so old data doesn't get dropped.
     # New code reads/writes address_street / address_city / ... below.
     address = models.CharField(max_length=500, blank=True)

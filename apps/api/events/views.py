@@ -3522,6 +3522,9 @@ def event_organizer_pool(
             "email": u.email,
             "bio": u.bio,
             "avatar_url": avatar_url,
+            "avatar_focal_x": u.avatar_focal_x,
+            "avatar_focal_y": u.avatar_focal_y,
+            "avatar_zoom": u.avatar_zoom,
             "role": role,
         }
         seen[u.id] = payload

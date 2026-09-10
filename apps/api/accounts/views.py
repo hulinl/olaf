@@ -213,7 +213,21 @@ def me_avatar(request: Request) -> Response:
     if user.avatar:
         user.avatar.delete(save=False)
     user.avatar = processed
-    user.save(update_fields=["avatar"])
+    # Reset focal + zoom na defaults — stará poloha by na nové fotce
+    # nedávala smysl. Frontend hned poté otevře editor, kde si user
+    # nastaví, jak má být obrázek zarámovaný. Konvence 0-100 % focal
+    # + 100-300 % zoom (stejná jako hero editor).
+    user.avatar_focal_x = 50.0
+    user.avatar_focal_y = 50.0
+    user.avatar_zoom = 100.0
+    user.save(
+        update_fields=[
+            "avatar",
+            "avatar_focal_x",
+            "avatar_focal_y",
+            "avatar_zoom",
+        ]
+    )
     return Response(UserSerializer(user, context={"request": request}).data)
 
 

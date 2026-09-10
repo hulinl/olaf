@@ -158,6 +158,9 @@ export interface OrganizerLookupEntry {
   last_name: string;
   bio: string;
   avatar_url: string;
+  avatar_focal_x: number;
+  avatar_focal_y: number;
+  avatar_zoom: number;
 }
 
 export type BlockType = EventBlock["type"];
