@@ -22,6 +22,14 @@ def _frontend_url(path: str) -> str:
     return f"{base}{path}"
 
 
+def _comment_url(comment: Comment) -> str:
+    """Deep-link přímo na konkrétní komentář v threadu — použito v
+    e-mail / push / in-app bell notifikacích o nové odpovědi. Frontend
+    DiscussionThread renderuje každý komentář s `id="comment-<pk>"`,
+    takže browser scrollne přímo tam. User request 2026-09-10."""
+    return f"{_topic_url(comment.topic)}#comment-{comment.pk}"
+
+
 def _topic_url(topic: Topic) -> str:
     # Deep-link to the topic itself, not the parent surface. Member-facing
     # routes are used so a plain community member isn't sent to an
@@ -68,10 +76,15 @@ def send_comment_notification(comment: Comment) -> None:
         if comment.author
         else "[smazaný uživatel]"
     )
+    # topic_url vede přímo na komentář (`#comment-<id>` anchor).
+    # Klíč v šabloně zůstává `topic_url` — starší templaty ho už
+    # očekávají, není důvod přejmenovávat, obsah je stále „kam se má
+    # kliknout na e-mail".
+    comment_url = _comment_url(comment)
     context = {
         "topic": topic,
         "comment": comment,
-        "topic_url": _topic_url(topic),
+        "topic_url": comment_url,
         "parent_label": _parent_label(topic),
         "author_name": author_name,
     }
@@ -92,7 +105,7 @@ def send_comment_notification(comment: Comment) -> None:
         topic.author,
         title=f"Nová odpověď: {topic.title}",
         body=f"{author_name}: {(comment.body or '')[:140]}",
-        url=_topic_url(topic),
+        url=comment_url,
         tag=f"comment-{comment.pk}",
     )
 
@@ -106,7 +119,7 @@ def send_comment_notification(comment: Comment) -> None:
         kind=Notification.KIND_DISCUSSION_REPLY,
         title=f'{author_name} odpověděl na „{topic.title}"',
         body=(comment.body or "")[:280],
-        link=_topic_url(topic),
+        link=comment_url,
         payload={
             "topic_id": topic.pk,
             "comment_id": comment.pk,

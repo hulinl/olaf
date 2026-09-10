@@ -633,8 +633,11 @@ function CommentCard({
 }) {
   return (
     <div
+      // id + scroll-mt drží anchor navigaci z e-mailu (#comment-<id>).
+      // Bez scroll-mt by sticky header překryl scrollovaný komentář.
+      id={`comment-${c.id}`}
       className={[
-        "rounded-md border border-border bg-surface px-4 py-3",
+        "scroll-mt-20 rounded-md border border-border bg-surface px-4 py-3 target:ring-2 target:ring-brand/40",
         nested ? "ml-6 border-l-2 border-l-brand/30 sm:ml-10" : "",
       ].join(" ")}
     >

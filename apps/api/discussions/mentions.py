@@ -21,7 +21,7 @@ import re
 from accounts.models import User
 from events.models import RSVP, Event
 from notifications.models import Notification
-from workspaces.models import Workspace, WorkspaceMember
+from workspaces.models import WorkspaceMember
 
 from .models import Comment, Topic
 
@@ -119,20 +119,15 @@ def _resolve_mention(token: str, eligible_ids: set[int]) -> User | None:
     return None
 
 
-def _topic_link(topic: Topic) -> str:
-    """Mirror discussions.emails._topic_url. Kept here to avoid
-    cross-importing private helpers."""
-    if topic.parent_type == Topic.PARENT_WORKSPACE:
-        try:
-            ws = Workspace.objects.get(pk=topic.parent_id)
-            return f"/admin/komunity/{ws.slug}"
-        except Workspace.DoesNotExist:
-            return "/"
-    try:
-        event = Event.objects.select_related("workspace").get(pk=topic.parent_id)
-        return f"/events/{event.workspace.slug}/{event.slug}"
-    except Event.DoesNotExist:
-        return "/"
+def _comment_link(comment: Comment) -> str:
+    """Deep-link přímo na konkrétní komentář v threadu — pro bell
+    notifikace o zmínce. Sdílí implementaci s discussions.emails
+    (member deep-link `/workspaces/<slug>/nastenka/<id>#comment-<pk>`),
+    aby workspace member neskončil na owner-only `/admin/…` URL.
+    User report 2026-09-09/10."""
+    from .emails import _comment_url
+
+    return _comment_url(comment)
 
 
 def notify_mentions(comment: Comment) -> int:
@@ -160,7 +155,7 @@ def notify_mentions(comment: Comment) -> int:
         if comment.author
         else "[smazaný uživatel]"
     )
-    link = _topic_link(topic)
+    link = _comment_link(comment)
     body_excerpt = (comment.body or "")[:280]
 
     created = 0
