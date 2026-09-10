@@ -750,9 +750,14 @@ export interface RSVPPaymentInstructions {
 }
 
 export interface RSVPRecord extends MyRSVP {
+  user_id: number;
   user_email: string;
   user_full_name: string;
   user_phone: string;
+  /** Avatar autora inline v RSVP payloadu — pro klikatelný avatar
+   *  v rosteru vedoucí na `/u/<user_id>`. Prázdný `url` = fallback
+   *  na iniciály. */
+  user_avatar: AuthorAvatar;
   attended: boolean | null;
   uploaded_doc_keys: string[];
   verified_doc_keys: string[];
@@ -802,6 +807,9 @@ export interface PersonSummary {
   phone: string;
   event_count: number;
   last_rsvp_at: string | null;
+  /** Avatar payload inline pro klikatelný avatar v Lidé CRM. Prázdný
+   *  `url` = fallback na iniciály. */
+  avatar: AuthorAvatar;
 }
 
 export interface PersonEventEntry {
@@ -1173,6 +1181,8 @@ export interface WorkspaceMemberSummary {
   last_name: string;
   full_name: string;
   phone: string;
+  /** Avatar inline pro klikatelný avatar v members list. */
+  avatar: AuthorAvatar;
   total_rsvps: number;
   upcoming_rsvps: number;
   past_rsvps: number;

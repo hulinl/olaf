@@ -5,6 +5,7 @@ from celery import shared_task
 from django.utils import timezone
 
 from .emails import (
+    send_event_available_notification,
     send_event_cancellation,
     send_event_update_notification,
     send_rsvp_confirmation,
@@ -71,6 +72,25 @@ def fan_out_event_update_task(
     users = User.objects.filter(id__in=recipient_ids)
     for user in users:
         send_event_update_notification(user, event, changed_labels)
+
+
+@shared_task(name="events.fan_out_event_available")
+def fan_out_event_available_task(event_id: int, recipient_ids: list[int]) -> None:
+    """Email every workspace member who was newly eligible for this
+    event (community share added or event published). Callers dedup
+    via Notification.payload → task jen posílá e-maily. User request
+    2026-09-10."""
+    if not recipient_ids:
+        return
+    try:
+        event = Event.objects.select_related("workspace").get(pk=event_id)
+    except Event.DoesNotExist:
+        return
+    from accounts.models import User
+
+    users = User.objects.filter(id__in=recipient_ids)
+    for user in users:
+        send_event_available_notification(user, event)
 
 
 @shared_task(name="events.dispatch_due_reminders")

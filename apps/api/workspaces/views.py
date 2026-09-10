@@ -540,6 +540,8 @@ def workspace_members(request: Request, slug: str) -> Response:
         ).prefetch_related("tags")
     }
 
+    from discussions.serializers import _author_avatar_payload
+
     return Response(
         [
             {
@@ -549,6 +551,7 @@ def workspace_members(request: Request, slug: str) -> Response:
                 "last_name": m.user.last_name,
                 "full_name": m.user.get_full_name(),
                 "phone": m.user.phone,
+                "avatar": _author_avatar_payload(m.user, request),
                 "total_rsvps": m.total_rsvps,
                 "upcoming_rsvps": m.upcoming_rsvps,
                 "past_rsvps": m.past_rsvps,

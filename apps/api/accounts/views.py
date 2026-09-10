@@ -750,6 +750,8 @@ def creator_people(request: Request) -> Response:
         .order_by("-last_rsvp_at", "last_name", "first_name")
     )
 
+    from discussions.serializers import _author_avatar_payload
+
     out = [
         {
             "user_id": u.id,
@@ -758,6 +760,7 @@ def creator_people(request: Request) -> Response:
             "phone": u.phone,
             "event_count": int(u.event_count or 0),
             "last_rsvp_at": u.last_rsvp_at,
+            "avatar": _author_avatar_payload(u, request),
         }
         for u in qs
     ]

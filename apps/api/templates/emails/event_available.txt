@@ -1,0 +1,15 @@
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
+
+v komunitě {{ workspace.name }} je nová akce, na kterou se můžeš přihlásit:
+
+„{{ event.title }}"
+
+{% if event_when %}Termín: {{ event_when }}
+{% endif %}{% if event.location_text %}Místo: {{ event.location_text }}
+{% endif %}{% if event.price_amount %}Cena: {{ event.price_amount }} {{ event.price_currency }}
+{% endif %}{% if event.capacity %}Kapacita: {{ event.capacity }} lidí
+{% endif %}
+
+Podrobnosti a přihláška: {{ event_url }}
+
+— Aplikace olaf

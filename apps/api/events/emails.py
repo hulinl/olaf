@@ -165,6 +165,33 @@ def send_event_update_notification(user, event: Event, changed_labels: list[str]
     )
 
 
+def send_event_available_notification(user, event: Event) -> None:
+    """Notify workspace member že se v jejich komunitě objevila nová
+    (published) akce. Trigger: (a) event publish + community shares,
+    (b) přidání do komunity už-published eventu. Volá fan_out task,
+    dedup na caller straně (Notification.payload). User request
+    2026-09-10.
+    """
+    if user is None or not user.email:
+        return
+    event_url = _frontend_event_url(event)
+    send_branded_email(
+        subject=f"Nová akce v komunitě: {event.title}",
+        template_base="emails/event_available",
+        context={
+            "user": user,
+            "event": event,
+            "workspace": event.workspace,
+            "event_url": event_url,
+            "event_when": format_event_dt(event.starts_at, event.tz),
+            "cta_url": event_url,
+            "cta_label": "Podívat se na akci",
+        },
+        recipient_list=[user.email],
+        fail_silently=True,
+    )
+
+
 def send_feedback_request(rsvp: RSVP) -> None:
     """Pošle jednomu účastníkovi mail s magic-linkem na feedback form.
     Best-effort — pokud user nemá usable e-mail, ticho ven; caller (fan-

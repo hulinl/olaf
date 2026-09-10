@@ -1194,11 +1194,20 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     # notification per active RSVPed user.
     from .notifications import (
         diff_changed_fields,
+        notify_event_available_in_workspaces,
         notify_event_updated,
         snapshot_event_for_diff,
     )
 
     before = snapshot_event_for_diff(event)
+    # Snapshot pro „nová akce v komunitě" notif — status předtím (draft
+    # vs published) + set aktuálních shared_workspace ids. Diff s
+    # post-save stavem řekne, jestli se má rozjet fan-out. User request
+    # 2026-09-10.
+    before_status = event.status
+    before_shared_ids = set(
+        event.shared_workspaces.values_list("id", flat=True)
+    )
     event = serializer.save()
 
     # Sync `event.location_url` <-> Map block's `map_url`. Existují
@@ -1252,6 +1261,35 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     # doesn't unwind the event update itself.
     with contextlib.suppress(Exception):
         notify_event_updated(event, changed, actor=request.user)
+
+    # „Nová akce v komunitě" notif — trigger v dvou případech:
+    #  (a) event přešel do PUBLISHED. Poslat mail primary workspace
+    #      i všem community shares.
+    #  (b) už-published event dostal nový community share.
+    # Dedup přes Notification.payload event_id (viz
+    # notify_event_available_in_workspaces).
+    after_status = event.status
+    after_shared_ids = set(
+        event.shared_workspaces.values_list("id", flat=True)
+    )
+    just_published = (
+        before_status != Event.STATUS_PUBLISHED
+        and after_status == Event.STATUS_PUBLISHED
+    )
+    newly_shared_ids = after_shared_ids - before_shared_ids
+    target_workspace_ids: set[int] = set()
+    if just_published:
+        target_workspace_ids.add(event.workspace_id)
+        target_workspace_ids |= after_shared_ids
+    elif after_status == Event.STATUS_PUBLISHED and newly_shared_ids:
+        target_workspace_ids |= newly_shared_ids
+    if target_workspace_ids:
+        with contextlib.suppress(Exception):
+            notify_event_available_in_workspaces(
+                event,
+                list(target_workspace_ids),
+                actor=request.user,
+            )
 
     if changed:
         from audit.models import AuditLog

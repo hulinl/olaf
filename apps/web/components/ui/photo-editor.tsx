@@ -5,6 +5,18 @@ import { useRef, useState } from "react";
 import { Field } from "@/components/ui/field";
 import { assetUrl } from "@/lib/api";
 
+/** Viewport guide překrývá editor náhled obdélníkem reprezentujícím,
+ *  co bude z fotky vidět na daném breakpointu / device. Aspect ratio je
+ *  width/height reálného render surface (např. desktop hero 2.3, mobile
+ *  hero 0.85). User pak vidí přímo, jestli mu důležitý element padne do
+ *  bezpečné oblasti pro každý breakpoint. */
+export interface ViewportGuide {
+  label: string;
+  aspectRatio: number;
+  /** Barva rámečku — HEX / tailwind color. Overlay je vždy dashed. */
+  colorClass?: string;
+}
+
 interface Props {
   /** URL obrázku k editaci — absolutní i relativní zpracuje assetUrl. */
   imageUrl: string;
@@ -25,11 +37,25 @@ interface Props {
   /** Popis nad editorem (viditelný label + hint). */
   label?: string;
   hint?: string;
+  /** Volitelné viewport guides — obdélníky uvnitř náhledu ukazující,
+   *  co bude vidět na desktop / mobil breakpointu. Není-li set, žádný
+   *  overlay se nekreslí (default pro avatar/cover). */
+  viewportGuides?: ViewportGuide[];
   onChange: (next: { focal_x: number; focal_y: number; zoom: number }) => void;
 }
 
 const ZOOM_MIN = 100;
 const ZOOM_MAX = 300;
+
+const ASPECT_TO_NUMBER: Record<
+  NonNullable<Props["aspectRatio"]>,
+  number
+> = {
+  "16/9": 16 / 9,
+  "1/1": 1,
+  "3/1": 3,
+  "4/3": 4 / 3,
+};
 
 /**
  * Notion-style focal-point + zoom editor. Reusable napříč hero
@@ -50,6 +76,7 @@ export function PhotoEditor({
   maxWidthClass = "max-w-lg",
   label = "Výřez / pozice",
   hint = "Přetáhni fotku a slider dole zoomni. Nic se nekropuje — celá fotka zůstává v úložišti.",
+  viewportGuides,
   onChange,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -181,6 +208,17 @@ export function PhotoEditor({
               <div className="absolute inset-x-0 top-2/3 h-px bg-white/40" />
             </div>
           )}
+          {/* Viewport guides — dashed obdélníky s labelem, centered
+              kolem focal pointu, sizes odpovídají target aspect ratio
+              vůči editor náhledu. */}
+          {viewportGuides &&
+            viewportGuides.length > 0 &&
+            !dragging && (
+              <ViewportOverlay
+                editorAspect={ASPECT_TO_NUMBER[aspectRatio]}
+                guides={viewportGuides}
+              />
+            )}
         </div>
 
         <label className="flex w-full max-w-xs items-center gap-2 text-xs text-ink-500">
@@ -219,7 +257,90 @@ export function PhotoEditor({
             Přetáhni pro posun · kolečkem / sliderem přiblíž · dvojklik = reset.
           </span>
         </div>
+        {viewportGuides && viewportGuides.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface-muted/40 px-3 py-2 text-[11px] text-ink-500">
+            <span className="font-medium text-ink-700">Náhled:</span>
+            {viewportGuides.map((g) => (
+              <span
+                key={g.label}
+                className="inline-flex items-center gap-1.5"
+              >
+                <span
+                  aria-hidden
+                  className={[
+                    "inline-block h-2 w-4 rounded-sm border-2 border-dashed",
+                    g.colorClass ?? "border-brand",
+                  ].join(" ")}
+                />
+                <span>{g.label}</span>
+              </span>
+            ))}
+            <span className="text-ink-400">
+              Obsah uvnitř rámečku bude vidět; okraje se ořežou.
+            </span>
+          </div>
+        )}
       </div>
     </Field>
+  );
+}
+
+/** Vykreslí uvnitř editor náhledu obdélníky reprezentující, co bude
+ *  vidět na daném target aspectu. Centrované kolem středu náhledu —
+ *  focal point sedí uprostřed, takže obdélníky jsou centered.
+ *
+ *  Matematika: image je do editor náhledu vsazen přes `object-fit:
+ *  cover` a editor má fixní aspect. Když target ratio > editor ratio,
+ *  target zobrazí horizontální pás (menší výška, plná šířka). Když
+ *  target ratio < editor ratio, target zobrazí vertikální pás. Overlay
+ *  je vždy vsazen do editor náhledu, centered. */
+function ViewportOverlay({
+  editorAspect,
+  guides,
+}: {
+  editorAspect: number;
+  guides: ViewportGuide[];
+}) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      {guides.map((g) => {
+        let widthPct = 100;
+        let heightPct = 100;
+        if (g.aspectRatio > editorAspect) {
+          // Target širší -> viditelný pás má plnou šířku editoru,
+          // sníženou výšku.
+          heightPct = (editorAspect / g.aspectRatio) * 100;
+        } else if (g.aspectRatio < editorAspect) {
+          // Target vyšší -> plná výška, snížená šířka.
+          widthPct = (g.aspectRatio / editorAspect) * 100;
+        }
+        const colorClass = g.colorClass ?? "border-brand";
+        return (
+          <div
+            key={g.label}
+            className={[
+              "absolute rounded-sm border-2 border-dashed",
+              colorClass,
+            ].join(" ")}
+            style={{
+              width: `${widthPct}%`,
+              height: `${heightPct}%`,
+              left: `${(100 - widthPct) / 2}%`,
+              top: `${(100 - heightPct) / 2}%`,
+            }}
+          >
+            <span
+              className={[
+                "absolute -top-2.5 left-1 rounded px-1 text-[10px] font-semibold uppercase tracking-wide",
+                "bg-canvas/90",
+                colorClass.replace("border-", "text-"),
+              ].join(" ")}
+            >
+              {g.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }

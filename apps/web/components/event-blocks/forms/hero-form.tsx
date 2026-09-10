@@ -51,7 +51,19 @@ export function HeroForm({
           focalY={payload.focal_y ?? 50}
           zoom={payload.zoom ?? 100}
           aspectRatio="16/9"
-          hint="Přetáhni fotku a slider dole zoomni. Nic se nekropuje — celá fotka zůstává v úložišti (share card i mail používají originál)."
+          hint="Přetáhni fotku a slider dole zoomni. Rámečky ukazují, co bude vidět na desktopu a na mobilu — mobil bere úzký vertikální pás uprostřed. Nic se nekropuje — celá fotka zůstává v úložišti (share card i mail používají originál)."
+          viewportGuides={[
+            // Desktop hero na public landing má min-h 520px + full
+            // width viewport. Aspect ~ 2.3 (širokoúhlý pás).
+            { label: "Desktop", aspectRatio: 2.3, colorClass: "border-brand" },
+            // Mobile hero má min-h 440px + viewport šířka 375-414.
+            // Aspect ~ 0.85 (skoro na výšku).
+            {
+              label: "Mobil",
+              aspectRatio: 0.85,
+              colorClass: "border-warning",
+            },
+          ]}
           onChange={(next) => onChange({ ...payload, ...next })}
         />
       )}

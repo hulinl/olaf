@@ -272,6 +272,7 @@ class RSVPEndpointTests(TestCase):
                     "email": "marta@example.com",
                     "first_name": "Marta",
                     "last_name": "Runner",
+                    "phone": "+420 111",
                 },
             },
             format="json",
@@ -300,6 +301,7 @@ class RSVPEndpointTests(TestCase):
                     "email": "real@example.com",
                     "first_name": "Imposter",
                     "last_name": "User",
+                    "phone": "+420 111",
                 },
             },
             format="json",
@@ -310,12 +312,9 @@ class RSVPEndpointTests(TestCase):
         real = User.objects.get(email="real@example.com")
         self.assertEqual(real.first_name, "Real")
 
-    def test_anon_rsvp_requires_phone_when_event_demands(self) -> None:
-        # Default `require_phone_on_rsvp=True` (product default), test
-        # event si nastavíme explicitně True a chybný (bez phone) RSVP
-        # musí vrátit 400.
-        self.event.require_phone_on_rsvp = True
-        self.event.save()
+    def test_anon_rsvp_requires_phone_globally(self) -> None:
+        # 2026-09-10: telefon je globálně povinný pro anon RSVP. Per-event
+        # toggle `require_phone_on_rsvp` je dead field.
         resp = self.client.post(
             self.url,
             {
@@ -331,9 +330,9 @@ class RSVPEndpointTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(resp.json().get("code"), "phone_required")
 
-    def test_anon_rsvp_phone_optional_when_event_does_not_demand(self) -> None:
-        # Když owner odsouhlasí "telefon volitelný" (typ. casual akce),
-        # phone-empty payload musí projít.
+    def test_anon_rsvp_phone_still_required_when_toggle_off(self) -> None:
+        # I když owner odznačil per-event „vyžadovat telefon", telefon
+        # je stále povinný — organizátor musí mít případ nouze.
         self.event.require_phone_on_rsvp = False
         self.event.save()
         resp = self.client.post(
@@ -348,7 +347,27 @@ class RSVPEndpointTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.json().get("code"), "phone_required")
+
+    def test_authenticated_rsvp_blocks_when_no_phone_on_profile(self) -> None:
+        # 2026-09-10: logged-in user bez user.phone dostane 400 s
+        # návodem doplnit v Nastavení.
+        user = User.objects.create_user(
+            email="noph@example.com",
+            password="pass-abcdef-1234",
+            first_name="No",
+            last_name="Phone",
+            phone="",
+        )
+        self.client.force_authenticate(user)
+        resp = self.client.post(
+            self.url,
+            {"answers": _valid_answers()},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.json().get("code"), "phone_required")
 
     def test_anonymous_rsvp_missing_account_rejected(self) -> None:
         resp = self.client.post(
@@ -909,6 +928,7 @@ class ConfigurableQuestionnaireTests(TestCase):
                 "account": {
                     "email": "p@example.com",
                     "first_name": "P", "last_name": "One",
+                    "phone": "+420 111",
                 },
             },
             format="json",
@@ -926,6 +946,7 @@ class ConfigurableQuestionnaireTests(TestCase):
                 "account": {
                     "email": "p@example.com",
                     "first_name": "P", "last_name": "One",
+                    "phone": "+420 111",
                 },
             },
             format="json",
@@ -951,6 +972,7 @@ class ConfigurableQuestionnaireTests(TestCase):
                 "account": {
                     "email": "p@example.com",
                     "first_name": "P", "last_name": "One",
+                    "phone": "+420 111",
                 },
             },
             format="json",

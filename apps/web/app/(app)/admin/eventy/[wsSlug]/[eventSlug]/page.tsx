@@ -6,6 +6,7 @@ import { Suspense, use, useEffect, useState } from "react";
 
 import { EventChecklist } from "@/components/event-checklist";
 import { ParticipantProfileDialog } from "@/components/participant-profile-dialog";
+import { Avatar } from "@/components/ui/avatar";
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -702,7 +703,15 @@ function RsvpRow({
   return (
     <tr className="group hover:bg-brand/10">
       <td className="px-4 py-3">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            aria-label={`Detail účastníka ${rsvp.user_full_name || rsvp.user_email}`}
+            className="shrink-0 rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <RosterAvatar rsvp={rsvp} />
+          </button>
           <button
             type="button"
             onClick={onOpenProfile}
@@ -712,9 +721,9 @@ function RsvpRow({
               {rsvp.user_full_name || "—"}
             </span>
             <span className="text-xs text-ink-500">{rsvp.user_email}</span>
-          {rsvp.user_phone && (
-            <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
-          )}
+            {rsvp.user_phone && (
+              <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
+            )}
           </button>
           {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
             <DuplicateBadge
@@ -1323,6 +1332,15 @@ function RsvpCard({
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            aria-label={`Detail účastníka ${rsvp.user_full_name || rsvp.user_email}`}
+            className="shrink-0 rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <RosterAvatar rsvp={rsvp} />
+          </button>
         <div className="flex min-w-0 flex-col items-start gap-1">
           <button
             type="button"
@@ -1344,6 +1362,7 @@ function RsvpCard({
             />
           )}
           <RsvpAlertBadges rsvp={rsvp} />
+        </div>
         </div>
         {rsvp.is_organizer ? (
           <span className="inline-flex shrink-0 rounded bg-brand/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
@@ -1479,5 +1498,24 @@ function SortableTh({
         </span>
       </button>
     </th>
+  );
+}
+
+/** Avatar v roster řádku — používá inline `user_avatar` payload z
+ *  RSVPSerializer (avatar url + focal + zoom). Iniciály vzaté z celého
+ *  jména; fallback „?" u anonymních prošlých registrací. Bez userId
+ *  prop protože wrap-button už drží onClick pro dialog. */
+function RosterAvatar({ rsvp }: { rsvp: RSVPRecord }) {
+  const [first = "", last = ""] = (rsvp.user_full_name || "").split(/\s+/, 2);
+  return (
+    <Avatar
+      firstName={first}
+      lastName={last}
+      avatarUrl={rsvp.user_avatar?.url}
+      focalX={rsvp.user_avatar?.focal_x}
+      focalY={rsvp.user_avatar?.focal_y}
+      zoom={rsvp.user_avatar?.zoom}
+      size={36}
+    />
   );
 }

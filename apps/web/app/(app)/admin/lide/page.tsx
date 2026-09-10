@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { PersonProfileDialog } from "@/components/person-profile-dialog";
+import { Avatar } from "@/components/ui/avatar";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
@@ -230,20 +231,23 @@ export default function LidePage() {
                 key={p.user_id}
                 type="button"
                 onClick={() => setOpenUserId(p.user_id)}
-                className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-brand hover:bg-brand/5 focus-ring"
+                className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-brand hover:bg-brand/5 focus-ring"
               >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-base font-semibold text-ink-900">
-                    {p.full_name}
-                  </span>
-                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-medium text-ink-700">
-                    {p.event_count} {plurAkce(p.event_count)}
-                  </span>
+                <PersonAvatar person={p} />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-base font-semibold text-ink-900">
+                      {p.full_name}
+                    </span>
+                    <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-medium text-ink-700">
+                      {p.event_count} {plurAkce(p.event_count)}
+                    </span>
+                  </div>
+                  <span className="text-xs text-ink-500">{p.email}</span>
+                  {p.phone && (
+                    <span className="text-xs text-ink-500">{p.phone}</span>
+                  )}
                 </div>
-                <span className="text-xs text-ink-500">{p.email}</span>
-                {p.phone && (
-                  <span className="text-xs text-ink-500">{p.phone}</span>
-                )}
               </button>
             ))}
           </div>
@@ -289,7 +293,10 @@ export default function LidePage() {
                     className="cursor-pointer hover:bg-brand/10"
                   >
                     <td className="px-4 py-3 font-medium text-ink-900">
-                      {p.full_name}
+                      <div className="flex items-center gap-3">
+                        <PersonAvatar person={p} />
+                        <span>{p.full_name}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-ink-700">{p.email}</td>
                     <td className="px-4 py-3 text-ink-700">
@@ -482,5 +489,24 @@ function PeopleSortableTh({
         </span>
       </button>
     </th>
+  );
+}
+
+/** Person avatar helper — 36px, iniciály z celého jména jako fallback,
+ *  focal+zoom z inline `avatar` payloadu (viz backend
+ *  accounts.views.creator_people). Decorative — klik na řádek už drží
+ *  PersonProfileDialog. */
+function PersonAvatar({ person }: { person: PersonSummary }) {
+  const [first = "", last = ""] = (person.full_name || "").split(/\s+/, 2);
+  return (
+    <Avatar
+      firstName={first}
+      lastName={last}
+      avatarUrl={person.avatar?.url}
+      focalX={person.avatar?.focal_x}
+      focalY={person.avatar?.focal_y}
+      zoom={person.avatar?.zoom}
+      size={36}
+    />
   );
 }

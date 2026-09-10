@@ -499,11 +499,15 @@ class RSVPCreateSerializer(serializers.Serializer):
 class RSVPSerializer(serializers.ModelSerializer):
     """RSVP as seen by the Owner (with PII)."""
 
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
     user_email = serializers.EmailField(source="user.email", read_only=True)
     user_full_name = serializers.CharField(
         source="user.get_full_name", read_only=True
     )
     user_phone = serializers.CharField(source="user.phone", read_only=True)
+    # Avatar payload inline aby roster mohl rovnou vykreslit fotku bez
+    # extra fetch per účastníka. Klikatelný avatar vede na /u/<user_id>.
+    user_avatar = serializers.SerializerMethodField()
     uploaded_doc_keys = serializers.SerializerMethodField()
     verified_doc_keys = serializers.SerializerMethodField()
     invoice_id = serializers.SerializerMethodField()
@@ -519,9 +523,11 @@ class RSVPSerializer(serializers.ModelSerializer):
             "status",
             "is_organizer",
             "can_toggle_organizer",
+            "user_id",
             "user_email",
             "user_full_name",
             "user_phone",
+            "user_avatar",
             "questionnaire_answers",
             "waitlist_position",
             "attended",
@@ -542,6 +548,11 @@ class RSVPSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_user_avatar(self, obj: RSVP) -> dict:
+        from discussions.serializers import _author_avatar_payload
+
+        return _author_avatar_payload(obj.user, self.context.get("request"))
 
     def get_contract(self, obj: RSVP) -> dict | None:
         """Slim payload o RSVPContract — frontend ho používá pro

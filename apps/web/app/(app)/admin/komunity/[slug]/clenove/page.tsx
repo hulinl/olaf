@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import { Avatar } from "@/components/ui/avatar";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { WorkspaceInviteSection } from "@/components/workspace-invite-section";
@@ -997,8 +998,10 @@ function MemberMobileCard({
         />
         <Link
           href={profileHref}
-          className="flex min-w-0 flex-1 flex-col gap-1.5 focus-ring"
+          className="flex min-w-0 flex-1 items-start gap-3 focus-ring"
         >
+          <MemberAvatar member={member} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="font-medium text-ink-900">
               {member.full_name || member.email}
@@ -1054,6 +1057,7 @@ function MemberMobileCard({
                 })}
               </span>
             )}
+          </div>
           </div>
         </Link>
         <button
@@ -1152,7 +1156,9 @@ function MemberRow({
           />
         </td>
         <td className="px-4 py-3">
-          <Link href={profileHref} className="flex flex-col focus-ring">
+          <Link href={profileHref} className="flex items-start gap-3 focus-ring">
+            <MemberAvatar member={member} />
+            <div className="flex flex-col">
             <div className="flex items-baseline gap-2">
               <span className="font-medium text-ink-900">
                 {member.full_name || "—"}
@@ -1173,6 +1179,7 @@ function MemberRow({
                 jsou schválně schované — najdeš je v expand panelu
                 (klik na "+" v posledním sloupci). Plochá tlačítka na
                 každém řádku sváděla k chybnému kliknutí. */}
+            </div>
           </Link>
         </td>
         <td className="whitespace-nowrap px-4 py-3 text-ink-700">
@@ -1836,5 +1843,22 @@ function BulkEmailDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Member avatar helper — 36px na desktop card, iniciály z celého
+ *  jména jako fallback. Wrap Link nemá — obklopující Link (na profile
+ *  dialog) drží klik. Ale visual je stejný jako v CRM / roster. */
+function MemberAvatar({ member }: { member: WorkspaceMemberSummary }) {
+  return (
+    <Avatar
+      firstName={member.first_name}
+      lastName={member.last_name}
+      avatarUrl={member.avatar?.url}
+      focalX={member.avatar?.focal_x}
+      focalY={member.avatar?.focal_y}
+      zoom={member.avatar?.zoom}
+      size={40}
+    />
   );
 }

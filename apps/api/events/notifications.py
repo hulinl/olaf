@@ -129,6 +129,104 @@ def notify_event_updated(event: Event, changed_fields: list[str], *, actor=None)
     return len(notifs)
 
 
+def notify_event_available_in_workspaces(
+    event: Event,
+    workspace_ids: list[int],
+    *,
+    actor=None,
+) -> int:
+    """Fan-out „nová akce v komunitě" — mail + bell + push všem
+    aktivním WorkspaceMemberům každé z daných workspace, kterým akce
+    ještě notifikaci pro tuto (event, workspace) kombinaci nedostala.
+    Triggery: (1) event přejde do published a je propojen s
+    komunitami — pošleme primary + shared. (2) published event dostane
+    nový community share — pošleme jen nově-added members.
+
+    Skip: event není published, workspace ids prázdné, actor je sám
+    sobě, opt-out (`notify_on_event_update`), už-doručeno (dedup přes
+    Notification.payload). User request 2026-09-10.
+    """
+    if event.status != Event.STATUS_PUBLISHED:
+        return 0
+    if not workspace_ids:
+        return 0
+
+    from accounts.models import User
+    from workspaces.models import WorkspaceMember
+
+    # Kandidáti = active WorkspaceMembers napříč všech target workspace
+    # ids, dedup přes user_id + respekt opt-out. Vyloučíme aktora.
+    candidate_user_ids = list(
+        WorkspaceMember.objects.filter(
+            workspace_id__in=workspace_ids,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        .values_list("user_id", flat=True)
+        .distinct()
+    )
+    if actor is not None:
+        candidate_user_ids = [
+            uid for uid in candidate_user_ids if uid != actor.id
+        ]
+    if not candidate_user_ids:
+        return 0
+
+    users = list(
+        User.objects.filter(
+            id__in=candidate_user_ids,
+            notify_on_event_update=True,
+        ).only("id", "email", "first_name", "last_name")
+    )
+    if not users:
+        return 0
+
+    # Dedup: kdo už dostal event_available pro tenhle event, přeskočit.
+    # payload obsahuje event_id, kind je fix. Query jednou, klientský
+    # filter.
+    already_notified = set(
+        Notification.objects.filter(
+            recipient_id__in=[u.id for u in users],
+            kind=Notification.KIND_EVENT_AVAILABLE,
+            payload__event_id=event.pk,
+        ).values_list("recipient_id", flat=True)
+    )
+    target_users = [u for u in users if u.id not in already_notified]
+    if not target_users:
+        return 0
+
+    title = f"Nová akce: {event.title}"
+    body = "V komunitě je nová akce, kterou můžeš navštívit — přihlas se."
+    link = _event_link(event)
+
+    Notification.objects.bulk_create(
+        [
+            Notification(
+                recipient_id=u.id,
+                kind=Notification.KIND_EVENT_AVAILABLE,
+                title=title,
+                body=body,
+                link=link,
+                payload={
+                    "event_id": event.pk,
+                    "event_slug": event.slug,
+                    "workspace_slug": event.workspace.slug,
+                    "workspace_ids": workspace_ids,
+                },
+            )
+            for u in target_users
+        ]
+    )
+
+    # E-mail + push fan-out přes Celery task (v prod běží EAGER, viz
+    # perf memory). Nechme nejde-selhat, notifikace v bellu už dorazila.
+    from .tasks import fan_out_event_available_task
+
+    fan_out_event_available_task.delay(
+        event.pk, [u.id for u in target_users]
+    )
+    return len(target_users)
+
+
 def notify_rsvp_approved(rsvp: RSVP) -> Notification | None:
     """Owner approved a pending registration — let the participant
     know directly in the bell. Returns the created row or None when
