@@ -330,12 +330,13 @@ function TopicCard({
       ].join(" ")}
     >
       {/* Header pruh s pastel tintem — vizuálně oddělí "kdo + kdy" od
-          samotného postu, tak jak to má Facebook / Instagram post. */}
-      <header className="flex items-start justify-between gap-3 border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
+          samotného postu. Kompaktnější než původní verze (user
+          2026-09-10 report: „bloky jsou dost velké"). */}
+      <header className="flex items-start justify-between gap-3 border-b border-border bg-surface-muted/40 px-3 py-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span
             aria-hidden
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-ink-900 ring-1 ring-white/60"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
             style={{ backgroundColor: avatarBg(topic.author_name) }}
           >
             {initialOf(topic.author_name)}
@@ -344,7 +345,7 @@ function TopicCard({
             <span className="truncate text-sm font-semibold text-ink-900">
               {topic.author_name}
             </span>
-            <span className="text-xs text-ink-500">
+            <span className="text-[11px] text-ink-500">
               <time dateTime={topic.created_at} title={created.toLocaleString("cs-CZ")}>
                 {absoluteDate}
               </time>
@@ -404,13 +405,13 @@ function TopicCard({
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
+      <div className="flex flex-col gap-2 px-3 py-3 sm:px-4">
         <Link
           href={href}
-          className="flex flex-col gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="flex flex-col gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <h4
-            className="text-base font-semibold text-ink-900 sm:text-lg"
+            className="text-[15px] font-semibold text-ink-900 sm:text-base"
             style={{ letterSpacing: "-0.015em" }}
           >
             {topic.title}
@@ -418,8 +419,8 @@ function TopicCard({
           {topic.body && (
             <p
               className={[
-                "whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-700",
-                expanded ? "" : "line-clamp-4",
+                "whitespace-pre-wrap break-words text-sm leading-snug text-ink-700",
+                expanded ? "" : "line-clamp-3",
               ].join(" ")}
             >
               {topic.body}
@@ -445,18 +446,13 @@ function TopicCard({
           </button>
         )}
 
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3 text-xs text-ink-500">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className="inline-flex items-center gap-1.5">
+        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border pt-2 text-[11px] text-ink-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            <span className="inline-flex items-center gap-1">
               <span aria-hidden>💬</span>
               <strong className="text-ink-900 tabular-nums">
                 {topic.comment_count}
-              </strong>{" "}
-              {topic.comment_count === 1
-                ? "komentář"
-                : topic.comment_count < 5
-                  ? "komentáře"
-                  : "komentářů"}
+              </strong>
             </span>
             {topic.like_count > 0 && (
               <span

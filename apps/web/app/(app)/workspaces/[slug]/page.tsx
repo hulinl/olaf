@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
 import { DiscussionWall } from "@/components/discussion-wall";
@@ -244,7 +244,31 @@ function WorkspaceTabs({
   userId: number;
 }) {
   type Tab = "akce" | "nastenka";
-  const [tab, setTab] = useState<Tab>("akce");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Tab persistujeme v ?tab=nastenka — když user klikne z nástěnky na
+  // topic detail a dá zpět v browseru, URL param zachová stav a při
+  // druhém načtení stránky se zvolí správný tab. User report
+  // 2026-09-10: „šel jsem z nástěnky na diskuzi, zpět mě hodilo na
+  // Nadcházející akce".
+  const initialTab: Tab =
+    searchParams.get("tab") === "nastenka" && isMember ? "nastenka" : "akce";
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    // replace, ne push — nechceme každý tab switch v history stacku,
+    // ale poslední stav při navigaci pryč musí být v URL. Next.js
+    // App Router preferuje URLSearchParams pattern.
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "akce") {
+      params.delete("tab");
+    } else {
+      params.set("tab", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : "?", { scroll: false });
+  }
 
   return (
     <>
@@ -253,13 +277,13 @@ function WorkspaceTabs({
         aria-label="Sekce komunity"
         className="mt-8 flex flex-wrap gap-2 text-sm"
       >
-        <TabButton active={tab === "akce"} onClick={() => setTab("akce")}>
+        <TabButton active={tab === "akce"} onClick={() => switchTab("akce")}>
           Nadcházející akce
         </TabButton>
         {isMember && (
           <TabButton
             active={tab === "nastenka"}
-            onClick={() => setTab("nastenka")}
+            onClick={() => switchTab("nastenka")}
           >
             Nástěnka
           </TabButton>
