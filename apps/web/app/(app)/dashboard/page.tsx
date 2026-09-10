@@ -16,6 +16,7 @@ import {
   formatEventPrice,
   workspaces,
 } from "@/lib/api";
+import { sortUpcoming } from "@/lib/event-sort";
 import { useUser } from "@/lib/user-context";
 
 export default function DashboardPage() {
@@ -55,8 +56,10 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const upcomingRsvped = (myEvents ?? []).filter(
-    (e) => new Date(e.ends_at).getTime() >= Date.now(),
+  const upcomingRsvped = sortUpcoming(
+    (myEvents ?? []).filter(
+      (e) => new Date(e.ends_at).getTime() >= Date.now(),
+    ),
   );
 
   return (

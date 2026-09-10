@@ -18,6 +18,7 @@ import {
   assetUrl,
   workspaces,
 } from "@/lib/api";
+import { sortPast, sortUpcoming } from "@/lib/event-sort";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -104,15 +105,19 @@ export default function WorkspaceDetailPage({ params }: Props) {
     now.getMonth(),
     now.getDate(),
   ).getTime();
-  const upcoming = (eventList ?? []).filter(
-    (e) =>
-      e.status === "published" &&
-      new Date(e.starts_at).getTime() >= todayStart,
+  const upcoming = sortUpcoming(
+    (eventList ?? []).filter(
+      (e) =>
+        e.status === "published" &&
+        new Date(e.starts_at).getTime() >= todayStart,
+    ),
   );
-  const past = (eventList ?? []).filter(
-    (e) =>
-      (e.status === "published" || e.status === "completed") &&
-      new Date(e.starts_at).getTime() < todayStart,
+  const past = sortPast(
+    (eventList ?? []).filter(
+      (e) =>
+        (e.status === "published" || e.status === "completed") &&
+        new Date(e.starts_at).getTime() < todayStart,
+    ),
   );
 
   return (
@@ -148,6 +153,12 @@ export default function WorkspaceDetailPage({ params }: Props) {
             )}
           </div>
           <div className="min-w-0 flex-1">
+            {/* Titulek + badges + "veřejný profil" na jednom řádku.
+                External button dřív seděl mimo textblock a na mobilu
+                (flex-col) skončil pod social row jako samotný řádek —
+                user report 2026-09-10. Teď je součástí H1 flex-wrap
+                (`ml-auto` ho zarovná vpravo bez ohledu na počet
+                badges), takže na mobilu i desktopu drží vedle titulu. */}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
                 {workspace.name}
@@ -157,6 +168,29 @@ export default function WorkspaceDetailPage({ params }: Props) {
                   Owner
                 </span>
               )}
+              <a
+                href={`/${workspace.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Veřejný profil"
+                aria-label="Otevřít veřejný profil v novém okně"
+                className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M14 3h7v7" />
+                  <path d="M10 14L21 3" />
+                  <path d="M21 14v7H3V3h7" />
+                </svg>
+              </a>
             </div>
             <WorkspaceMetaLine
               location={workspace.location}
@@ -165,29 +199,6 @@ export default function WorkspaceDetailPage({ params }: Props) {
             />
             <WorkspaceSocialsRow workspace={workspace} className="mt-3" />
           </div>
-          <a
-            href={`/${workspace.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Veřejný profil"
-            aria-label="Otevřít veřejný profil v novém okně"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14 3h7v7" />
-              <path d="M10 14L21 3" />
-              <path d="M21 14v7H3V3h7" />
-            </svg>
-          </a>
         </header>
 
         {workspace.bio && (

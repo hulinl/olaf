@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { ApiError, type EventSummary, events } from "@/lib/api";
+import { sortPast, sortUpcoming } from "@/lib/event-sort";
 
 /**
  * Consumer view — events the signed-in user is RSVPed to. Owner / creator
@@ -37,11 +38,15 @@ export default function MyEventsPage() {
   }, []);
 
   const now = new Date();
-  const upcoming = (list ?? []).filter(
-    (e) => new Date(e.ends_at).getTime() >= now.getTime(),
+  const upcoming = sortUpcoming(
+    (list ?? []).filter(
+      (e) => new Date(e.ends_at).getTime() >= now.getTime(),
+    ),
   );
-  const past = (list ?? []).filter(
-    (e) => new Date(e.ends_at).getTime() < now.getTime(),
+  const past = sortPast(
+    (list ?? []).filter(
+      (e) => new Date(e.ends_at).getTime() < now.getTime(),
+    ),
   );
 
   return (

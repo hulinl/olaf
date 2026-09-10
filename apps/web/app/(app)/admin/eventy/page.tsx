@@ -12,6 +12,7 @@ import {
   assetUrl,
   events,
 } from "@/lib/api";
+import { sortPast, sortUpcoming } from "@/lib/event-sort";
 
 const STATUS_LABELS: Record<EventSummary["status"], string> = {
   draft: "Draft",
@@ -72,12 +73,16 @@ export default function AdminEventyTablePage() {
   }, [router]);
 
   const now = Date.now();
-  const rows = (ownedEvents ?? []).filter((e) => {
+  const rowsRaw = (ownedEvents ?? []).filter((e) => {
     const endsAt = new Date(e.ends_at).getTime();
     if (filter === "upcoming") return endsAt >= now;
     if (filter === "past") return endsAt < now;
     return true;
   });
+  // Nadcházející = nejbližší nahoru, minulé + all = nejnovější nahoru.
+  // Sjednocené s ostatními event listy v aplikaci.
+  const rows =
+    filter === "upcoming" ? sortUpcoming(rowsRaw) : sortPast(rowsRaw);
 
   return (
     <div className="flex flex-col gap-6">

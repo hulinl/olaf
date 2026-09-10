@@ -15,6 +15,7 @@ import {
   formatEventDateRange,
   formatEventPrice,
 } from "@/lib/api";
+import { sortPast, sortUpcoming } from "@/lib/event-sort";
 import { serverFetch } from "@/lib/server-api";
 
 interface Props {
@@ -77,15 +78,19 @@ export default async function WorkspaceProfilePage({ params }: Props) {
     now.getMonth(),
     now.getDate(),
   ).getTime();
-  const upcoming = events.filter(
-    (e) =>
-      e.status === "published" &&
-      new Date(e.starts_at).getTime() >= todayStart,
+  const upcoming = sortUpcoming(
+    events.filter(
+      (e) =>
+        e.status === "published" &&
+        new Date(e.starts_at).getTime() >= todayStart,
+    ),
   );
-  const past = events.filter(
-    (e) =>
-      (e.status === "published" || e.status === "completed") &&
-      new Date(e.starts_at).getTime() < todayStart,
+  const past = sortPast(
+    events.filter(
+      (e) =>
+        (e.status === "published" || e.status === "completed") &&
+        new Date(e.starts_at).getTime() < todayStart,
+    ),
   );
 
   return (

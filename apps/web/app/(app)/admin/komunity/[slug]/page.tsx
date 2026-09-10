@@ -21,6 +21,7 @@ import {
   auth,
   workspaces,
 } from "@/lib/api";
+import { sortPast, sortUpcoming } from "@/lib/event-sort";
 
 import { MembersCrmView } from "./clenove/page";
 
@@ -135,15 +136,19 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
     now.getMonth(),
     now.getDate(),
   ).getTime();
-  const upcoming = eventList.filter(
-    (e) =>
-      e.status === "published" &&
-      new Date(e.starts_at).getTime() >= todayStart,
+  const upcoming = sortUpcoming(
+    eventList.filter(
+      (e) =>
+        e.status === "published" &&
+        new Date(e.starts_at).getTime() >= todayStart,
+    ),
   );
-  const past = eventList.filter(
-    (e) =>
-      (e.status === "published" || e.status === "completed") &&
-      new Date(e.starts_at).getTime() < todayStart,
+  const past = sortPast(
+    eventList.filter(
+      (e) =>
+        (e.status === "published" || e.status === "completed") &&
+        new Date(e.starts_at).getTime() < todayStart,
+    ),
   );
 
   return (
