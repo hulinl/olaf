@@ -315,6 +315,13 @@ function ViewportOverlay({
           widthPct = (g.aspectRatio / editorAspect) * 100;
         }
         const colorClass = g.colorClass ?? "border-brand";
+        // Explicit paired classes — Tailwind CSS musí border-* i
+        // text-* najít v souboru pro tree-shake. Dynamic replace by
+        // build necustomizoval.
+        const textClass =
+          colorClass === "border-warning"
+            ? "text-warning"
+            : "text-brand";
         return (
           <div
             key={g.label}
@@ -333,7 +340,7 @@ function ViewportOverlay({
               className={[
                 "absolute -top-2.5 left-1 rounded px-1 text-[10px] font-semibold uppercase tracking-wide",
                 "bg-canvas/90",
-                colorClass.replace("border-", "text-"),
+                textClass,
               ].join(" ")}
             >
               {g.label}

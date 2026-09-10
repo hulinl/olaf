@@ -139,6 +139,14 @@ export function PersonProfileDialog({ userId, onClose, onHidden }: Props) {
                   {person.full_name}
                 </h2>
                 <p className="mt-1 text-sm text-ink-500">{person.email}</p>
+                <a
+                  href={`/u/${person.user_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                >
+                  Otevřít veřejný profil ↗
+                </a>
               </header>
 
               <section>

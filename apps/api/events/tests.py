@@ -376,9 +376,12 @@ class RSVPEndpointTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_authenticated_rsvp(self) -> None:
+        # 2026-09-10: authenticated user musí mít v profilu telefon —
+        # bez něj backend RSVP blokuje (organizátor pro případ nouze).
         user = User.objects.create_user(
             email="petr@example.com", password="pass-abcdef-1234",
             first_name="Petr", last_name="Runner", email_verified=True,
+            phone="+420 123 456",
         )
         self.client.force_authenticate(user)
         resp = self.client.post(self.url, {"answers": _valid_answers()}, format="json")
