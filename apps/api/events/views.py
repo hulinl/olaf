@@ -227,14 +227,18 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
     user = request.user if request.user.is_authenticated else None
     if user is None:
         account = data.get("account") or {}
-        # Per-event toggle: pokud `require_phone_on_rsvp=True`, anon
-        # registrant musí vyplnit telefon. Default je True (emergencies);
-        # owner odsetě u casual akcí.
-        if event.require_phone_on_rsvp and not (account.get("phone") or "").strip():
+        # Telefon je globálně povinný (user 2026-09-10). Organizátor
+        # musí mít možnost okamžitě zavolat, pokud účastník třeba
+        # nedorazí. Per-event toggle na modelu (`require_phone_on_rsvp`)
+        # zůstává jako dead field; frontend/backend ho ignorují.
+        if not (account.get("phone") or "").strip():
             return Response(
                 {
                     "account": {
-                        "phone": "Telefon je u této akce povinný.",
+                        "phone": (
+                            "Telefon je povinný pro případ nouze — "
+                            "organizátor tě musí umět kontaktovat."
+                        ),
                     },
                     "code": "phone_required",
                 },
@@ -270,6 +274,24 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
         # Žádný auto-login — guest RSVP zůstává guest. Pokud chce user
         # spravovat svoje registrace, projde signup flow s tím samým
         # e-mailem.
+    else:
+        # Authenticated user musí mít v profilu telefon. Frontend RSVP
+        # form ho vynucuje přes samostatný phone card (viz
+        # apps/web/app/[slug]/e/[eventSlug]/rsvp/page.tsx) a ukládá ho
+        # na profil ještě před RSVP submitem. Backend safety net —
+        # když projde direct API call nebo starý klient, blokujeme.
+        if not (user.phone or "").strip():
+            return Response(
+                {
+                    "detail": (
+                        "Nemáš v profilu telefon. Doplň ho v Nastavení "
+                        "profilu a zkus přihlášku znovu — organizátor ho "
+                        "potřebuje pro případ nouze."
+                    ),
+                    "code": "phone_required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     try:
         rsvp = RSVP.create_for_event(

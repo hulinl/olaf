@@ -102,6 +102,10 @@ class UserSerializer(serializers.ModelSerializer):
             "avatar_focal_x",
             "avatar_focal_y",
             "avatar_zoom",
+            "profile_show_email",
+            "profile_show_phone",
+            "profile_show_address",
+            "profile_show_avatar",
             "address",
             # Structured address (V1 invoice prep)
             "address_street",
@@ -146,6 +150,132 @@ class UserSerializer(serializers.ModelSerializer):
             "date_joined",
         )
         read_only_fields = ("id", "email", "email_verified", "date_joined")
+
+
+class UserPublicProfileSerializer(serializers.ModelSerializer):
+    """Payload pro `/u/<id>` public profile view. Respektuje user's
+    `profile_show_*` toggles — pole, která user schoval, vrátíme jako
+    prázdné stringy (`""`) nebo `null` (avatar_url). Konzumenti mají
+    respektovat prázdnou hodnotu jako „nezveřejněno".
+
+    **Organizer bypass**: když je viewer organizátor akce, na které je
+    target user zaregistrovaný (RSVP non-cancelled), toggles obcházíme
+    a vrátíme vše. User request 2026-09-10 — organizátor musí vidět
+    kompletní kontakt u účastníků svých akcí.
+    """
+
+    full_name = serializers.CharField(source="get_full_name", read_only=True)
+    avatar_url = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    address_street = serializers.SerializerMethodField()
+    address_city = serializers.SerializerMethodField()
+    address_zip = serializers.SerializerMethodField()
+    address_country = serializers.SerializerMethodField()
+    # Read-only signál pro frontend: `bypassed=True` = viewer je
+    # organizátor nad tímto účastníkem, takže vidí vše bez ohledu na
+    # target toggles. UI si pak ukáže badge „Vidíš jako pořadatel".
+    organizer_bypass = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "display_name",
+            "full_name",
+            "bio",
+            "avatar_url",
+            "avatar_focal_x",
+            "avatar_focal_y",
+            "avatar_zoom",
+            "email",
+            "phone",
+            "address_street",
+            "address_city",
+            "address_zip",
+            "address_country",
+            "organizer_bypass",
+        )
+        read_only_fields = fields
+
+    def _bypasses_toggles(self, obj: User) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        if request.user.pk == obj.pk:
+            # User vidí vlastní profil kompletně.
+            return True
+        # Organizátor akce, na které je target přihlášený.
+        from events.models import RSVP
+        from workspaces.models import WorkspaceMember
+
+        # Workspaces, ve kterých je viewer owner/admin.
+        managed_workspace_ids = list(
+            WorkspaceMember.objects.filter(
+                user=request.user,
+                role__in=[
+                    WorkspaceMember.ROLE_OWNER,
+                    WorkspaceMember.ROLE_ADMIN,
+                ],
+            ).values_list("workspace_id", flat=True)
+        )
+        if not managed_workspace_ids:
+            return False
+        return RSVP.objects.filter(
+            user=obj,
+            event__workspace_id__in=managed_workspace_ids,
+        ).exclude(status=RSVP.STATUS_CANCELLED).exists()
+
+    def get_organizer_bypass(self, obj: User) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        if request.user.pk == obj.pk:
+            return False  # own profile — nebypass, ale všechno vidím tak jako tak
+        return self._bypasses_toggles(obj)
+
+    def _absolute_avatar_url(self, obj: User) -> str:
+        if not obj.avatar:
+            return ""
+        request = self.context.get("request")
+        url = obj.avatar.url
+        if request and url.startswith("/"):
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_avatar_url(self, obj: User) -> str:
+        if not obj.profile_show_avatar and not self._bypasses_toggles(obj):
+            return ""
+        return self._absolute_avatar_url(obj)
+
+    def get_email(self, obj: User) -> str:
+        if not obj.profile_show_email and not self._bypasses_toggles(obj):
+            return ""
+        return obj.email
+
+    def get_phone(self, obj: User) -> str:
+        if not obj.profile_show_phone and not self._bypasses_toggles(obj):
+            return ""
+        return obj.phone or ""
+
+    def _address_field(self, obj: User, field: str) -> str:
+        if not obj.profile_show_address and not self._bypasses_toggles(obj):
+            return ""
+        return getattr(obj, field, "") or ""
+
+    def get_address_street(self, obj: User) -> str:
+        return self._address_field(obj, "address_street")
+
+    def get_address_city(self, obj: User) -> str:
+        return self._address_field(obj, "address_city")
+
+    def get_address_zip(self, obj: User) -> str:
+        return self._address_field(obj, "address_zip")
+
+    def get_address_country(self, obj: User) -> str:
+        return self._address_field(obj, "address_country")
 
 
 from .models import BillingProfile  # noqa: E402

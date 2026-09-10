@@ -24,6 +24,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     SignupSerializer,
+    UserPublicProfileSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
@@ -229,6 +230,31 @@ def me_avatar(request: Request) -> Response:
         ]
     )
     return Response(UserSerializer(user, context={"request": request}).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def user_public_profile(request: Request, user_id: int) -> Response:
+    """Veřejný profil daného usera. Respektuje `profile_show_*` toggles
+    — pole schovaná uživatelem se vrátí jako prázdné stringy. Viewer
+    který je organizátorem akce, na které je target přihlášený, dostává
+    kompletní data (organizer_bypass=True) — pořadatel musí mít
+    kontakt na účastníka pro případ nouze.
+
+    Ochrana: auth-only, aby random veřejnost neškrábala e-maily. Pořád
+    respektuje toggles i pro auth-usery, kteří nejsou organizátoři.
+    """
+    try:
+        target = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"detail": "Uživatel neexistuje."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    serializer = UserPublicProfileSerializer(
+        target, context={"request": request}
+    )
+    return Response(serializer.data)
 
 
 @api_view(["GET"])

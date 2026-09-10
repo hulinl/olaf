@@ -182,6 +182,10 @@ export default function ProfileSettingsPage() {
         emergency_contact_name: user.emergency_contact_name,
         emergency_contact_phone: user.emergency_contact_phone,
         emergency_contact_relationship: user.emergency_contact_relationship,
+        profile_show_email: user.profile_show_email,
+        profile_show_phone: user.profile_show_phone,
+        profile_show_address: user.profile_show_address,
+        profile_show_avatar: user.profile_show_avatar,
       };
       const updated = await auth.updateMe(patch);
       setUser(updated);
@@ -651,6 +655,47 @@ export default function ProfileSettingsPage() {
         </CardSection>
       </Card>
 
+      <Card>
+        <CardSection>
+          <h2 className="text-lg font-semibold text-ink-900">
+            Veřejný profil
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Kdo klikne na tvůj avatar / jméno v aplikaci, uvidí tvoji
+            profilovou stránku <code>/u/{user.id}</code>. Tady
+            rozhodneš, které údaje tam ukážeme. Pořadatel akce, na
+            kterou jsi přihlášený, vidí kontakt vždy pro případ nouze
+            — bez ohledu na tyto přepínače.
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            <VisibilityToggle
+              checked={user.profile_show_avatar}
+              onChange={(v) => update("profile_show_avatar", v)}
+              label="Profilová fotka"
+              hint="Když vypneš, ostatní vidí jen iniciály."
+            />
+            <VisibilityToggle
+              checked={user.profile_show_email}
+              onChange={(v) => update("profile_show_email", v)}
+              label="E-mail"
+              hint="Zobrazíme jako mailto: link."
+            />
+            <VisibilityToggle
+              checked={user.profile_show_phone}
+              onChange={(v) => update("profile_show_phone", v)}
+              label="Telefon"
+              hint="Zobrazíme jako tel: link. Doporučujeme skryté — pořadatel akce ho vidí tak jako tak."
+            />
+            <VisibilityToggle
+              checked={user.profile_show_address}
+              onChange={(v) => update("profile_show_address", v)}
+              label="Adresa"
+              hint="Ulice, město, PSČ. Doporučujeme skryté."
+            />
+          </div>
+        </CardSection>
+      </Card>
+
       {error && <Alert variant="danger">{error}</Alert>}
       {saved && !error && (
         <p className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-ink-900">
@@ -683,6 +728,33 @@ export default function ProfileSettingsPage() {
         />
       )}
     </form>
+  );
+}
+
+function VisibilityToggle({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <label className="flex items-start gap-3 rounded-md border border-border bg-surface p-3 text-sm hover:bg-surface-muted/40">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 size-4 shrink-0 accent-brand"
+      />
+      <span className="flex flex-col gap-0.5">
+        <span className="font-medium text-ink-900">{label}</span>
+        <span className="text-xs text-ink-500">{hint}</span>
+      </span>
+    </label>
   );
 }
 

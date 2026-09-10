@@ -67,6 +67,44 @@ class WorkspaceWallTests(TestCase):
         list_resp = self.client.get(url)
         self.assertEqual(len(list_resp.json()), 1)
 
+    def test_list_includes_recent_comments_preview(self):
+        """Feed rework 2026-09-10: list endpoint musí posílat
+        `recent_comments` — 2 poslední top-level komentáře v chronologickém
+        pořadí, aby frontend feed karta ukázala náhled bez druhého fetch."""
+        from discussions.models import Comment, Topic
+
+        self.client.force_authenticate(self.owner)
+        topic = Topic.objects.create(
+            parent_type=Topic.PARENT_WORKSPACE,
+            parent_id=self.ws.pk,
+            author=self.owner,
+            title="Nějaké téma",
+            body="",
+        )
+        # 3 top-level komentáře — jen 2 poslední se mají vrátit.
+        # Nested reply (parent set) se do preview NEbere.
+        c1 = Comment.objects.create(topic=topic, author=self.owner, body="první")
+        c2 = Comment.objects.create(topic=topic, author=self.owner, body="druhý")
+        c3 = Comment.objects.create(topic=topic, author=self.owner, body="třetí")
+        Comment.objects.create(
+            topic=topic, author=self.owner, body="reply na první", parent=c1
+        )
+
+        url = reverse("discussions:workspace-topics", kwargs={"slug": "olaf"})
+        list_resp = self.client.get(url)
+        self.assertEqual(list_resp.status_code, drf_status.HTTP_200_OK)
+        payload = list_resp.json()
+        self.assertEqual(len(payload), 1)
+
+        recent = payload[0]["recent_comments"]
+        self.assertEqual(len(recent), 2, "recent_comments je limit 2")
+        # Chronologicky, tj. starší -> novější. Preview obsahuje c2 a c3
+        # (dva nejnovější top-level), reply na c1 se nepočítá.
+        self.assertEqual(recent[0]["id"], c2.pk)
+        self.assertEqual(recent[1]["id"], c3.pk)
+        # comment_count počítá i nested reply (4 celkem).
+        self.assertEqual(payload[0]["comment_count"], 4)
+
 
 class EventWallTests(TestCase):
     def setUp(self):

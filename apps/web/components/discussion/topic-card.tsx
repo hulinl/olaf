@@ -498,20 +498,26 @@ function TopicHeader({
             focalX={topic.author_avatar.focal_x}
             focalY={topic.author_avatar.focal_y}
             zoom={topic.author_avatar.zoom}
+            userId={topic.author_id ?? null}
           />
         ) : (
-          <span
-            aria-hidden
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
-            style={{ backgroundColor: avatarBg(topic.author_name) }}
-          >
-            {initialOf(topic.author_name)}
-          </span>
+          <ProfileLink userId={topic.author_id ?? null}>
+            <span
+              aria-hidden
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
+              style={{ backgroundColor: avatarBg(topic.author_name) }}
+            >
+              {initialOf(topic.author_name)}
+            </span>
+          </ProfileLink>
         )}
         <div className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-sm font-semibold text-ink-900">
+          <ProfileLink
+            userId={topic.author_id ?? null}
+            className="truncate text-sm font-semibold text-ink-900 hover:text-brand"
+          >
             {topic.author_name}
-          </span>
+          </ProfileLink>
           <span className="text-[11px] text-ink-500">
             <time
               dateTime={topic.created_at}
@@ -555,13 +561,15 @@ function AvatarImage({
   focalX,
   focalY,
   zoom,
+  userId,
 }: {
   url: string;
   focalX: number;
   focalY: number;
   zoom: number;
+  userId: number | null;
 }) {
-  return (
+  const visual = (
     <span className="inline-block h-8 w-8 shrink-0 overflow-hidden rounded-full bg-surface-strong ring-1 ring-white/60">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -575,6 +583,31 @@ function AvatarImage({
         }}
       />
     </span>
+  );
+  return <ProfileLink userId={userId}>{visual}</ProfileLink>;
+}
+
+/** Malý wrapper: když má user id, wrap v Linku na /u/<id>. Bez id
+ *  (např. smazaný autor) rendrujeme jen children. */
+function ProfileLink({
+  userId,
+  children,
+  className,
+}: {
+  userId: number | null;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  if (!userId) {
+    return className ? <span className={className}>{children}</span> : <>{children}</>;
+  }
+  return (
+    <a
+      href={`/u/${userId}`}
+      className={className ?? "inline-block hover:opacity-80"}
+    >
+      {children}
+    </a>
   );
 }
 

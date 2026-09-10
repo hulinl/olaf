@@ -210,6 +210,14 @@ export default function RSVPPage({ params }: Props) {
       }
       if (sectionEnabled("photo_consent")) answers.photo_consent = photoConsent;
 
+      // Logged-in user co ještě neměl telefon v profilu ho teď vyplnil
+      // přes phone card níž — uložíme ho na profil ještě před RSVP,
+      // ať backend + budoucí registrace mají hodnotu. Backend RSVP
+      // endpoint user profil sám nikdy nemění.
+      if (user && !user.phone && acctPhone.trim()) {
+        const updated = await auth.updateMe({ phone: acctPhone.trim() });
+        setUser(updated);
+      }
       const payload = user
         ? { answers }
         : {
@@ -557,27 +565,59 @@ export default function RSVPPage({ params }: Props) {
                         onChange={(e) => setAcctEmail(e.target.value)}
                       />
                     </Field>
-                    {/* Když owner odznačil "Vyžadovat telefon" v
-                        Detailech akce, pole vůbec neukážeme — méně
-                        frikce, žádné zbytečné "Telefon (volitelné)".
-                        User k tomu: "když řeknu že ho tam nechci, tak
-                        ať tam to pole ani není". */}
-                    {event.require_phone_on_rsvp && (
-                      <Field
-                        label="Telefon"
-                        htmlFor="phone"
-                        hint="Pro případ nouze nebo rychlou komunikaci."
-                      >
-                        <Input
-                          id="phone"
-                          type="tel"
-                          autoComplete="tel"
-                          required
-                          value={acctPhone}
-                          onChange={(e) => setAcctPhone(e.target.value)}
-                        />
-                      </Field>
-                    )}
+                    {/* Telefon je od 2026-09-10 globálně povinný —
+                        organizátor musí mít možnost okamžitě zavolat,
+                        pokud účastník třeba nedorazí. `event.require_
+                        phone_on_rsvp` toggle na modelu zůstává jako
+                        dead field pro backward-compat, RSVP form ho
+                        ignoruje. */}
+                    <Field
+                      label="Telefon"
+                      htmlFor="phone"
+                      hint="Pořadatel ho potřebuje pro případ nouze — když třeba nedorazíš, může okamžitě zavolat."
+                    >
+                      <Input
+                        id="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        required
+                        value={acctPhone}
+                        onChange={(e) => setAcctPhone(e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                </CardSection>
+              </Card>
+            )}
+
+            {/* Logged-in user co v profilu ještě nemá telefon musí ho
+                teď doplnit — RSVP form je globálně vyžaduje pro
+                organizátory (případ nouze). Value se po submit uloží
+                na jeho profil, aby další registrace už měl. */}
+            {user && !user.phone && (
+              <Card>
+                <CardSection>
+                  <h2 className="text-base font-semibold text-ink-900">
+                    Telefon
+                  </h2>
+                  <p className="mt-1 text-sm text-ink-500">
+                    V profilu nemáš telefon, doplň ho tady. Pořadatel
+                    ho potřebuje pro případ nouze — když třeba
+                    nedorazíš, může okamžitě zavolat. Uložíme ho ke
+                    tvému profilu, ať u další akce už nebudeš muset
+                    vyplňovat.
+                  </p>
+                  <div className="mt-4 max-w-xs">
+                    <Field label="Telefon *" htmlFor="phone_logged_in">
+                      <Input
+                        id="phone_logged_in"
+                        type="tel"
+                        autoComplete="tel"
+                        required
+                        value={acctPhone}
+                        onChange={(e) => setAcctPhone(e.target.value)}
+                      />
+                    </Field>
                   </div>
                 </CardSection>
               </Card>

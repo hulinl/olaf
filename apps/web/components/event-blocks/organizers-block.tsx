@@ -74,6 +74,7 @@ export function OrganizersBlock({ payload, lookup, tone = "canvas" }: Props) {
                 focalY={u.avatar_focal_y}
                 zoom={u.avatar_zoom}
                 size={80}
+                userId={u.id}
               />
               <div>
                 <p

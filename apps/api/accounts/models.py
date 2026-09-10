@@ -55,6 +55,17 @@ class User(AbstractBaseUser, PermissionsMixin):
     avatar_focal_x = models.FloatField(default=50.0)
     avatar_focal_y = models.FloatField(default=50.0)
     avatar_zoom = models.FloatField(default=100.0)
+
+    # Viditelnost profilových polí na public profile page `/u/<id>`.
+    # Default: jméno a fotka veřejné (potřebné, aby avatar links vůbec
+    # smyslu); e-mail veřejný (většina uživatelů to očekává); telefon
+    # a adresa privátní. User si v /settings/profile může toggle.
+    # Organizátor akce vidí u svých participantů vše bez ohledu na
+    # toggles — user request 2026-09-10.
+    profile_show_email = models.BooleanField(default=True)
+    profile_show_phone = models.BooleanField(default=False)
+    profile_show_address = models.BooleanField(default=False)
+    profile_show_avatar = models.BooleanField(default=True)
     # Legacy single-line address — kept so old data doesn't get dropped.
     # New code reads/writes address_street / address_city / ... below.
     address = models.CharField(max_length=500, blank=True)

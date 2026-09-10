@@ -157,9 +157,17 @@ export function CommentComposer({
         )}
         <textarea
           ref={textareaRef}
-          rows={compact ? 1 : 2}
+          rows={1}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => {
+            setBody(e.target.value);
+            // Auto-grow: schrneme na 1 řádek při prázdném vstupu,
+            // jinak dorosteme do scrollHeight (max-h drží strop, ať
+            // extremně dlouhé posty nevytočí celou kartu). FB pattern.
+            const el = e.currentTarget;
+            el.style.height = "auto";
+            el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+          }}
           placeholder={effectivePlaceholder}
           onKeyDown={(e) => {
             // Ctrl/Cmd+Enter posts. Enter alone keeps newlines
@@ -169,7 +177,7 @@ export function CommentComposer({
               (e.currentTarget.form as HTMLFormElement | null)?.requestSubmit();
             }
           }}
-          className="w-full resize-none bg-transparent text-sm text-ink-900 placeholder:text-ink-500 focus:outline-none"
+          className="w-full resize-none overflow-y-auto bg-transparent text-sm text-ink-900 placeholder:text-ink-500 focus:outline-none"
         />
         {imagePreview ? (
           <div className="relative w-fit">

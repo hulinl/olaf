@@ -54,12 +54,22 @@ export function CommentCard({
         focalY={c.author_avatar.focal_y}
         zoom={c.author_avatar.zoom}
         size={nested ? 24 : 32}
+        userId={c.author_id ?? null}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2">
-          <p className="text-[13px] font-semibold text-ink-900">
-            {c.author_name}
-          </p>
+          {c.author_id ? (
+            <a
+              href={`/u/${c.author_id}`}
+              className="text-[13px] font-semibold text-ink-900 hover:text-brand"
+            >
+              {c.author_name}
+            </a>
+          ) : (
+            <p className="text-[13px] font-semibold text-ink-900">
+              {c.author_name}
+            </p>
+          )}
           {c.body && (
             <RichText
               text={c.body}

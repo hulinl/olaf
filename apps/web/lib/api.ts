@@ -94,6 +94,13 @@ export interface User {
   avatar_focal_x: number;
   avatar_focal_y: number;
   avatar_zoom: number;
+  /** Toggles viditelnosti polí na public profile `/u/<id>`. Vlastní
+   *  profil vidí user pořád kompletně, organizátor svých participantů
+   *  taky (bypass v UserPublicProfileSerializer). */
+  profile_show_email: boolean;
+  profile_show_phone: boolean;
+  profile_show_address: boolean;
+  profile_show_avatar: boolean;
   address: string;
   // Structured address (Slice 4 — for invoices)
   address_street: string;
@@ -916,6 +923,31 @@ export interface EventCollaborator {
   email: string;
   full_name: string;
   created_at: string;
+}
+
+export interface UserPublicProfile {
+  id: number;
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  full_name: string;
+  bio: string;
+  /** Prázdný string = user schoval avatar toggle, nebo nemá fotku
+   *  vůbec — UI má fallback iniciály. */
+  avatar_url: string;
+  avatar_focal_x: number;
+  avatar_focal_y: number;
+  avatar_zoom: number;
+  /** Prázdné = user pole schoval. UI ukazuje jen neprázdná. */
+  email: string;
+  phone: string;
+  address_street: string;
+  address_city: string;
+  address_zip: string;
+  address_country: string;
+  /** True = viewer je organizátor akce s targetem přihlášeným. Backend
+   *  vyplnil vše bez ohledu na target toggles. UI ukazuje badge. */
+  organizer_bypass: boolean;
 }
 
 export interface OrganizerPoolEntry {
@@ -2630,6 +2662,8 @@ export const auth = {
   },
   deleteAvatar: () =>
     apiFetch<User>("/api/auth/me/avatar/", { method: "DELETE" }),
+  userProfile: (userId: number) =>
+    apiFetch<UserPublicProfile>(`/api/auth/users/${userId}/profile/`),
   requestPasswordReset: (email: string) =>
     apiFetch<{ detail: string }>("/api/auth/password/reset/request/", {
       method: "POST",

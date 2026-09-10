@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { assetUrl } from "@/lib/api";
 
 interface AvatarProps {
@@ -13,6 +15,10 @@ interface AvatarProps {
   focalY?: number;
   zoom?: number;
   size?: number;
+  /** Když je set (id z UserSerializer), obalíme avatar do Linku na
+   *  `/u/<id>` — public profile page. Undefined = ne-klikatelný
+   *  (např. pro anon signaturu, nebo když ID neznáme). */
+  userId?: number | null;
 }
 
 /** Circular avatar. Když má user avatar_url, ukazuje obrázek zarámovaný
@@ -20,6 +26,10 @@ interface AvatarProps {
  *  pastel-tinted iniciály (deterministický background dělá
  *  DiscussionWall separátně; tady necháváme neutrální surface-strong
  *  ať to fituje kdekoliv v UI).
+ *
+ *  Když je `userId` set, kliknutím se skočí na `/u/<id>`, což je
+ *  public profile view. Bez userId zůstává avatar decorative-only
+ *  (matches původní chování, backward compat).
  */
 export function Avatar({
   firstName,
@@ -29,33 +39,28 @@ export function Avatar({
   focalY = 50,
   zoom = 100,
   size = 36,
+  userId,
 }: AvatarProps) {
   const src = avatarUrl ? assetUrl(avatarUrl) : "";
-  if (src) {
-    return (
-      <span
-        aria-hidden="true"
-        className="inline-block overflow-hidden rounded-full bg-surface-strong"
-        style={{ width: size, height: size }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt=""
-          className="h-full w-full object-cover"
-          style={{
-            objectPosition: `${focalX}% ${focalY}%`,
-            transform: `scale(${zoom / 100})`,
-            transformOrigin: `${focalX}% ${focalY}%`,
-          }}
-        />
-      </span>
-    );
-  }
-  const initials =
-    `${firstName.charAt(0) ?? ""}${lastName.charAt(0) ?? ""}`.toUpperCase() ||
-    "?";
-  return (
+  const visual = src ? (
+    <span
+      aria-hidden="true"
+      className="inline-block overflow-hidden rounded-full bg-surface-strong"
+      style={{ width: size, height: size }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className="h-full w-full object-cover"
+        style={{
+          objectPosition: `${focalX}% ${focalY}%`,
+          transform: `scale(${zoom / 100})`,
+          transformOrigin: `${focalX}% ${focalY}%`,
+        }}
+      />
+    </span>
+  ) : (
     <span
       aria-hidden="true"
       className="inline-flex items-center justify-center rounded-full bg-surface-strong font-semibold text-ink-900"
@@ -66,7 +71,22 @@ export function Avatar({
         lineHeight: 1,
       }}
     >
-      {initials}
+      {(
+        `${firstName.charAt(0) ?? ""}${lastName.charAt(0) ?? ""}`.toUpperCase() ||
+        "?"
+      )}
     </span>
   );
+  if (userId) {
+    return (
+      <Link
+        href={`/u/${userId}`}
+        aria-label={`Profil uživatele ${firstName} ${lastName}`.trim()}
+        className="inline-block rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+      >
+        {visual}
+      </Link>
+    );
+  }
+  return visual;
 }
