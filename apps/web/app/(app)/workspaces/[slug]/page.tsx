@@ -246,20 +246,21 @@ function WorkspaceTabs({
   type Tab = "akce" | "nastenka";
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Tab persistujeme v ?tab=nastenka — když user klikne z nástěnky na
-  // topic detail a dá zpět v browseru, URL param zachová stav a při
-  // druhém načtení stránky se zvolí správný tab. User report
-  // 2026-09-10: „šel jsem z nástěnky na diskuzi, zpět mě hodilo na
-  // Nadcházející akce".
-  const initialTab: Tab =
+  // URL je single source of truth pro tab. useState(initial) pattern
+  // nefungoval na back-nav — Next.js App Router při návratu z child
+  // route (`/workspaces/x/nastenka/123` → back → `/workspaces/x?tab=…`)
+  // page komponentu neremountne, jen re-renderuje ze cache, takže
+  // useState zůstal na staré hodnotě. Derivujeme tab přímo ze
+  // searchParams, ať se change (back-nav i click) projeví automaticky.
+  // User report 2026-09-10 (druhá iterace).
+  const tab: Tab =
     searchParams.get("tab") === "nastenka" && isMember ? "nastenka" : "akce";
-  const [tab, setTab] = useState<Tab>(initialTab);
 
   function switchTab(next: Tab) {
-    setTab(next);
     // replace, ne push — nechceme každý tab switch v history stacku,
-    // ale poslední stav při navigaci pryč musí být v URL. Next.js
-    // App Router preferuje URLSearchParams pattern.
+    // ale poslední stav při navigaci pryč musí být v URL. Router.replace
+    // triggeruje re-render s novými searchParams → derivovaný `tab` se
+    // aktualizuje.
     const params = new URLSearchParams(searchParams.toString());
     if (next === "akce") {
       params.delete("tab");
