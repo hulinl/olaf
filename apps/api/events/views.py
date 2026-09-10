@@ -419,7 +419,9 @@ def my_events(request: Request) -> Response:
         .select_related("event", "event__workspace")
         .order_by("event__starts_at")
     )
-    serializer = EventSummarySerializer([r.event for r in rsvps], many=True)
+    serializer = EventSummarySerializer(
+        [r.event for r in rsvps], many=True, context={"request": request}
+    )
     return Response(serializer.data)
 
 
@@ -453,7 +455,9 @@ def owner_events(request: Request) -> Response:
         .order_by("-starts_at")
         .distinct()
     )
-    serializer = EventSummarySerializer(events, many=True)
+    serializer = EventSummarySerializer(
+        events, many=True, context={"request": request}
+    )
     return Response(serializer.data)
 
 
@@ -1832,7 +1836,9 @@ def deleted_events_list(request: Request) -> Response:
         .order_by("-deleted_at")
         .distinct()
     )
-    serializer = EventSummarySerializer(events, many=True)
+    serializer = EventSummarySerializer(
+        events, many=True, context={"request": request}
+    )
     return Response(serializer.data)
 
 

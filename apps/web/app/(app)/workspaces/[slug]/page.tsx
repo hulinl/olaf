@@ -417,9 +417,24 @@ function EventCard({
   showStatus: boolean;
 }) {
   const starts = new Date(event.starts_at);
+  // Href priority:
+  //  1) Owner view = /admin/eventy/... (organizátorská konzole)
+  //  2) Registrovaný user (yes/waitlist/pending) = /events/<ws>/<slug>
+  //     (in-app "moje účast" — QR platba, dokumenty, checklist,
+  //     nástěnka akce). Public landing má odkud odsud otevřít v novém
+  //     okně.
+  //  3) Ostatní = public landing /<ws>/e/<slug>.
+  // User report 2026-09-10: klik v komunitě vedl vždy na public
+  // landing, i pro registrovaného usera.
+  const hasActiveRsvp =
+    event.my_rsvp_status === "yes" ||
+    event.my_rsvp_status === "waitlist" ||
+    event.my_rsvp_status === "pending_approval";
   const href = showStatus
     ? `/admin/eventy/${workspaceSlug}/${event.slug}`
-    : `/${workspaceSlug}/e/${event.slug}`;
+    : hasActiveRsvp
+      ? `/events/${workspaceSlug}/${event.slug}`
+      : `/${workspaceSlug}/e/${event.slug}`;
   return (
     <Link
       href={href}

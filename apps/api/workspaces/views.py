@@ -367,7 +367,11 @@ def workspace_events(request: Request, slug: str) -> Response:
     if viewer_role is None:
         qs = qs.exclude(status=Event.STATUS_DRAFT)
     qs = qs.order_by("-starts_at")
-    return Response(EventSummarySerializer(qs, many=True).data)
+    return Response(
+        EventSummarySerializer(
+            qs, many=True, context={"request": request}
+        ).data
+    )
 
 
 @api_view(["POST"])

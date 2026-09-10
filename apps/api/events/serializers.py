@@ -419,6 +419,14 @@ class EventSummarySerializer(serializers.ModelSerializer):
     )
     waitlist_count = serializers.IntegerField(read_only=True)
     pending_approval_count = serializers.IntegerField(read_only=True)
+    # Viewer's RSVP status pro tenhle event, pokud je autentikovaný.
+    # Frontend to používá k rozhodnutí, kam vede klik na event card:
+    # přihlášený user (yes/waitlist/pending) -> "moje účast"
+    # /events/<ws>/<slug>, neregistrovaný -> public /<ws>/e/<slug>.
+    # Vrací None když request v contextu není nebo user nemá RSVP.
+    # User report 2026-09-10: klik na akci v komunitě vždy vedl na
+    # public landing, i pro registrovaného.
+    my_rsvp_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -441,11 +449,19 @@ class EventSummarySerializer(serializers.ModelSerializer):
             "price_currency",
             "price_note",
             "deleted_at",
+            "my_rsvp_status",
         )
         read_only_fields = fields
 
     def get_cover_url(self, obj: Event) -> str | None:
         return obj.cover.url if obj.cover else None
+
+    def get_my_rsvp_status(self, obj: Event) -> str | None:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        rsvp = obj.rsvps.filter(user=request.user).only("status").first()
+        return rsvp.status if rsvp else None
 
 
 class RSVPCreateSerializer(serializers.Serializer):

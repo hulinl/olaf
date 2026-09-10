@@ -282,6 +282,11 @@ export interface EventSummary {
   price_currency: string;
   price_note: string;
   deleted_at: string | null;
+  /** Status RSVP aktuálně přihlášeného usera. Null když viewer není
+   *  autentikovaný nebo na tuhle akci nemá RSVP. Frontend to používá
+   *  ke správnému směrování kliknutí na event card (moje účast vs
+   *  public landing). */
+  my_rsvp_status: MyRSVP["status"] | null;
 }
 
 export interface EventImage {
