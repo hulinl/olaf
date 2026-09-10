@@ -227,12 +227,12 @@ function TopicGrid({
     />
   );
 
-  // Feed layout (2026-09-10, user report): jeden sloupec posts pod
-  // sebou, čitelná šířka (max-w-2xl), plný body text — dlaždicový
-  // 2-col grid s clampnutým body byl málo čitelný, user chce
-  // Facebook-style zeď. Připnuté zůstávají nahoře jako sekce.
+  // Feed layout (2026-09-10, user request): jeden sloupec pod sebou,
+  // full-width v rámci stránkového kontejneru (rodič má max-w-5xl),
+  // fixní preview výška, "Zobrazit více" toggle. Připnuté zůstávají
+  // nahoře jako samostatná sekce.
   return (
-    <div className="mx-auto mt-5 flex w-full max-w-2xl flex-col gap-6">
+    <div className="mt-5 flex w-full flex-col gap-6">
       {pinned.length > 0 && (
         <div className="flex flex-col gap-3">
           <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
@@ -255,6 +255,42 @@ function TopicGrid({
   );
 }
 
+/** "Před N dny" / "Dnes" / "Včera" / absolute datum pro starší.
+ *  Zobrazuje se v hlavičce karty vedle absolutního data — user na
+ *  první pohled vidí, jak čerstvý příspěvek je. */
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diffDays = Math.floor((now - then) / (24 * 3600 * 1000));
+  if (diffDays < 1) return "dnes";
+  if (diffDays === 1) return "včera";
+  if (diffDays < 7) return `před ${diffDays} dny`;
+  if (diffDays < 14) return "před týdnem";
+  if (diffDays < 30) return `před ${Math.floor(diffDays / 7)} týdny`;
+  if (diffDays < 60) return "před měsícem";
+  if (diffDays < 365) return `před ${Math.floor(diffDays / 30)} měsíci`;
+  return `před ${Math.floor(diffDays / 365)} lety`;
+}
+
+/** Iniciála z celého jména autora — první písmeno prvního slova,
+ *  fallback "?" pro prázdný string / smazané autory. */
+function initialOf(name: string): string {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  return first.charAt(0).toUpperCase() || "?";
+}
+
+/** Deterministický pastel avatar background z author_name — každý
+ *  autor má konzistentní barvu napříč posty, aniž bychom potřebovali
+ *  avatar URL z API. HSL s pevnou saturací + lightness = pastel. */
+function avatarBg(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 55%, 82%)`;
+}
+
 function TopicCard({
   topic,
   href,
@@ -270,41 +306,69 @@ function TopicCard({
   onTogglePin: () => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  // Absolute datum + relativní hint ("před 2 dny") — user 2026-09-10:
+  // chce vidět jak staré posty jsou na první pohled.
+  const created = new Date(topic.created_at);
+  const absoluteDate = created.toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "long",
+    year:
+      created.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  });
+  const relative = formatRelative(topic.created_at);
+  // Line clamp threshold — když je body ≤ 4 řádky-ish (heuristika:
+  // 280 znaků / 4 newliny), nemá cenu ukazovat „Zobrazit více".
+  const needsExpand =
+    topic.body.length > 280 || topic.body.split("\n").length > 4;
+
   return (
     <article
       className={[
-        "group relative flex flex-col gap-3 rounded-xl border bg-surface p-5 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-brand/40 hover:shadow-md sm:p-6",
+        "group relative flex flex-col overflow-hidden rounded-xl border bg-surface shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-brand/40 hover:shadow-md",
         topic.pinned ? "border-brand/40" : "border-border",
       ].join(" ")}
     >
-      {/* Header: autor + datum + badges. Action icons vpravo, jen na
-          hover — netahají oči od obsahu. */}
-      <header className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col">
-          <span className="text-sm font-medium text-ink-900">
-            {topic.author_name}
+      {/* Header pruh s pastel tintem — vizuálně oddělí "kdo + kdy" od
+          samotného postu, tak jak to má Facebook / Instagram post. */}
+      <header className="flex items-start justify-between gap-3 border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-ink-900 ring-1 ring-white/60"
+            style={{ backgroundColor: avatarBg(topic.author_name) }}
+          >
+            {initialOf(topic.author_name)}
           </span>
-          <span className="text-xs text-ink-500">
-            {new Date(topic.last_activity_at).toLocaleDateString("cs-CZ", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </span>
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-sm font-semibold text-ink-900">
+              {topic.author_name}
+            </span>
+            <span className="text-xs text-ink-500">
+              <time dateTime={topic.created_at} title={created.toLocaleString("cs-CZ")}>
+                {absoluteDate}
+              </time>
+              <span aria-hidden> · </span>
+              <span>{relative}</span>
+            </span>
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           {topic.pinned && (
-            <span className="inline-flex items-center gap-1 rounded bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-brand">
-              <span aria-hidden>📌</span> Připnuto
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+              <span aria-hidden>📌</span>
+              <span className="hidden sm:inline">Připnuto</span>
             </span>
           )}
           {topic.locked && (
-            <span className="inline-flex rounded bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-ink-500">
+            <span className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
               Zamčeno
             </span>
           )}
           {(canModerate || canDelete) && (
-            <div className="ml-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="ml-0.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+              {/* Na dotykových zařízeních není hover, akce musí být vidět
+                  hned. Na desktopu je hide-until-hover, aby netahaly oči. */}
               {canModerate && (
                 <button
                   type="button"
@@ -315,7 +379,7 @@ function TopicCard({
                   }}
                   title={topic.pinned ? "Odepnout" : "Připnout"}
                   aria-label={topic.pinned ? "Odepnout" : "Připnout"}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:bg-surface-muted hover:text-ink-900 focus-ring"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:bg-surface-muted hover:text-ink-900 focus-ring"
                 >
                   <span aria-hidden>{topic.pinned ? "📌" : "📍"}</span>
                 </button>
@@ -330,7 +394,7 @@ function TopicCard({
                   }}
                   title="Smazat téma"
                   aria-label="Smazat téma"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:text-danger focus-ring"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-ink-500 shadow-sm hover:text-danger focus-ring"
                 >
                   <span aria-hidden>×</span>
                 </button>
@@ -340,47 +404,81 @@ function TopicCard({
         </div>
       </header>
 
-      <Link href={href} className="flex flex-col gap-3 focus-ring">
-        <h4
-          className="text-lg font-semibold text-ink-900"
-          style={{ letterSpacing: "-0.015em" }}
+      <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
+        <Link
+          href={href}
+          className="flex flex-col gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
-          {topic.title}
-        </h4>
-        {topic.body && (
-          // whitespace-pre-wrap zachová odstavce z originálu; break-words
-          // kryje dlouhé URL / bez mezer. Line-clamp 8 řádek — dost pro
-          // celý běžný post, dlouhé eseje ořízne s "…" a user musí
-          // kliknout do threadu. Facebook používá podobný pattern.
-          <p className="line-clamp-[8] whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-700">
-            {topic.body}
-          </p>
-        )}
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-ink-500">
-          <span className="inline-flex items-center gap-1">
-            <span aria-hidden>💬</span>
-            <strong className="text-ink-900 tabular-nums">
-              {topic.comment_count}
-            </strong>{" "}
-            {topic.comment_count === 1
-              ? "komentář"
-              : topic.comment_count < 5
-                ? "komentáře"
-                : "komentářů"}
-          </span>
-          {topic.like_count > 0 && (
-            <span
+          <h4
+            className="text-base font-semibold text-ink-900 sm:text-lg"
+            style={{ letterSpacing: "-0.015em" }}
+          >
+            {topic.title}
+          </h4>
+          {topic.body && (
+            <p
               className={[
-                "inline-flex items-center gap-1",
-                topic.i_liked ? "font-medium text-brand" : "text-ink-500",
+                "whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-700",
+                expanded ? "" : "line-clamp-4",
               ].join(" ")}
             >
-              <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
-              <span className="tabular-nums">{topic.like_count}</span>
-            </span>
+              {topic.body}
+            </p>
           )}
+        </Link>
+
+        {topic.body && needsExpand && (
+          // Standalone toggle — nesmí propagate do Link parenta (jinak
+          // by kliknutí na "Zobrazit více" navigovalo do threadu místo
+          // expandu). preventDefault + stopPropagation.
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            className="self-start text-xs font-medium text-brand hover:underline focus-ring"
+            aria-expanded={expanded}
+          >
+            {expanded ? "Zobrazit méně" : "Zobrazit více"}
+          </button>
+        )}
+
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3 text-xs text-ink-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden>💬</span>
+              <strong className="text-ink-900 tabular-nums">
+                {topic.comment_count}
+              </strong>{" "}
+              {topic.comment_count === 1
+                ? "komentář"
+                : topic.comment_count < 5
+                  ? "komentáře"
+                  : "komentářů"}
+            </span>
+            {topic.like_count > 0 && (
+              <span
+                className={[
+                  "inline-flex items-center gap-1",
+                  topic.i_liked ? "font-medium text-brand" : "text-ink-500",
+                ].join(" ")}
+              >
+                <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
+                <span className="tabular-nums">{topic.like_count}</span>
+              </span>
+            )}
+          </div>
+          <Link
+            href={href}
+            className="inline-flex items-center gap-1 font-medium text-ink-700 hover:text-brand focus-ring"
+          >
+            Otevřít diskuzi
+            <span aria-hidden>→</span>
+          </Link>
         </div>
-      </Link>
+      </div>
     </article>
   );
 }
