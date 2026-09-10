@@ -3,7 +3,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import type { AuthorAvatar, DiscussionComment } from "@/lib/api";
 
 import { PaperclipIcon } from "./icons";
@@ -118,13 +117,12 @@ export function CommentComposer({
     placeholder ??
     (replyTo ? `Odpověď ${replyTo.author_name}…` : "Napiš komentář…");
 
+  const canSubmit = (body.trim().length > 0 || !!attachment) && !posting;
+
   return (
     <form
       onSubmit={handle}
-      className={[
-        "flex gap-2",
-        compact ? "items-start" : "items-start",
-      ].join(" ")}
+      className="flex items-start gap-2"
     >
       {!compact && (
         <Avatar
@@ -134,14 +132,18 @@ export function CommentComposer({
           focalX={currentUser.avatar_focal_x}
           focalY={currentUser.avatar_focal_y}
           zoom={currentUser.avatar_zoom}
-          size={32}
+          size={28}
         />
       )}
-      <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-2xl border border-border bg-surface-muted/50 px-3 py-2">
+      {/* Kompaktní bublina — jeden řádek s inline paperclip + odeslat
+          ikonou. Reply chip a přílohové preview se přidávají nahoře
+          když jsou aktivní. Menší padding + placeholder shrinks celý
+          composer o polovinu proti FB-mock ale zachovává funkce. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-full border border-border bg-surface-muted/50 px-2 py-1 focus-within:border-brand/40 focus-within:bg-surface">
         {replyTo && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-2 py-1 text-xs">
+          <div className="mx-1 mt-1 flex flex-wrap items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-2 py-0.5 text-[11px]">
             <span className="text-ink-700">
-              Odpovídáš{" "}
+              Odpověď{" "}
               <strong className="text-ink-900">{replyTo.author_name}</strong>
             </span>
             {onCancelReply && (
@@ -149,98 +151,121 @@ export function CommentComposer({
                 type="button"
                 onClick={onCancelReply}
                 className="font-medium text-ink-500 hover:text-ink-900"
+                aria-label="Zrušit odpověď"
               >
-                × Zrušit
+                ×
               </button>
             )}
           </div>
         )}
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={body}
-          onChange={(e) => {
-            setBody(e.target.value);
-            // Auto-grow: schrneme na 1 řádek při prázdném vstupu,
-            // jinak dorosteme do scrollHeight (max-h drží strop, ať
-            // extremně dlouhé posty nevytočí celou kartu). FB pattern.
-            const el = e.currentTarget;
-            el.style.height = "auto";
-            el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-          }}
-          placeholder={effectivePlaceholder}
-          onKeyDown={(e) => {
-            // Ctrl/Cmd+Enter posts. Enter alone keeps newlines
-            // (FB-parity — comment textarea is multiline).
-            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-              e.preventDefault();
-              (e.currentTarget.form as HTMLFormElement | null)?.requestSubmit();
-            }
-          }}
-          className="w-full resize-none overflow-y-auto bg-transparent text-sm text-ink-900 placeholder:text-ink-500 focus:outline-none"
-        />
-        {imagePreview ? (
-          <div className="relative w-fit">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imagePreview}
-              alt="Náhled přílohy"
-              className="max-h-40 rounded-md border border-border"
-            />
-            <button
-              type="button"
-              onClick={clearAttachment}
-              aria-label="Odebrat přílohu"
-              className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-canvas text-ink-700 shadow-sm hover:text-danger focus-ring"
-            >
-              <span aria-hidden>×</span>
-            </button>
+        {(imagePreview || attachment) && (
+          <div className="mx-1">
+            {imagePreview ? (
+              <div className="relative w-fit">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreview}
+                  alt="Náhled přílohy"
+                  className="max-h-32 rounded-md border border-border"
+                />
+                <button
+                  type="button"
+                  onClick={clearAttachment}
+                  aria-label="Odebrat přílohu"
+                  className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-canvas text-[10px] text-ink-700 shadow-sm hover:text-danger focus-ring"
+                >
+                  <span aria-hidden>×</span>
+                </button>
+              </div>
+            ) : attachment ? (
+              <div className="flex w-fit items-center gap-1.5 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px]">
+                <PaperclipIcon />
+                <span className="max-w-[200px] truncate font-medium text-ink-900">
+                  {attachment.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearAttachment}
+                  aria-label="Odebrat přílohu"
+                  className="text-ink-500 hover:text-danger"
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
           </div>
-        ) : attachment ? (
-          <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-surface px-2 py-1 text-xs">
-            <PaperclipIcon />
-            <span className="max-w-[240px] truncate font-medium text-ink-900">
-              {attachment.name}
-            </span>
-            <button
-              type="button"
-              onClick={clearAttachment}
-              aria-label="Odebrat přílohu"
-              className="text-ink-500 hover:text-danger"
-            >
-              ×
-            </button>
-          </div>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        )}
+        <div className="flex items-end gap-1">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={body}
+            onChange={(e) => {
+              setBody(e.target.value);
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+            }}
+            placeholder={effectivePlaceholder}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                (e.currentTarget.form as HTMLFormElement | null)?.requestSubmit();
+              }
+            }}
+            className="min-h-[28px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1 text-sm text-ink-900 placeholder:text-ink-500 focus:outline-none"
+          />
           <label
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-transparent px-2 py-1 text-xs font-medium text-ink-500 hover:bg-surface hover:text-ink-900 focus-within:ring-2 focus-within:ring-brand/40"
-            title="Přidat přílohu"
+            className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-ink-500 hover:bg-surface hover:text-ink-900 focus-within:ring-2 focus-within:ring-brand/40"
+            title={attachment ? "Změnit přílohu" : "Přidat přílohu"}
           >
             <PaperclipIcon />
-            <span>{attachment ? "Změnit" : "Příloha"}</span>
             <input
               type="file"
               onChange={pickAttachment}
               className="hidden"
             />
           </label>
-          <Button
+          <button
             type="submit"
-            variant="primary"
-            size="md"
-            loading={posting}
-            disabled={(!body.trim() && !attachment) || posting}
+            disabled={!canSubmit}
+            aria-label={replyTo ? "Odeslat odpověď" : "Publikovat"}
+            className={[
+              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors focus-ring",
+              canSubmit
+                ? "bg-brand text-brand-ink hover:opacity-90"
+                : "bg-surface text-ink-500 opacity-60",
+            ].join(" ")}
           >
-            {posting
-              ? "Odesílám…"
-              : replyTo
-                ? "Odeslat odpověď"
-                : "Publikovat"}
-          </Button>
+            {posting ? (
+              <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-brand-ink/40 border-t-brand-ink" />
+            ) : (
+              <SendIcon />
+            )}
+          </button>
         </div>
       </div>
     </form>
+  );
+}
+
+/** Feather-icons Send glyph — telegram-like paper plane. */
+function SendIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4z" />
+    </svg>
   );
 }
 

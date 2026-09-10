@@ -75,6 +75,7 @@ export function TopicCard({
 }: Props) {
   const confirmDialog = useConfirm();
   const [expanded, setExpanded] = useState(!!initiallyExpanded);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
   const [detail, setDetail] = useState<DiscussionTopicDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -374,10 +375,42 @@ export function TopicCard({
           {topic.title}
         </h4>
         {topic.body && (
-          <RichText
-            text={topic.body}
-            className="whitespace-pre-wrap break-words text-sm leading-snug text-ink-700"
-          />
+          <>
+            {/* line-clamp na wrap divu clampne text bez ohledu na
+                inline span uvnitř RichText — display: -webkit-box na
+                wrap-u + span content jako inline text. Heuristika pro
+                „potřebuje expand": > ~4 řádky textu (280 chars nebo
+                4+ řádky). Kratší posty se ukazují celé. */}
+            {bodyNeedsExpand(topic.body) ? (
+              <div
+                className={
+                  bodyExpanded
+                    ? "text-sm leading-snug text-ink-700"
+                    : "line-clamp-4 text-sm leading-snug text-ink-700"
+                }
+              >
+                <RichText
+                  text={topic.body}
+                  className="whitespace-pre-wrap break-words"
+                />
+              </div>
+            ) : (
+              <RichText
+                text={topic.body}
+                className="whitespace-pre-wrap break-words text-sm leading-snug text-ink-700"
+              />
+            )}
+            {bodyNeedsExpand(topic.body) && (
+              <button
+                type="button"
+                onClick={() => setBodyExpanded((v) => !v)}
+                aria-expanded={bodyExpanded}
+                className="self-start text-xs font-medium text-brand hover:underline focus-ring"
+              >
+                {bodyExpanded ? "Zobrazit méně" : "Zobrazit více"}
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -390,7 +423,7 @@ export function TopicCard({
       />
 
       {/* Comments section: hidden N link + preview / full list */}
-      <div className="flex flex-col gap-3 border-t border-border bg-surface-muted/20 px-3 py-3 sm:px-4">
+      <div className="flex flex-col gap-2 border-t border-border bg-surface-muted/20 px-3 py-2 sm:px-4 sm:py-3">
         {detailError && (
           <p className="text-xs text-danger">{detailError}</p>
         )}
@@ -717,14 +750,14 @@ function TopicActionsBar({
           ? `${topic.comment_count} komentáře`
           : `${topic.comment_count} komentářů`;
   return (
-    <div className="flex items-center gap-1 border-t border-border px-2 py-1.5">
+    <div className="flex items-center gap-0.5 border-t border-border px-2 py-1">
       <button
         type="button"
         onClick={() => void onToggleLike()}
         aria-pressed={topic.i_liked}
         disabled={likeBusy}
         className={[
-          "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors focus-ring",
+          "inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium transition-colors focus-ring",
           topic.i_liked
             ? "text-brand hover:bg-brand/5"
             : "text-ink-700 hover:bg-surface-muted",
@@ -733,7 +766,7 @@ function TopicActionsBar({
         <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
         <span>Líbí</span>
         {topic.like_count > 0 && (
-          <span className="tabular-nums text-xs text-ink-500">
+          <span className="tabular-nums text-[11px] text-ink-500">
             · {topic.like_count}
           </span>
         )}
@@ -742,13 +775,20 @@ function TopicActionsBar({
         type="button"
         onClick={onToggleExpand}
         aria-expanded={expanded}
-        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted focus-ring"
+        className="inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-ink-700 transition-colors hover:bg-surface-muted focus-ring"
       >
         <span aria-hidden>💬</span>
         <span>{commentLabel}</span>
       </button>
     </div>
   );
+}
+
+/** Kdy dát „Zobrazit více" tlačítko pod post body. Krátké posty
+ *  (méně než ~4 řádky) se ukazují celé — clamp + toggle by tam byl
+ *  zbytečný. Heuristika: 280 znaků nebo 4+ hardcoded newliny. */
+function bodyNeedsExpand(body: string): boolean {
+  return body.length > 280 || body.split("\n").length > 4;
 }
 
 /** „Před N dny" / „dnes" / „včera" / older-as-date pro headline. */
