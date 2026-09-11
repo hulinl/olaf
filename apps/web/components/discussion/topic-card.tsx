@@ -780,14 +780,38 @@ function TopicActionsBar({
       : topic.comment_count < 5
         ? `${topic.comment_count} komentáře`
         : `${topic.comment_count} komentářů`;
-  const hasStats = topic.like_count > 0 || topic.comment_count > 0;
   return (
-    <div className="flex flex-col gap-1 border-t border-border px-3 pb-1 pt-2 sm:px-4">
-      {/* Souhrn reakcí — jeden řádek nad akcemi. Facebook-style: čísla
-          jsou drobná, klikatelná, sjednocují líbí + komentáře do jedné
-          meta-liny místo dvou oddělených badge tlačítek. */}
-      {hasStats && (
-        <div className="flex items-center gap-3 text-[11px] text-ink-500">
+    // Akce + stats na jednom řádku: Líbí / Komentovat vlevo (grow),
+    // stats (♥ N · N komentářů) v pravém rohu drobným textem. Předtím
+    // stats zabírala vlastní řádek nad akcemi — screenshot feedback
+    // 2026-09-11 „zbytečně bere řádek".
+    <div className="flex items-center gap-2 border-t border-border px-2 py-1">
+      <button
+        type="button"
+        onClick={() => void onToggleLike()}
+        aria-pressed={topic.i_liked}
+        disabled={likeBusy}
+        className={[
+          "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors focus-ring",
+          topic.i_liked
+            ? "text-brand hover:bg-brand/5"
+            : "text-ink-700 hover:bg-surface-muted",
+        ].join(" ")}
+      >
+        <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
+        <span>Líbí</span>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        aria-expanded={expanded}
+        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-ink-700 transition-colors hover:bg-surface-muted focus-ring"
+      >
+        <span aria-hidden>💬</span>
+        <span>Komentovat</span>
+      </button>
+      {(topic.like_count > 0 || topic.comment_count > 0) && (
+        <div className="flex shrink-0 items-center gap-2 pr-1 text-[11px] text-ink-500">
           {topic.like_count > 0 && (
             <span
               className={[
@@ -797,7 +821,7 @@ function TopicActionsBar({
               aria-label={`Líbí se ${topic.like_count}`}
             >
               <span aria-hidden>♥</span>
-              <span className="tabular-nums font-medium">{topic.like_count}</span>
+              <span className="tabular-nums">{topic.like_count}</span>
             </span>
           )}
           {topic.comment_count > 0 && (
@@ -811,32 +835,6 @@ function TopicActionsBar({
           )}
         </div>
       )}
-      <div className="flex items-center gap-0.5">
-        <button
-          type="button"
-          onClick={() => void onToggleLike()}
-          aria-pressed={topic.i_liked}
-          disabled={likeBusy}
-          className={[
-            "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors focus-ring",
-            topic.i_liked
-              ? "text-brand hover:bg-brand/5"
-              : "text-ink-700 hover:bg-surface-muted",
-          ].join(" ")}
-        >
-          <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
-          <span>Líbí</span>
-        </button>
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          aria-expanded={expanded}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-ink-700 transition-colors hover:bg-surface-muted focus-ring"
-        >
-          <span aria-hidden>💬</span>
-          <span>Komentovat</span>
-        </button>
-      </div>
     </div>
   );
 }

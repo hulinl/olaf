@@ -51,29 +51,58 @@ export function CommentCard({
           bubliny (jinak visí bez kontextu vpravo dolů) a přílohu
           umisťujeme jako subtílní pill, aby nedominoval nad textem. */}
       <div className="relative w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <Avatar
-            firstName={c.author_name}
-            lastName=""
-            avatarUrl={c.author_avatar.url}
-            focalX={c.author_avatar.focal_x}
-            focalY={c.author_avatar.focal_y}
-            zoom={c.author_avatar.zoom}
-            size={16}
-            userId={c.author_id ?? null}
-            userSlug={c.author_avatar.slug || null}
-          />
-          {c.author_avatar.slug || c.author_id ? (
-            <a
-              href={`/u/${c.author_avatar.slug || c.author_id}`}
-              className="text-[13px] font-semibold leading-none text-ink-900 hover:text-brand"
+        {/* Hlavička bubliny: avatar + jméno + čas + volitelný like
+            counter — vše v jednom řádku, ať čas nezabírá vlastní
+            patku (2026-09-11 user request „čas za jméno"). */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <Avatar
+              firstName={c.author_name}
+              lastName=""
+              avatarUrl={c.author_avatar.url}
+              focalX={c.author_avatar.focal_x}
+              focalY={c.author_avatar.focal_y}
+              zoom={c.author_avatar.zoom}
+              size={16}
+              userId={c.author_id ?? null}
+              userSlug={c.author_avatar.slug || null}
+            />
+            {c.author_avatar.slug || c.author_id ? (
+              <a
+                href={`/u/${c.author_avatar.slug || c.author_id}`}
+                className="text-[13px] font-semibold leading-none text-ink-900 hover:text-brand"
+              >
+                {c.author_name}
+              </a>
+            ) : (
+              <p className="text-[13px] font-semibold leading-none text-ink-900">
+                {c.author_name}
+              </p>
+            )}
+          </div>
+          <time
+            dateTime={c.created_at}
+            title={new Date(c.created_at).toLocaleString("cs-CZ")}
+            className="text-[11px] text-ink-500"
+          >
+            {new Date(c.created_at).toLocaleString("cs-CZ", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </time>
+          {c.like_count > 0 && (
+            <span
+              className={[
+                "ml-auto inline-flex items-center gap-1 text-[11px]",
+                c.i_liked ? "text-brand" : "text-ink-500",
+              ].join(" ")}
+              aria-label={`Líbí se ${c.like_count}`}
             >
-              {c.author_name}
-            </a>
-          ) : (
-            <p className="text-[13px] font-semibold leading-none text-ink-900">
-              {c.author_name}
-            </p>
+              <span aria-hidden>♥</span>
+              <span className="tabular-nums">{c.like_count}</span>
+            </span>
           )}
         </div>
         {c.body && (
@@ -90,33 +119,6 @@ export function CommentCard({
             />
           </div>
         )}
-        {/* Meta patka bubliny — čas + lajk counter. Zůstává drobným
-            textem, aby netlačila na obsah. */}
-        <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] text-ink-500">
-          <time
-            dateTime={c.created_at}
-            title={new Date(c.created_at).toLocaleString("cs-CZ")}
-          >
-            {new Date(c.created_at).toLocaleString("cs-CZ", {
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </time>
-          {c.like_count > 0 && (
-            <span
-              className={[
-                "inline-flex items-center gap-1",
-                c.i_liked ? "text-brand" : "text-ink-500",
-              ].join(" ")}
-              aria-label={`Líbí se ${c.like_count}`}
-            >
-              <span aria-hidden>♥</span>
-              <span className="tabular-nums">{c.like_count}</span>
-            </span>
-          )}
-        </div>
       </div>
       {/* Akce pod bublinou — všechny na stejném řádku vlevo, i Smazat.
           Předtím bylo Smazat přes ml-auto na pravém kraji, čímž se

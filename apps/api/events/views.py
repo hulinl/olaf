@@ -1198,6 +1198,31 @@ def update_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     serializer = EventWriteSerializer(event, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
 
+    # Draft slug refresh: dokud je akce ještě draft a user nezasílá
+    # explicit slug, regenerujeme slug z nového titlu. Publikované
+    # akce mají slug „locked" — přejmenování jen vytvoří EventSlugAlias
+    # skrz pre_save signal. User request 2026-09-11: kopie a nové
+    # drafty nesmí mít v URL zbytky jako „-kopie" nebo staré názvy.
+    if (
+        "title" in serializer.validated_data
+        and "slug" not in serializer.validated_data
+        and event.status == Event.STATUS_DRAFT
+    ):
+        from django.utils.text import slugify
+
+        base = slugify(serializer.validated_data["title"]) or "akce"
+        candidate = base
+        n = 2
+        while (
+            Event.objects.filter(workspace=event.workspace, slug=candidate)
+            .exclude(pk=event.pk)
+            .exists()
+        ):
+            candidate = f"{base}-{n}"
+            n += 1
+        if candidate != event.slug:
+            serializer.validated_data["slug"] = candidate
+
     new_slug = serializer.validated_data.get("slug")
     if (
         new_slug
@@ -1350,8 +1375,10 @@ def duplicate_event(
     Templates (V1.5).
 
     New event:
-    - title = `{title} (kopie)`
-    - slug = `{slug}-kopie[-N]` (unique within workspace)
+    - title = original (bez "(kopie)" suffixu — status=draft badge to
+      říká líp než text v názvu)
+    - slug = čistý slugify(title)[-N] dedup — nikdy neobsahuje "-kopie"
+      (2026-09-11 user report „run-01-kopie vypadá neprofesionálně")
     - status = draft
     - cancellation_reason = "" (start clean)
     - cover file is duplicated, not referenced
@@ -1361,6 +1388,7 @@ def duplicate_event(
     - RSVPs, gallery images, co-creators — NOT copied
     """
     from django.core.files.base import ContentFile
+    from django.utils.text import slugify
 
     try:
         event = Event.objects.select_related("workspace").get(
@@ -1372,7 +1400,7 @@ def duplicate_event(
     if not can_manage_event(request.user, event):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-    base = f"{event.slug}-kopie"
+    base = slugify(event.title) or "akce"
     new_slug = base
     n = 2
     while Event.objects.filter(workspace=event.workspace, slug=new_slug).exists():
@@ -1382,7 +1410,7 @@ def duplicate_event(
     copy = Event.objects.create(
         workspace=event.workspace,
         slug=new_slug,
-        title=f"{event.title} (kopie)",
+        title=event.title,
         description=event.description,
         starts_at=event.starts_at,
         ends_at=event.ends_at,
