@@ -269,3 +269,39 @@ class EmailTemplateRenderTests(TestCase):
             self.assertNotIn("#}", content, "leaked template comment end")
             self.assertNotIn("{%", content, "leaked template tag start")
             self.assertNotIn("{{", content, "leaked template var start")
+
+    def test_all_email_templates_have_single_line_comments(self) -> None:
+        """Statická kontrola všech `templates/emails/*.html` souborů —
+        Django `{# ... #}` comment tag je striktně single-line. Bug
+        2026-09-11: `event_available.html` a `workspace_broadcast.html`
+        měly multi-line `{# ... #}` → render engine je neparsoval a
+        text se objevil v mailu.
+
+        Test scanne všechny HTML mail templates a fail-í, když najde
+        `{#` bez odpovídajícího `#}` na stejném řádku. Ideálně by měl
+        team používat `{% comment %}...{% endcomment %}` pro víceřádkové
+        komentáře (nebo je vůbec neposlat do templates).
+        """
+        from pathlib import Path
+
+        from django.conf import settings
+
+        templates_dir = (
+            Path(settings.BASE_DIR) / "templates" / "emails"
+        )
+        assert templates_dir.exists(), templates_dir
+        offenders: list[str] = []
+        for path in sorted(templates_dir.glob("*.html")):
+            for line_no, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if "{#" not in line:
+                    continue
+                idx = line.index("{#")
+                if "#}" not in line[idx:]:
+                    offenders.append(
+                        f"{path.name}:{line_no} — multi-line "
+                        f"{{# ... #}} block; použij "
+                        f"{{% comment %}}...{{% endcomment %}}"
+                    )
+        self.assertEqual(offenders, [], "\n".join(offenders))

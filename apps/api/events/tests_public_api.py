@@ -381,3 +381,74 @@ class PublicEventsListTests(TestCase):
         self.assertEqual(body["price"]["note"], "v ceně je oběd")
         # coverImage je None protože jsme neuploadovali cover.
         self.assertIsNone(body["coverImage"])
+        # Guides pole existuje i pro akce bez organizers bloku (empty).
+        self.assertEqual(body["guides"], [])
+
+
+class PublicEventsGuidesTests(TestCase):
+    """Guides field v public API payloadu — pole {name, avatarImage}
+    z organizers landing bloku. Respekt user's profile_show_avatar
+    toggle a filtr proti aktuálnímu organizer pool-u."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        from workspaces.models import WorkspaceMember
+
+        self.owner = User.objects.create_user(
+            email="owner@example.com",
+            password="pass-abcdef-1234",
+            first_name="Owner",
+            last_name="One",
+        )
+        self.ws = Workspace.objects.create(slug="ws", name="WS")
+        WorkspaceMember.objects.create(
+            workspace=self.ws,
+            user=self.owner,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+        self.url = reverse("public-events-batch")
+
+    def _make_event_with_organizers(self, user_ids: list[int]) -> Event:
+        return _make_event(
+            self.ws,
+            slug="s-org",
+            blocks=[
+                {
+                    "id": "b1",
+                    "type": "organizers",
+                    "payload": {"user_ids": user_ids},
+                }
+            ],
+        )
+
+    def test_guides_lists_valid_pool_members(self) -> None:
+        self._make_event_with_organizers([self.owner.id])
+        body = self.client.get(self.url).json()[0]
+        self.assertEqual(len(body["guides"]), 1)
+        self.assertEqual(body["guides"][0]["name"], "Owner One")
+
+    def test_guides_skips_users_outside_pool(self) -> None:
+        # Vytvořený user, ale není owner/admin/collaborator té workspace
+        # → block ho drží, ale API má vrátit prázdné pole.
+        stranger = User.objects.create_user(
+            email="stranger@example.com",
+            password="pass-abcdef-1234",
+            first_name="Cizinec",
+            last_name="Zvenku",
+        )
+        self._make_event_with_organizers([stranger.id])
+        body = self.client.get(self.url).json()[0]
+        self.assertEqual(body["guides"], [])
+
+    def test_guides_skips_avatar_when_user_hid_it(self) -> None:
+        self.owner.profile_show_avatar = False
+        self.owner.save(update_fields=["profile_show_avatar"])
+        self._make_event_with_organizers([self.owner.id])
+        body = self.client.get(self.url).json()[0]
+        self.assertEqual(body["guides"][0]["name"], "Owner One")
+        self.assertIsNone(body["guides"][0]["avatarImage"])
+
+    def test_guides_empty_when_no_organizers_block(self) -> None:
+        _make_event(self.ws, slug="proste-akce")
+        body = self.client.get(self.url).json()[0]
+        self.assertEqual(body["guides"], [])

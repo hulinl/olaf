@@ -112,6 +112,74 @@ def _compute_state(event: Event, now, registered: int) -> str:
     return "open"
 
 
+def _resolve_guides(event: Event) -> list[dict]:
+    """Vede-li akci vybraný organizátor (přes organizers landing block),
+    vrátíme ho externímu konzumentovi jako `{name, avatarImage}`.
+
+    Reuse logika z `EventDetailSerializer.get_organizers_by_user_id`:
+    z bloku typu `organizers` vezmeme `user_ids` v pořadí jak je
+    asistentka seřadila; filtrujeme proti aktuálnímu organizer pool-u
+    (workspace owner/admin sjednoceno s EventCollaborator) aby nezůstal viset
+    zombie ID.
+    """
+    ids: list[int] = []
+    seen: set[int] = set()
+    for block in event.blocks or []:
+        if not isinstance(block, dict) or block.get("type") != "organizers":
+            continue
+        for uid in (block.get("payload") or {}).get("user_ids") or []:
+            if isinstance(uid, int) and uid not in seen:
+                ids.append(uid)
+                seen.add(uid)
+    if not ids:
+        return []
+
+    from accounts.models import User
+    from workspaces.models import WorkspaceMember
+
+    from .models import EventCollaborator
+
+    pool_ids: set[int] = set(
+        WorkspaceMember.objects.filter(
+            workspace=event.workspace,
+            role__in=[
+                WorkspaceMember.ROLE_OWNER,
+                WorkspaceMember.ROLE_ADMIN,
+            ],
+        ).values_list("user_id", flat=True)
+    )
+    pool_ids.update(
+        EventCollaborator.objects.filter(event=event).values_list(
+            "user_id", flat=True
+        )
+    )
+    ids = [uid for uid in ids if uid in pool_ids]
+    if not ids:
+        return []
+
+    users_by_id = {u.id: u for u in User.objects.filter(id__in=ids)}
+    guides: list[dict] = []
+    for uid in ids:
+        u = users_by_id.get(uid)
+        if u is None:
+            continue
+        avatar_url = ""
+        # Respect profile_show_avatar toggle — když si user schoval
+        # avatar z veřejnosti, ani external web ho nedostane.
+        if u.avatar and getattr(u, "profile_show_avatar", True):
+            try:
+                avatar_url = _absolute_media_url(u.avatar.url)
+            except (ValueError, AttributeError):
+                avatar_url = ""
+        guides.append(
+            {
+                "name": u.get_full_name() or u.email,
+                "avatarImage": avatar_url or None,
+            }
+        )
+    return guides
+
+
 def _serialize_event(event: Event, now) -> dict:
     """Payload dle spec v3 (2026-09-11 rozšíření o coverImage,
     description, price — nice-to-have pole aby externí konzumenti měli
@@ -155,6 +223,7 @@ def _serialize_event(event: Event, now) -> dict:
         "coverImage": cover_url or None,
         "description": event.description or "",
         "price": price,
+        "guides": _resolve_guides(event),
     }
 
 
