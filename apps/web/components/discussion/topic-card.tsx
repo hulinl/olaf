@@ -85,6 +85,12 @@ export function TopicCard({
 
   const canModerate = scope.isModerator;
   const canDeleteTopic = canModerate || topic.author_id === currentUser.id;
+  // Když v pravém horním rohu nic není (žádný pin/lock badge ani
+  // moderátor menu), nechceme držet 56/64 px pravý buffer — stats
+  // vedle titulku mají jít až k okraji karty. Když badge/menu je,
+  // zachováme buffer, aby se neplácli o sebe.
+  const hasTopRight =
+    topic.pinned || topic.locked || canModerate || canDeleteTopic;
 
   async function loadDetail() {
     setDetailLoading(true);
@@ -367,7 +373,12 @@ export function TopicCard({
         onDelete={() => onDelete(topic.id)}
       />
 
-      <div className="flex flex-col gap-2 px-3 py-3 pr-14 sm:px-4 sm:pr-16">
+      <div
+        className={[
+          "flex flex-col gap-2 px-3 py-3 sm:px-4",
+          hasTopRight ? "pr-14 sm:pr-16" : "",
+        ].join(" ")}
+      >
         {/* Titulek + stats na jednom řádku — user request 2026-09-11
             „srdce/komentáře vedle nadpisu, ne u autora". Titulek roste,
             stats jsou fixní vpravo; když je titul dlouhý, wrap-ne pod
