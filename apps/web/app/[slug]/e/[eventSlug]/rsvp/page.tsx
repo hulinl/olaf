@@ -327,28 +327,46 @@ export default function RSVPPage({ params }: Props) {
             {headline}
           </h1>
           <p className="mt-3 text-ink-700">{successBody}</p>
-          {/* Anonymous flow → žádný auto-login, žádné "Moje účast"
-              cesty do aplikace. Místo toho ukážeme měkkou nabídku
-              vytvořit si účet s pre-filled e-mailem; pokud user
-              vyplnil ne-prázdnou hodnotu v acctEmail, předáme ho do
-              signup URL. */}
-          {!user && (
-            <p className="mt-6 text-sm text-ink-500">
-              Chceš spravovat svoje registrace a vidět všechny své akce na
-              jednom místě?{" "}
-              <Link
-                href={
-                  acctEmail
-                    ? `/signup?email=${encodeURIComponent(acctEmail)}`
-                    : "/signup"
-                }
-                className="font-medium text-ink-900 underline hover:text-brand"
-              >
-                Vytvořit si tu zdarma účet →
-              </Link>
-            </p>
-          )}
+          {/* Anonymous flow: RSVP jsme udělali, ale user zatím
+              nemá account. Předtím diskrétní text-link nechal moc
+              lidí projít bez signup — teď plnohodnotná CTA karta
+              vysvětlí, proč se to vyplatí. User request 2026-09-11:
+              „aby uživatelé neodcházeli". */}
         </div>
+
+        {!user && (
+          <div className="mt-8 w-full max-w-xl">
+            <div className="rounded-2xl border border-brand/30 bg-brand/5 p-5 text-left">
+              <h3 className="text-base font-semibold text-ink-900">
+                Dokonči registraci — nastav si účet
+              </h3>
+              <p className="mt-2 text-sm text-ink-700">
+                Zvládneš to za 30 vteřin. Uvidíš všechny svoje
+                registrace na jednom místě, dostaneš připomenutí před
+                akcí a nemusíš vyplňovat jméno/telefon znovu na
+                další.
+              </p>
+              <p className="mt-2 text-xs text-ink-500">
+                Máme tvůj e-mail. Po odeslání ti přijde link, kliknutím
+                dokončíš setup a budeš rovnou přihlášený.
+              </p>
+              <div className="mt-4">
+                <LinkButton
+                  href={
+                    acctEmail
+                      ? `/signup?email=${encodeURIComponent(acctEmail)}`
+                      : "/signup"
+                  }
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                >
+                  Vytvořit účet →
+                </LinkButton>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           {user ? (

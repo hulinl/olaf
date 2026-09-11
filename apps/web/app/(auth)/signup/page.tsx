@@ -32,20 +32,20 @@ function SignupForm() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<"created" | "takeover" | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      await auth.signup({
+      const resp = await auth.signup({
         first_name: firstName,
         last_name: lastName,
         email,
         password,
       });
-      setSuccess(true);
+      setSuccess(resp.code ?? "created");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.firstFieldError() ?? err.message);
@@ -58,14 +58,24 @@ function SignupForm() {
   }
 
   if (success) {
+    const isTakeover = success === "takeover";
     return (
       <AuthShell
-        title="Zkontroluj e-mail"
+        title={isTakeover ? "Vítáme tě zpátky!" : "Zkontroluj e-mail"}
         subtitle={
-          <>
-            Poslali jsme ověřovací odkaz na <strong>{email}</strong>. Klikni
-            na něj a účet ti aktivujeme.
-          </>
+          isTakeover ? (
+            <>
+              Tuhle adresu už u nás známe z tvé předchozí registrace na
+              akci. Poslali jsme na <strong>{email}</strong> ověřovací odkaz
+              — po kliknutí budeš rovnou přihlášený.
+            </>
+          ) : (
+            <>
+              Poslali jsme ověřovací odkaz na <strong>{email}</strong>. Po
+              kliknutí na něj budeš rovnou přihlášený, není potřeba se pak
+              znovu logovat.
+            </>
+          )
         }
         footer={
           <Link href="/login" className="underline">
@@ -75,7 +85,11 @@ function SignupForm() {
       >
         <p className="text-sm text-ink-500">
           Odkaz platí 24 hodin. Pokud e-mail nevidíš, mrkni do složky
-          Spam.
+          Spam. Nedorazil? Na{" "}
+          <Link href="/login" className="underline">
+            přihlašovací stránce
+          </Link>{" "}
+          si můžeš nechat poslat nový.
         </p>
       </AuthShell>
     );

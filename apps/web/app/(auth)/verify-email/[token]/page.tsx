@@ -4,7 +4,6 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
 import { AuthShell } from "@/components/ui/auth-shell";
-import { LinkButton } from "@/components/ui/button";
 import { ApiError, auth } from "@/lib/api";
 
 type Status = "pending" | "success" | "error";
@@ -27,7 +26,15 @@ export default function VerifyEmailPage({
         await auth.verifyEmail(token);
         if (cancelled) return;
         setStatus("success");
-        setMessage("E-mail je ověřený. Teď se můžeš přihlásit.");
+        setMessage("Hotovo, přesouváme tě do aplikace…");
+        // Auto-login: backend nastavuje session přímo na verify (viz
+        // accounts.views.verify_email 2026-09-11). Přesměrujeme
+        // rovnou do dashboardu, ať user nemusí znovu zadávat heslo.
+        // Redirect přes plné navigation (assign) — SPA push by
+        // nepřevzalo novou session cookie do fetch layeru.
+        setTimeout(() => {
+          if (!cancelled) window.location.assign("/dashboard");
+        }, 400);
       } catch (err) {
         if (cancelled) return;
         setStatus("error");
@@ -41,13 +48,15 @@ export default function VerifyEmailPage({
     return () => {
       cancelled = true;
     };
+    // router není v deps záměrně — cíl je jednorázový verify při mountu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const title =
     status === "pending"
       ? "Ověřuji e-mail…"
       : status === "success"
-        ? "Hotovo"
+        ? "Vítej!"
         : "Ověření se nepovedlo";
 
   return (
@@ -65,15 +74,10 @@ export default function VerifyEmailPage({
         ) : null
       }
     >
-      {status === "pending" && (
+      {(status === "pending" || status === "success") && (
         <div className="flex justify-center py-2">
           <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
         </div>
-      )}
-      {status === "success" && (
-        <LinkButton href="/login" variant="primary" size="lg" fullWidth>
-          Přejít na přihlášení
-        </LinkButton>
       )}
     </AuthShell>
   );

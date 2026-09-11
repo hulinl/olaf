@@ -48,7 +48,8 @@ def signup(request: Request) -> Response:
     data = serializer.validated_data
 
     existing = User.objects.filter(email=data["email"]).first()
-    if existing is not None and not existing.email_verified:
+    take_over = existing is not None and not existing.email_verified
+    if take_over:
         existing.set_password(data["password"])
         existing.first_name = data["first_name"]
         existing.last_name = data["last_name"]
@@ -69,8 +70,26 @@ def signup(request: Request) -> Response:
     token = EmailVerificationToken.objects.create(user=user)
     send_verification_email(user, token)
 
+    # Response nese `code` pro frontend, aby take-over flow (uživatel
+    # už měl anon RSVP účet, teď mu jen zakládáme heslo) dostal jinou
+    # hlášku než čerstvá registrace. User report 2026-09-11: bez toho
+    # signup dostávali stejný „check email" message a nevěděli, že
+    # už jsou v systému.
+    if take_over:
+        detail = (
+            "Tenhle e-mail už u nás známe z tvé předchozí registrace na "
+            "akci. Poslali jsme ti mail — po kliknutí na odkaz budeš rovnou "
+            "přihlášený a hotovo."
+        )
+        code = "takeover"
+    else:
+        detail = (
+            "Účet je založený. Podívej se do e-mailu — po kliknutí na "
+            "odkaz budeš rovnou přihlášený."
+        )
+        code = "created"
     return Response(
-        {"detail": "Account created. Check your email to verify your address."},
+        {"detail": detail, "code": code, "email": user.email},
         status=status.HTTP_201_CREATED,
     )
 
@@ -139,7 +158,14 @@ def verify_email(request: Request) -> Response:
     token.user.save(update_fields=["email_verified"])
     token.mark_used()
 
-    return Response({"detail": "Email verified. You can now log in."})
+    # Auto-login: user právě prokázal, že vlastní e-mailovou adresu,
+    # takže mu rovnou dáme session. Odstraní zbytečný krok „a teď se
+    # přihlas heslem, které jsi před chvílí zadal". User report
+    # 2026-09-11.
+    login(request, token.user)
+    return Response(
+        UserSerializer(token.user, context={"request": request}).data
+    )
 
 
 @api_view(["POST"])

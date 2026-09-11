@@ -66,6 +66,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     profile_show_phone = models.BooleanField(default=False)
     profile_show_address = models.BooleanField(default=False)
     profile_show_avatar = models.BooleanField(default=True)
+
+    # 2026-09-11: pro proaktivní stuck-user nudge (viz management
+    # command `notify_stuck_users`). Timestamp posledního odeslaného
+    # připomenutí — používáme pro dedup, ať uživatel nedostane víc
+    # jak 1 mail za 48 h. Null pro účty, které nikdy nedostaly nudge.
+    last_stuck_reminder_at = models.DateTimeField(null=True, blank=True)
     # Legacy single-line address — kept so old data doesn't get dropped.
     # New code reads/writes address_street / address_city / ... below.
     address = models.CharField(max_length=500, blank=True)

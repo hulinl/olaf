@@ -28,6 +28,8 @@ class SignupTests(TestCase):
         self.assertEqual(EmailVerificationToken.objects.filter(user=user).count(), 1)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Potvrď svůj olaf účet", mail.outbox[0].subject)
+        # Response nese `code` pro frontend UX (2026-09-11).
+        self.assertEqual(resp.json().get("code"), "created")
 
     def test_rejects_short_password(self) -> None:
         self.payload["password"] = "short1"
@@ -78,6 +80,9 @@ class SignupTests(TestCase):
         self.assertEqual(existing.first_name, "Marta")
         self.assertEqual(existing.last_name, "Member")
         self.assertFalse(existing.email_verified)
+        # Response `code=takeover` — frontend UX ukáže „vítáme tě
+        # zpátky" místo obecné hlášky (2026-09-11).
+        self.assertEqual(resp.json().get("code"), "takeover")
 
 
 class EmailVerificationTests(TestCase):
@@ -99,6 +104,18 @@ class EmailVerificationTests(TestCase):
         self.token.refresh_from_db()
         self.assertTrue(self.user.email_verified)
         self.assertIsNotNone(self.token.used_at)
+
+    def test_verify_auto_logs_user_in(self) -> None:
+        """Response nese User payload a session cookie — user je
+        rovnou přihlášený, nemusí procházet login formu znovu.
+        User request 2026-09-11 (aby uživatelé neodcházeli)."""
+        resp = self.client.post(self.url, {"token": self.token.token}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # Response má User shape s e-mailem.
+        self.assertEqual(resp.json()["email"], "marta@example.com")
+        # /api/auth/me/ teď 200 (session cookie set jako side effect verify).
+        me = self.client.get(reverse("accounts:me"))
+        self.assertEqual(me.status_code, status.HTTP_200_OK)
 
     def test_invalid_token_rejected(self) -> None:
         resp = self.client.post(self.url, {"token": "not-a-real-token"}, format="json")

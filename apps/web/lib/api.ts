@@ -2581,12 +2581,22 @@ export const auth = {
     last_name: string;
     phone?: string;
   }) =>
-    apiFetch<{ detail: string }>("/api/auth/signup/", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+    // Backend rozlišuje `code: "takeover"` (existující unverified user
+    // z anon RSVP dostává heslo) vs `code: "created"` (nový účet).
+    // Frontend použije `code` na správnou hlášku, `email` jako
+    // fallback zobrazovaný adresátovi.
+    apiFetch<{ detail: string; code: "takeover" | "created"; email: string }>(
+      "/api/auth/signup/",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
   verifyEmail: (token: string) =>
-    apiFetch<{ detail: string }>("/api/auth/verify/", {
+    // Backend teď po úspěšném verify uděla auto-login a vrátí User
+    // payload (session cookie je set jako side effect). Frontend
+    // /verify-email/[token] page pak přesměruje do dashboardu.
+    apiFetch<User>("/api/auth/verify/", {
       method: "POST",
       body: JSON.stringify({ token }),
     }),
