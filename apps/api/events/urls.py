@@ -32,6 +32,14 @@ urlpatterns = [
         views.ingest_event_from_source,
         name="from-source",
     ),
+    # Canonical short-URL landing — `/api/events/e/<public_id>/`. Musí
+    # být nad `<slug:workspace_slug>/…` patterny, jinak by `e` matchlo
+    # jako workspace slug. 2026-09-11.
+    path(
+        "e/<str:public_id>/",
+        views.public_event_by_hash,
+        name="public-by-hash",
+    ),
     path(
         "import-schema/",
         views.import_schema,

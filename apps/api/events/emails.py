@@ -10,14 +10,24 @@ from .models import RSVP, Event
 
 
 def _frontend_event_url(event: Event) -> str:
+    """Canonical share URL (2026-09-11) — krátký `/e/<public_id>` alias
+    resolvuje se 308 redirectem na plný landing. Fallback na staré
+    `/{ws}/e/{slug}` jen kdyby event z nějakého důvodu neměl public_id
+    (mělo by být vždy vyplněné dle save() overloadu)."""
     base = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    if event.public_id:
+        return f"{base}/e/{event.public_id}"
     return f"{base}/{event.workspace.slug}/e/{event.slug}"
 
 
 def _frontend_cancel_url(rsvp: RSVP) -> str:
     """Magic-link URL pro guest cancel — `rsvp.cancel_token` jako query
     param. Tu URL posíláme do confirmation e-mailu, aby anon registrant
-    mohl registraci zrušit bez přihlášení do aplikace."""
+    mohl registraci zrušit bez přihlášení do aplikace.
+
+    RSVP cancel je vázán na fully-qualified landing URL (chce hostname
+    workspace pro breadcrumbs). Aliasy resolvují na backendu i tady
+    díky `_load_published_event` fallback logic."""
     base = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
     return (
         f"{base}/{rsvp.event.workspace.slug}/e/{rsvp.event.slug}"

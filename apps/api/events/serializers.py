@@ -196,6 +196,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = (
+            "public_id",
             "slug",
             "title",
             "description",

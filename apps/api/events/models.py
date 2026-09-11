@@ -1,4 +1,5 @@
 """Event + RSVP models (PRD §4.5, §4.6, §8)."""
+import secrets
 import uuid
 
 from django.conf import settings
@@ -8,6 +9,26 @@ from django.utils import timezone
 
 from workspaces.managers import TenantQuerySet, TenantScopedModel
 from workspaces.validators import SLUG_MAX_LENGTH, SLUG_RE
+
+# Crockford-inspired base32 alphabet — bez matoucích 0/O, 1/l/I. Používá
+# se pro `Event.public_id`. 8 znaků z tohoto alphabetu = ~1T kombinací,
+# collision u ~1M eventů ~pravděpodobnost 0.5 %.
+PUBLIC_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+PUBLIC_ID_LEN = 8
+
+
+def generate_event_public_id() -> str:
+    """Vygeneruje unique public_id pro Event. Retry-loop na collision;
+    použití secrets.choice zaručí crypto-safe randomness (nikdo nemůže
+    predikovat další hash a scrapovat drafty přes URL guessing)."""
+    # Import lazy — model třída ještě neexistuje při import time.
+    for _ in range(10):
+        candidate = "".join(
+            secrets.choice(PUBLIC_ID_ALPHABET) for _ in range(PUBLIC_ID_LEN)
+        )
+        if not Event.all_objects.filter(public_id=candidate).exists():
+            return candidate
+    raise RuntimeError("Could not generate unique event public_id after 10 tries")
 
 
 class EventQuerySet(TenantQuerySet):
@@ -83,6 +104,19 @@ class Event(TenantScopedModel):
     ]
 
     # Workspace FK + objects = TenantManager come from TenantScopedModel.
+
+    # Krátké public ID pro sdílené odkazy (2026-09-11) — canonical URL
+    # `/e/<public_id>`. Crockford-like base32 alphabet (bez 0/O, 1/l/I),
+    # 8 znaků = ~1T kombinací. Auto-gen v `save()` pokud prázdné; nikdy
+    # se nemění (i po rename slugu). Staré URL `/<ws>/e/<slug>` fungují
+    # jako alias — resolvují na canonical `/e/<hash>` přes 308 redirect.
+    public_id = models.CharField(
+        max_length=12,
+        unique=True,
+        blank=True,
+        db_index=True,
+        help_text="Short share ID, e.g. `a3b9kmnp`.",
+    )
 
     slug = models.SlugField(
         max_length=SLUG_MAX_LENGTH,
@@ -389,6 +423,11 @@ class Event(TenantScopedModel):
             raise ValidationError(
                 {"ends_at": "End date/time cannot be earlier than start."}
             )
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_event_public_id()
+        super().save(*args, **kwargs)
 
     @property
     def is_open_for_rsvp(self) -> bool:

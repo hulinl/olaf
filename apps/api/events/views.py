@@ -113,22 +113,10 @@ def _load_published_event(workspace_slug: str, event_slug: str):
     return alias.event
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def public_event(request: Request, workspace_slug: str, event_slug: str) -> Response:
-    """Public event landing-page data (PRD §4.5)."""
-    event = _load_published_event(workspace_slug, event_slug)
-    if event is None:
-        return Response(
-            {"detail": "Event not found."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    # Draft events show a friendly placeholder to non-owners instead of
-    # 404 — the owner shares the URL with collaborators / participants
-    # before flipping to published, and seeing "not found" was confusing
-    # enough that people kept asking "did you delete it?" Owners still
-    # see the full landing in preview mode.
+def _render_public_event(event: Event, request: Request) -> Response:
+    """Common event landing response — draft placeholder or full serializer.
+    Shared between the legacy `/{ws}/e/{slug}/` endpoint and the new
+    `/e/{public_id}/` canonical share URL."""
     if event.status == Event.STATUS_DRAFT and not can_manage_event(
         request.user, event
     ):
@@ -149,8 +137,6 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
 
     serializer = EventPublicSerializer(event, context={"request": request})
     payload = serializer.data
-
-    # If the requester is authenticated and has an RSVP, include it.
     if request.user.is_authenticated:
         my_rsvp = (
             RSVP.objects.filter(event=event, user=request.user).first()
@@ -161,8 +147,46 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
         payload["i_am_owner"] = can_manage_event(request.user, event)
     else:
         payload["i_am_owner"] = False
-
     return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_event_by_hash(request: Request, public_id: str) -> Response:
+    """Canonical share URL `/e/<public_id>/` — 2026-09-11 redesign.
+    Krátký hash je stabilní přes rename, žije mimo workspace slug
+    namespace, vejde se do 20-znakového URL. Staré `/<ws>/e/<slug>`
+    routes zůstávají funkční přes public_event níže."""
+    event = (
+        Event.objects.select_related("workspace")
+        .filter(public_id=public_id)
+        .first()
+    )
+    if event is None:
+        return Response(
+            {"detail": "Event not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return _render_public_event(event, request)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_event(request: Request, workspace_slug: str, event_slug: str) -> Response:
+    """Public event landing-page data (PRD §4.5).
+
+    Legacy vzorec `/api/events/<ws>/<event>/` — resolvuje workspace i
+    event slug přes aliasy. Nový klient sdílí přes public_id (viz
+    `public_event_by_hash`), payload nese `public_id`, aby si frontend
+    mohl 308 na canonical URL sáhnout.
+    """
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None:
+        return Response(
+            {"detail": "Event not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return _render_public_event(event, request)
 
 
 class _ExistingVerifiedUser(Exception):

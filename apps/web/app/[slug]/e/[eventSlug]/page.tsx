@@ -120,7 +120,11 @@ export default async function EventLandingPage({ params }: Props) {
           </Link>
           <div className="flex items-center gap-3">
             <ShareButton
-              url={`/${event.workspace_slug}/e/${event.slug}`}
+              url={
+                event.public_id
+                  ? `/e/${event.public_id}`
+                  : `/${event.workspace_slug}/e/${event.slug}`
+              }
               title={event.title}
               text={event.title}
               variant="soft"

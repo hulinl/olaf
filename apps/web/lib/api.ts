@@ -269,6 +269,10 @@ export interface Workspace {
 }
 
 export interface EventSummary {
+  /** Krátký share hash — canonical URL je `/e/<public_id>`
+   *  (2026-09-11). Historické `/{workspace}/e/{slug}` fungují jako
+   *  alias s 308 redirectem. */
+  public_id: string;
   slug: string;
   title: string;
   starts_at: string;
@@ -1790,6 +1794,18 @@ export const events = {
     // to a 404 so callers' existing redirect logic kicks in.
     const data = await apiFetch<Event & { is_draft_preview?: boolean }>(
       `/api/events/${workspaceSlug}/${eventSlug}/`,
+    );
+    if ((data as { is_draft_preview?: boolean }).is_draft_preview) {
+      throw new ApiError(404, { detail: "Event not found." });
+    }
+    return data as Event;
+  },
+  /** Canonical share URL fetch — `/api/events/e/<public_id>/`. Used
+   *  by the `/e/[publicId]` route (2026-09-11). Draft-preview handling
+   *  same as `publicEvent`. */
+  publicEventByHash: async (publicId: string) => {
+    const data = await apiFetch<Event & { is_draft_preview?: boolean }>(
+      `/api/events/e/${publicId}/`,
     );
     if ((data as { is_draft_preview?: boolean }).is_draft_preview) {
       throw new ApiError(404, { detail: "Event not found." });
