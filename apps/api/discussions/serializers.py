@@ -46,6 +46,10 @@ class CommentSerializer(serializers.ModelSerializer):
     i_liked = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     attachment_name = serializers.SerializerMethodField()
+    # 2026-09-11: preview feed potřebuje vědět, kolik replies každý
+    # top-level komentář má, aby mohl ukázat „↳ N odpovědí" indikátor.
+    # Bez toho user nevidí, že se pod komentářem něco skrývá.
+    reply_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -62,6 +66,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_avatar",
             "like_count",
             "i_liked",
+            "reply_count",
             "created_at",
             "updated_at",
         )
@@ -76,6 +81,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_avatar",
             "like_count",
             "i_liked",
+            "reply_count",
             "created_at",
             "updated_at",
         )
@@ -108,6 +114,14 @@ class CommentSerializer(serializers.ModelSerializer):
         if request is None or not request.user.is_authenticated:
             return False
         return obj.likes.filter(user=request.user).exists()
+
+    def get_reply_count(self, obj: Comment) -> int:
+        """Počet přímých replies. Pro top-level komentář = počet
+        odpovědí; pro reply vždy 0 (backend normalizuje na jednu
+        úroveň hloubky)."""
+        if obj.parent_id is not None:
+            return 0
+        return obj.replies.count()
 
 
 class TopicSerializer(serializers.ModelSerializer):

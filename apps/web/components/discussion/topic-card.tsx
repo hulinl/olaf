@@ -85,12 +85,6 @@ export function TopicCard({
 
   const canModerate = scope.isModerator;
   const canDeleteTopic = canModerate || topic.author_id === currentUser.id;
-  // Když v pravém horním rohu nic není (žádný pin/lock badge ani
-  // moderátor menu), nechceme držet 56/64 px pravý buffer — stats
-  // vedle titulku mají jít až k okraji karty. Když badge/menu je,
-  // zachováme buffer, aby se neplácli o sebe.
-  const hasTopRight =
-    topic.pinned || topic.locked || canModerate || canDeleteTopic;
 
   async function loadDetail() {
     setDetailLoading(true);
@@ -361,36 +355,37 @@ export function TopicCard({
         topic.pinned ? "border-brand/40" : "border-border",
       ].join(" ")}
     >
-      {/* Top-right meta: pin/lock badges + moderátor menu. Absolute
-          pozicované, aby neubíralo pravý prostor titulku a meta-liny
-          zbytečně. User request 2026-09-11 („hlavní bude nadpis"). */}
-      <TopicTopRight
-        pinned={topic.pinned}
-        locked={topic.locked}
-        canModerate={canModerate}
-        canDelete={canDeleteTopic}
-        onTogglePin={() => onTogglePin(topic)}
-        onDelete={() => onDelete(topic.id)}
-      />
-
-      <div
-        className={[
-          "flex flex-col gap-2 px-3 py-3 sm:px-4",
-          hasTopRight ? "pr-14 sm:pr-16" : "",
-        ].join(" ")}
-      >
-        {/* Titulek + stats na jednom řádku — user request 2026-09-11
-            „srdce/komentáře vedle nadpisu, ne u autora". Titulek roste,
-            stats jsou fixní vpravo; když je titul dlouhý, wrap-ne pod
-            stats bez překryvu (min-w-0 v h4). */}
-        <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-2 px-3 py-3 sm:px-4">
+        {/* Titulek + stats + pin/menu na jednom flex řádku — všechno
+            v layout-u, žádné absolute pozicování ani pr-buffer.
+            Titulek roste do plné šířky (min-w-0 flex-1), pravý stack
+            je shrink-0 v pravém horním rohu. User request 2026-09-11
+            „ikony úplně v pravém rohu, ať titulek neteče na dva řádky". */}
+        <div className="flex items-start justify-between gap-2">
           <h4
             className="min-w-0 flex-1 text-base font-semibold text-ink-900 sm:text-lg"
             style={{ letterSpacing: "-0.015em" }}
           >
             {topic.title}
           </h4>
-          <span className="mt-0.5 inline-flex shrink-0 items-center gap-2 text-[12px] text-ink-500">
+          <div className="flex shrink-0 items-center gap-1 text-[12px] text-ink-500">
+            {topic.pinned && (
+              <span
+                title="Připnuto"
+                className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand"
+              >
+                <span aria-hidden>📌</span>
+                <span className="hidden sm:inline">Připnuto</span>
+              </span>
+            )}
+            {topic.locked && (
+              <span
+                title="Zamčeno"
+                className="inline-flex rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500"
+              >
+                Zamčeno
+              </span>
+            )}
             <button
               type="button"
               onClick={() => void handleToggleTopicLike()}
@@ -398,7 +393,7 @@ export function TopicCard({
               aria-pressed={topic.i_liked}
               aria-label={topic.i_liked ? "Zrušit líbí" : "Dát líbí"}
               className={[
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors focus-ring",
+                "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 transition-colors focus-ring",
                 topic.i_liked
                   ? "text-brand hover:bg-brand/5"
                   : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
@@ -412,14 +407,23 @@ export function TopicCard({
             </button>
             {topic.comment_count > 0 && (
               <span
-                className="inline-flex items-center gap-1"
+                className="inline-flex items-center gap-1 px-1"
                 aria-label={`${topic.comment_count} komentářů`}
               >
                 <span aria-hidden>💬</span>
                 <span className="tabular-nums">{topic.comment_count}</span>
               </span>
             )}
-          </span>
+            {(canModerate || canDeleteTopic) && (
+              <TopicMenu
+                canModerate={canModerate}
+                canDelete={canDeleteTopic}
+                pinned={topic.pinned}
+                onTogglePin={() => onTogglePin(topic)}
+                onDelete={() => onDelete(topic.id)}
+              />
+            )}
+          </div>
         </div>
         {/* Meta-line: doplňkové info malým — mini avatar, jméno, datum,
             relative time. Pod titulem, čte se lehce, hlavní vizuální
@@ -535,6 +539,25 @@ export function TopicCard({
                         }
                   }
                 />
+                {/* Skryté replies indikátor v preview módu — když má
+                    top-level komentář odpovědi, ale v preview jsou
+                    schované, ukážeme drobnou klikatelnou linii ať user
+                    ví, co se pod „Zobrazit další" skrývá (2026-09-11
+                    bug report: „nevím, že tam je něco skrytého"). */}
+                {!expanded && top.reply_count > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(true)}
+                    className="ml-9 self-start text-[12px] text-ink-500 hover:text-ink-900 focus-ring sm:ml-11"
+                  >
+                    ↳{" "}
+                    {top.reply_count === 1
+                      ? "1 odpověď"
+                      : top.reply_count < 5
+                        ? `${top.reply_count} odpovědi`
+                        : `${top.reply_count} odpovědí`}
+                  </button>
+                )}
                 {replies.map((r) => (
                   <CommentCard
                     key={r.id}
@@ -628,58 +651,6 @@ function MiniAvatar({
     <ProfileLink userId={userId} userSlug={userSlug}>
       {visual}
     </ProfileLink>
-  );
-}
-
-/** Top-right stack: pin/lock badges + moderátor menu.
- *  Absolute-pozicované, aby netlačilo na hlavní obsah karty. */
-function TopicTopRight({
-  pinned,
-  locked,
-  canModerate,
-  canDelete,
-  onTogglePin,
-  onDelete,
-}: {
-  pinned: boolean;
-  locked: boolean;
-  canModerate: boolean;
-  canDelete: boolean;
-  onTogglePin: () => void;
-  onDelete: () => void;
-}) {
-  const showAnything =
-    pinned || locked || canModerate || canDelete;
-  if (!showAnything) return null;
-  return (
-    <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-      {pinned && (
-        <span
-          title="Připnuto"
-          className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand"
-        >
-          <span aria-hidden>📌</span>
-          <span className="hidden sm:inline">Připnuto</span>
-        </span>
-      )}
-      {locked && (
-        <span
-          title="Zamčeno"
-          className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500"
-        >
-          Zamčeno
-        </span>
-      )}
-      {(canModerate || canDelete) && (
-        <TopicMenu
-          canModerate={canModerate}
-          canDelete={canDelete}
-          pinned={pinned}
-          onTogglePin={onTogglePin}
-          onDelete={onDelete}
-        />
-      )}
-    </div>
   );
 }
 

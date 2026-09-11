@@ -613,6 +613,11 @@ export interface DiscussionComment {
   author_avatar: AuthorAvatar;
   like_count: number;
   i_liked: boolean;
+  /** Počet přímých replies (backend normalizuje na jeden level).
+   *  Pro top-level komentář = počet odpovědí; pro reply vždy 0.
+   *  Preview feed použije, aby ukázal „↳ N odpovědí" tam, kde se
+   *  reply skrývá pod „Zobrazit další komentáře" (2026-09-11). */
+  reply_count: number;
   created_at: string;
   updated_at: string;
 }
