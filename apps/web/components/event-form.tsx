@@ -822,6 +822,14 @@ export function EventForm({
               Akce se objeví v každé komunitě, kterou tu máš zaškrtnutou —
               ve feedu i na veřejném profilu té komunity. Odškrtnutím se
               sdílení zruší; přidat můžeš pomocí dropdownu níže.
+              {!isEdit && (
+                <>
+                  {" "}
+                  Když akci odškrtneš ze všech komunit, uloží se do tvého{" "}
+                  <strong className="font-medium">osobního prostoru</strong>{" "}
+                  a nikde se veřejně nezobrazí (dobré pro test).
+                </>
+              )}
             </p>
 
             <ul className="mt-4 flex flex-col gap-2">

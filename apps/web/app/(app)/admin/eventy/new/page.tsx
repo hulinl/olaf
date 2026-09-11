@@ -21,22 +21,29 @@ import { ApiError, type Workspace, events, workspaces } from "@/lib/api";
 export default function NewEventPage() {
   const router = useRouter();
   const [home, setHome] = useState<Workspace | null>(null);
+  // Personal workspace držíme upfront jako fallback target pro
+  // „odškrtnout komunitu" akci — user request 2026-09-11: „chci akci
+  // vytvořit bez sdílení do komunity, i když jednu komunitu mám".
+  // Když user odškrtne primary community, přepneme primary na personal
+  // client-side (akce ještě neexistuje, žádný backend call).
+  const [personal, setPersonal] = useState<Workspace | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const mine = await workspaces.mine();
-        const owned = mine.filter((w) => w.my_role === "owner");
+        const [mine, p] = await Promise.all([
+          workspaces.mine(),
+          workspaces.personal(),
+        ]);
         if (cancelled) return;
+        setPersonal(p);
+        const owned = mine.filter((w) => w.my_role === "owner");
         if (owned.length > 0) {
           // Sorted by name by the API; pick the first.
           setHome(owned[0]);
         } else {
-          // No community → fall back to the lazy personal workspace.
-          const p = await workspaces.personal();
-          if (cancelled) return;
           setHome(p);
         }
       } catch (err) {
@@ -93,6 +100,17 @@ export default function NewEventPage() {
           router.push(`/admin/eventy/${home.slug}/${event.slug}/edit`)
         }
         submitLabel="Vytvořit akci"
+        // New mode: „přesun" akce je jen client-side přepnutí primary
+        // workspace v state. Backend endpoint zavoláme až při submit.
+        // Vrácený tvar existuje kvůli edit-mode signatuře — new mode
+        // ho ignoruje (žádný router.push, žádný fetch).
+        onMoveToWorkspace={async (targetSlug) => {
+          const nextHome =
+            (personal?.slug === targetSlug ? personal : null) ??
+            (await workspaces.detail(targetSlug).catch(() => null));
+          if (nextHome) setHome(nextHome);
+          return { new_workspace_slug: targetSlug, event_slug: "" };
+        }}
       />
     </div>
   );
