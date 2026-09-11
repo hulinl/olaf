@@ -439,14 +439,19 @@ export default function RSVPPage({ params }: Props) {
   }
 
   if (!event.is_open_for_rsvp) {
+    const isPast =
+      event.status === "completed" ||
+      new Date(event.ends_at).getTime() < Date.now();
     return (
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-16">
         <div className="w-full max-w-md text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
-            Registrace nejsou otevřené
+            {isPast ? "Akce už proběhla" : "Registrace nejsou otevřené"}
           </h1>
           <p className="mt-3 text-ink-700">
-            Tato akce momentálně nepřijímá přihlášky.
+            {isPast
+              ? "Tato akce už skončila, přihlášky se nepřijímají. Podívej se na stránku akce, jak dopadla."
+              : "Tato akce momentálně nepřijímá přihlášky."}
           </p>
           <LinkButton
             href={`/${slug}/e/${eventSlug}`}

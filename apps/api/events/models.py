@@ -431,7 +431,16 @@ class Event(TenantScopedModel):
 
     @property
     def is_open_for_rsvp(self) -> bool:
-        return self.status == self.STATUS_PUBLISHED
+        """RSVP je otevřený jen když je akce published A ještě neskončila.
+        Sám status stačí, dokud Celery `complete_finished_events` task
+        stihne ends_at flipnout — ale ten běhá v 15min intervalu a
+        landing page + RSVP submit musí reagovat okamžitě. Bez
+        `ends_at > now` chceka mohla přijít RSVP na akci co skončila
+        před 10 min (user report 2026-09-11).
+        """
+        if self.status != self.STATUS_PUBLISHED:
+            return False
+        return self.ends_at > timezone.now()
 
     @property
     def is_deleted(self) -> bool:

@@ -105,10 +105,31 @@ export default async function EventLandingPage({ params }: Props) {
   }
 
   const cancelled = event.status === "cancelled";
+  // Proběhlá akce = ends_at v minulosti nebo status=completed.
+  // Landing zůstává dostupná (web olafadventures.cz má sekci
+  // „již realizováno" — user request 2026-09-11), ale RSVP je
+  // uzamčené a stránka získá subtle muted vzhled + banner nahoře.
+  const isPast =
+    event.status === "completed" ||
+    new Date(event.ends_at).getTime() < Date.now();
   const cta_href = `/${event.workspace_slug}/e/${event.slug}/rsvp`;
 
   return (
     <div data-theme="paper" className="bg-canvas text-ink-900">
+      {isPast && !cancelled && (
+        <div
+          role="status"
+          className="w-full border-b border-ink-900/10 bg-ink-900 text-ink-inverse"
+        >
+          <div className="mx-auto flex max-w-5xl items-center justify-center gap-2 px-4 py-2 text-sm">
+            <span aria-hidden>📅</span>
+            <span>
+              <strong className="font-semibold">Již realizovaná akce</strong>
+              {" · "}přihlášky jsou uzavřené.
+            </span>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-10 border-b border-border bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link
@@ -138,7 +159,16 @@ export default async function EventLandingPage({ params }: Props) {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col overflow-x-clip">
+      <main
+        className={[
+          "flex flex-1 flex-col overflow-x-clip",
+          // Muted styling pro proběhlé akce — sytost dolů, hlavní
+          // obsah zůstává čitelný. Cancelled akce mají vlastní badge,
+          // muted na ně nedáváme (banner ZRUŠENO je červený, kombo
+          // s desaturací by vypadalo nemocně).
+          isPast && !cancelled ? "opacity-80 saturate-50" : "",
+        ].join(" ")}
+      >
         {!event.blocks || event.blocks.length === 0 ? (
           // Minimal hero when the owner hasn't built an obsah yet. Used
           // to fall off into an empty page where any other auto-section
