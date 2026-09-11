@@ -57,23 +57,42 @@ def _load_published_event(workspace_slug: str, event_slug: str):
     primary workspace OR shared, falling back to the event's primary
     workspace URL when only the shared path was requested.
 
-    Slug alias fallback (2026-09-11): pokud přímý match selže,
-    hledáme v EventSlugAlias — když owner přejmenoval slug, staré
-    URL vede na EventSlugAlias.old_slug a resolved event má
-    aktuální canonical slug. View nadřazený `public_event` pak
-    přidá do payloadu `canonical_slug` pole (frontend detekuje
-    rozdíl a router.replace-uje).
+    Workspace slug alias (2026-09-11 hotfix): když přijde starý
+    workspace slug (typicky `personal-<id>` před cleanup migrací),
+    přeložíme ho na canonical přes WorkspaceSlugAlias předtím, než
+    hledáme event. Bez tohoto všechny sdílené linky vypadající jako
+    `/personal-25/e/…` padaly do 404.
+
+    Event slug alias fallback: pokud přímý match selže i po
+    workspace alias resolution, hledáme v EventSlugAlias — když
+    owner přejmenoval event slug, staré URL vede na alias a resolved
+    event má aktuální canonical slug. Frontend detekuje rozdíl v
+    response payloadu a 308 redirect-uje.
     """
     from django.db.models import Q as DQ
 
+    from workspaces.models import Workspace, WorkspaceSlugAlias
+
     from .models import EventSlugAlias
+
+    # Workspace alias resolution: pokud přímý slug není hit, zkusíme
+    # alias tabulku a použijeme canonical slug pro zbytek dotazů.
+    ws_slugs_to_try = [workspace_slug]
+    if not Workspace.objects.filter(slug=workspace_slug).exists():
+        ws_alias = (
+            WorkspaceSlugAlias.objects.select_related("workspace")
+            .filter(old_slug=workspace_slug)
+            .first()
+        )
+        if ws_alias is not None:
+            ws_slugs_to_try.append(ws_alias.workspace.slug)
 
     event = (
         Event.objects.select_related("workspace")
         .filter(slug=event_slug)
         .filter(
-            DQ(workspace__slug=workspace_slug)
-            | DQ(shared_workspaces__slug=workspace_slug)
+            DQ(workspace__slug__in=ws_slugs_to_try)
+            | DQ(shared_workspaces__slug__in=ws_slugs_to_try)
         )
         .first()
     )
@@ -85,16 +104,12 @@ def _load_published_event(workspace_slug: str, event_slug: str):
             "event", "event__workspace"
         )
         .filter(
-            workspace__slug=workspace_slug, old_slug=event_slug
+            workspace__slug__in=ws_slugs_to_try, old_slug=event_slug
         )
         .first()
     )
     if alias is None:
         return None
-    # Alias event: může být v jiné (primary) workspace než ta ze
-    # kterou URL přišla; ale request slug matches alias.workspace,
-    # takže vracíme canonical event. Frontend v response pole
-    # `canonical_slug` uvidí rozdíl.
     return alias.event
 
 
