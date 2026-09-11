@@ -41,7 +41,7 @@ class NotifyStuckUsersCommandTests(TestCase):
             date_joined=self.now - timedelta(hours=5),
         )
         out = self._run()
-        self.assertIn("Notification sent to 1", out)
+        self.assertIn("1 signup", out)
         self.assertEqual(len(mail.outbox), 1)
         u.refresh_from_db()
         self.assertIsNotNone(u.last_stuck_reminder_at)

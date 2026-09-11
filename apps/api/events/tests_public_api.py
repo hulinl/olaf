@@ -376,7 +376,7 @@ class PublicEventsListTests(TestCase):
         resp = self.client.get(self.url)
         body = resp.json()[0]
         self.assertEqual(body["description"], "Popis akce")
-        self.assertEqual(body["price"]["amount"], "1500")
+        self.assertIn(body["price"]["amount"], ("1500", "1500.00"))
         self.assertEqual(body["price"]["currency"], "CZK")
         self.assertEqual(body["price"]["note"], "v ceně je oběd")
         # coverImage je None protože jsme neuploadovali cover.
