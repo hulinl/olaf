@@ -106,17 +106,22 @@ class MyPersonalWorkspaceTests(TestCase):
         self.assertIn(r.status_code, (401, 403))
 
     def test_lazy_creates_personal_workspace(self) -> None:
+        # Před fetchem žádná personal workspace ještě neexistuje.
         self.assertFalse(
             Workspace.objects.filter(
-                slug=f"personal-{self.user.pk}"
+                is_personal=True, members__user=self.user
             ).exists()
         )
         self.client.force_authenticate(self.user)
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 200)
-        ws = Workspace.objects.get(slug=f"personal-{self.user.pk}")
+        # Slug se generuje z name (2026-09-11: dřív `personal-<id>`,
+        # teď clean slugify).
+        ws = Workspace.objects.get(is_personal=True, members__user=self.user)
         self.assertTrue(ws.is_personal)
         self.assertEqual(ws.default_tz, "Europe/Prague")
+        self.assertNotIn("personal-", ws.slug)
+        self.assertEqual(r.json()["slug"], ws.slug)
         # User je owner.
         membership = WorkspaceMember.objects.get(workspace=ws, user=self.user)
         self.assertEqual(membership.role, "owner")
@@ -127,8 +132,10 @@ class MyPersonalWorkspaceTests(TestCase):
         self.client.get(self.url)
         self.assertEqual(
             Workspace.objects.filter(
-                slug=f"personal-{self.user.pk}"
-            ).count(),
+                is_personal=True, members__user=self.user
+            )
+            .distinct()
+            .count(),
             1,
         )
 
@@ -136,11 +143,11 @@ class MyPersonalWorkspaceTests(TestCase):
         # Personal workspaces jsou plumbing, ne destination — chybí
         # v /api/workspaces/mine/.
         self.client.force_authenticate(self.user)
-        self.client.get(self.url)  # creates personal
+        personal = self.client.get(self.url).json()
         r = self.client.get(reverse("workspaces:mine"))
         self.assertEqual(r.status_code, 200)
         slugs = [w["slug"] for w in r.json()]
-        self.assertNotIn(f"personal-{self.user.pk}", slugs)
+        self.assertNotIn(personal["slug"], slugs)
 
 
 class WorkspaceEventsListTests(TestCase):

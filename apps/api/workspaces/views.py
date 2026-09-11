@@ -14,12 +14,42 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
-from .models import Workspace, WorkspaceMember
+from .models import Workspace, WorkspaceMember, WorkspaceSlugAlias
 from .serializers import (
     WorkspaceCreateSerializer,
     WorkspacePublicSerializer,
     WorkspaceWriteSerializer,
 )
+
+
+def _resolve_workspace(slug: str) -> Workspace | None:
+    """Vrátí Workspace pro daný slug, případně přes WorkspaceSlugAlias.
+
+    2026-09-11: přejmenování komunit (typicky `personal-<id>` cleanup)
+    vytváří aliasy — všechny views by měly resolvovat přes tohle,
+    aby staré URL nepadaly do 404. Frontend detekuje `slug != param`
+    a 308 přesměruje na canonical.
+    """
+    ws = Workspace.objects.filter(slug=slug).first()
+    if ws is not None:
+        return ws
+    alias = (
+        WorkspaceSlugAlias.objects.select_related("workspace")
+        .filter(old_slug=slug)
+        .first()
+    )
+    return alias.workspace if alias else None
+
+
+def _get_workspace_or_alias(slug: str) -> Workspace:
+    """Drop-in náhrada za `_get_workspace_or_alias(slug)` — pro
+    existující try/except DoesNotExist bloky. Zachovává původní API,
+    ale hledá i přes WorkspaceSlugAlias.
+    """
+    ws = _resolve_workspace(slug)
+    if ws is None:
+        raise Workspace.DoesNotExist(f"Workspace {slug!r} not found")
+    return ws
 
 
 class WorkspaceContactThrottle(AnonRateThrottle):
@@ -93,7 +123,7 @@ def public_workspace(request: Request, slug: str) -> Response:
       - private  → 200 only to members; 404 otherwise (no existence leak)
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(
             {"detail": "Workspace not found."},
@@ -141,28 +171,59 @@ def my_personal_workspace(request: Request) -> Response:
     """Get-or-create the user's personal workspace.
 
     Personal workspaces are lazy tenant containers so any user can spin
-    up an event without first founding a community. The slug is
-    deterministic (`personal-<user_id>`) so URLs stay stable; the user
-    can rename + repurpose later via the standard edit endpoints.
+    up an event without first founding a community. Slug se generuje
+    ze jména (2026-09-11 — dřív bylo `personal-<user_id>`, ale to
+    vypadalo neprofesionálně v URL; existující workspacy přejmenovala
+    migrace 0012).
 
     Hidden from /api/workspaces/ public discovery and from `mine` if
     the user has other workspaces — they're plumbing, not a destination.
     """
+    from django.utils.text import slugify
+
     user = request.user
-    full_name = user.get_full_name() or user.email.split("@", 1)[0]
-    workspace, _ = Workspace.objects.get_or_create(
-        slug=f"personal-{user.id}",
-        defaults={
-            "name": f"{full_name} — můj prostor",
-            "is_personal": True,
-            "default_tz": "Europe/Prague",
-            "visibility": Workspace.VISIBILITY_UNLISTED,
-        },
+
+    # Existující personal workspace najdeme přes membership (owner) +
+    # is_personal, ne přes slug — starý slug `personal-<id>` už tam
+    # nebude po migraci 0012.
+    existing = (
+        Workspace.objects.filter(
+            is_personal=True,
+            members__user=user,
+            members__role=WorkspaceMember.ROLE_OWNER,
+        )
+        .distinct()
+        .first()
     )
-    WorkspaceMember.objects.get_or_create(
+    if existing is not None:
+        data = WorkspacePublicSerializer(
+            existing, context={"request": request}
+        ).data
+        data["my_role"] = WorkspaceMember.ROLE_OWNER
+        return Response(data)
+
+    full_name = user.get_full_name() or user.email.split("@", 1)[0]
+    name = f"{full_name} — můj prostor"
+
+    base = (slugify(name) or f"w-{user.pk}")[:50].rstrip("-")
+    candidate = base
+    n = 2
+    while Workspace.objects.filter(slug=candidate).exists():
+        suffix = f"-{n}"
+        candidate = f"{base[: 50 - len(suffix)]}{suffix}"
+        n += 1
+
+    workspace = Workspace.objects.create(
+        slug=candidate,
+        name=name,
+        is_personal=True,
+        default_tz="Europe/Prague",
+        visibility=Workspace.VISIBILITY_UNLISTED,
+    )
+    WorkspaceMember.objects.create(
         workspace=workspace,
         user=user,
-        defaults={"role": WorkspaceMember.ROLE_OWNER},
+        role=WorkspaceMember.ROLE_OWNER,
     )
     data = WorkspacePublicSerializer(workspace, context={"request": request}).data
     data["my_role"] = WorkspaceMember.ROLE_OWNER
@@ -214,7 +275,7 @@ def workspace_detail(request: Request, slug: str) -> Response:
     PATCH — owner-only; updates writable profile fields.
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(
             {"detail": "Workspace not found."},
@@ -270,7 +331,7 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
     one-liners. `field` must be "logo" or "cover" (matches Workspace.<field>).
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -338,7 +399,7 @@ def workspace_events(request: Request, slug: str) -> Response:
     from events.serializers import EventSummarySerializer
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(
             {"detail": "Workspace not found."},
@@ -389,7 +450,7 @@ def workspace_contact(request: Request, slug: str) -> Response:
     e-mail, takže owner odpovídá přímo v mailovém klientu.
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(
             {"detail": "Workspace not found."},
@@ -474,7 +535,7 @@ def workspace_members(request: Request, slug: str) -> Response:
     from events.models import RSVP, Event
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -587,7 +648,7 @@ def workspace_member_detail(
     from events.models import RSVP, Event
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -670,7 +731,7 @@ def workspace_member_remove(
     from events.permissions import is_workspace_super_admin
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -733,7 +794,7 @@ def workspace_participants(request: Request, slug: str) -> Response:
     from events.models import RSVP, Event
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -818,7 +879,7 @@ def workspace_removed_members(
     them in the regular member roster.
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -900,7 +961,7 @@ def workspace_member_promote(
     """Promote a member to admin (super-admin only). No-ops if already
     admin or owner."""
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -965,7 +1026,7 @@ def workspace_member_demote(
     """Demote an admin back to member (super-admin only). Cannot demote
     the owner — there must always be at least one owner."""
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -1012,7 +1073,7 @@ def workspace_member_handover(
     preserved by the swap.
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -1123,7 +1184,7 @@ def _serialize_tag(t) -> dict:
 def person_tags(request: Request, slug: str) -> Response:
     """List + create tags for a workspace's Lidé CRM."""
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _can_view_workspace_people(request.user, workspace):
@@ -1165,7 +1226,7 @@ def person_tag_detail(request: Request, slug: str, tag_id: int) -> Response:
     Deleting a tag drops it from everyone it was assigned to (cascade
     via the m2m through table); profiles + people stay untouched."""
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):
@@ -1210,7 +1271,7 @@ def _get_or_create_profile(workspace, user):
 def person_note(request: Request, slug: str, user_id: int) -> Response:
     """Set the free-text CRM note on a person within this workspace."""
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _can_view_workspace_people(request.user, workspace):
@@ -1236,7 +1297,7 @@ def person_tag_assignment(
 ) -> Response:
     """Attach (POST) / detach (DELETE) one tag from one person."""
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _can_view_workspace_people(request.user, workspace):
@@ -1280,7 +1341,7 @@ def workspace_members_csv(request: Request, slug: str):
     from .models import PersonProfile
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _can_view_workspace_people(request.user, workspace):
@@ -1414,7 +1475,7 @@ def workspace_members_bulk_email(
     from events.models import RSVP, Event
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):
@@ -1526,7 +1587,7 @@ def workspace_payments_reconcile(request: Request, slug: str) -> Response:
     state isn't something co-creators should do.
     """
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):
@@ -1634,7 +1695,7 @@ def workspace_add_existing_member(request: Request, slug: str) -> Response:
     from accounts.models import User
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):
@@ -1763,7 +1824,7 @@ def workspace_invitations(request: Request, slug: str) -> Response:
     from .models import WorkspaceInvitation
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):
@@ -1876,7 +1937,7 @@ def workspace_invitations_bulk(request: Request, slug: str) -> Response:
     from .models import WorkspaceInvitation
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):
@@ -2005,7 +2066,7 @@ def workspace_invitation_detail(
     from .models import WorkspaceInvitation
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
         invitation = WorkspaceInvitation.objects.get(
             pk=invitation_id, workspace=workspace
         )
@@ -2031,7 +2092,7 @@ def workspace_invite_link(request: Request, slug: str) -> Response:
     import secrets
 
     try:
-        workspace = Workspace.objects.get(slug=slug)
+        workspace = _get_workspace_or_alias(slug)
     except Workspace.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if not _is_owner(request.user, workspace):

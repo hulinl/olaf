@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { AppFooter } from "@/components/ui/app-footer";
 import { Logo } from "@/components/ui/logo";
@@ -63,6 +63,12 @@ export default async function WorkspaceProfilePage({ params }: Props) {
     fetchEvents(slug),
   ]);
   if (!workspace) notFound();
+  // Workspace slug alias: pokud backend vrátil workspace pod canonical
+  // slug-em (starý `personal-<id>` po 2026-09-11 migraci), pošleme
+  // 308 redirect na čistou URL.
+  if (workspace.slug !== slug) {
+    permanentRedirect(`/${workspace.slug}`);
+  }
 
   const logo = assetUrl(workspace.logo_url);
   const cover = assetUrl(workspace.cover_url);

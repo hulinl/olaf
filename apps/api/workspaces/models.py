@@ -304,3 +304,28 @@ class WorkspaceInvitation(models.Model):
                     self.token = candidate
                     break
         super().save(*args, **kwargs)
+
+
+class WorkspaceSlugAlias(models.Model):
+    """Historický slug pro Workspace po rename — stejný pattern jako
+    EventSlugAlias. Backend při 404 zkusí alias a vrátí workspace pod
+    canonical slug-em (frontend pak 308 na canonical URL).
+
+    Vzniká automaticky přes pre_save signal na Workspace + data
+    migracemi (např. `personal-<id>` → čistý slug 2026-09-11).
+    """
+
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name="slug_aliases",
+    )
+    old_slug = models.SlugField(max_length=50, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "workspaces_slug_alias"
+        indexes = [models.Index(fields=["old_slug"])]
+
+    def __str__(self) -> str:
+        return f"{self.old_slug} → {self.workspace.slug}"
