@@ -19,7 +19,6 @@ def create_periodic_task(apps, schema_editor):
         day_of_week="*",
         day_of_month="*",
         month_of_year="*",
-        timezone="UTC",
     )
     PeriodicTask.objects.get_or_create(
         name="accounts.notify_stuck_users",
