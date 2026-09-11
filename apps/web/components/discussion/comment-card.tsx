@@ -46,10 +46,11 @@ export function CommentCard({
         nested ? "ml-9 sm:ml-11" : "",
       ].join(" ")}
     >
-      {/* Avatar je součástí bubliny — inline s jménem, výška ≈ výška
-          textu jména. User request 2026-09-11 („miniatura jako součást
-          bubliny, stejně vysoká jako jméno"). */}
-      <div className="w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2">
+      {/* Bublina drží avatar, jméno, tělo, čas i lajk pohromadě — čas
+          teče jako drobný text na patě bubliny (2026-09-11 user request:
+          „čas dovnitř"). Reply/smazat zůstávají mimo, protože jsou to
+          akce, ne meta. */}
+      <div className="relative w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2 pr-3">
         <div className="flex items-center gap-1.5">
           <Avatar
             firstName={c.author_name}
@@ -81,6 +82,31 @@ export function CommentCard({
             className="mt-1 block whitespace-pre-wrap break-words text-sm text-ink-700"
           />
         )}
+        <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-ink-500">
+          <time
+            dateTime={c.created_at}
+            title={new Date(c.created_at).toLocaleString("cs-CZ")}
+          >
+            {new Date(c.created_at).toLocaleString("cs-CZ", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </time>
+          {c.like_count > 0 && (
+            <span
+              className={[
+                "inline-flex items-center gap-1",
+                c.i_liked ? "text-brand" : "text-ink-500",
+              ].join(" ")}
+              aria-label={`Líbí se ${c.like_count}`}
+            >
+              <span aria-hidden>♥</span>
+              <span className="tabular-nums">{c.like_count}</span>
+            </span>
+          )}
+        </div>
       </div>
       {c.attachment_url && (
         <CommentAttachment
@@ -88,52 +114,32 @@ export function CommentCard({
           name={c.attachment_name}
         />
       )}
-      <div className="ml-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-500">
+      <div className="ml-3 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
         <button
           type="button"
           onClick={() => onToggleLike()}
-            aria-pressed={c.i_liked}
-            className={[
-              "font-medium hover:text-ink-900",
-              c.i_liked ? "text-brand" : "text-ink-500",
-            ].join(" ")}
+          aria-pressed={c.i_liked}
+          className={[
+            "font-medium hover:text-ink-900",
+            c.i_liked ? "text-brand" : "text-ink-500",
+          ].join(" ")}
+        >
+          {c.i_liked ? "Líbí se ti to" : "Líbí"}
+        </button>
+        {onReply && (
+          <button
+            type="button"
+            onClick={onReply}
+            className="font-medium text-ink-500 hover:text-ink-900"
           >
-            {c.i_liked ? "Líbí se ti to" : "Líbí"}
+            Odpovědět
           </button>
-          {onReply && (
-            <button
-              type="button"
-              onClick={onReply}
-              className="font-medium hover:text-ink-900"
-            >
-              Odpovědět
-            </button>
-          )}
-          <span aria-hidden>·</span>
-          <span title={new Date(c.created_at).toLocaleString("cs-CZ")}>
-            {new Date(c.created_at).toLocaleString("cs-CZ", {
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-          {c.like_count > 0 && (
-            <span
-              className={[
-                "inline-flex items-center gap-1",
-                c.i_liked ? "text-brand" : "text-ink-500",
-              ].join(" ")}
-            >
-              <span aria-hidden>♥</span>
-              <span className="tabular-nums">{c.like_count}</span>
-            </span>
-          )}
+        )}
         {(canModerate || c.author_id === currentUserId) && (
           <button
             type="button"
             onClick={() => onDelete()}
-            className="ml-auto hover:text-danger"
+            className="ml-auto font-medium text-ink-500 hover:text-danger"
           >
             Smazat
           </button>
