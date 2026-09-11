@@ -20,12 +20,13 @@ import { ApiError, type Workspace, events, workspaces } from "@/lib/api";
  */
 export default function NewEventPage() {
   const router = useRouter();
+  // 2026-09-11: defaultně akce začíná v osobním prostoru — user říká
+  // „musím vybrat defaultně nic". Community sharing přidá user
+  // explicitně v EventForm dropdownu. Když se přidá community, jde do
+  // sharedSlugs (a EventForm si primary přehodí přes onMoveToWorkspace
+  // při odškrtnutí personal — kterou v listu ale skrýváme, tak se to
+  // stane až když user vybere jinou komunitu z dropdownu).
   const [home, setHome] = useState<Workspace | null>(null);
-  // Personal workspace držíme upfront jako fallback target pro
-  // „odškrtnout komunitu" akci — user request 2026-09-11: „chci akci
-  // vytvořit bez sdílení do komunity, i když jednu komunitu mám".
-  // Když user odškrtne primary community, přepneme primary na personal
-  // client-side (akce ještě neexistuje, žádný backend call).
   const [personal, setPersonal] = useState<Workspace | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,19 +34,10 @@ export default function NewEventPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [mine, p] = await Promise.all([
-          workspaces.mine(),
-          workspaces.personal(),
-        ]);
+        const p = await workspaces.personal();
         if (cancelled) return;
         setPersonal(p);
-        const owned = mine.filter((w) => w.my_role === "owner");
-        if (owned.length > 0) {
-          // Sorted by name by the API; pick the first.
-          setHome(owned[0]);
-        } else {
-          setHome(p);
-        }
+        setHome(p);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {

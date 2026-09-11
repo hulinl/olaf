@@ -896,9 +896,24 @@ export function EventForm({
                   onChange={(e) => {
                     const slug = e.target.value;
                     if (!slug) return;
-                    setSharedSlugs((prev) =>
-                      prev.includes(slug) ? prev : [...prev, slug],
-                    );
+                    // 2026-09-11: nová akce startuje s primary=personal
+                    // (skryté v listu). První přidaná komunita se stane
+                    // primary — user chce, aby akce „patřila" té
+                    // komunitě (canonical URL = /community/e/slug),
+                    // ne osobnímu prostoru. Edit mode necháváme
+                    // beze změny.
+                    const shouldMovePrimary =
+                      !isEdit &&
+                      onMoveToWorkspace &&
+                      personalWorkspace &&
+                      workspaceSlug === personalWorkspace.slug;
+                    if (shouldMovePrimary) {
+                      void onMoveToWorkspace(slug);
+                    } else {
+                      setSharedSlugs((prev) =>
+                        prev.includes(slug) ? prev : [...prev, slug],
+                      );
+                    }
                     e.target.value = "";
                   }}
                   className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
