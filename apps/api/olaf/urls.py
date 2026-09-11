@@ -17,6 +17,10 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls", namespace="accounts")),
     path("api/workspaces/", include("workspaces.urls", namespace="workspaces")),
     path("api/events/", include("events.urls", namespace="events")),
+    # Veřejné API pro externí konzumenty (olafadventures.cz, atd.).
+    # Bez auth, CORS *, cache 60 s. Spec: repo hulinl/olafadventures-web
+    # docs/olaf-events-public-api-spec.md.
+    path("api/public/", include("events.public_api_urls")),
     path("api/communities/", include("communities.urls", namespace="communities")),
     path("api/discussions/", include("discussions.urls", namespace="discussions")),
     path("api/gear/", include("gear.urls", namespace="gear")),
