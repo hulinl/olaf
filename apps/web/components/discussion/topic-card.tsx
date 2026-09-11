@@ -357,23 +357,54 @@ export function TopicCard({
         topic.pinned ? "border-brand/40" : "border-border",
       ].join(" ")}
     >
-      <TopicHeader
-        topic={topic}
-        absoluteDate={absoluteDate}
-        relative={relative}
-        canDelete={canDeleteTopic}
+      {/* Top-right meta: pin/lock badges + moderátor menu. Absolute
+          pozicované, aby neubíralo pravý prostor titulku a meta-liny
+          zbytečně. User request 2026-09-11 („hlavní bude nadpis"). */}
+      <TopicTopRight
+        pinned={topic.pinned}
+        locked={topic.locked}
         canModerate={canModerate}
-        onDelete={() => onDelete(topic.id)}
+        canDelete={canDeleteTopic}
         onTogglePin={() => onTogglePin(topic)}
+        onDelete={() => onDelete(topic.id)}
       />
 
-      <div className="flex flex-col gap-2 px-3 py-3 sm:px-4">
+      <div className="flex flex-col gap-2 px-3 py-3 pr-14 sm:px-4 sm:pr-16">
         <h4
-          className="text-[15px] font-semibold text-ink-900 sm:text-base"
+          className="text-base font-semibold text-ink-900 sm:text-lg"
           style={{ letterSpacing: "-0.015em" }}
         >
           {topic.title}
         </h4>
+        {/* Meta-line: doplňkové info malým — mini avatar, jméno, datum,
+            relative time. Pod titulem, čte se lehce, hlavní vizuální
+            důraz drží titulek. */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-ink-500">
+          <MiniAvatar
+            url={topic.author_avatar.url}
+            focalX={topic.author_avatar.focal_x}
+            focalY={topic.author_avatar.focal_y}
+            zoom={topic.author_avatar.zoom}
+            userId={topic.author_id ?? null}
+            initial={initialOf(topic.author_name)}
+            colorBg={avatarBg(topic.author_name)}
+          />
+          <ProfileLink
+            userId={topic.author_id ?? null}
+            className="font-medium text-ink-700 hover:text-brand"
+          >
+            {topic.author_name}
+          </ProfileLink>
+          <span aria-hidden>·</span>
+          <time
+            dateTime={topic.created_at}
+            title={new Date(topic.created_at).toLocaleString("cs-CZ")}
+          >
+            {absoluteDate}
+          </time>
+          <span aria-hidden>·</span>
+          <span>{relative}</span>
+        </div>
         {topic.body && (
           <>
             {/* line-clamp na wrap divu clampne text bez ohledu na
@@ -505,105 +536,28 @@ export function TopicCard({
   );
 }
 
-function TopicHeader({
-  topic,
-  absoluteDate,
-  relative,
-  canDelete,
-  canModerate,
-  onDelete,
-  onTogglePin,
-}: {
-  topic: DiscussionTopic;
-  absoluteDate: string;
-  relative: string;
-  canDelete: boolean;
-  canModerate: boolean;
-  onDelete: () => void;
-  onTogglePin: () => void;
-}) {
-  return (
-    <header className="flex items-start justify-between gap-3 border-b border-border bg-surface-muted/40 px-3 py-2 sm:px-4">
-      <div className="flex min-w-0 items-center gap-2.5">
-        {topic.author_avatar.url ? (
-          <AvatarImage
-            url={topic.author_avatar.url}
-            focalX={topic.author_avatar.focal_x}
-            focalY={topic.author_avatar.focal_y}
-            zoom={topic.author_avatar.zoom}
-            userId={topic.author_id ?? null}
-          />
-        ) : (
-          <ProfileLink userId={topic.author_id ?? null}>
-            <span
-              aria-hidden
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-ink-900 ring-1 ring-white/60"
-              style={{ backgroundColor: avatarBg(topic.author_name) }}
-            >
-              {initialOf(topic.author_name)}
-            </span>
-          </ProfileLink>
-        )}
-        <div className="flex min-w-0 flex-col leading-tight">
-          <ProfileLink
-            userId={topic.author_id ?? null}
-            className="truncate text-sm font-semibold text-ink-900 hover:text-brand"
-          >
-            {topic.author_name}
-          </ProfileLink>
-          <span className="text-[11px] text-ink-500">
-            <time
-              dateTime={topic.created_at}
-              title={new Date(topic.created_at).toLocaleString("cs-CZ")}
-            >
-              {absoluteDate}
-            </time>
-            <span aria-hidden> · </span>
-            <span>{relative}</span>
-          </span>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {topic.pinned && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
-            <span aria-hidden>📌</span>
-            <span className="hidden sm:inline">Připnuto</span>
-          </span>
-        )}
-        {topic.locked && (
-          <span className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-            Zamčeno
-          </span>
-        )}
-        {(canModerate || canDelete) && (
-          <TopicMenu
-            canModerate={canModerate}
-            canDelete={canDelete}
-            pinned={topic.pinned}
-            onTogglePin={onTogglePin}
-            onDelete={onDelete}
-          />
-        )}
-      </div>
-    </header>
-  );
-}
-
-function AvatarImage({
+/** Malý avatar (14px) do meta-liny topic karty. Když má autor
+ *  fotku, renderujeme obrázek s focal/zoom; jinak pastelový kruh
+ *  s iniciálou. Kliknutí vede na `/u/<userId>`. */
+function MiniAvatar({
   url,
   focalX,
   focalY,
   zoom,
   userId,
+  initial,
+  colorBg,
 }: {
   url: string;
   focalX: number;
   focalY: number;
   zoom: number;
   userId: number | null;
+  initial: string;
+  colorBg: string;
 }) {
-  const visual = (
-    <span className="inline-block h-8 w-8 shrink-0 overflow-hidden rounded-full bg-surface-strong ring-1 ring-white/60">
+  const visual = url ? (
+    <span className="inline-block h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full bg-surface-strong ring-1 ring-white/60">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
@@ -616,8 +570,68 @@ function AvatarImage({
         }}
       />
     </span>
+  ) : (
+    <span
+      aria-hidden
+      className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-ink-900 ring-1 ring-white/60"
+      style={{ backgroundColor: colorBg }}
+    >
+      {initial}
+    </span>
   );
   return <ProfileLink userId={userId}>{visual}</ProfileLink>;
+}
+
+/** Top-right stack: pin/lock badges + moderátor menu.
+ *  Absolute-pozicované, aby netlačilo na hlavní obsah karty. */
+function TopicTopRight({
+  pinned,
+  locked,
+  canModerate,
+  canDelete,
+  onTogglePin,
+  onDelete,
+}: {
+  pinned: boolean;
+  locked: boolean;
+  canModerate: boolean;
+  canDelete: boolean;
+  onTogglePin: () => void;
+  onDelete: () => void;
+}) {
+  const showAnything =
+    pinned || locked || canModerate || canDelete;
+  if (!showAnything) return null;
+  return (
+    <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+      {pinned && (
+        <span
+          title="Připnuto"
+          className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand"
+        >
+          <span aria-hidden>📌</span>
+          <span className="hidden sm:inline">Připnuto</span>
+        </span>
+      )}
+      {locked && (
+        <span
+          title="Zamčeno"
+          className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500"
+        >
+          Zamčeno
+        </span>
+      )}
+      {(canModerate || canDelete) && (
+        <TopicMenu
+          canModerate={canModerate}
+          canDelete={canDelete}
+          pinned={pinned}
+          onTogglePin={onTogglePin}
+          onDelete={onDelete}
+        />
+      )}
+    </div>
+  );
 }
 
 /** Malý wrapper: když má user id, wrap v Linku na /u/<id>. Bez id

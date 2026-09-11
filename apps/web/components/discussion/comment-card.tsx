@@ -42,51 +42,55 @@ export function CommentCard({
     <div
       id={`comment-${c.id}`}
       className={[
-        "flex scroll-mt-20 gap-2 target:ring-2 target:ring-brand/40 target:rounded-lg",
+        "flex scroll-mt-20 flex-col gap-1 target:ring-2 target:ring-brand/40 target:rounded-lg",
         nested ? "ml-9 sm:ml-11" : "",
       ].join(" ")}
     >
-      <Avatar
-        firstName={c.author_name}
-        lastName=""
-        avatarUrl={c.author_avatar.url}
-        focalX={c.author_avatar.focal_x}
-        focalY={c.author_avatar.focal_y}
-        zoom={c.author_avatar.zoom}
-        size={nested ? 24 : 32}
-        userId={c.author_id ?? null}
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2">
+      {/* Avatar je součástí bubliny — inline s jménem, výška ≈ výška
+          textu jména. User request 2026-09-11 („miniatura jako součást
+          bubliny, stejně vysoká jako jméno"). */}
+      <div className="w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <Avatar
+            firstName={c.author_name}
+            lastName=""
+            avatarUrl={c.author_avatar.url}
+            focalX={c.author_avatar.focal_x}
+            focalY={c.author_avatar.focal_y}
+            zoom={c.author_avatar.zoom}
+            size={16}
+            userId={c.author_id ?? null}
+          />
           {c.author_id ? (
             <a
               href={`/u/${c.author_id}`}
-              className="text-[13px] font-semibold text-ink-900 hover:text-brand"
+              className="text-[13px] font-semibold leading-none text-ink-900 hover:text-brand"
             >
               {c.author_name}
             </a>
           ) : (
-            <p className="text-[13px] font-semibold text-ink-900">
+            <p className="text-[13px] font-semibold leading-none text-ink-900">
               {c.author_name}
             </p>
           )}
-          {c.body && (
-            <RichText
-              text={c.body}
-              className="mt-0.5 block whitespace-pre-wrap break-words text-sm text-ink-700"
-            />
-          )}
         </div>
-        {c.attachment_url && (
-          <CommentAttachment
-            url={c.attachment_url}
-            name={c.attachment_name}
+        {c.body && (
+          <RichText
+            text={c.body}
+            className="mt-1 block whitespace-pre-wrap break-words text-sm text-ink-700"
           />
         )}
-        <div className="ml-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-500">
-          <button
-            type="button"
-            onClick={() => onToggleLike()}
+      </div>
+      {c.attachment_url && (
+        <CommentAttachment
+          url={c.attachment_url}
+          name={c.attachment_name}
+        />
+      )}
+      <div className="ml-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-500">
+        <button
+          type="button"
+          onClick={() => onToggleLike()}
             aria-pressed={c.i_liked}
             className={[
               "font-medium hover:text-ink-900",
@@ -124,16 +128,15 @@ export function CommentCard({
               <span className="tabular-nums">{c.like_count}</span>
             </span>
           )}
-          {(canModerate || c.author_id === currentUserId) && (
-            <button
-              type="button"
-              onClick={() => onDelete()}
-              className="ml-auto hover:text-danger"
-            >
-              Smazat
-            </button>
-          )}
-        </div>
+        {(canModerate || c.author_id === currentUserId) && (
+          <button
+            type="button"
+            onClick={() => onDelete()}
+            className="ml-auto hover:text-danger"
+          >
+            Smazat
+          </button>
+        )}
       </div>
     </div>
   );
