@@ -26,6 +26,14 @@ class RegisterThrottle(_ConfigurableAnonThrottle):
     scope = "register"
 
 
+class ResendVerificationThrottle(_ConfigurableAnonThrottle):
+    """5 verify-resend requests per hour per IP — chrání proti spam
+    resend loop, ale je nezávislý na `register` scope aby testy signup
+    endpointu nesdílely counter s tímhle endpointem."""
+
+    scope = "resend_verification"
+
+
 class LoginThrottle(_ConfigurableAnonThrottle):
     """PRD §6 — 5 login attempts per 15 minutes per IP."""
 

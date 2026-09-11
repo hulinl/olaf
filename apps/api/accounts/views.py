@@ -28,7 +28,12 @@ from .serializers import (
     UserSerializer,
     VerifyEmailSerializer,
 )
-from .throttles import LoginThrottle, PasswordResetThrottle, RegisterThrottle
+from .throttles import (
+    LoginThrottle,
+    PasswordResetThrottle,
+    RegisterThrottle,
+    ResendVerificationThrottle,
+)
 
 
 @api_view(["POST"])
@@ -96,7 +101,7 @@ def signup(request: Request) -> Response:
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@throttle_classes([RegisterThrottle])
+@throttle_classes([ResendVerificationThrottle])
 def resend_verification(request: Request) -> Response:
     """Znovu-poslat verifikační mail. User request 2026-09-11: uživatel
     prošel anon RSVP -> signup upgrade, verify mail nedorazil nebo

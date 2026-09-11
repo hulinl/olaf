@@ -1,4 +1,5 @@
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -7,8 +8,17 @@ from rest_framework.test import APIClient
 from .models import EmailVerificationToken, PasswordResetToken, User
 
 
+def _clear_throttle_cache() -> None:
+    """DRF AnonRateThrottle drží počítadlo requestů v Django cache
+    per IP. Testy volají signup/login endpointy víckrát než je rate
+    limit (5/h), takže mezi testy musíme cache vymazat, jinak druhý
+    a další testy dostávají 429."""
+    cache.clear()
+
+
 class SignupTests(TestCase):
     def setUp(self) -> None:
+        _clear_throttle_cache()
         self.client = APIClient()
         self.url = reverse("accounts:signup")
         self.payload = {
@@ -129,6 +139,7 @@ class EmailVerificationTests(TestCase):
 
 class LoginTests(TestCase):
     def setUp(self) -> None:
+        _clear_throttle_cache()
         self.client = APIClient()
         self.user = User.objects.create_user(
             email="marta@example.com",
@@ -181,6 +192,7 @@ class ResendVerificationTests(TestCase):
     """
 
     def setUp(self) -> None:
+        _clear_throttle_cache()
         self.client = APIClient()
         self.url = reverse("accounts:verify-resend")
         self.user = User.objects.create_user(
@@ -238,6 +250,7 @@ class AnonRsvpToSignupToLoginFlowTests(TestCase):
     """
 
     def setUp(self) -> None:
+        _clear_throttle_cache()
         self.client = APIClient()
 
     def test_full_flow_matches_prod_incident(self) -> None:

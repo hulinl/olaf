@@ -196,6 +196,7 @@ REST_FRAMEWORK = {
         "register": "5/h",
         "login": "5/15m",
         "password_reset": "5/h",
+        "resend_verification": "5/h",
         "workspace_contact": "5/h",
     },
 }
