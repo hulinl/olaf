@@ -1,10 +1,12 @@
 """Add `User.profile_slug` — human-readable URL identifier for
 `/u/<profile_slug>` public profile page (2026-09-11).
 
-Migration order:
-  1. Add nullable slug field (schema change, no unique yet).
-  2. Backfill: pro každého existujícího usera vygeneruj slug.
-  3. Přepni na unique + non-null.
+Non-atomic: první pokus v prod (rev 164) padl s DuplicateTable na
+`accounts_user_profile_slug_17f7faf7_like` — Container App restartoval
+uprostřed migrace a nechal orphan indexy. S atomic=True se DROP IF
+EXISTS smazl při rollbacku a retry lupal do stejné zdi. Přepnutím na
+atomic=False + idempotentním RunSQL (IF NOT EXISTS / IF EXISTS) se
+migrace zapíše průběžně a je bezpečná pro retry i pro čerstvé DB.
 """
 from django.db import migrations, models
 from django.utils.text import slugify
@@ -41,45 +43,89 @@ def clear_profile_slugs(apps, schema_editor):
     User.objects.update(profile_slug="")
 
 
+ADD_COLUMN_SQL = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'accounts_user' AND column_name = 'profile_slug'
+    ) THEN
+        ALTER TABLE "accounts_user"
+        ADD COLUMN "profile_slug" varchar(100) NOT NULL DEFAULT '';
+    END IF;
+END
+$$;
+"""
+
+DROP_COLUMN_SQL = 'ALTER TABLE "accounts_user" DROP COLUMN IF EXISTS "profile_slug";'
+
+FINALIZE_SQL = """
+DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_like";
+DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_uniq";
+ALTER TABLE "accounts_user"
+    DROP CONSTRAINT IF EXISTS "accounts_user_profile_slug_17f7faf7_uniq";
+ALTER TABLE "accounts_user"
+    ADD CONSTRAINT "accounts_user_profile_slug_17f7faf7_uniq"
+    UNIQUE ("profile_slug");
+CREATE INDEX IF NOT EXISTS "accounts_user_profile_slug_17f7faf7_like"
+    ON "accounts_user" ("profile_slug" varchar_pattern_ops);
+"""
+
+FINALIZE_REVERSE_SQL = """
+DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_like";
+ALTER TABLE "accounts_user"
+    DROP CONSTRAINT IF EXISTS "accounts_user_profile_slug_17f7faf7_uniq";
+"""
+
+
 class Migration(migrations.Migration):
+    # Non-atomic: každý step se commituje samostatně, takže retry po
+    # container restartu pokračuje odkud přestal místo úplného
+    # rollbacku (který nechává orphan DDL v DB).
+    atomic = False
+
     dependencies = [
         ("accounts", "0018_periodic_notify_stuck_users"),
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="user",
-            name="profile_slug",
-            field=models.SlugField(
-                blank=True,
-                default="",
-                max_length=100,
-            ),
+        # Column přidáváme přes idempotentní SQL, ne AddField — retry
+        # po pádu by jinak spadlo na „column already exists".
+        # SeparateDatabaseAndState říká Django, že state = SlugField(blank),
+        # ale DB práci uděláme sami.
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name="user",
+                    name="profile_slug",
+                    field=models.SlugField(
+                        blank=True, default="", max_length=100
+                    ),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql=ADD_COLUMN_SQL, reverse_sql=DROP_COLUMN_SQL
+                ),
+            ],
         ),
         migrations.RunPython(backfill_profile_slugs, clear_profile_slugs),
-        # 2026-09-11: první pokus o AlterField v prod padl (Container
-        # App restart → dva replicas běžely migrate paralelně, jeden
-        # nechal orphan `_like` index). Před unique přechodem tedy
-        # nejdřív preventivně dropneme případné leftover indexy +
-        # constraint; DROP IF EXISTS je no-op při čisté migraci.
-        migrations.RunSQL(
-            sql=[
-                'DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_like";',
-                'DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_uniq";',
-                'ALTER TABLE "accounts_user" '
-                'DROP CONSTRAINT IF EXISTS '
-                '"accounts_user_profile_slug_17f7faf7_uniq";',
+        # Finální stav: unique + _like index. Idempotentní SQL, takže
+        # bezpečné i po částečně provedeném předchozím pokusu.
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AlterField(
+                    model_name="user",
+                    name="profile_slug",
+                    field=models.SlugField(
+                        blank=True, max_length=100, unique=True
+                    ),
+                ),
             ],
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-        migrations.AlterField(
-            model_name="user",
-            name="profile_slug",
-            field=models.SlugField(
-                blank=True,
-                db_index=True,
-                max_length=100,
-                unique=True,
-            ),
+            database_operations=[
+                migrations.RunSQL(
+                    sql=FINALIZE_SQL, reverse_sql=FINALIZE_REVERSE_SQL
+                ),
+            ],
         ),
     ]
