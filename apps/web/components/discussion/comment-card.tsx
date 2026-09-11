@@ -46,11 +46,11 @@ export function CommentCard({
         nested ? "ml-9 sm:ml-11" : "",
       ].join(" ")}
     >
-      {/* Bublina drží avatar, jméno, tělo, čas i lajk pohromadě — čas
-          teče jako drobný text na patě bubliny (2026-09-11 user request:
-          „čas dovnitř"). Reply/smazat zůstávají mimo, protože jsou to
-          akce, ne meta. */}
-      <div className="relative w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2 pr-3">
+      {/* Bublina drží jméno, tělo, přílohu, čas i lajk pohromadě. Po
+          screenshot feedbacku 2026-09-11: attachment musí být uvnitř
+          bubliny (jinak visí bez kontextu vpravo dolů) a přílohu
+          umisťujeme jako subtílní pill, aby nedominoval nad textem. */}
+      <div className="relative w-fit max-w-full rounded-2xl bg-surface-muted/60 px-3 py-2">
         <div className="flex items-center gap-1.5">
           <Avatar
             firstName={c.author_name}
@@ -82,7 +82,17 @@ export function CommentCard({
             className="mt-1 block whitespace-pre-wrap break-words text-sm text-ink-700"
           />
         )}
-        <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-ink-500">
+        {c.attachment_url && (
+          <div className="mt-2">
+            <CommentAttachment
+              url={c.attachment_url}
+              name={c.attachment_name}
+            />
+          </div>
+        )}
+        {/* Meta patka bubliny — čas + lajk counter. Zůstává drobným
+            textem, aby netlačila na obsah. */}
+        <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] text-ink-500">
           <time
             dateTime={c.created_at}
             title={new Date(c.created_at).toLocaleString("cs-CZ")}
@@ -108,12 +118,9 @@ export function CommentCard({
           )}
         </div>
       </div>
-      {c.attachment_url && (
-        <CommentAttachment
-          url={c.attachment_url}
-          name={c.attachment_name}
-        />
-      )}
+      {/* Akce pod bublinou — všechny na stejném řádku vlevo, i Smazat.
+          Předtím bylo Smazat přes ml-auto na pravém kraji, čímž se
+          vizuálně odpojilo od komentáře (bug report 2026-09-11). */}
       <div className="ml-3 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
         <button
           type="button"
@@ -139,7 +146,7 @@ export function CommentCard({
           <button
             type="button"
             onClick={() => onDelete()}
-            className="ml-auto font-medium text-ink-500 hover:text-danger"
+            className="font-medium text-ink-500 hover:text-danger"
           >
             Smazat
           </button>
@@ -160,7 +167,7 @@ function CommentAttachment({ url, name }: { url: string; name: string }) {
         href={absolute}
         target="_blank"
         rel="noopener noreferrer"
-        className="ml-3 block w-fit overflow-hidden rounded-md border border-border bg-surface-muted focus-ring"
+        className="block w-fit overflow-hidden rounded-md border border-border bg-surface focus-ring"
         aria-label="Zvětšit fotku"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -177,11 +184,11 @@ function CommentAttachment({ url, name }: { url: string; name: string }) {
       href={absolute}
       target="_blank"
       rel="noopener noreferrer"
-      className="ml-3 inline-flex w-fit items-center gap-2 rounded-md border border-border bg-surface-muted/40 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted focus-ring"
+      className="inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-surface/80 px-2 py-1 text-[12px] font-medium text-ink-700 ring-1 ring-border hover:bg-surface focus-ring"
     >
       <PaperclipIcon />
-      <span>{name || "soubor"}</span>
-      <span aria-hidden className="text-ink-500">
+      <span className="truncate">{name || "soubor"}</span>
+      <span aria-hidden className="shrink-0 text-ink-500">
         ↓
       </span>
     </a>
