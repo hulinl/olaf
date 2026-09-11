@@ -237,3 +237,35 @@ class RsvpApproveRejectNotificationTests(TestCase):
         self.assertIsNone(notify_rsvp_approved(self.rsvp))
         self.assertIsNone(notify_rsvp_rejected(self.rsvp))
         self.assertEqual(Notification.objects.count(), 0)
+
+
+class EmailTemplateRenderTests(TestCase):
+    """Regression: 2026-09-11 uživatel viděl v mailu literal
+    ``{# Snapshot ... #}`` — Django template comment tag
+    (``{# ... #}``) je striktně single-line, můj multi-line komentář
+    se neparsoval a projel do finálního mailu. Test rendruje šablony
+    a odmítne cokoli, co obsahuje leftover template tokens.
+    """
+
+    def _make_event(self):
+        owner = _make_user("owner@example.com")
+        ws = _make_workspace(owner, slug="test-ws")
+        return _make_event(ws)
+
+    def test_event_available_email_has_no_leaked_template_tokens(self) -> None:
+        from django.core import mail
+
+        from events.emails import send_event_available_notification
+
+        user = _make_user("recipient@example.com")
+        event = self._make_event()
+        mail.outbox.clear()
+        send_event_available_notification(user, event)
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        html_alt = msg.alternatives[0][0] if msg.alternatives else ""
+        for content in (msg.body, html_alt):
+            self.assertNotIn("{#", content, "leaked template comment start")
+            self.assertNotIn("#}", content, "leaked template comment end")
+            self.assertNotIn("{%", content, "leaked template tag start")
+            self.assertNotIn("{{", content, "leaked template var start")
