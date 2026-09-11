@@ -55,10 +55,20 @@ def _load_published_event(workspace_slug: str, event_slug: str):
     must work for either path — otherwise clicking an event from a
     community that shares it produces a confused 404. We match by
     primary workspace OR shared, falling back to the event's primary
-    workspace URL when only the shared path was requested."""
+    workspace URL when only the shared path was requested.
+
+    Slug alias fallback (2026-09-11): pokud přímý match selže,
+    hledáme v EventSlugAlias — když owner přejmenoval slug, staré
+    URL vede na EventSlugAlias.old_slug a resolved event má
+    aktuální canonical slug. View nadřazený `public_event` pak
+    přidá do payloadu `canonical_slug` pole (frontend detekuje
+    rozdíl a router.replace-uje).
+    """
     from django.db.models import Q as DQ
 
-    return (
+    from .models import EventSlugAlias
+
+    event = (
         Event.objects.select_related("workspace")
         .filter(slug=event_slug)
         .filter(
@@ -67,6 +77,25 @@ def _load_published_event(workspace_slug: str, event_slug: str):
         )
         .first()
     )
+    if event is not None:
+        return event
+
+    alias = (
+        EventSlugAlias.objects.select_related(
+            "event", "event__workspace"
+        )
+        .filter(
+            workspace__slug=workspace_slug, old_slug=event_slug
+        )
+        .first()
+    )
+    if alias is None:
+        return None
+    # Alias event: může být v jiné (primary) workspace než ta ze
+    # kterou URL přišla; ale request slug matches alias.workspace,
+    # takže vracíme canonical event. Frontend v response pole
+    # `canonical_slug` uvidí rozdíl.
+    return alias.event
 
 
 @api_view(["GET"])

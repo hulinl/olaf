@@ -1,0 +1,28 @@
+{% extends "emails/_base.html" %}
+{% load czech %}
+
+{% block subject %}Dokončíš registraci na olaf?{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ user.first_name|czech_vocative }},
+  </p>
+  <p style="margin:0 0 16px;">
+    přihlásil/a jsi se u nás na akci — díky za důvěru. Registraci máme, ale bez účtu ti nemůžeme ukázat detaily, poslat připomenutí ani ti dát přístup ke skupinovým věcem (nástěnka, diskuze).
+  </p>
+  <p style="margin:0 0 16px;">
+    Vytvoření účtu zabere minutu. Máme tvůj e-mail, stačí kliknout níž, zadat heslo a jsi uvnitř.
+  </p>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;">
+    <tr>
+      <td align="center" style="background-color:#f59e0b;border-radius:8px;">
+        <a href="{{ link }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Vytvořit účet</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:24px 0 0;font-size:13px;color:#737373;">
+    Nechceš účet? V pohodě — na akci jsi pořád přihlášený/á, potvrzení máš v e-mailu. Tenhle e-mail můžeš klidně ignorovat.
+  </p>
+{% endblock %}

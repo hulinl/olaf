@@ -313,16 +313,20 @@ def me_avatar(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def user_public_profile(request: Request, user_id: int) -> Response:
-    """Veřejný profil daného usera. Respektuje `profile_show_*` toggles
-    — pole schovaná uživatelem se vrátí jako prázdné stringy. Viewer
-    který je organizátorem akce, na které je target přihlášený, dostává
-    kompletní data (organizer_bypass=True) — pořadatel musí mít
-    kontakt na účastníka pro případ nouze.
+    """Veřejný profil daného usera. Auth chování:
 
-    Ochrana: auth-only, aby random veřejnost neškrábala e-maily. Pořád
-    respektuje toggles i pro auth-usery, kteří nejsou organizátoři.
+      - **Anonymous viewer** — vrátí jen jméno, bio, avatar (pokud
+        `profile_show_avatar`). E-mail / telefon / adresa vždycky
+        prázdné, ať jsou toggles jakékoli. Chrání proti external
+        scrapingu (2026-09-11 — endpoint uvolněn pro guides link
+        z externího webu).
+      - **Authenticated viewer** — respektuje `profile_show_*` toggles
+        jak dosud.
+      - **Organizer bypass** — když je viewer owner/admin workspace-u
+        kde je target user zaregistrovaný na akci (non-cancelled
+        RSVP), vidí kompletní kontakt bez ohledu na toggles.
     """
     try:
         target = User.objects.get(pk=user_id)

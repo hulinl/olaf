@@ -200,6 +200,13 @@ class UserPublicProfileSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    def _is_anonymous_viewer(self) -> bool:
+        """Anonymous viewer nesmí ani při zapnutých toggles vidět
+        e-mail/telefon/adresu — chrání proti external scrapingu
+        (endpoint je AllowAny od 2026-09-11)."""
+        request = self.context.get("request")
+        return not request or not request.user.is_authenticated
+
     def _bypasses_toggles(self, obj: User) -> bool:
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
@@ -251,16 +258,22 @@ class UserPublicProfileSerializer(serializers.ModelSerializer):
         return self._absolute_avatar_url(obj)
 
     def get_email(self, obj: User) -> str:
+        if self._is_anonymous_viewer():
+            return ""
         if not obj.profile_show_email and not self._bypasses_toggles(obj):
             return ""
         return obj.email
 
     def get_phone(self, obj: User) -> str:
+        if self._is_anonymous_viewer():
+            return ""
         if not obj.profile_show_phone and not self._bypasses_toggles(obj):
             return ""
         return obj.phone or ""
 
     def _address_field(self, obj: User, field: str) -> str:
+        if self._is_anonymous_viewer():
+            return ""
         if not obj.profile_show_address and not self._bypasses_toggles(obj):
             return ""
         return getattr(obj, field, "") or ""

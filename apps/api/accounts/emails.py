@@ -23,6 +23,26 @@ def send_verification_email(user: User, token: EmailVerificationToken) -> None:
     )
 
 
+def send_finish_signup_email(user: User) -> None:
+    """Nudge pro anon-RSVP usera co nikdy nedokončil signup. User má
+    registraci na akci ale ještě si nevytvořil účet — link ho hodí na
+    /signup s pre-fillovaným e-mailem. Bez tokenu, bez password reset
+    flow. User request 2026-09-11 — 2. vlna „stuck users"."""
+    signup_link = _frontend_url(
+        f"/signup?email={user.email}"
+    )
+    send_branded_email(
+        subject="Dokončíš registraci na olaf?",
+        template_base="emails/finish_signup",
+        context={
+            "user": user,
+            "link": signup_link,
+        },
+        recipient_list=[user.email],
+        fail_silently=True,
+    )
+
+
 def send_password_reset_email(user: User, token: PasswordResetToken) -> None:
     send_branded_email(
         subject="Obnovení hesla — olaf",

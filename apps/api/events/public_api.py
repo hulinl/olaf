@@ -247,16 +247,34 @@ _PUBLIC_STATUSES = [
 def _resolve_event(slug: str) -> tuple[Event | None, bool]:
     """Vrátí (event, is_archived). Archived = deleted_at set. Vracíme
     ho zvlášť, aby view rozlišil 404 od 410. Používáme `all_objects`
-    manager (bez default filtru na deleted_at)."""
-    qs = (
+    manager (bez default filtru na deleted_at).
+
+    Slug alias fallback (2026-09-11): pokud přímý match selže,
+    zkontrolujeme EventSlugAlias — externí konzumenti co drží starý
+    slug (např. rozeslané odkazy) dostanou aktuální data místo 404.
+    """
+    from .models import EventSlugAlias
+
+    event = (
         Event.all_objects.filter(slug=slug, status__in=_PUBLIC_STATUSES)
         .select_related("workspace")
         .order_by("-starts_at")
+        .first()
     )
-    event = qs.first()
-    if event is None:
+    if event is not None:
+        return event, event.deleted_at is not None
+
+    alias = (
+        EventSlugAlias.objects.select_related(
+            "event", "event__workspace"
+        )
+        .filter(old_slug=slug, event__status__in=_PUBLIC_STATUSES)
+        .first()
+    )
+    if alias is None:
         return None, False
-    return event, event.deleted_at is not None
+    ev = alias.event
+    return ev, ev.deleted_at is not None
 
 
 @require_safe

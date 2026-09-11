@@ -47,9 +47,32 @@ class PublicProfileVisibilityTests(TestCase):
             kwargs={"user_id": self.target.pk},
         )
 
-    def test_anonymous_cannot_access(self) -> None:
+    def test_anonymous_can_access_but_gets_no_contact_info(self) -> None:
+        """2026-09-11: endpoint uvolněn na AllowAny (guides link
+        z externího webu). Anonymous viewer dostane jen jméno / bio /
+        avatar; e-mail/telefon/adresa vždycky prázdné bez ohledu na
+        toggles — chrání proti external scrapingu."""
+        # Cílový user má email + phone show=True (default), přesto
+        # anonymous viewer nedostane hodnoty.
+        self.target.profile_show_email = True
+        self.target.profile_show_phone = True
+        self.target.profile_show_address = True
+        self.target.save(
+            update_fields=[
+                "profile_show_email",
+                "profile_show_phone",
+                "profile_show_address",
+            ]
+        )
         resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertEqual(body["first_name"], "Target")
+        # Anonymous viewer nedostává kontakt bez ohledu na toggles.
+        self.assertEqual(body["email"], "")
+        self.assertEqual(body["phone"], "")
+        self.assertEqual(body["address_street"], "")
+        self.assertFalse(body["organizer_bypass"])
 
     def test_hidden_fields_return_empty(self) -> None:
         self.client.force_authenticate(self.viewer)

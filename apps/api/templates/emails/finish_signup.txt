@@ -1,0 +1,11 @@
+{% load czech %}Ahoj {{ user.first_name|czech_vocative }},
+
+přihlásil/a jsi se u nás na akci — díky za důvěru. Registraci máme, ale bez účtu ti nemůžeme ukázat detaily, poslat připomenutí ani ti dát přístup ke skupinovým věcem (nástěnka, diskuze).
+
+Vytvoření účtu zabere minutu. Máme tvůj e-mail, stačí kliknout níž, zadat heslo a jsi uvnitř.
+
+Vytvořit účet: {{ link }}
+
+Nechceš účet? V pohodě — na akci jsi pořád přihlášený/á, potvrzení máš v e-mailu. Tenhle e-mail můžeš klidně ignorovat.
+
+— Aplikace olaf

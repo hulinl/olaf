@@ -1490,3 +1490,38 @@ def _maybe_schedule_auto_contract(rsvp: "RSVP") -> None:
                 auto_send_contract_for_rsvp_task(rsvp_id)
 
     transaction.on_commit(_enqueue)
+
+
+class EventSlugAlias(models.Model):
+    """Historický slug pro Event po rename. Když owner změní
+    `event.slug`, pre-save signal vytvoří EventSlugAlias záznam s
+    předchozím slug. Public event view při 404 zkontroluje alias
+    a 301-redirectuje na aktuální canonical URL. User request
+    2026-09-11 — abychom mohli měnit sluggy bez rozbití rozeslaných
+    odkazů (Nicole si slug překlepla, Olaf chce personal-2 rename,
+    atd.)."""
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="slug_aliases",
+    )
+    # Denormalizovaný workspace — kdyby event přešel do jiné workspace
+    # v budoucnu, staré alias URL zůstávají v původní workspace.
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.CASCADE,
+        related_name="event_slug_aliases",
+    )
+    old_slug = models.SlugField(max_length=200)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "events_slug_alias"
+        unique_together = [("workspace", "old_slug")]
+        indexes = [
+            models.Index(fields=["workspace", "old_slug"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.workspace.slug}/e/{self.old_slug} -> {self.event.slug}"

@@ -7,6 +7,7 @@ import { use, useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { Logo } from "@/components/ui/logo";
 import { ApiError, type UserPublicProfile, auth } from "@/lib/api";
 
 interface Props {
@@ -92,8 +93,30 @@ export default function PublicProfilePage({ params }: Props) {
     !!profile.address_zip;
 
   return (
-    <main className="flex flex-1 flex-col">
-      <section className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:py-12">
+    <div className="min-h-screen bg-canvas text-ink-900">
+      {/* Minimální top nav — page je AllowAny, může sem přijít
+          anonymous user z externího webu (guides link z
+          olafadventures.cz atd.). Nemá mít v aplikaci navigation
+          state, ale musí mít cestu zpět na home / login. */}
+      <header className="sticky top-0 z-10 border-b border-border bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+          <Link
+            href="/"
+            className="text-ink-900 transition-opacity hover:opacity-80"
+            aria-label="olaf"
+          >
+            <Logo size={26} />
+          </Link>
+          <Link
+            href="/login"
+            className="text-sm font-medium text-ink-700 hover:text-brand"
+          >
+            Přihlásit
+          </Link>
+        </div>
+      </header>
+      <main className="flex flex-1 flex-col">
+        <section className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:py-12">
         <Breadcrumbs
           items={[{ label: "Lidé" }, { label: displayName }]}
         />
@@ -212,7 +235,8 @@ export default function PublicProfilePage({ params }: Props) {
             → Nastavit vlastní veřejný profil
           </Link>
         </p>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   );
 }
