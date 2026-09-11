@@ -43,16 +43,12 @@ export default function NewEventFromSourcePage() {
     let cancelled = false;
     (async () => {
       try {
-        const mine = await workspaces.mine();
-        const owned = mine.filter((w) => w.my_role === "owner");
+        // 2026-09-11: default = personal, konzistentní s /new — akce
+        // se nemá automaticky navěsit na komunitu, dokud si ji user
+        // explicitně nevybere v EventForm dropdownu.
+        const p = await workspaces.personal();
         if (cancelled) return;
-        if (owned.length > 0) {
-          setHome(owned[0]);
-        } else {
-          const p = await workspaces.personal();
-          if (cancelled) return;
-          setHome(p);
-        }
+        setHome(p);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
