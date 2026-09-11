@@ -253,3 +253,131 @@ class PublicEventsBatchTests(TestCase):
         slugs = ",".join(f"e{i}" for i in range(60))
         resp = self.client.get(self.url + f"?slugs={slugs}")
         self.assertLessEqual(len(resp.json()), 50)
+
+
+class PublicEventsListTests(TestCase):
+    """v3 list mode (2026-09-11): bez `slugs=` param se `/api/public/
+    events` chová jako list. Podporuje upcoming filter + pagination."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.ws = Workspace.objects.create(
+            slug="olafadventures", name="Olaf Adventures"
+        )
+        self.url = reverse("public-events-batch")
+
+    def test_list_returns_all_published_events(self) -> None:
+        _make_event(self.ws, slug="alpha")
+        _make_event(
+            self.ws,
+            slug="beta",
+            starts_at=timezone.now() + timedelta(days=20),
+            ends_at=timezone.now() + timedelta(days=20, hours=4),
+        )
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertEqual({e["slug"] for e in body}, {"alpha", "beta"})
+
+    def test_list_skips_drafts_and_archived(self) -> None:
+        _make_event(self.ws, slug="alpha")
+        _make_event(self.ws, slug="draftik", status=Event.STATUS_DRAFT)
+        deleted = _make_event(self.ws, slug="dead")
+        deleted.deleted_at = timezone.now()
+        deleted.save(update_fields=["deleted_at"])
+        resp = self.client.get(self.url)
+        self.assertEqual([e["slug"] for e in resp.json()], ["alpha"])
+
+    def test_upcoming_filter_hides_ended_events(self) -> None:
+        # Ended akce — proběhla, chce se schovat.
+        _make_event(
+            self.ws,
+            slug="proslo",
+            starts_at=timezone.now() - timedelta(days=5),
+            ends_at=timezone.now() - timedelta(days=4),
+            status=Event.STATUS_COMPLETED,
+        )
+        # Aktuálně běží — má být v upcoming.
+        _make_event(
+            self.ws,
+            slug="prave-bezi",
+            starts_at=timezone.now() - timedelta(hours=1),
+            ends_at=timezone.now() + timedelta(hours=2),
+        )
+        # V budoucnu.
+        _make_event(
+            self.ws,
+            slug="pristi-tyden",
+            starts_at=timezone.now() + timedelta(days=7),
+            ends_at=timezone.now() + timedelta(days=7, hours=4),
+        )
+        resp = self.client.get(self.url + "?upcoming=true")
+        slugs = [e["slug"] for e in resp.json()]
+        self.assertIn("prave-bezi", slugs)
+        self.assertIn("pristi-tyden", slugs)
+        self.assertNotIn("proslo", slugs)
+
+    def test_upcoming_orders_chronologically_ascending(self) -> None:
+        # V upcoming mode chceme nejbližší akce první — user vidí co
+        # se blíží.
+        _make_event(
+            self.ws,
+            slug="za-tyden",
+            starts_at=timezone.now() + timedelta(days=7),
+            ends_at=timezone.now() + timedelta(days=7, hours=4),
+        )
+        _make_event(
+            self.ws,
+            slug="zitra",
+            starts_at=timezone.now() + timedelta(days=1),
+            ends_at=timezone.now() + timedelta(days=1, hours=4),
+        )
+        resp = self.client.get(self.url + "?upcoming=true")
+        slugs = [e["slug"] for e in resp.json()]
+        self.assertEqual(slugs, ["zitra", "za-tyden"])
+
+    def test_pagination_limit_and_offset(self) -> None:
+        for i in range(5):
+            _make_event(
+                self.ws,
+                slug=f"e{i}",
+                starts_at=timezone.now() + timedelta(days=i + 1),
+                ends_at=timezone.now() + timedelta(days=i + 1, hours=4),
+            )
+        resp = self.client.get(self.url + "?upcoming=true&limit=2&offset=1")
+        body = resp.json()
+        self.assertEqual(len(body), 2)
+        self.assertEqual([e["slug"] for e in body], ["e1", "e2"])
+
+    def test_limit_capped_at_max(self) -> None:
+        # limit=999 se má clampnout na 200 (max).
+        for i in range(3):
+            _make_event(
+                self.ws,
+                slug=f"e{i}",
+                starts_at=timezone.now() + timedelta(days=i + 1),
+                ends_at=timezone.now() + timedelta(days=i + 1, hours=4),
+            )
+        resp = self.client.get(self.url + "?limit=999")
+        # Nemáme jak assertovat cap přímo z response, ale endpoint
+        # nesmí throw. Vrátí max 3 protože máme 3 eventy.
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.json()), 3)
+
+    def test_payload_contains_v3_fields(self) -> None:
+        _make_event(
+            self.ws,
+            slug="s-cenou",
+            description="Popis akce",
+            price_amount="1500",
+            price_currency="CZK",
+            price_note="v ceně je oběd",
+        )
+        resp = self.client.get(self.url)
+        body = resp.json()[0]
+        self.assertEqual(body["description"], "Popis akce")
+        self.assertEqual(body["price"]["amount"], "1500")
+        self.assertEqual(body["price"]["currency"], "CZK")
+        self.assertEqual(body["price"]["note"], "v ceně je oběd")
+        # coverImage je None protože jsme neuploadovali cover.
+        self.assertIsNone(body["coverImage"])

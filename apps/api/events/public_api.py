@@ -45,6 +45,17 @@ def _absolute_event_url(event: Event) -> str:
     return f"{base}/{event.workspace.slug}/e/{event.slug}"
 
 
+def _absolute_media_url(url: str) -> str:
+    """Absolute URL pro média — v dev je storage relativní (`/media/...`),
+    v prod Azure Blob absolutní. External konzument potřebuje absolutní."""
+    if not url:
+        return ""
+    if url.startswith(("http://", "https://")):
+        return url
+    base = getattr(settings, "FRONTEND_URL", "https://olaf.events").rstrip("/")
+    return f"{base}{url}"
+
+
 def _iso(dt) -> str | None:
     """ISO 8601 s UTC 'Z' suffixem tak, jak spec požaduje."""
     if dt is None:
@@ -102,11 +113,26 @@ def _compute_state(event: Event, now, registered: int) -> str:
 
 
 def _serialize_event(event: Event, now) -> dict:
-    """Payload dle spec v2."""
+    """Payload dle spec v3 (2026-09-11 rozšíření o coverImage,
+    description, price — nice-to-have pole aby externí konzumenti měli
+    kompletní kartu bez druhého fetch)."""
     registered = event.confirmed_rsvp_count
     capacity = event.capacity
     spots_left = None if capacity is None else max(0, capacity - registered)
     difficulty_label = _DIFFICULTY_LABEL.get(event.difficulty)
+    cover_url = ""
+    if event.cover:
+        try:
+            cover_url = _absolute_media_url(event.cover.url)
+        except (ValueError, AttributeError):
+            cover_url = ""
+    price = None
+    if event.price_amount is not None:
+        price = {
+            "amount": str(event.price_amount),
+            "currency": event.price_currency or "CZK",
+            "note": event.price_note or "",
+        }
     return {
         # Identita
         "slug": event.slug,
@@ -125,6 +151,10 @@ def _serialize_event(event: Event, now) -> dict:
         "spotsLeft": spots_left,
         "registrationOpensAt": _iso(event.registration_opens_at),
         "registrationClosesAt": _iso(event.registration_closes_at),
+        # v3 nice-to-have — externí web card bez druhého fetch
+        "coverImage": cover_url or None,
+        "description": event.description or "",
+        "price": price,
     }
 
 
@@ -177,32 +207,97 @@ def public_event_status(request, slug: str) -> HttpResponse:
     return _cors_ok(JsonResponse(_serialize_event(event, now)))
 
 
+_LIST_LIMIT_DEFAULT = 50
+_LIST_LIMIT_MAX = 200
+
+
+def _parse_int(value: str | None, default: int, minimum: int, maximum: int) -> int:
+    try:
+        n = int(value) if value is not None else default
+    except (TypeError, ValueError):
+        n = default
+    return max(minimum, min(maximum, n))
+
+
 @require_safe
 @cache_control(public=True, max_age=60, s_maxage=60)
 def public_events_batch(request) -> HttpResponse:
-    """GET /api/public/events?slugs=a,b,c"""
-    raw = (request.GET.get("slugs") or "").strip()
-    slugs = [s.strip() for s in raw.split(",") if s.strip()]
-    if not slugs:
-        return _cors_ok(JsonResponse([], safe=False))
-    slugs = slugs[:50]
-    events = (
+    """Hybrid endpoint (spec v3, 2026-09-11):
+
+      GET /api/public/events?slugs=a,b,c
+        → batch by slug (existing v1 chování, silent skip pro
+          neexistující sluggy, cap 50).
+
+      GET /api/public/events?upcoming=true&limit=50&offset=0
+        → list všech publikovaných akcí (nový v3 mód). Bez `slugs=`
+          param se aktivuje. `upcoming=true` filtruje state != 'ended'
+          (draft/archived se nikdy neukazují). `limit` 1-200 (default
+          50), `offset` >= 0.
+
+    Draft nikdy neukazujeme; archived (deleted_at) jsou skipnuté i v
+    list módu.
+    """
+    now = timezone.now()
+
+    # --- Batch mód (slugs= je set) --------------------------------
+    raw_slugs = (request.GET.get("slugs") or "").strip()
+    if raw_slugs:
+        slugs = [s.strip() for s in raw_slugs.split(",") if s.strip()][:50]
+        events = (
+            Event.all_objects.filter(
+                slug__in=slugs,
+                status__in=_PUBLIC_STATUSES,
+                deleted_at__isnull=True,
+            )
+            .select_related("workspace")
+            .order_by("-starts_at")
+        )
+        by_slug: dict[str, Event] = {}
+        for ev in events:
+            if ev.slug not in by_slug:
+                by_slug[ev.slug] = ev
+        payload = [
+            _serialize_event(by_slug[s], now) for s in slugs if s in by_slug
+        ]
+        return _cors_ok(JsonResponse(payload, safe=False))
+
+    # --- List mód (slugs není set) --------------------------------
+    upcoming_flag = (request.GET.get("upcoming") or "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    limit = _parse_int(
+        request.GET.get("limit"),
+        default=_LIST_LIMIT_DEFAULT,
+        minimum=1,
+        maximum=_LIST_LIMIT_MAX,
+    )
+    offset = _parse_int(
+        request.GET.get("offset"), default=0, minimum=0, maximum=100000
+    )
+
+    qs = (
         Event.all_objects.filter(
-            slug__in=slugs,
             status__in=_PUBLIC_STATUSES,
             deleted_at__isnull=True,
         )
         .select_related("workspace")
-        .order_by("-starts_at")
     )
-    by_slug: dict[str, Event] = {}
-    for ev in events:
-        if ev.slug not in by_slug:
-            by_slug[ev.slug] = ev
-    now = timezone.now()
-    payload = [
-        _serialize_event(by_slug[s], now) for s in slugs if s in by_slug
-    ]
+    if upcoming_flag:
+        # Upcoming = ends_at v budoucnu + status není completed/cancelled.
+        # Odpovídá state != 'ended' logice v `_compute_state`.
+        qs = qs.filter(ends_at__gt=now).exclude(
+            status__in=[Event.STATUS_COMPLETED, Event.STATUS_CANCELLED]
+        )
+        # Pro upcoming je přirozené řazení chronologické — nejbližší
+        # akce první.
+        qs = qs.order_by("starts_at")
+    else:
+        qs = qs.order_by("-starts_at")
+
+    events = list(qs[offset : offset + limit])
+    payload = [_serialize_event(ev, now) for ev in events]
     return _cors_ok(JsonResponse(payload, safe=False))
 
 
