@@ -1349,18 +1349,18 @@ function CollaboratorsSection({
 }
 
 /** Integrace — public URL a JSON API endpoint pro embed na externí web.
- *  Ukazuje canonical share URL (`/e/<public_id>`) i legacy landing URL.
- *  API endpoint vrací plný Event JSON — chce-li kolegyně na svém webu
- *  načíst akci a vyrenderovat vlastní kartu, kopíruje si tuhle URL.
- *  User request 2026-09-11. */
+ *  Ukazuje canonical share URL (`/e/<public_id>`) + JSON API endpoint,
+ *  který externí systémy (např. web olafadventures.cz Payload admin)
+ *  vloží jako zdroj živého stavu akce. `public_id` je stabilní přes
+ *  přejmenování — integrace nepadne, když se změní slug. */
 function IntegrationsSection({ event }: { event: OlafEvent }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const shareUrl = event.public_id
     ? `${origin}/e/${event.public_id}`
     : `${origin}/${event.workspace_slug}/e/${event.slug}`;
   const apiUrl = event.public_id
-    ? `${origin}/api/events/e/${event.public_id}/`
-    : `${origin}/api/events/${event.workspace_slug}/${event.slug}/`;
+    ? `${origin}/api/events/e/${event.public_id}`
+    : `${origin}/api/public/events/${event.slug}`;
 
   return (
     <section>
@@ -1377,8 +1377,8 @@ function IntegrationsSection({ event }: { event: OlafEvent }) {
           value={shareUrl}
         />
         <CopyableUrlRow
-          label="Public API endpoint (JSON)"
-          hint="GET request vrací event data (titulek, datum, místo, kapacita, popis, obrázky…). Anonymous přístup — nepotřebuje token."
+          label="API URL pro externí integrace"
+          hint="Vlož do adminu externího webu (např. olafadventures.cz), aby zobrazoval živý stav akce. Vrací JSON s title, datum, kapacita, cena, guides atd. CORS ok, žádný token."
           value={apiUrl}
         />
         {event.public_id && (

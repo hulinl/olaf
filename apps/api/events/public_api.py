@@ -294,6 +294,35 @@ def public_event_status(request, slug: str) -> HttpResponse:
     return _cors_ok(JsonResponse(_serialize_event(event, now)))
 
 
+@require_safe
+@cache_control(public=True, max_age=60, s_maxage=60)
+def public_event_by_hash(request, public_id: str) -> HttpResponse:
+    """GET /api/public/events/e/{public_id}
+
+    Canonical share URL exposed to external consumers (např. web
+    olafadventures.cz). `public_id` je stabilní přes rename slugu,
+    takže integrace do Payload adminu nepadne, když Olaf akci
+    přejmenuje. Stejný v3 payload jako `/api/public/events/{slug}`.
+    """
+    event = (
+        Event.all_objects.filter(
+            public_id=public_id, status__in=_PUBLIC_STATUSES
+        )
+        .select_related("workspace")
+        .first()
+    )
+    if event is None:
+        return _cors_ok(
+            JsonResponse({"error": "Event not found"}, status=404)
+        )
+    if event.deleted_at is not None:
+        return _cors_ok(
+            JsonResponse({"error": "Event archived"}, status=410)
+        )
+    now = timezone.now()
+    return _cors_ok(JsonResponse(_serialize_event(event, now)))
+
+
 _LIST_LIMIT_DEFAULT = 50
 _LIST_LIMIT_MAX = 200
 
