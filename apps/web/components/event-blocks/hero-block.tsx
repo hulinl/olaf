@@ -14,6 +14,12 @@ interface Props {
   /** Subtle count text („4 z 20 přihlášeno") shown next to the CTA button. */
   countLabel?: string | null;
   tone?: BlockTone;
+  /** Když true, CTA button se schová a místo něj přijde disabled-vypadající
+   *  „Přihlášky uzavřené" label. User request 2026-09-11 — na proběhlé
+   *  akce nesmí jít kliknout „Přihlásit". */
+  ctaDisabled?: boolean;
+  /** Label pro disabled state (jinak fallback „Přihlášky uzavřené"). */
+  ctaDisabledLabel?: string;
 }
 
 export function HeroBlock({
@@ -24,6 +30,8 @@ export function HeroBlock({
   badge,
   countLabel,
   tone = "canvas",
+  ctaDisabled = false,
+  ctaDisabledLabel = "Přihlášky uzavřené",
 }: Props) {
   const cover = assetUrl(payload.cover_url);
   const title = payload.title_override || fallbackTitle;
@@ -148,12 +156,27 @@ export function HeroBlock({
         )}
 
         <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
-          <Link
-            href={ctaHref}
-            className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-6 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
-          >
-            {ctaLabel}
-          </Link>
+          {ctaDisabled ? (
+            <span
+              aria-disabled="true"
+              className={[
+                "inline-flex h-12 items-center justify-center rounded-md px-6 text-base font-semibold",
+                onDark
+                  ? "bg-white/15 text-white/70"
+                  : "bg-surface-muted text-ink-500",
+                "cursor-not-allowed select-none",
+              ].join(" ")}
+            >
+              {ctaDisabledLabel}
+            </span>
+          ) : (
+            <Link
+              href={ctaHref}
+              className="inline-flex h-12 items-center justify-center rounded-md bg-brand px-6 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover focus-ring"
+            >
+              {ctaLabel}
+            </Link>
+          )}
           {countLabel && (
             <span
               className={[

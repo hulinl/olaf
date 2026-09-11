@@ -44,6 +44,11 @@ interface Props {
   /** Inline organizer side-lookup (event.organizers_by_user_id) for the
    *  organizers block — server-side joined User data per user_id. */
   organizersByUserId?: Record<string, OrganizerLookupEntry>;
+  /** Když true, hero CTA se schová a místo něj přijde disabled label
+   *  (past events, cancelled). Propaguje se přes BlockRenderer do
+   *  HeroBlock. */
+  heroCtaDisabled?: boolean;
+  heroCtaDisabledLabel?: string;
 }
 
 export function BlockRenderer({
@@ -57,6 +62,8 @@ export function BlockRenderer({
   eventPrice,
   gearListsBySlug,
   organizersByUserId,
+  heroCtaDisabled,
+  heroCtaDisabledLabel,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -68,6 +75,8 @@ export function BlockRenderer({
           badge={heroBadge}
           countLabel={heroCountLabel}
           tone={tone}
+          ctaDisabled={heroCtaDisabled}
+          ctaDisabledLabel={heroCtaDisabledLabel}
         />
       );
     case "prose":

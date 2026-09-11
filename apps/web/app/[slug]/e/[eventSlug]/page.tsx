@@ -119,10 +119,10 @@ export default async function EventLandingPage({ params }: Props) {
       {isPast && !cancelled && (
         <div
           role="status"
-          className="w-full border-b border-ink-900/10 bg-ink-900 text-ink-inverse"
+          className="w-full border-b border-danger/40 bg-danger text-white"
         >
           <div className="mx-auto flex max-w-5xl items-center justify-center gap-2 px-4 py-2 text-sm">
-            <span aria-hidden>📅</span>
+            <span aria-hidden>⚠</span>
             <span>
               <strong className="font-semibold">Již realizovaná akce</strong>
               {" · "}přihlášky jsou uzavřené.
@@ -233,6 +233,10 @@ export default async function EventLandingPage({ params }: Props) {
                   }}
                   gearListsBySlug={event.gear_lists_by_slug}
                   organizersByUserId={event.organizers_by_user_id}
+                  heroCtaDisabled={isPast || cancelled}
+                  heroCtaDisabledLabel={
+                    cancelled ? "Akce zrušena" : "Přihlášky uzavřené"
+                  }
                 />
               ))}
             </>
@@ -356,6 +360,8 @@ function FallbackHero({
       })
     : `${starts.toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })} – ${ends.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}`;
   const cancelled = event.status === "cancelled";
+  const isPast =
+    event.status === "completed" || ends.getTime() < Date.now();
 
   return (
     <section className="bg-canvas">
@@ -379,6 +385,13 @@ function FallbackHero({
           {cancelled ? (
             <span className="rounded-md bg-danger px-4 py-2 text-sm font-semibold text-white">
               Zrušeno
+            </span>
+          ) : isPast ? (
+            <span
+              aria-disabled="true"
+              className="cursor-not-allowed select-none rounded-md bg-surface-muted px-5 py-2.5 text-sm font-semibold text-ink-500"
+            >
+              Přihlášky uzavřené
             </span>
           ) : event.is_open_for_rsvp ? (
             <Link
