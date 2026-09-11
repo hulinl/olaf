@@ -21,7 +21,13 @@ class NoStoreApiMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        if request.path.startswith("/api/"):
+        # `/api/public/` = veřejné read-only API pro externí konzumenty
+        # (olafadventures.cz). Ty naopak potřebují cache-friendly
+        # hlavičky (public, max-age=60) — view si je nastavil přes
+        # `@cache_control`, nechme je projít. User request 2026-09-11.
+        if request.path.startswith("/api/") and not request.path.startswith(
+            "/api/public/"
+        ):
             # `private` reinforces that intermediate caches must not
             # store this; `no-store` is the strong signal that even
             # the browser cache must not retain it.
