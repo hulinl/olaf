@@ -2,7 +2,6 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
-import { Avatar } from "@/components/ui/avatar";
 import type { AuthorAvatar, DiscussionComment } from "@/lib/api";
 
 import { PaperclipIcon } from "./icons";
@@ -119,22 +118,14 @@ export function CommentComposer({
 
   const canSubmit = (body.trim().length > 0 || !!attachment) && !posting;
 
+  // Avatar u composeru neukazujeme — user píše za sebe, přebývá tam
+  // (user report 2026-09-11). Avatar se objeví teprve u vlastního
+  // komentáře v listu.
   return (
     <form
       onSubmit={handle}
       className="flex items-start gap-2"
     >
-      {!compact && (
-        <Avatar
-          firstName={currentUser.first_name}
-          lastName={currentUser.last_name}
-          avatarUrl={currentUser.avatar_url}
-          focalX={currentUser.avatar_focal_x}
-          focalY={currentUser.avatar_focal_y}
-          zoom={currentUser.avatar_zoom}
-          size={28}
-        />
-      )}
       {/* Kompaktní bublina — jeden řádek s inline paperclip + odeslat
           ikonou. Reply chip a přílohové preview se přidávají nahoře
           když jsou aktivní. Menší padding + placeholder shrinks celý
