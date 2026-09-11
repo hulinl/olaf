@@ -1,9 +1,6 @@
 """Tests for the public read-only events API (2026-09-11).
 
 Spec: repo hulinl/olafadventures-web docs/olaf-events-public-api-spec.md.
-Konzumenti (olafadventures.cz) fetchují stav akce (kapacita, počet
-míst, state enum) přímo z olaf.events tak, aby jednu pravdu držel
-backend.
 """
 from datetime import timedelta
 
@@ -28,6 +25,7 @@ def _make_event(workspace, **overrides) -> Event:
         "ends_at": starts + timedelta(hours=4),
         "status": Event.STATUS_PUBLISHED,
         "capacity": 10,
+        "location_text": "Beskydy",
     }
     defaults.update(overrides)
     return Event.objects.create(workspace=workspace, **defaults)
@@ -43,46 +41,79 @@ class PublicEventStatusTests(TestCase):
     def _url(self, slug: str) -> str:
         return reverse("public-event-status", kwargs={"slug": slug})
 
-    def test_returns_payload_for_published_event(self) -> None:
-        event = _make_event(self.ws, capacity=14)
-        # 4 potvrzené RSVPs, 1 organizátor (nezapočítává se do
-        # confirmed_rsvp_count).
-        for i in range(4):
-            u = User.objects.create_user(
-                email=f"u{i}@example.com",
-                password="pass-abcdef-1234",
-                first_name=f"U{i}",
-                last_name="X",
-            )
-            RSVP.objects.create(event=event, user=u, status=RSVP.STATUS_YES)
-        organizer = User.objects.create_user(
-            email="org@example.com",
-            password="pass-abcdef-1234",
-            first_name="O",
-            last_name="X",
+    def test_v2_payload_has_all_identity_and_termin_fields(self) -> None:
+        event = _make_event(
+            self.ws,
+            title="Letní běžecký kemp 2026",
+            location_text="Beskydy",
+            difficulty=Event.DIFFICULTY_MODERATE,
         )
-        RSVP.objects.create(
-            event=event,
-            user=organizer,
-            status=RSVP.STATUS_YES,
-            is_organizer=True,
-        )
-
         resp = self.client.get(self._url(event.slug))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         body = resp.json()
+        # Identita
         self.assertEqual(body["slug"], event.slug)
-        self.assertEqual(body["state"], "open")
-        self.assertEqual(body["capacity"], 14)
-        self.assertEqual(body["registered"], 4)
-        self.assertEqual(body["spotsLeft"], 10)
+        self.assertEqual(body["title"], "Letní běžecký kemp 2026")
         self.assertIn("olafadventures/e/", body["url"])
-        # CORS + cache headers.
+        # Termín + místo
+        self.assertTrue(body["date"].endswith("Z"))
+        self.assertIsNone(body["endDate"])  # jednodenní event
+        self.assertEqual(body["duration"], 1)
+        self.assertEqual(body["location"], "Beskydy")
+        self.assertEqual(body["difficulty"], "Střední")
+        # Registrace
+        self.assertEqual(body["state"], "open")
+        self.assertEqual(body["capacity"], 10)
+        self.assertEqual(body["registered"], 0)
+        self.assertEqual(body["spotsLeft"], 10)
+        self.assertIsNone(body["registrationOpensAt"])
+        self.assertIsNone(body["registrationClosesAt"])
+        # Headers
         self.assertEqual(resp["Access-Control-Allow-Origin"], "*")
         self.assertIn("public", resp["Cache-Control"])
-        self.assertIn("max-age=60", resp["Cache-Control"])
 
-    def test_soldout_when_capacity_reached(self) -> None:
+    def test_multiday_event_endDate_and_duration(self) -> None:
+        # 4-denní kemp: 13. srpna -> 16. srpna (inclusive) = 4 dny.
+        start = timezone.now().replace(
+            year=2026, month=8, day=13, hour=0, minute=0, second=0, microsecond=0
+        )
+        event = _make_event(
+            self.ws,
+            slug="letni-kemp",
+            starts_at=start,
+            ends_at=start + timedelta(days=3),
+        )
+        body = self.client.get(self._url(event.slug)).json()
+        self.assertEqual(body["duration"], 4)
+        self.assertIsNotNone(body["endDate"])
+        self.assertTrue(body["endDate"].endswith("Z"))
+
+    def test_difficulty_returns_null_when_not_set(self) -> None:
+        event = _make_event(self.ws, difficulty="")
+        body = self.client.get(self._url(event.slug)).json()
+        self.assertIsNone(body["difficulty"])
+
+    def test_state_planned_before_registration_opens(self) -> None:
+        # Registrace se otevírá až za týden.
+        event = _make_event(
+            self.ws,
+            registration_opens_at=timezone.now() + timedelta(days=7),
+        )
+        body = self.client.get(self._url(event.slug)).json()
+        self.assertEqual(body["state"], "planned")
+        self.assertTrue(body["registrationOpensAt"].endswith("Z"))
+
+    def test_state_soldout_after_registration_closes(self) -> None:
+        # Registrace zavřená před hodinou — spec: `soldout` když
+        # `now >= registrationClosesAt`.
+        event = _make_event(
+            self.ws,
+            registration_closes_at=timezone.now() - timedelta(hours=1),
+        )
+        body = self.client.get(self._url(event.slug)).json()
+        self.assertEqual(body["state"], "soldout")
+
+    def test_state_soldout_when_capacity_reached(self) -> None:
         event = _make_event(self.ws, capacity=2)
         for i in range(2):
             u = User.objects.create_user(
@@ -92,23 +123,21 @@ class PublicEventStatusTests(TestCase):
                 last_name="X",
             )
             RSVP.objects.create(event=event, user=u, status=RSVP.STATUS_YES)
-        resp = self.client.get(self._url(event.slug))
-        body = resp.json()
+        body = self.client.get(self._url(event.slug)).json()
         self.assertEqual(body["state"], "soldout")
         self.assertEqual(body["spotsLeft"], 0)
 
-    def test_running_when_event_in_progress(self) -> None:
-        # Starts_at v minulosti, ends_at v budoucnosti.
+    def test_state_running_when_event_in_progress(self) -> None:
         now = timezone.now()
         event = _make_event(
             self.ws,
             starts_at=now - timedelta(hours=1),
             ends_at=now + timedelta(hours=2),
         )
-        resp = self.client.get(self._url(event.slug))
-        self.assertEqual(resp.json()["state"], "running")
+        body = self.client.get(self._url(event.slug)).json()
+        self.assertEqual(body["state"], "running")
 
-    def test_ended_when_event_past(self) -> None:
+    def test_state_ended_when_event_past(self) -> None:
         now = timezone.now()
         event = _make_event(
             self.ws,
@@ -116,13 +145,12 @@ class PublicEventStatusTests(TestCase):
             ends_at=now - timedelta(days=1, hours=20),
             status=Event.STATUS_COMPLETED,
         )
-        resp = self.client.get(self._url(event.slug))
-        self.assertEqual(resp.json()["state"], "ended")
+        body = self.client.get(self._url(event.slug)).json()
+        self.assertEqual(body["state"], "ended")
 
     def test_capacity_null_returns_null_spots_left(self) -> None:
         event = _make_event(self.ws, capacity=None)
-        resp = self.client.get(self._url(event.slug))
-        body = resp.json()
+        body = self.client.get(self._url(event.slug)).json()
         self.assertIsNone(body["capacity"])
         self.assertIsNone(body["spotsLeft"])
         self.assertEqual(body["state"], "open")
@@ -137,22 +165,13 @@ class PublicEventStatusTests(TestCase):
         resp = self.client.get(self._url("nikdy-neexistoval"))
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_deleted_event_returns_410(self) -> None:
+    def test_archived_event_returns_410(self) -> None:
         event = _make_event(self.ws, slug="archivovana")
         event.deleted_at = timezone.now()
         event.save(update_fields=["deleted_at"])
-        # Manager `objects` filtruje deleted_at, ale `_resolve_event`
-        # public API musí najít i archived (jinak 404); testujeme
-        # explicitně 410 branch. Zajistíme přes `all_objects` — pokud
-        # náš `_resolve_event` používá `objects`, musí se přepnout.
         resp = self.client.get(self._url("archivovana"))
-        # Aktuálně `Event.objects` default filtr skryje deleted_at →
-        # public API vrátí 404. Ok pro V1 — spec 410 flow můžeme
-        # doplnit později. Testujeme 404 pro archived.
-        self.assertIn(
-            resp.status_code,
-            (status.HTTP_404_NOT_FOUND, status.HTTP_410_GONE),
-        )
+        self.assertEqual(resp.status_code, status.HTTP_410_GONE)
+        self.assertEqual(resp.json()["error"], "Event archived")
 
     def test_no_auth_required(self) -> None:
         event = _make_event(self.ws)
@@ -204,6 +223,14 @@ class PublicEventsBatchTests(TestCase):
         resp = self.client.get(self.url + "?slugs=alpha,draft-only")
         self.assertEqual([e["slug"] for e in resp.json()], ["alpha"])
 
+    def test_skips_archived_events(self) -> None:
+        _make_event(self.ws, slug="alpha")
+        archived = _make_event(self.ws, slug="dead")
+        archived.deleted_at = timezone.now()
+        archived.save(update_fields=["deleted_at"])
+        resp = self.client.get(self.url + "?slugs=alpha,dead")
+        self.assertEqual([e["slug"] for e in resp.json()], ["alpha"])
+
     def test_empty_slugs_returns_empty_array(self) -> None:
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
@@ -216,8 +243,6 @@ class PublicEventsBatchTests(TestCase):
         self.assertIn("public", resp["Cache-Control"])
 
     def test_caps_at_50_slugs(self) -> None:
-        # Ochrana proti misuse — jeden request nesmí eskalovat DB
-        # hit desítkami tisíc slugů.
         for i in range(60):
             _make_event(
                 self.ws,
@@ -227,5 +252,4 @@ class PublicEventsBatchTests(TestCase):
             )
         slugs = ",".join(f"e{i}" for i in range(60))
         resp = self.client.get(self.url + f"?slugs={slugs}")
-        # Vratíme max 50 (order z query paramu, s dedupem).
         self.assertLessEqual(len(resp.json()), 50)

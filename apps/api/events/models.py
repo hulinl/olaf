@@ -130,6 +130,43 @@ class Event(TenantScopedModel):
         ),
     )
 
+    # 2026-09-11: pole pro veřejné API v2 (externí konzumenti jako
+    # olafadventures.cz web fetchují stav akce). Bez těchto polí musela
+    # spec vracet `null` pro registration times + fixní state.
+    DIFFICULTY_LIGHT = "light"
+    DIFFICULTY_MODERATE = "moderate"
+    DIFFICULTY_HARD = "hard"
+    DIFFICULTY_EXTREME = "extreme"
+    DIFFICULTY_CHOICES = [
+        (DIFFICULTY_LIGHT, "Lehká"),
+        (DIFFICULTY_MODERATE, "Střední"),
+        (DIFFICULTY_HARD, "Náročná"),
+        (DIFFICULTY_EXTREME, "Extrémní"),
+    ]
+    difficulty = models.CharField(
+        max_length=20,
+        choices=DIFFICULTY_CHOICES,
+        blank=True,
+        default="",
+        help_text="Náročnost — používá veřejné API a externí weby.",
+    )
+    registration_opens_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Kdy se otevírá registrace. Null = otevřeno hned po publikaci "
+            "(default V1 chování)."
+        ),
+    )
+    registration_closes_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Kdy se registrace uzavírá. Null = otevřeno až do začátku "
+            "akce (default V1 chování)."
+        ),
+    )
+
     visibility = models.CharField(
         max_length=20,
         choices=VISIBILITY_CHOICES,
