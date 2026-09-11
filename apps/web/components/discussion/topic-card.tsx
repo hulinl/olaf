@@ -368,12 +368,48 @@ export function TopicCard({
       />
 
       <div className="flex flex-col gap-2 px-3 py-3 pr-14 sm:px-4 sm:pr-16">
-        <h4
-          className="text-base font-semibold text-ink-900 sm:text-lg"
-          style={{ letterSpacing: "-0.015em" }}
-        >
-          {topic.title}
-        </h4>
+        {/* Titulek + stats na jednom řádku — user request 2026-09-11
+            „srdce/komentáře vedle nadpisu, ne u autora". Titulek roste,
+            stats jsou fixní vpravo; když je titul dlouhý, wrap-ne pod
+            stats bez překryvu (min-w-0 v h4). */}
+        <div className="flex items-start justify-between gap-3">
+          <h4
+            className="min-w-0 flex-1 text-base font-semibold text-ink-900 sm:text-lg"
+            style={{ letterSpacing: "-0.015em" }}
+          >
+            {topic.title}
+          </h4>
+          <span className="mt-0.5 inline-flex shrink-0 items-center gap-2 text-[12px] text-ink-500">
+            <button
+              type="button"
+              onClick={() => void handleToggleTopicLike()}
+              disabled={likeBusy}
+              aria-pressed={topic.i_liked}
+              aria-label={topic.i_liked ? "Zrušit líbí" : "Dát líbí"}
+              className={[
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors focus-ring",
+                topic.i_liked
+                  ? "text-brand hover:bg-brand/5"
+                  : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+                likeBusy ? "opacity-60" : "",
+              ].join(" ")}
+            >
+              <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
+              {topic.like_count > 0 && (
+                <span className="tabular-nums">{topic.like_count}</span>
+              )}
+            </button>
+            {topic.comment_count > 0 && (
+              <span
+                className="inline-flex items-center gap-1"
+                aria-label={`${topic.comment_count} komentářů`}
+              >
+                <span aria-hidden>💬</span>
+                <span className="tabular-nums">{topic.comment_count}</span>
+              </span>
+            )}
+          </span>
+        </div>
         {/* Meta-line: doplňkové info malým — mini avatar, jméno, datum,
             relative time. Pod titulem, čte se lehce, hlavní vizuální
             důraz drží titulek. */}
@@ -404,40 +440,6 @@ export function TopicCard({
           </time>
           <span aria-hidden>·</span>
           <span>{relative}</span>
-          {/* Pravý roh meta-liny: like button (srdíčko + počet) +
-              suchý counter komentářů. Klik na srdíčko = toggle like;
-              action bar dole zmizel úplně (2026-09-11 user request
-              „srdíčko ať je rovnou vpravo, hotovo"). */}
-          <span className="ml-auto inline-flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleToggleTopicLike()}
-              disabled={likeBusy}
-              aria-pressed={topic.i_liked}
-              aria-label={topic.i_liked ? "Zrušit líbí" : "Dát líbí"}
-              className={[
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors focus-ring",
-                topic.i_liked
-                  ? "text-brand hover:bg-brand/5"
-                  : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
-                likeBusy ? "opacity-60" : "",
-              ].join(" ")}
-            >
-              <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
-              {topic.like_count > 0 && (
-                <span className="tabular-nums">{topic.like_count}</span>
-              )}
-            </button>
-            {topic.comment_count > 0 && (
-              <span
-                className="inline-flex items-center gap-1"
-                aria-label={`${topic.comment_count} komentářů`}
-              >
-                <span aria-hidden>💬</span>
-                <span className="tabular-nums">{topic.comment_count}</span>
-              </span>
-            )}
-          </span>
         </div>
         {topic.body && (
           <>

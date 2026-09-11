@@ -205,7 +205,10 @@ def my_personal_workspace(request: Request) -> Response:
     full_name = user.get_full_name() or user.email.split("@", 1)[0]
     name = f"{full_name} — můj prostor"
 
-    base = (slugify(name) or f"w-{user.pk}")[:50].rstrip("-")
+    # Slug generujeme jen ze jména (bez „-muj-prostor" suffixu, který
+    # slug jen prodlužoval — 2026-09-11). Kolize s existující komunitou
+    # dedupujeme přes -N. Fallback `w-<pk>` když je jméno prázdné.
+    base = (slugify(full_name) or f"w-{user.pk}")[:50].rstrip("-")
     candidate = base
     n = 2
     while Workspace.objects.filter(slug=candidate).exists():
