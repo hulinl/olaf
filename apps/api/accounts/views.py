@@ -77,6 +77,43 @@ def signup(request: Request) -> Response:
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([RegisterThrottle])
+def resend_verification(request: Request) -> Response:
+    """Znovu-poslat verifikační mail. User request 2026-09-11: uživatel
+    prošel anon RSVP -> signup upgrade, verify mail nedorazil nebo
+    přehlédl, na login vidí jen „ověř mail" bez akce jak dál. Endpoint
+    ho odblokuje: přijme e-mail, pokud existuje unverified user, vygeneruje
+    nový EmailVerificationToken a pošle mail. Vrátí 202 vždy — neodhalí,
+    jestli e-mail v systému existuje (proti enumeration).
+
+    Rate-limit přes RegisterThrottle (stejný jako signup) — abusive
+    resend flow nesmí zavalit inbox.
+    """
+    email = (request.data.get("email") or "").strip().lower()
+    if not email:
+        return Response(
+            {"detail": "E-mail je povinný."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user = User.objects.filter(email=email).first()
+    # Best-effort: pokud user existuje a je unverified, pošle. Verified
+    # / neexistující user dostane stejnou 202 odpověď.
+    if user is not None and not user.email_verified:
+        token = EmailVerificationToken.objects.create(user=user)
+        send_verification_email(user, token)
+    return Response(
+        {
+            "detail": (
+                "Pokud ten e-mail máme, poslali jsme na něj nový "
+                "verifikační odkaz. Zkontroluj prosím schránku (i spam)."
+            )
+        },
+        status=status.HTTP_202_ACCEPTED,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def verify_email(request: Request) -> Response:
     """Confirm an email verification token. PRD §4.1."""
     serializer = VerifyEmailSerializer(data=request.data)
@@ -123,8 +160,20 @@ def login_view(request: Request) -> Response:
             status=status.HTTP_401_UNAUTHORIZED,
         )
     if not user.email_verified:
+        # Frontend rozlišuje "wrong pass" vs "verify email" podle `code`,
+        # aby mohl u druhého případu nabídnout „Poslat verifikační mail
+        # znovu" (endpoint /verify/resend/). User report 2026-09-11:
+        # uživatel co prošel anon RSVP -> signup upgrade dostal verify
+        # mail, ale bez CTA se nezorientoval a zůstal zablokovaný.
         return Response(
-            {"detail": "Please verify your email address before signing in."},
+            {
+                "detail": (
+                    "Nejdřív ověř e-mailovou adresu. Poslali jsme ti "
+                    "potvrzovací mail — klikni v něm na odkaz a přihlas se "
+                    "znovu."
+                ),
+                "code": "email_not_verified",
+            },
             status=status.HTTP_403_FORBIDDEN,
         )
 

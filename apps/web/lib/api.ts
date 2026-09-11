@@ -2590,6 +2590,11 @@ export const auth = {
       method: "POST",
       body: JSON.stringify({ token }),
     }),
+  resendVerification: (email: string) =>
+    apiFetch<{ detail: string }>("/api/auth/verify/resend/", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
   login: (payload: { email: string; password: string }) =>
     apiFetch<User>("/api/auth/login/", {
       method: "POST",

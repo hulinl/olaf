@@ -8,6 +8,7 @@ urlpatterns = [
     path("csrf/", views.csrf, name="csrf"),
     path("signup/", views.signup, name="signup"),
     path("verify/", views.verify_email, name="verify"),
+    path("verify/resend/", views.resend_verification, name="verify-resend"),
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("me/", views.me, name="me"),

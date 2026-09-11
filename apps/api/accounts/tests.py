@@ -128,6 +128,11 @@ class LoginTests(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        # Frontend potřebuje rozlišit "verify email" od "wrong password"
+        # aby mohl u prvního nabídnout „Poslat verifikaci znovu".
+        # User report 2026-09-11: uživatel bez `code` neměl akci a
+        # zůstal zablokovaný.
+        self.assertEqual(resp.json().get("code"), "email_not_verified")
 
     def test_authenticates_verified_user(self) -> None:
         self.user.email_verified = True
@@ -149,6 +154,140 @@ class LoginTests(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ResendVerificationTests(TestCase):
+    """User který byl blokovaný na login (email_not_verified) může přes
+    tenhle endpoint znovu-vyžádat verifikační mail. Chrání proti
+    enumeration — pro neexistující i verified user vrátíme stejnou 202
+    odpověď bez detailu.
+    """
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.url = reverse("accounts:verify-resend")
+        self.user = User.objects.create_user(
+            email="pavel@example.com",
+            password="hike-forest-2026",
+            first_name="Pavel",
+            last_name="Uchytil",
+        )
+
+    def test_sends_new_token_for_unverified_user(self) -> None:
+        # Nejprve podržíme případ, kdy user má už existující (nepoužitý)
+        # token — endpoint stejně pošle nový, aby vždycky měl aktuální
+        # link.
+        EmailVerificationToken.objects.create(user=self.user)
+        mail.outbox.clear()
+        resp = self.client.post(
+            self.url, {"email": "pavel@example.com"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Potvrď svůj olaf účet", mail.outbox[0].subject)
+        # Nový token existuje vedle starého.
+        self.assertGreaterEqual(
+            EmailVerificationToken.objects.filter(user=self.user).count(), 2
+        )
+
+    def test_verified_user_gets_202_but_no_email(self) -> None:
+        self.user.email_verified = True
+        self.user.save()
+        resp = self.client.post(
+            self.url, {"email": "pavel@example.com"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_unknown_email_returns_202_with_no_email(self) -> None:
+        # Enumeration-safe: neodhalíme, jestli e-mail v systému je.
+        resp = self.client.post(
+            self.url, {"email": "ghost@example.com"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_missing_email_returns_400(self) -> None:
+        resp = self.client.post(self.url, {}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AnonRsvpToSignupToLoginFlowTests(TestCase):
+    """Regression pro user report 2026-09-11 (uchytil.pavel@email.cz):
+    uživatel prošel anon RSVP → dostal light user (unverified) → později
+    signup s heslem → verify e-mail dorazil, ale user neklikl → login
+    vrátí `email_not_verified` s hláškou co dělat. Endpoint /verify/
+    resend/ odblokuje.
+    """
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+
+    def test_full_flow_matches_prod_incident(self) -> None:
+        # 1. Anon RSVP simulace — vytvoříme unusable-password user
+        #    (stejně jako _create_light_user dělá).
+        user = User(
+            email="pavel@example.com",
+            first_name="Pavel",
+            last_name="Uchytil",
+            email_verified=False,
+        )
+        user.set_unusable_password()
+        user.save()
+
+        # 2. Signup s tímtéž e-mailem — take-over flow.
+        signup_url = reverse("accounts:signup")
+        resp = self.client.post(
+            signup_url,
+            {
+                "email": "pavel@example.com",
+                "password": "hike-forest-2026",
+                "first_name": "Pavel",
+                "last_name": "Uchytil",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("hike-forest-2026"))
+        self.assertFalse(user.email_verified)  # verify e-mail v inboxu
+
+        # 3. Login — očekáváme 403 s code=email_not_verified.
+        login_url = reverse("accounts:login")
+        login_resp = self.client.post(
+            login_url,
+            {"email": "pavel@example.com", "password": "hike-forest-2026"},
+            format="json",
+        )
+        self.assertEqual(login_resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            login_resp.json().get("code"), "email_not_verified"
+        )
+
+        # 4. User klikne „Poslat verifikaci znovu".
+        mail.outbox.clear()
+        resend_url = reverse("accounts:verify-resend")
+        resend_resp = self.client.post(
+            resend_url, {"email": "pavel@example.com"}, format="json"
+        )
+        self.assertEqual(resend_resp.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(len(mail.outbox), 1)
+
+        # 5. Verifikuje přes vydaný token.
+        token = EmailVerificationToken.objects.filter(user=user).last()
+        verify_url = reverse("accounts:verify")
+        verify_resp = self.client.post(
+            verify_url, {"token": str(token.token)}, format="json"
+        )
+        self.assertEqual(verify_resp.status_code, status.HTTP_200_OK)
+
+        # 6. Login znovu — teď projde.
+        login2 = self.client.post(
+            login_url,
+            {"email": "pavel@example.com", "password": "hike-forest-2026"},
+            format="json",
+        )
+        self.assertEqual(login2.status_code, status.HTTP_200_OK)
 
 
 class PasswordResetTests(TestCase):

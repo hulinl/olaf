@@ -28,22 +28,55 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Když backend vrátí 403 + code=email_not_verified, místo generické
+  // chyby ukážeme dedikovanou hlášku s tlačítkem „Poslat verifikaci
+  // znovu". User report 2026-09-11: uživatel co prošel anon RSVP ->
+  // signup zůstal zablokovaný na login page bez akce jak dál.
+  const [needsVerify, setNeedsVerify] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resentNotice, setResentNotice] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setNeedsVerify(false);
+    setResentNotice(null);
     try {
       await auth.login({ email, password });
       router.push(safeNext ?? "/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.firstFieldError() ?? err.message);
+        if (err.status === 403 && err.data?.code === "email_not_verified") {
+          setNeedsVerify(true);
+          setError(null);
+        } else {
+          setError(err.firstFieldError() ?? err.message);
+        }
       } else {
         setError("Něco se pokazilo. Zkus to prosím znovu.");
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleResendVerify() {
+    if (!email.trim()) return;
+    setResending(true);
+    setResentNotice(null);
+    try {
+      const resp = await auth.resendVerification(email.trim());
+      setResentNotice(
+        resp.detail ??
+          "Pokud e-mail máme, poslali jsme na něj nový verifikační odkaz.",
+      );
+    } catch {
+      setResentNotice(
+        "Nepodařilo se poslat mail. Zkus to za chvíli znovu.",
+      );
+    } finally {
+      setResending(false);
     }
   }
 
@@ -97,6 +130,34 @@ function LoginForm() {
         </Field>
 
         {error && <Alert variant="danger">{error}</Alert>}
+
+        {needsVerify && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink-900">
+            <p>
+              <strong>Nejdřív ověř svůj e-mail.</strong> Poslali jsme ti
+              potvrzovací mail — klikni v něm na odkaz a přihlas se
+              znovu.
+            </p>
+            <p className="mt-2 text-xs text-ink-700">
+              Nedorazil? Zkontroluj spam. Nebo si nech poslat nový:
+            </p>
+            <div className="mt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleResendVerify}
+                loading={resending}
+                disabled={resending || !email.trim()}
+              >
+                {resending ? "Odesílám…" : "Poslat verifikaci znovu"}
+              </Button>
+            </div>
+            {resentNotice && (
+              <p className="mt-2 text-xs text-ink-700">{resentNotice}</p>
+            )}
+          </div>
+        )}
 
         <Button
           type="submit"
