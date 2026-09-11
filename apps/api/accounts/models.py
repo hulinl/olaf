@@ -28,6 +28,16 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     # Identity
     email = models.EmailField(unique=True, db_index=True)
+    # 2026-09-11: public URL identifier — `/u/<profile_slug>` místo
+    # numerického `/u/<id>`. Auto-fill při save() ze `get_full_name`
+    # slugify, s dedup suffixem `-N` při konfliktu. Backend endpoint
+    # přijímá i legacy `/u/<int:id>` a redirectuje na canonical slug.
+    profile_slug = models.SlugField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        db_index=True,
+    )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     display_name = models.CharField(max_length=100, blank=True)
@@ -247,6 +257,34 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
+
+    def save(self, *args, **kwargs):
+        # Auto-generate `profile_slug` když je prázdný — děje se to
+        # při signupu (nový row) i při take-over flow (first_name se
+        # nastaví teprve teď). Ne-refill při rename profilu — jednou
+        # publikovaný slug drží pro consistency URL.
+        if not self.profile_slug:
+            self.profile_slug = self._make_profile_slug()
+        super().save(*args, **kwargs)
+
+    def _make_profile_slug(self) -> str:
+        """Vyrobí unique profile_slug ze jména. Fallback na e-mail
+        prefix + numerický suffix když je jméno prázdné (anon RSVP
+        light-user). Dedup přes `slug-N` sufix."""
+        from django.utils.text import slugify
+
+        base = slugify(self.get_full_name())
+        if not base:
+            base = slugify(self.email.split("@", 1)[0]) or "user"
+        candidate = base[:90]  # nechme prostor pro dedup suffix
+        n = 1
+        # Test collision proti DB — `.exclude(pk=self.pk)` aby při
+        # re-save existujícího usera se sám s sebou nesrazil.
+        qs = User.objects.exclude(pk=self.pk) if self.pk else User.objects
+        while qs.filter(profile_slug=candidate).exists():
+            n += 1
+            candidate = f"{base[:90]}-{n}"
+        return candidate
 
     def get_short_name(self) -> str:
         return self.first_name

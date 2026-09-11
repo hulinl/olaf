@@ -106,6 +106,7 @@ class UserSerializer(serializers.ModelSerializer):
             "profile_show_phone",
             "profile_show_address",
             "profile_show_avatar",
+            "profile_slug",
             "address",
             # Structured address (V1 invoice prep)
             "address_street",
@@ -149,7 +150,13 @@ class UserSerializer(serializers.ModelSerializer):
             "email_verified",
             "date_joined",
         )
-        read_only_fields = ("id", "email", "email_verified", "date_joined")
+        read_only_fields = (
+            "id",
+            "email",
+            "email_verified",
+            "date_joined",
+            "profile_slug",
+        )
 
 
 class UserPublicProfileSerializer(serializers.ModelSerializer):
@@ -181,6 +188,7 @@ class UserPublicProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id",
+            "profile_slug",
             "first_name",
             "last_name",
             "display_name",

@@ -17,8 +17,12 @@ interface AvatarProps {
   size?: number;
   /** Když je set (id z UserSerializer), obalíme avatar do Linku na
    *  `/u/<id>` — public profile page. Undefined = ne-klikatelný
-   *  (např. pro anon signaturu, nebo když ID neznáme). */
+   *  (např. pro anon signaturu, nebo když ID neznáme).
+   *  2026-09-11: preferuj `userSlug` — dnes canonical URL je
+   *  `/u/<profile_slug>`. `userId` zůstává jako backward-compat,
+   *  aby callsite s legacy payloadem nespadl. */
   userId?: number | null;
+  userSlug?: string | null;
 }
 
 /** Circular avatar. Když má user avatar_url, ukazuje obrázek zarámovaný
@@ -40,7 +44,15 @@ export function Avatar({
   zoom = 100,
   size = 36,
   userId,
+  userSlug,
 }: AvatarProps) {
+  // Prefer slug (canonical URL) — fallback na numerické id pro
+  // backward compat s callsite kde slug ještě není v payloadu.
+  const profileHref = userSlug
+    ? `/u/${userSlug}`
+    : userId
+      ? `/u/${userId}`
+      : null;
   const src = avatarUrl ? assetUrl(avatarUrl) : "";
   const visual = src ? (
     <span
@@ -77,10 +89,10 @@ export function Avatar({
       )}
     </span>
   );
-  if (userId) {
+  if (profileHref) {
     return (
       <Link
-        href={`/u/${userId}`}
+        href={profileHref}
         aria-label={`Profil uživatele ${firstName} ${lastName}`.trim()}
         className="inline-block rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       >

@@ -101,6 +101,9 @@ export interface User {
   profile_show_phone: boolean;
   profile_show_address: boolean;
   profile_show_avatar: boolean;
+  /** Public URL identifier — `/u/<profile_slug>`. Auto-fill při
+   *  save() z jména; read-only pro frontend. */
+  profile_slug: string;
   address: string;
   // Structured address (Slice 4 — for invoices)
   address_street: string;
@@ -547,12 +550,16 @@ export interface EventChecklist {
 
 /** Avatar snapshot inline v Topic/Comment/... payloadech, aby frontend
  *  Avatar komponenta mohla renderovat bez zvláštního user fetch.
- *  `url: ""` = user avatar nemá → fallback na iniciály. */
+ *  `url: ""` = user avatar nemá → fallback na iniciály.
+ *  `slug` (2026-09-11) = `User.profile_slug` — Avatar link vede na
+ *  `/u/<slug>` místo numerického `/u/<id>`. Prázdný string = user
+ *  nemá slug (neměl by nastat po data migraci, ale be safe). */
 export interface AuthorAvatar {
   url: string;
   focal_x: number;
   focal_y: number;
   zoom: number;
+  slug: string;
 }
 
 export interface DiscussionTopic {
@@ -758,6 +765,7 @@ export interface RSVPPaymentInstructions {
 
 export interface RSVPRecord extends MyRSVP {
   user_id: number;
+  user_profile_slug: string;
   user_email: string;
   user_full_name: string;
   user_phone: string;
@@ -809,6 +817,7 @@ export interface RSVPRecord extends MyRSVP {
 
 export interface PersonSummary {
   user_id: number;
+  profile_slug: string;
   full_name: string;
   email: string;
   phone: string;
@@ -830,6 +839,7 @@ export interface PersonEventEntry {
 
 export interface PersonDetail {
   user_id: number;
+  profile_slug: string;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -942,6 +952,7 @@ export interface EventCollaborator {
 
 export interface UserPublicProfile {
   id: number;
+  profile_slug: string;
   first_name: string;
   last_name: string;
   display_name: string;
@@ -967,6 +978,7 @@ export interface UserPublicProfile {
 
 export interface OrganizerPoolEntry {
   user_id: number;
+  profile_slug: string;
   display_name: string;
   full_name: string;
   email: string;
@@ -981,6 +993,7 @@ export interface OrganizerPoolEntry {
 export interface ParticipantProfile {
   rsvp_id: number;
   user_id: number;
+  profile_slug: string;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -1183,6 +1196,7 @@ export type WorkspaceRole = "owner" | "admin" | "member" | null;
 
 export interface WorkspaceMemberSummary {
   id: number;
+  profile_slug: string;
   email: string;
   first_name: string;
   last_name: string;
@@ -2700,8 +2714,8 @@ export const auth = {
   },
   deleteAvatar: () =>
     apiFetch<User>("/api/auth/me/avatar/", { method: "DELETE" }),
-  userProfile: (userId: number) =>
-    apiFetch<UserPublicProfile>(`/api/auth/users/${userId}/profile/`),
+  userProfile: (userKey: string | number) =>
+    apiFetch<UserPublicProfile>(`/api/auth/users/${userKey}/profile/`),
   requestPasswordReset: (email: string) =>
     apiFetch<{ detail: string }>("/api/auth/password/reset/request/", {
       method: "POST",

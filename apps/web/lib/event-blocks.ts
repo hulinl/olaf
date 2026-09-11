@@ -152,6 +152,7 @@ export type EventBlock =
 
 export interface OrganizerLookupEntry {
   id: number;
+  profile_slug: string;
   display_name: string;
   full_name: string;
   first_name: string;

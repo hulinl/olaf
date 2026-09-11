@@ -2216,6 +2216,7 @@ def participant_profile(
         {
             "rsvp_id": rsvp.id,
             "user_id": user.id,
+            "profile_slug": user.profile_slug,
             "first_name": user.first_name,
             "last_name": user.last_name,
             "full_name": user.get_full_name() or user.email,
@@ -3612,6 +3613,7 @@ def event_organizer_pool(
                 avatar_url = u.avatar.url
         payload = {
             "user_id": u.id,
+            "profile_slug": u.profile_slug,
             "display_name": u.display_name or u.get_full_name(),
             "full_name": u.get_full_name(),
             "email": u.email,

@@ -60,10 +60,11 @@ export function CommentCard({
             zoom={c.author_avatar.zoom}
             size={16}
             userId={c.author_id ?? null}
+            userSlug={c.author_avatar.slug || null}
           />
-          {c.author_id ? (
+          {c.author_avatar.slug || c.author_id ? (
             <a
-              href={`/u/${c.author_id}`}
+              href={`/u/${c.author_avatar.slug || c.author_id}`}
               className="text-[13px] font-semibold leading-none text-ink-900 hover:text-brand"
             >
               {c.author_name}

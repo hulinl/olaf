@@ -156,6 +156,13 @@ export default function RSVPPage({ params }: Props) {
           events.publicEvent(slug, eventSlug),
         ]);
         if (cancelled) return;
+        // Slug alias — pokud backend přišel s canonical slug-em, který
+        // se liší od URL, přepneme se hned na canonical, ať bookmark /
+        // share pointí na živý slug.
+        if (ev.slug !== eventSlug || ev.workspace_slug !== slug) {
+          router.replace(`/${ev.workspace_slug}/e/${ev.slug}/rsvp`);
+          return;
+        }
         setUser(me);
         setEvent(ev);
         if (me) {

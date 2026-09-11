@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { BlockRenderer } from "@/components/event-blocks/block-renderer";
 import { AppFooter } from "@/components/ui/app-footer";
@@ -95,6 +95,13 @@ export default async function EventLandingPage({ params }: Props) {
   if (!event) notFound();
   if (isDraftPreview(event)) {
     return <DraftPreviewPage preview={event} />;
+  }
+  // Event slug alias: pokud přišel starý slug (backend hit přes
+  // EventSlugAlias → vrací event s canonical `event.slug`), pošleme
+  // 308 na canonical URL, ať se link ustálí a share/OG karty
+  // odkazují na jeden zdroj.
+  if (event.slug !== eventSlug || event.workspace_slug !== slug) {
+    permanentRedirect(`/${event.workspace_slug}/e/${event.slug}`);
   }
 
   const cancelled = event.status === "cancelled";

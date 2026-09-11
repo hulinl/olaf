@@ -44,7 +44,7 @@ class PublicProfileVisibilityTests(TestCase):
         )
         self.url = reverse(
             "accounts:user-public-profile",
-            kwargs={"user_id": self.target.pk},
+            kwargs={"user_key": str(self.target.pk)},
         )
 
     def test_anonymous_can_access_but_gets_no_contact_info(self) -> None:
@@ -192,6 +192,6 @@ class PublicProfileVisibilityTests(TestCase):
     def test_nonexistent_user_returns_404(self) -> None:
         self.client.force_authenticate(self.viewer)
         resp = self.client.get(
-            reverse("accounts:user-public-profile", kwargs={"user_id": 99999})
+            reverse("accounts:user-public-profile", kwargs={"user_key": "99999"})
         )
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)

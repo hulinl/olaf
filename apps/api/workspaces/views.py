@@ -546,6 +546,7 @@ def workspace_members(request: Request, slug: str) -> Response:
         [
             {
                 "id": m.user.id,
+                "profile_slug": m.user.profile_slug,
                 "email": m.user.email,
                 "first_name": m.user.first_name,
                 "last_name": m.user.last_name,

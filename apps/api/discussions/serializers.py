@@ -7,20 +7,31 @@ from .models import Comment, Topic
 
 
 def _author_avatar_payload(author, request) -> dict:
-    """Common {url, focal_x, focal_y, zoom} block for author avatar.
-    Returned inline v Topic/Comment serializerech aby frontend Avatar
-    komponenta mohla renderovat bez zvláštního fetch. Prázdné pole
-    (url="") = user nemá nahranou fotku → fallback na iniciály."""
-    if author is None or not author.avatar:
-        return {"url": "", "focal_x": 50.0, "focal_y": 50.0, "zoom": 100.0}
-    url = author.avatar.url
-    if request and url.startswith("/"):
-        url = request.build_absolute_uri(url)
+    """Common {url, focal_x, focal_y, zoom, slug} block for author
+    avatar. Returned inline v Topic/Comment serializerech aby frontend
+    Avatar komponenta mohla renderovat bez zvláštního fetch. Prázdný
+    `url` = user nemá nahranou fotku → fallback na iniciály. `slug`
+    (2026-09-11) je `User.profile_slug` — Avatar link vede na
+    `/u/<slug>` místo `/u/<id>`."""
+    if author is None:
+        return {
+            "url": "",
+            "focal_x": 50.0,
+            "focal_y": 50.0,
+            "zoom": 100.0,
+            "slug": "",
+        }
+    url = ""
+    if author.avatar:
+        url = author.avatar.url
+        if request and url.startswith("/"):
+            url = request.build_absolute_uri(url)
     return {
         "url": url,
         "focal_x": author.avatar_focal_x,
         "focal_y": author.avatar_focal_y,
         "zoom": author.avatar_zoom,
+        "slug": author.profile_slug or "",
     }
 
 

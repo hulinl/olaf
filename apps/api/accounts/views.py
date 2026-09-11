@@ -314,23 +314,19 @@ def me_avatar(request: Request) -> Response:
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def user_public_profile(request: Request, user_id: int) -> Response:
-    """Veřejný profil daného usera. Auth chování:
+def user_public_profile(request: Request, user_key: str) -> Response:
+    """Veřejný profil daného usera. Path param `user_key` může být buď
+    `profile_slug` (canonical URL od 2026-09-11), nebo numerické user
+    ID (backward compat pro linky vytvořené před rename).
 
-      - **Anonymous viewer** — vrátí jen jméno, bio, avatar (pokud
-        `profile_show_avatar`). E-mail / telefon / adresa vždycky
-        prázdné, ať jsou toggles jakékoli. Chrání proti external
-        scrapingu (2026-09-11 — endpoint uvolněn pro guides link
-        z externího webu).
-      - **Authenticated viewer** — respektuje `profile_show_*` toggles
-        jak dosud.
-      - **Organizer bypass** — když je viewer owner/admin workspace-u
-        kde je target user zaregistrovaný na akci (non-cancelled
-        RSVP), vidí kompletní kontakt bez ohledu na toggles.
+    Auth chování viz UserPublicProfileSerializer docstring.
     """
-    try:
-        target = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
+    # Numerické ID → lookup by pk (backward compat)
+    if user_key.isdigit():
+        target = User.objects.filter(pk=int(user_key)).first()
+    else:
+        target = User.objects.filter(profile_slug=user_key).first()
+    if target is None:
         return Response(
             {"detail": "Uživatel neexistuje."},
             status=status.HTTP_404_NOT_FOUND,
@@ -839,6 +835,7 @@ def creator_people(request: Request) -> Response:
     out = [
         {
             "user_id": u.id,
+            "profile_slug": u.profile_slug,
             "full_name": u.get_full_name() or u.email,
             "email": u.email,
             "phone": u.phone,
@@ -896,6 +893,7 @@ def creator_person_detail(request: Request, user_id: int) -> Response:
     return Response(
         {
             "user_id": person.id,
+            "profile_slug": person.profile_slug,
             "first_name": person.first_name,
             "last_name": person.last_name,
             "full_name": person.get_full_name() or person.email,

@@ -11,22 +11,21 @@ import { Logo } from "@/components/ui/logo";
 import { ApiError, type UserPublicProfile, auth } from "@/lib/api";
 
 interface Props {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 }
 
 /**
- * Public user profile — `/u/<id>`. Zobrazuje co user zveřejnil přes
- * `profile_show_*` toggles v Nastavení. Když je viewer organizátor
- * akce s target userem, backend vrátí kompletní data (viz
- * UserPublicProfileSerializer.organizer_bypass) a UI ukáže badge, ať
- * je jasné proč tam vidí kontakt.
+ * Public user profile — `/u/<profile_slug>` (canonical od 2026-09-11).
+ * Backward compat: `/u/<numerický-id>` funguje taky — backend
+ * endpoint akceptuje oboje, po fetch redirect-neme na canonical
+ * slug URL.
  *
- * Cílem je klikatelný odkaz odkudkoli v aplikaci — avatar v discussion
- * feedu / organizers block / roster / community members. User si zjistí
- * kdo za jménem stojí bez tápání.
+ * Anonymous viewer dostane jen jméno, bio, avatar. Auth viewer +
+ * organizer bypass respektují `profile_show_*` toggles (viz
+ * UserPublicProfileSerializer).
  */
 export default function PublicProfilePage({ params }: Props) {
-  const { id } = use(params);
+  const { slug } = use(params);
   const router = useRouter();
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +34,21 @@ export default function PublicProfilePage({ params }: Props) {
   useEffect(() => {
     let cancelled = false;
     auth
-      .userProfile(Number.parseInt(id, 10))
+      .userProfile(slug)
       .then((p) => {
-        if (!cancelled) setProfile(p);
+        if (cancelled) return;
+        setProfile(p);
+        // Backward compat: kdyby user přišel na /u/<číslo>, canonical
+        // URL je /u/<profile_slug>. Redirect zpět, aby link/SEO byl
+        // předvídatelný.
+        if (p.profile_slug && p.profile_slug !== slug) {
+          router.replace(`/u/${p.profile_slug}`);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          router.replace(`/login?next=/u/${id}`);
+          router.replace(`/login?next=/u/${slug}`);
           return;
         }
         if (err instanceof ApiError && err.status === 404) {
@@ -54,7 +60,7 @@ export default function PublicProfilePage({ params }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [id, router]);
+  }, [slug, router]);
 
   if (notFound) {
     return (

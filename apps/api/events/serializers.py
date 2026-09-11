@@ -369,6 +369,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
                     avatar_url = u.avatar.url
             result[str(u.id)] = {
                 "id": u.id,
+                "profile_slug": u.profile_slug,
                 "display_name": u.display_name or u.get_full_name(),
                 "full_name": u.get_full_name(),
                 "first_name": u.first_name,
@@ -503,13 +504,17 @@ class RSVPSerializer(serializers.ModelSerializer):
     """RSVP as seen by the Owner (with PII)."""
 
     user_id = serializers.IntegerField(source="user.id", read_only=True)
+    user_profile_slug = serializers.CharField(
+        source="user.profile_slug", read_only=True
+    )
     user_email = serializers.EmailField(source="user.email", read_only=True)
     user_full_name = serializers.CharField(
         source="user.get_full_name", read_only=True
     )
     user_phone = serializers.CharField(source="user.phone", read_only=True)
     # Avatar payload inline aby roster mohl rovnou vykreslit fotku bez
-    # extra fetch per účastníka. Klikatelný avatar vede na /u/<user_id>.
+    # extra fetch per účastníka. Klikatelný avatar vede na
+    # /u/<profile_slug>.
     user_avatar = serializers.SerializerMethodField()
     uploaded_doc_keys = serializers.SerializerMethodField()
     verified_doc_keys = serializers.SerializerMethodField()
@@ -527,6 +532,7 @@ class RSVPSerializer(serializers.ModelSerializer):
             "is_organizer",
             "can_toggle_organizer",
             "user_id",
+            "user_profile_slug",
             "user_email",
             "user_full_name",
             "user_phone",

@@ -13,7 +13,14 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("me/", views.me, name="me"),
     path("me/avatar/", views.me_avatar, name="me-avatar"),
-    path("users/<int:user_id>/profile/", views.user_public_profile, name="user-public-profile"),
+    # Slug varianta (současná — canonical URL) + legacy numerická
+    # (backward compat pro odkazy vytvořené před 2026-09-11 rename).
+    # Slug se skládá z písmen/číslic/pomlček, `<str:>` je toleruje.
+    path(
+        "users/<str:user_key>/profile/",
+        views.user_public_profile,
+        name="user-public-profile",
+    ),
     path("me/todo/", views.me_todo, name="me-todo"),
     path(
         "me/billing-profiles/",

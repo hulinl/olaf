@@ -385,11 +385,13 @@ export function TopicCard({
             focalX={topic.author_avatar.focal_x}
             focalY={topic.author_avatar.focal_y}
             zoom={topic.author_avatar.zoom}
+            userSlug={topic.author_avatar.slug || null}
             userId={topic.author_id ?? null}
             initial={initialOf(topic.author_name)}
             colorBg={avatarBg(topic.author_name)}
           />
           <ProfileLink
+            userSlug={topic.author_avatar.slug || null}
             userId={topic.author_id ?? null}
             className="font-medium text-ink-700 hover:text-brand"
           >
@@ -545,6 +547,7 @@ function MiniAvatar({
   focalY,
   zoom,
   userId,
+  userSlug,
   initial,
   colorBg,
 }: {
@@ -553,6 +556,7 @@ function MiniAvatar({
   focalY: number;
   zoom: number;
   userId: number | null;
+  userSlug: string | null;
   initial: string;
   colorBg: string;
 }) {
@@ -579,7 +583,11 @@ function MiniAvatar({
       {initial}
     </span>
   );
-  return <ProfileLink userId={userId}>{visual}</ProfileLink>;
+  return (
+    <ProfileLink userId={userId} userSlug={userSlug}>
+      {visual}
+    </ProfileLink>
+  );
 }
 
 /** Top-right stack: pin/lock badges + moderátor menu.
@@ -634,23 +642,32 @@ function TopicTopRight({
   );
 }
 
-/** Malý wrapper: když má user id, wrap v Linku na /u/<id>. Bez id
- *  (např. smazaný autor) rendrujeme jen children. */
+/** Malý wrapper: pokud známe profile_slug nebo numerické id, wrap v
+ *  Linku na `/u/<slug|id>`. Preferujeme slug (canonical URL od
+ *  2026-09-11); id je backward-compat fallback. Bez obou (např.
+ *  smazaný autor) rendrujeme jen children. */
 function ProfileLink({
   userId,
+  userSlug,
   children,
   className,
 }: {
   userId: number | null;
+  userSlug?: string | null;
   children: React.ReactNode;
   className?: string;
 }) {
-  if (!userId) {
+  const href = userSlug
+    ? `/u/${userSlug}`
+    : userId
+      ? `/u/${userId}`
+      : null;
+  if (!href) {
     return className ? <span className={className}>{children}</span> : <>{children}</>;
   }
   return (
     <a
-      href={`/u/${userId}`}
+      href={href}
       className={className ?? "inline-block hover:opacity-80"}
     >
       {children}
