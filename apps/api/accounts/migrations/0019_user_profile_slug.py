@@ -57,6 +57,21 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunPython(backfill_profile_slugs, clear_profile_slugs),
+        # 2026-09-11: první pokus o AlterField v prod padl (Container
+        # App restart → dva replicas běžely migrate paralelně, jeden
+        # nechal orphan `_like` index). Před unique přechodem tedy
+        # nejdřív preventivně dropneme případné leftover indexy +
+        # constraint; DROP IF EXISTS je no-op při čisté migraci.
+        migrations.RunSQL(
+            sql=[
+                'DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_like";',
+                'DROP INDEX IF EXISTS "accounts_user_profile_slug_17f7faf7_uniq";',
+                'ALTER TABLE "accounts_user" '
+                'DROP CONSTRAINT IF EXISTS '
+                '"accounts_user_profile_slug_17f7faf7_uniq";',
+            ],
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         migrations.AlterField(
             model_name="user",
             name="profile_slug",
