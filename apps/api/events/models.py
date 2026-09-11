@@ -533,6 +533,11 @@ class RSVP(models.Model):
         unique=True,
         db_index=True,
     )
+    # 2026-09-11: dedup pro proaktivní feedback mail — Celery beat
+    # (dispatch_due_feedback_requests) běží každou hodinu a hledá RSVPs
+    # kterým akce doběhla před 24-72 h. Bez tohoto pole by se mail
+    # posílal opakovaně. Null = ještě nikdy neposlaný.
+    feedback_sent_at = models.DateTimeField(null=True, blank=True)
     # Kdo zrušil registraci — owner v rosteru vidí "Sám zrušil" vs
     # "Zrušil pořadatel" badge, aby měl kontext na cancelled řádkách.
     # Prázdný string = aktivní RSVP nebo legacy bez záznamu.

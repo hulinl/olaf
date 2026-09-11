@@ -8,6 +8,7 @@ from .emails import (
     send_event_available_notification,
     send_event_cancellation,
     send_event_update_notification,
+    send_feedback_request,
     send_rsvp_confirmation,
     send_waitlist_promotion,
 )
@@ -146,6 +147,51 @@ def purge_old_soft_deletes_task(retention_days: int = 30) -> dict[str, int]:
     if count:
         qs.delete()
     return {"purged": count}
+
+
+@shared_task(name="events.dispatch_due_feedback_requests")
+def dispatch_due_feedback_requests_task() -> dict[str, int]:
+    """Proactive post-event feedback nudge (2026-09-11). Beat schedule
+    každou hodinu; pošle mail všem confirmed RSVPs (non-organizer)
+    kterým akce doběhla mezi 24 a 72 h zpět a ještě žádný feedback
+    mail nedostali.
+
+    Okno 24-72 h drží ekvilibrium — nechceme mail hned po akci
+    (unavený user), ale ani po měsíci (už zapomněl). Cutoff-based
+    dedup přes `feedback_sent_at` pole, ne přes Notification tabulku
+    (RSVP-level state je odolnější k re-run).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    now = timezone.now()
+    lower = now - timedelta(hours=72)
+    upper = now - timedelta(hours=24)
+
+    rsvps = (
+        RSVP.objects.filter(
+            event__ends_at__gte=lower,
+            event__ends_at__lte=upper,
+            event__deleted_at__isnull=True,
+            status=RSVP.STATUS_YES,
+            is_organizer=False,
+            feedback_sent_at__isnull=True,
+        )
+        .select_related("event", "event__workspace", "user")
+    )
+    sent = 0
+    for rsvp in rsvps:
+        if rsvp.user is None or not rsvp.user.email:
+            continue
+        try:
+            send_feedback_request(rsvp)
+        except Exception:
+            continue
+        rsvp.feedback_sent_at = now
+        rsvp.save(update_fields=["feedback_sent_at"])
+        sent += 1
+    return {"sent": sent}
 
 
 @shared_task(name="events.send_checklist_reminder_now")

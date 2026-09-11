@@ -152,6 +152,26 @@ export function EventForm({
     initial?.requires_approval ?? false,
   );
 
+  // 2026-09-11: pole pro veřejné API v2 (externí konzumenty jako
+  // olafadventures.cz). Difficulty = enum label, reg times = optional
+  // datetime picker. Prázdné value = zachovává V1 chování (reg
+  // otevřená hned po publish až do začátku akce).
+  const [difficulty, setDifficulty] = useState<
+    "" | "light" | "moderate" | "hard" | "extreme"
+  >(initial?.difficulty ?? "");
+  // datetime-local input formát je "YYYY-MM-DDTHH:MM" (bez sekund a Z);
+  // převádíme z ISO při načtení, na ISO při submitu.
+  const [registrationOpensAt, setRegistrationOpensAt] = useState(
+    initial?.registration_opens_at
+      ? initial.registration_opens_at.slice(0, 16)
+      : "",
+  );
+  const [registrationClosesAt, setRegistrationClosesAt] = useState(
+    initial?.registration_closes_at
+      ? initial.registration_closes_at.slice(0, 16)
+      : "",
+  );
+
   const [visibility, setVisibility] = useState<"public" | "invite_only">(
     initial?.visibility ?? "public",
   );
@@ -339,6 +359,13 @@ export function EventForm({
         waitlist_enabled: waitlistEnabled,
         require_phone_on_rsvp: requirePhoneOnRsvp,
         requires_approval: requiresApproval,
+        difficulty: difficulty || "",
+        registration_opens_at: registrationOpensAt
+          ? fromLocalInput(registrationOpensAt)
+          : null,
+        registration_closes_at: registrationClosesAt
+          ? fromLocalInput(registrationClosesAt)
+          : null,
         visibility,
         status,
         enabled_questionnaire_sections: enabledSections,
@@ -568,6 +595,73 @@ export function EventForm({
                 Vyžadovat moje schválení každé registrace
               </label>
             </div>
+          </div>
+        </CardSection>
+      </Card>
+
+      <Card>
+        <CardSection>
+          <h2 className="text-base font-semibold text-ink-900">
+            Další informace pro externí weby
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Tyto údaje bere veřejné API (např. web olafadventures.cz).
+            Můžou zůstat prázdné — pak se ve výpisu na externím webu
+            prostě neukážou.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field
+              label="Náročnost"
+              htmlFor="difficulty"
+              hint="Ukazuje se jako badge na kartě akce na webu."
+            >
+              <select
+                id="difficulty"
+                value={difficulty}
+                onChange={(e) =>
+                  setDifficulty(
+                    e.target.value as
+                      | ""
+                      | "light"
+                      | "moderate"
+                      | "hard"
+                      | "extreme",
+                  )
+                }
+                className="h-11 rounded-md border border-border bg-surface px-3 text-sm focus-ring"
+              >
+                <option value="">— nezveřejněno —</option>
+                <option value="light">Lehká</option>
+                <option value="moderate">Střední</option>
+                <option value="hard">Náročná</option>
+                <option value="extreme">Extrémní</option>
+              </select>
+            </Field>
+            <div />
+            <Field
+              label="Registrace se otevírá"
+              htmlFor="reg_opens"
+              hint="Prázdné = otevřená hned po publikaci akce."
+            >
+              <Input
+                id="reg_opens"
+                type="datetime-local"
+                value={registrationOpensAt}
+                onChange={(e) => setRegistrationOpensAt(e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Registrace se uzavírá"
+              htmlFor="reg_closes"
+              hint="Prázdné = otevřená až do začátku akce."
+            >
+              <Input
+                id="reg_closes"
+                type="datetime-local"
+                value={registrationClosesAt}
+                onChange={(e) => setRegistrationClosesAt(e.target.value)}
+              />
+            </Field>
           </div>
         </CardSection>
       </Card>

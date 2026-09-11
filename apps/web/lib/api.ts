@@ -313,6 +313,13 @@ export interface Event extends EventSummary {
    *  True kvůli emergencies; owner si u casual akcí (komunita, BBQ)
    *  odznačí. */
   require_phone_on_rsvp: boolean;
+  /** 2026-09-11: pole pro veřejné API v2 (externí konzumenty jako
+   *  olafadventures.cz web). Prázdné = nezveřejněno. */
+  difficulty: "" | "light" | "moderate" | "hard" | "extreme";
+  /** ISO 8601. Null = registrace otevřená hned po publish. */
+  registration_opens_at: string | null;
+  /** ISO 8601. Null = otevřená až do začátku akce. */
+  registration_closes_at: string | null;
   blocks: EventBlock[];
   /** Inline payload for every `gear` block on this event's landing.
    *  Map of slug → PublicGearList. Private lists are omitted. */
@@ -1739,6 +1746,12 @@ export interface EventWritePayload {
   visibility?: "public" | "invite_only";
   status?: "draft" | "published" | "closed" | "cancelled" | "completed";
   requires_approval?: boolean;
+  /** Náročnost — používá veřejné API pro externí konzumenty. */
+  difficulty?: "" | "light" | "moderate" | "hard" | "extreme";
+  /** ISO 8601 nebo null. */
+  registration_opens_at?: string | null;
+  /** ISO 8601 nebo null. */
+  registration_closes_at?: string | null;
   blocks?: EventBlock[];
   enabled_questionnaire_sections?: QuestionnaireSection[];
   cancellation_reason?: string;
