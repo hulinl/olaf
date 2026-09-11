@@ -404,34 +404,40 @@ export function TopicCard({
           </time>
           <span aria-hidden>·</span>
           <span>{relative}</span>
-          {/* Stats teď žijí na konci meta-liny topicu vpravo, aby
-              nezabíraly vlastní řádek nad akcemi (user request
-              2026-09-11 „na řádek autora, akorát vpravo"). */}
-          {(topic.like_count > 0 || topic.comment_count > 0) && (
-            <span className="ml-auto inline-flex items-center gap-2">
+          {/* Pravý roh meta-liny: like button (srdíčko + počet) +
+              suchý counter komentářů. Klik na srdíčko = toggle like;
+              action bar dole zmizel úplně (2026-09-11 user request
+              „srdíčko ať je rovnou vpravo, hotovo"). */}
+          <span className="ml-auto inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleToggleTopicLike()}
+              disabled={likeBusy}
+              aria-pressed={topic.i_liked}
+              aria-label={topic.i_liked ? "Zrušit líbí" : "Dát líbí"}
+              className={[
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors focus-ring",
+                topic.i_liked
+                  ? "text-brand hover:bg-brand/5"
+                  : "text-ink-500 hover:bg-surface-muted hover:text-ink-900",
+                likeBusy ? "opacity-60" : "",
+              ].join(" ")}
+            >
+              <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
               {topic.like_count > 0 && (
-                <span
-                  className={[
-                    "inline-flex items-center gap-1",
-                    topic.i_liked ? "text-brand" : "text-ink-500",
-                  ].join(" ")}
-                  aria-label={`Líbí se ${topic.like_count}`}
-                >
-                  <span aria-hidden>♥</span>
-                  <span className="tabular-nums">{topic.like_count}</span>
-                </span>
+                <span className="tabular-nums">{topic.like_count}</span>
               )}
-              {topic.comment_count > 0 && (
-                <span className="tabular-nums">
-                  {topic.comment_count === 1
-                    ? "1 komentář"
-                    : topic.comment_count < 5
-                      ? `${topic.comment_count} komentáře`
-                      : `${topic.comment_count} komentářů`}
-                </span>
-              )}
-            </span>
-          )}
+            </button>
+            {topic.comment_count > 0 && (
+              <span
+                className="inline-flex items-center gap-1"
+                aria-label={`${topic.comment_count} komentářů`}
+              >
+                <span aria-hidden>💬</span>
+                <span className="tabular-nums">{topic.comment_count}</span>
+              </span>
+            )}
+          </span>
         </div>
         {topic.body && (
           <>
@@ -472,12 +478,6 @@ export function TopicCard({
           </>
         )}
       </div>
-
-      <TopicActionsBar
-        topic={topic}
-        likeBusy={likeBusy}
-        onToggleLike={handleToggleTopicLike}
-      />
 
       {/* Comments section: hidden N link + preview / full list. Border
           nad ní záměrně chybí — akce (líbí/komentář) a diskuze jsou
@@ -787,37 +787,6 @@ function TopicMenu({
   );
 }
 
-function TopicActionsBar({
-  topic,
-  likeBusy,
-  onToggleLike,
-}: {
-  topic: DiscussionTopic;
-  likeBusy: boolean;
-  onToggleLike: () => Promise<void>;
-}) {
-  // 2026-09-11: tlačítko „Komentovat" zmizelo — composer je stejně
-  // vždy vidět dole. Zůstalo jen Líbí (full-width action row).
-  return (
-    <div className="border-t border-border px-2 py-1">
-      <button
-        type="button"
-        onClick={() => void onToggleLike()}
-        aria-pressed={topic.i_liked}
-        disabled={likeBusy}
-        className={[
-          "inline-flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors focus-ring",
-          topic.i_liked
-            ? "text-brand hover:bg-brand/5"
-            : "text-ink-700 hover:bg-surface-muted",
-        ].join(" ")}
-      >
-        <span aria-hidden>{topic.i_liked ? "♥" : "♡"}</span>
-        <span>Líbí</span>
-      </button>
-    </div>
-  );
-}
 
 /** Kdy dát „Zobrazit více" tlačítko pod post body. Krátké posty
  *  (méně než ~4 řádky) se ukazují celé — clamp + toggle by tam byl
