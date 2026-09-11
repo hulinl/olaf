@@ -304,6 +304,8 @@ export default function EventEditCockpitPage({ params }: Props) {
 
       <EventLinksSection wsSlug={wsSlug} eventSlug={eventSlug} />
 
+      <IntegrationsSection event={event} />
+
       <section>
         <h2 className="text-lg font-semibold text-ink-900">Export akce</h2>
         <p className="mt-1 text-sm text-ink-500">
@@ -1343,5 +1345,100 @@ function CollaboratorsSection({
         </form>
       )}
     </section>
+  );
+}
+
+/** Integrace — public URL a JSON API endpoint pro embed na externí web.
+ *  Ukazuje canonical share URL (`/e/<public_id>`) i legacy landing URL.
+ *  API endpoint vrací plný Event JSON — chce-li kolegyně na svém webu
+ *  načíst akci a vyrenderovat vlastní kartu, kopíruje si tuhle URL.
+ *  User request 2026-09-11. */
+function IntegrationsSection({ event }: { event: OlafEvent }) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const shareUrl = event.public_id
+    ? `${origin}/e/${event.public_id}`
+    : `${origin}/${event.workspace_slug}/e/${event.slug}`;
+  const apiUrl = event.public_id
+    ? `${origin}/api/events/e/${event.public_id}/`
+    : `${origin}/api/events/${event.workspace_slug}/${event.slug}/`;
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-ink-900">Integrace</h2>
+      <p className="mt-1 text-sm text-ink-500">
+        Sdílená URL i JSON API endpoint pro embed na externí web.
+        Odkazy se nemění po přejmenování — <code className="rounded bg-surface-muted px-1 font-mono text-xs">public_id</code>{" "}
+        je stabilní identifikátor akce.
+      </p>
+      <div className="mt-3 flex flex-col gap-4">
+        <CopyableUrlRow
+          label="Sdílená URL"
+          hint="Krátký odkaz pro WhatsApp / mail / QR kód. Přesměruje na plnou landing stránku akce."
+          value={shareUrl}
+        />
+        <CopyableUrlRow
+          label="Public API endpoint (JSON)"
+          hint="GET request vrací event data (titulek, datum, místo, kapacita, popis, obrázky…). Anonymous přístup — nepotřebuje token."
+          value={apiUrl}
+        />
+        {event.public_id && (
+          <CopyableUrlRow
+            label="Public ID"
+            hint="Stabilní identifikátor akce. Změní se jen když se akce smaže + znovu vytvoří."
+            value={event.public_id}
+            mono
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CopyableUrlRow({
+  label,
+  hint,
+  value,
+  mono,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  mono?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — silent */
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+        {label}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          readOnly
+          value={value}
+          onFocus={(e) => e.target.select()}
+          className={[
+            "min-w-[260px] flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink-700 focus-ring",
+            mono ? "font-mono" : "",
+          ].join(" ")}
+        />
+        <button
+          type="button"
+          onClick={copy}
+          className="rounded-md border border-border bg-surface px-2 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-muted"
+        >
+          {copied ? "✓" : "Kopírovat"}
+        </button>
+      </div>
+      <p className="text-xs text-ink-500">{hint}</p>
+    </div>
   );
 }
