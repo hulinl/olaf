@@ -236,11 +236,102 @@ export default function EventFeedbackListPage({ params }: Props) {
                     )}
                   </div>
                 )}
+
+                <PublishToggleRow
+                  row={r}
+                  onChange={(updated) =>
+                    setRows((prev) =>
+                      prev
+                        ? prev.map((x) => (x.id === updated.id ? updated : x))
+                        : prev,
+                    )
+                  }
+                  wsSlug={wsSlug}
+                  eventSlug={eventSlug}
+                />
               </li>
             );
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Toggle "Zveřejnit jako referenci" pod každou zpětnou vazbou.
+ *  Optimistic update — pokud backend selže, vrátíme původní stav. */
+function PublishToggleRow({
+  row,
+  onChange,
+  wsSlug,
+  eventSlug,
+}: {
+  row: FeedbackRow;
+  onChange: (updated: FeedbackRow) => void;
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const previous = row;
+    const optimistic = { ...row, is_public: !row.is_public };
+    onChange(optimistic);
+    try {
+      const updated = await events.publishFeedback(
+        wsSlug,
+        eventSlug,
+        row.id,
+        optimistic.is_public,
+      );
+      onChange(updated);
+    } catch (err) {
+      onChange(previous);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Publikace se nepovedla.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-muted/30 px-4 py-2 text-xs">
+      <div className="flex items-center gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-ink-700">
+          <input
+            type="checkbox"
+            checked={row.is_public}
+            onChange={toggle}
+            disabled={busy}
+            className="size-4 accent-brand"
+          />
+          <span>
+            Zveřejnit jako referenci na stránce akce
+            {row.consented_to_publish ? (
+              <span className="ml-2 rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-success">
+                se souhlasem
+              </span>
+            ) : (
+              <span className="ml-2 rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
+                jméno anonymizováno
+              </span>
+            )}
+          </span>
+        </label>
+      </div>
+      {row.is_public && (
+        <span className="text-ink-500">
+          Zobrazí se jako <strong className="text-ink-700">„{row.public_display_name}"</strong>
+        </span>
+      )}
+      {error && <span className="text-danger">{error}</span>}
     </div>
   );
 }

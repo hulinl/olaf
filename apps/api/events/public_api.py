@@ -323,6 +323,48 @@ def public_event_by_hash(request, public_id: str) -> HttpResponse:
     return _cors_ok(JsonResponse(_serialize_event(event, now)))
 
 
+@require_safe
+@cache_control(public=True, max_age=60, s_maxage=60)
+def public_event_references(request, public_id: str) -> HttpResponse:
+    """GET /api/public/events/e/{public_id}/references
+
+    Reference (zveřejněné zpětné vazby) k akci — landing sekce + externí
+    web olafadventures.cz „Co říkají účastníci". Zpět dostáváme JSON
+    s `references: [{id, rating, went_well, display_name, created_at}]`
+    + agregát `summary: {count, average_rating}`. Feedback bez
+    `is_public=True` se nikdy nevrací (2026-09-14).
+    """
+    from .models import EventFeedback
+    from .serializers import PublicReferenceSerializer
+
+    event = (
+        Event.all_objects.filter(
+            public_id=public_id, status__in=_PUBLIC_STATUSES
+        )
+        .first()
+    )
+    if event is None or event.deleted_at is not None:
+        return _cors_ok(
+            JsonResponse({"error": "Event not found"}, status=404)
+        )
+
+    qs = (
+        EventFeedback.objects.filter(event=event, is_public=True)
+        .order_by("-created_at")
+    )
+    references = PublicReferenceSerializer(qs, many=True).data
+    ratings = [r["rating"] for r in references]
+    summary = {
+        "count": len(references),
+        "average_rating": (
+            round(sum(ratings) / len(ratings), 2) if ratings else None
+        ),
+    }
+    return _cors_ok(
+        JsonResponse({"summary": summary, "references": references})
+    )
+
+
 _LIST_LIMIT_DEFAULT = 50
 _LIST_LIMIT_MAX = 200
 

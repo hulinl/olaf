@@ -51,6 +51,11 @@ urlpatterns = [
         name="create",
     ),
     path(
+        "<slug:workspace_slug>/references/",
+        views.workspace_references,
+        name="workspace-references",
+    ),
+    path(
         "<slug:workspace_slug>/import/",
         views.import_event,
         name="import",
@@ -299,6 +304,12 @@ urlpatterns = [
         "<slug:workspace_slug>/<slug:event_slug>/feedback/",
         views.event_feedback,
         name="event-feedback",
+    ),
+    path(
+        "<slug:workspace_slug>/<slug:event_slug>/feedback/"
+        "<int:feedback_id>/publish/",
+        views.event_feedback_publish,
+        name="event-feedback-publish",
     ),
     path(
         "<slug:workspace_slug>/<slug:event_slug>/feedback.csv",

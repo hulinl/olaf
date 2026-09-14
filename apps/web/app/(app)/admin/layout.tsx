@@ -19,6 +19,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/ukoly", label: "Úkoly" },
   { href: "/admin/komunity", label: "Komunity" },
   { href: "/admin/lide", label: "Lidé" },
+  { href: "/admin/reference", label: "Reference" },
   { href: "/admin/vybaveni", label: "Vybavení" },
   { href: "/admin/platby", label: "Platby" },
   { href: "/admin/audit", label: "Aktivita" },

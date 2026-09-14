@@ -32,6 +32,10 @@ export default function FeedbackPage({ params }: Props) {
   const [rating, setRating] = useState<number | null>(null);
   const [wentWell, setWentWell] = useState("");
   const [couldImprove, setCouldImprove] = useState("");
+  // 2026-09-14: participant consent — když zaškrtne, owner smí feedback
+  // zveřejnit se plným jménem. Bez souhlasu smí owner zveřejnit jen
+  // se zkráceným jménem („Jana H.").
+  const [consented, setConsented] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +57,7 @@ export default function FeedbackPage({ params }: Props) {
           setRating(r.existing.rating);
           setWentWell(r.existing.went_well);
           setCouldImprove(r.existing.could_improve);
+          setConsented(r.existing.consented_to_publish);
         }
       } catch (err) {
         if (cancelled) return;
@@ -82,6 +87,7 @@ export default function FeedbackPage({ params }: Props) {
         rating,
         went_well: wentWell.trim(),
         could_improve: couldImprove.trim(),
+        consented_to_publish: consented,
       });
       setDone(true);
     } catch (err) {
@@ -185,6 +191,25 @@ export default function FeedbackPage({ params }: Props) {
               className="rounded-md border border-border bg-surface px-3 py-2 text-sm placeholder:text-ink-300 focus-ring transition-colors duration-150"
             />
           </Field>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-surface-muted/40 p-3 text-sm text-ink-700">
+            <input
+              type="checkbox"
+              checked={consented}
+              onChange={(e) => setConsented(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-brand"
+            />
+            <span>
+              <strong className="block font-medium text-ink-900">
+                Souhlasím se zveřejněním s mým jménem
+              </strong>
+              Organizátor může moje hodnocení a text „co se povedlo"
+              použít jako referenci na stránce akce. Bez souhlasu se
+              zobrazí jen zkráceně („Jana H.") — a to jen když se
+              organizátor rozhodne referenci publikovat. „Co příště jinak"
+              zůstává soukromé v obou případech.
+            </span>
+          </label>
 
           {error && <Alert variant="danger">{error}</Alert>}
 

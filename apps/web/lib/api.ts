@@ -366,6 +366,43 @@ export interface Event extends EventSummary {
    *  the "Aktualizovat z Notion" button). Empty for hand-created
    *  events. */
   external_ref: string;
+  /** Zveřejněné reference (zpětné vazby s `is_public=True`). Landing
+   *  page proběhlé akce ukazuje tuto sekci; ostatní akce mají prázdné
+   *  pole. Backend limituje na 20 nejnovějších — víc není třeba. */
+  public_references: PublicReference[];
+  public_references_summary: { count: number; average_rating: number | null } | null;
+}
+
+export interface PublicReference {
+  id: number;
+  rating: number;
+  went_well: string;
+  /** Zkráceně jméno: "Jana H." bez consentu, plné jméno s consentem,
+   *  "Anonymní účastník" bez jména. Backend computed přes
+   *  `EventFeedback.public_display_name()`. */
+  display_name: string;
+  created_at: string;
+}
+
+/** Owner surface — plný feedback payload včetně `is_public` toggle
+ *  a odkazu na akci. Používá to `/admin/eventy/<ws>/<slug>/zpetne-vazby/`
+ *  + `/admin/reference/`. */
+export interface EventFeedback {
+  id: number;
+  email: string;
+  name: string;
+  rating: number;
+  went_well: string;
+  could_improve: string;
+  is_public: boolean;
+  consented_to_publish: boolean;
+  public_display_name: string;
+  created_at: string;
+  updated_at: string;
+  event_title: string;
+  event_slug: string;
+  event_public_id: string;
+  workspace_slug: string;
 }
 
 export interface RiskChecklistItem {
@@ -1860,17 +1897,24 @@ export const events = {
         rating: number;
         went_well: string;
         could_improve: string;
+        consented_to_publish: boolean;
         updated_at: string;
       } | null;
     }>(`/api/events/feedback/${encodeURIComponent(token)}/`),
   submitFeedbackByToken: (
     token: string,
-    payload: { rating: number; went_well: string; could_improve: string },
+    payload: {
+      rating: number;
+      went_well: string;
+      could_improve: string;
+      consented_to_publish: boolean;
+    },
   ) =>
     apiFetch<{
       rating: number;
       went_well: string;
       could_improve: string;
+      consented_to_publish: boolean;
       updated_at: string;
     }>(`/api/events/feedback/${encodeURIComponent(token)}/`, {
       method: "POST",
@@ -1878,24 +1922,35 @@ export const events = {
     }),
   /** Owner surface — vrátí list submitted feedback pro akci. */
   listFeedback: (workspaceSlug: string, eventSlug: string) =>
-    apiFetch<
-      Array<{
-        id: number;
-        email: string;
-        name: string;
-        rating: number;
-        went_well: string;
-        could_improve: string;
-        created_at: string;
-        updated_at: string;
-        event_title: string;
-      }>
-    >(`/api/events/${workspaceSlug}/${eventSlug}/feedback/`),
+    apiFetch<EventFeedback[]>(
+      `/api/events/${workspaceSlug}/${eventSlug}/feedback/`,
+    ),
   /** Owner-triggered fan-out — mail všem YES non-organizer RSVP. */
   sendFeedbackRequest: (workspaceSlug: string, eventSlug: string) =>
     apiFetch<{ sent: number }>(
       `/api/events/${workspaceSlug}/${eventSlug}/feedback/`,
       { method: "POST" },
+    ),
+  /** Owner toggle — zveřejnit nebo skrýt jednotlivou zpětnou vazbu
+   *  jako referenci. Frontend používá landing sekce „Reference"
+   *  + admin overview `/admin/reference`. */
+  publishFeedback: (
+    workspaceSlug: string,
+    eventSlug: string,
+    feedbackId: number,
+    isPublic: boolean,
+  ) =>
+    apiFetch<EventFeedback>(
+      `/api/events/${workspaceSlug}/${eventSlug}/feedback/${feedbackId}/publish/`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ is_public: isPublic }),
+      },
+    ),
+  /** Owner přehled všech zpětných vazeb napříč akcemi workspacu. */
+  workspaceReferences: (workspaceSlug: string) =>
+    apiFetch<EventFeedback[]>(
+      `/api/events/${workspaceSlug}/references/`,
     ),
   /** Externí odkazy k akci (Google Sheet, Notion, mapa, ...). GET
    *  vrátí anonu jen `is_public=True`, owner/co-creator všechno. */
@@ -2169,6 +2224,10 @@ export const events = {
       `/api/events/${workspaceSlug}/${eventSlug}/rsvps/${rsvpId}/profile/`,
     ),
   people: () => apiFetch<PersonSummary[]>("/api/auth/me/people/"),
+  /** Aggregate — všechny zpětné vazby napříč akcemi vlastněných
+   *  workspaces. Pro `/admin/reference` overview. */
+  allReferences: () =>
+    apiFetch<EventFeedback[]>("/api/auth/me/references/"),
   person: (userId: number) =>
     apiFetch<PersonDetail>(`/api/auth/me/people/${userId}/`),
   /** V2 Lidé — hide a person from caller's roster. Their account +

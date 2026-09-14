@@ -12,6 +12,7 @@ import {
   assetUrl,
   type Event,
   type EventDraftPreview,
+  type PublicReference,
   formatEventDateRange,
   formatSpotsRemaining,
 } from "@/lib/api";
@@ -252,6 +253,15 @@ export default async function EventLandingPage({ params }: Props) {
             existing "Vybavení" block into the block builder. */}
 
 
+        {/* Reference — jen na proběhlé akci a jen když existují.
+            2026-09-14 „chci ukázat hodnocení z účastníků". */}
+        {isPast && event.public_references && event.public_references.length > 0 && (
+          <ReferencesSection
+            references={event.public_references}
+            summary={event.public_references_summary}
+          />
+        )}
+
         {/* Public landing is presentation-only. Participant zone (payment
             + docs + invoice) lives at /events/[ws]/[event] and on the
             dashboard's "Čeká na tebe" feed — landing stays clean.
@@ -416,5 +426,87 @@ function FallbackHero({
         </div>
       </div>
     </section>
+  );
+}
+
+/** Reference sekce — jen na proběhlé akci, jen s alespoň jednou
+ *  publikovanou zpětnou vazbou. `average_rating` v summary vyplavá
+ *  jako headline nad kartičkami. Layout: 1 col mobile, 2 col md+. */
+function ReferencesSection({
+  references,
+  summary,
+}: {
+  references: PublicReference[];
+  summary: {
+    count: number;
+    average_rating: number | null;
+  } | null;
+}) {
+  return (
+    <section className="bg-surface-muted/30">
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
+        <div className="mb-8 flex flex-col gap-2">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-ink-500">
+            Reference
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">
+            Co říkají účastníci
+          </h2>
+          {summary && summary.count > 0 && summary.average_rating != null && (
+            <p className="text-sm text-ink-500">
+              <StarBar rating={summary.average_rating} />
+              {" · "}
+              průměr {summary.average_rating.toFixed(1)} z 5 ({summary.count}{" "}
+              {summary.count === 1
+                ? "hodnocení"
+                : summary.count < 5
+                  ? "hodnocení"
+                  : "hodnocení"}
+              )
+            </p>
+          )}
+        </div>
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {references.map((r) => (
+            <li
+              key={r.id}
+              className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-sm"
+            >
+              <StarBar rating={r.rating} />
+              {r.went_well && (
+                <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">
+                  „{r.went_well}"
+                </p>
+              )}
+              <p className="text-xs text-ink-500">
+                — {r.display_name}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/** 5-hvězdičkový vizuál. `rating` je 0-5 (může být necelé pro průměr).
+ *  Půl hvězdy renderujeme přes CSS gradient — jednoduchý inline SVG. */
+function StarBar({ rating }: { rating: number }) {
+  const stars = [1, 2, 3, 4, 5];
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 text-brand"
+      aria-label={`Hodnocení ${rating} z 5`}
+    >
+      {stars.map((n) => {
+        const filled = rating >= n;
+        const half = !filled && rating >= n - 0.5;
+        return (
+          <span key={n} aria-hidden className="text-base">
+            {filled ? "★" : half ? "★" : "☆"}
+          </span>
+        );
+      })}
+    </span>
   );
 }

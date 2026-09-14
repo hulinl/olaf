@@ -1374,6 +1374,23 @@ class EventFeedback(models.Model):
     went_well = models.TextField(blank=True, default="")
     could_improve = models.TextField(blank=True, default="")
 
+    # 2026-09-14: Reference feature. Owner toggle „zveřejnit"
+    # (`is_public`) povolí feedback do public listu na landing page
+    # proběhlé akce + externí API. Participant checkbox
+    # (`consented_to_publish`) je jen indikátor souhlasu — bez souhlasu
+    # smí owner zveřejnit s anonymizovaným jménem („Anonymní účastník").
+    # Kombinace: is_public && consented_to_publish → celé jméno; jinak
+    # zkrácené („Jana H.") nebo úplně anonymní.
+    is_public = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Owner toggle: povolit zobrazení v public referencích.",
+    )
+    consented_to_publish = models.BooleanField(
+        default=False,
+        help_text="Participant sám zaškrtl souhlas se zveřejněním.",
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1382,10 +1399,26 @@ class EventFeedback(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["event", "-created_at"]),
+            models.Index(fields=["is_public", "-created_at"]),
         ]
 
     def __str__(self) -> str:
         return f"Feedback #{self.pk} for {self.event.slug} ({self.rating}★)"
+
+    def public_display_name(self) -> str:
+        """Zkráceně jméno pro public reference. `consented_to_publish`
+        = celé jméno; jinak zkrácené „Křestní P." (první písmeno
+        příjmení). Bez jména vůbec → „Anonymní účastník".
+        """
+        raw = (self.name or "").strip()
+        if not raw:
+            return "Anonymní účastník"
+        if self.consented_to_publish:
+            return raw
+        parts = raw.split()
+        if len(parts) == 1:
+            return parts[0]
+        return f"{parts[0]} {parts[-1][0]}."
 
 
 class EventLink(models.Model):

@@ -192,6 +192,11 @@ class EventPublicSerializer(serializers.ModelSerializer):
     recommended_gear_list = serializers.SerializerMethodField()
     risk_checklist = serializers.SerializerMethodField()
     organizers_by_user_id = serializers.SerializerMethodField()
+    # 2026-09-14: reference embed pro past events — landing page si
+    # nemusí táhnout separátní endpoint. Non-past události mají
+    # `public_references_summary=None` (nezobrazuje se sekce).
+    public_references = serializers.SerializerMethodField()
+    public_references_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -241,6 +246,8 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "billing_profile",
             "required_documents",
             "external_ref",
+            "public_references",
+            "public_references_summary",
             "created_at",
         )
         read_only_fields = fields
@@ -261,6 +268,27 @@ class EventPublicSerializer(serializers.ModelSerializer):
 
     def get_shared_workspace_slugs(self, obj: Event) -> list[str]:
         return list(obj.shared_workspaces.values_list("slug", flat=True))
+
+    def get_public_references(self, obj: Event) -> list[dict]:
+        from .models import EventFeedback
+
+        qs = (
+            EventFeedback.objects.filter(event=obj, is_public=True)
+            .order_by("-created_at")[:20]
+        )
+        return PublicReferenceSerializer(qs, many=True).data
+
+    def get_public_references_summary(self, obj: Event) -> dict | None:
+        from .models import EventFeedback
+
+        qs = EventFeedback.objects.filter(event=obj, is_public=True)
+        ratings = list(qs.values_list("rating", flat=True))
+        if not ratings:
+            return {"count": 0, "average_rating": None}
+        return {
+            "count": len(ratings),
+            "average_rating": round(sum(ratings) / len(ratings), 2),
+        }
 
     def get_risk_checklist(self, obj: Event) -> list:
         """Owner-only: risk checklist is internal prep, not for the
@@ -1083,9 +1111,17 @@ class EventLinkSerializer(serializers.ModelSerializer):
 
 
 class EventFeedbackSerializer(serializers.ModelSerializer):
-    """Owner-facing view — jméno + e-mail + odpovědi na akci."""
+    """Owner-facing view — jméno + e-mail + odpovědi + reference flagy."""
 
     event_title = serializers.CharField(source="event.title", read_only=True)
+    event_slug = serializers.CharField(source="event.slug", read_only=True)
+    event_public_id = serializers.CharField(
+        source="event.public_id", read_only=True
+    )
+    workspace_slug = serializers.CharField(
+        source="event.workspace.slug", read_only=True
+    )
+    public_display_name = serializers.CharField(read_only=True)
 
     class Meta:
         model = EventFeedback
@@ -1096,9 +1132,37 @@ class EventFeedbackSerializer(serializers.ModelSerializer):
             "rating",
             "went_well",
             "could_improve",
+            "is_public",
+            "consented_to_publish",
+            "public_display_name",
             "created_at",
             "updated_at",
             "event_title",
+            "event_slug",
+            "event_public_id",
+            "workspace_slug",
+        )
+        read_only_fields = fields
+
+
+class PublicReferenceSerializer(serializers.ModelSerializer):
+    """Public reference payload — anonymizované jméno, žádný e-mail,
+    žádný `could_improve` (soukromá kritika). Používá se na landing
+    page proběhlé akce + v externím API pro olafadventures.cz.
+    """
+
+    display_name = serializers.CharField(
+        source="public_display_name", read_only=True
+    )
+
+    class Meta:
+        model = EventFeedback
+        fields = (
+            "id",
+            "rating",
+            "went_well",
+            "display_name",
+            "created_at",
         )
         read_only_fields = fields
 
@@ -1112,4 +1176,11 @@ class FeedbackSubmitSerializer(serializers.Serializer):
     )
     could_improve = serializers.CharField(
         max_length=4000, required=False, allow_blank=True, default=""
+    )
+    # 2026-09-14: participant explicit consent — když je True, owner
+    # smí feedback zveřejnit s celým jménem. Bez souhlasu se v public
+    # zobrazí jen zkráceně („Jana H.") a to jen pokud owner is_public
+    # sám zaškrtne.
+    consented_to_publish = serializers.BooleanField(
+        required=False, default=False
     )

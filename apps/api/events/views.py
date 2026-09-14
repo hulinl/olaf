@@ -3937,6 +3937,7 @@ def feedback_by_token(request: Request, token: str) -> Response:
                         "rating": existing.rating,
                         "went_well": existing.went_well,
                         "could_improve": existing.could_improve,
+                        "consented_to_publish": existing.consented_to_publish,
                         "updated_at": existing.updated_at.isoformat(),
                     }
                     if existing
@@ -3965,6 +3966,7 @@ def feedback_by_token(request: Request, token: str) -> Response:
             "rating": data["rating"],
             "went_well": data.get("went_well", ""),
             "could_improve": data.get("could_improve", ""),
+            "consented_to_publish": data.get("consented_to_publish", False),
         },
     )
     return Response(
@@ -3972,6 +3974,7 @@ def feedback_by_token(request: Request, token: str) -> Response:
             "rating": feedback.rating,
             "went_well": feedback.went_well,
             "could_improve": feedback.could_improve,
+            "consented_to_publish": feedback.consented_to_publish,
             "updated_at": feedback.updated_at.isoformat(),
         },
         status=status.HTTP_200_OK,
@@ -4038,6 +4041,93 @@ def event_feedback(
     )
 
     return Response({"sent": sent})
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def event_feedback_publish(
+    request: Request,
+    workspace_slug: str,
+    event_slug: str,
+    feedback_id: int,
+) -> Response:
+    """Toggle `is_public` na jednotlivé zpětné vazbě — reference se
+    tak objeví na landing proběhlé akce + v public API.
+
+    Owner-only. Body: `{"is_public": true|false}`. Bez consent-u
+    participanta stále smí owner publish, jen se zobrazí zkrácené
+    jméno („Jana H."). User request 2026-09-14.
+    """
+    event = _load_published_event(workspace_slug, event_slug)
+    if event is None or not can_manage_event(request.user, event):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    fb = EventFeedback.objects.filter(event=event, pk=feedback_id).first()
+    if fb is None:
+        return Response(
+            {"detail": "Feedback not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    is_public = request.data.get("is_public")
+    if not isinstance(is_public, bool):
+        return Response(
+            {"is_public": "Musí být boolean."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    fb.is_public = is_public
+    fb.save(update_fields=["is_public", "updated_at"])
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    verb = "zveřejněna" if is_public else "schována"
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_EVENT_UPDATE,
+        workspace=event.workspace,
+        target_type="event",
+        target_id=event.pk,
+        summary=f'Reference k akci „{event.title}" — {verb}.',
+        payload={"feedback_id": fb.pk, "is_public": is_public},
+    )
+
+    from .serializers import EventFeedbackSerializer
+
+    return Response(EventFeedbackSerializer(fb).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_references(request: Request, workspace_slug: str) -> Response:
+    """Owner přehled všech zpětných vazeb napříč akcemi workspacu —
+    včetně flagu, jestli je konkrétní reference zveřejněná. Používá
+    to `/admin/reference` stránka.
+
+    Gate: owner/admin workspacu (kdokoli kdo může spravovat aspoň
+    jednu akci; v praxi = workspace owner).
+    """
+    from workspaces.models import Workspace
+
+    from .models import EventFeedback
+    from .permissions import is_workspace_owner
+    from .serializers import EventFeedbackSerializer
+
+    try:
+        workspace = Workspace.objects.get(slug=workspace_slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if not is_workspace_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    qs = (
+        EventFeedback.objects.filter(event__workspace=workspace)
+        .select_related("event", "event__workspace")
+        .order_by("-created_at")
+    )
+    return Response(EventFeedbackSerializer(qs, many=True).data)
 
 
 def _feedback_csv_bytes(event: Event) -> bytes:

@@ -75,6 +75,11 @@ urlpatterns = [
         name="creator-person-purge",
     ),
     path(
+        "me/references/",
+        views.creator_references,
+        name="creator-references",
+    ),
+    path(
         "me/api-tokens/",
         views.api_tokens,
         name="api-tokens",

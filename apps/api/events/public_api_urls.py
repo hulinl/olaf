@@ -29,6 +29,15 @@ urlpatterns = [
         name="public-event-by-hash",
     ),
     path(
+        "events/e/<str:public_id>/references",
+        require_http_methods(["GET", "OPTIONS"])(
+            lambda request, public_id: public_api.public_events_options(request)
+            if request.method == "OPTIONS"
+            else public_api.public_event_references(request, public_id=public_id)
+        ),
+        name="public-event-references",
+    ),
+    path(
         "events/<slug:slug>",
         require_http_methods(["GET", "OPTIONS"])(
             lambda request, slug: public_api.public_events_options(request)

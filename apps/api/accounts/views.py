@@ -792,6 +792,33 @@ def anthropic_integration(request: Request) -> Response:
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def creator_references(request: Request) -> Response:
+    """Aggregate view — všechny zpětné vazby napříč akcemi ve všech
+    workspacech, kde je user owner. Frontend `/admin/reference` z toho
+    rendruje tabulku s toggle „zveřejnit / skrýt".
+    """
+    from events.models import EventFeedback
+    from events.serializers import EventFeedbackSerializer
+    from workspaces.models import WorkspaceMember
+
+    owned_ws_ids = list(
+        WorkspaceMember.objects.filter(
+            user=request.user, role=WorkspaceMember.ROLE_OWNER
+        ).values_list("workspace_id", flat=True)
+    )
+    if not owned_ws_ids:
+        return Response([])
+
+    qs = (
+        EventFeedback.objects.filter(event__workspace_id__in=owned_ws_ids)
+        .select_related("event", "event__workspace")
+        .order_by("-created_at")
+    )
+    return Response(EventFeedbackSerializer(qs, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def creator_people(request: Request) -> Response:
     """Deduped list of users who've RSVPed (non-cancelled) to any event
     in a workspace the caller owns. One row per user with aggregate
