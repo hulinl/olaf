@@ -42,6 +42,11 @@ interface Props {
    *  nově přidaného Map blocku (`map_url`), aby user nemusel URL
    *  zadávat dvakrát. Backend pak po save synchronizuje obě pole. */
   eventLocationUrl?: string;
+  /** Event-level lokace + místo srazu — čerpá je hero block, když má
+   *  `show_location=true`. Předáváme do formu jako read-only preview,
+   *  ať user vidí, co bude v hero vidět. */
+  eventLocationText?: string;
+  eventMeetingPointText?: string;
 }
 
 const ADD_OPTIONS: BlockType[] = [
@@ -65,6 +70,8 @@ export function Builder({
   eventSlug,
   eventPrice,
   eventLocationUrl,
+  eventLocationText,
+  eventMeetingPointText,
 }: Props) {
   // Default to all blocks collapsed — opening the builder with a
   // long page used to dump every form on screen at once, eating
@@ -184,6 +191,9 @@ export function Builder({
                   workspaceSlug={workspaceSlug}
                   eventSlug={eventSlug}
                   eventPrice={eventPrice}
+                  eventLocationText={eventLocationText}
+                  eventMeetingPointText={eventMeetingPointText}
+                  eventLocationUrl={eventLocationUrl}
                 />
               </div>
             )}
@@ -253,12 +263,18 @@ function BlockForm({
   workspaceSlug,
   eventSlug,
   eventPrice,
+  eventLocationText,
+  eventMeetingPointText,
+  eventLocationUrl,
 }: {
   block: EventBlock;
   onChange: (payload: EventBlock["payload"]) => void;
   workspaceSlug?: string;
   eventSlug?: string;
   eventPrice?: EventPriceContext;
+  eventLocationText?: string;
+  eventMeetingPointText?: string;
+  eventLocationUrl?: string;
 }) {
   switch (block.type) {
     case "hero":
@@ -268,6 +284,9 @@ function BlockForm({
           onChange={onChange}
           workspaceSlug={workspaceSlug}
           eventSlug={eventSlug}
+          eventLocationText={eventLocationText}
+          eventMeetingPointText={eventMeetingPointText}
+          eventLocationUrl={eventLocationUrl}
         />
       );
     case "prose":

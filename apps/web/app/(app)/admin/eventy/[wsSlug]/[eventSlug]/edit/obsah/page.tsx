@@ -164,6 +164,8 @@ export default function EventBlocksPage({ params }: Props) {
           note: event.price_note,
         }}
         eventLocationUrl={event.location_url ?? ""}
+        eventLocationText={event.location_text ?? ""}
+        eventMeetingPointText={event.meeting_point_text ?? ""}
       />
 
       {/* Sticky save bar — only visible while there are unsaved

@@ -44,6 +44,12 @@ export interface HeroBlockPayload {
   meta?: BlockMetaTile[];
   cta_label?: string;
   cta_href?: string;
+  /** Když true, hero ukáže lokaci + sraz + click-through na mapu z
+   *  event settings (`location_text`, `meeting_point_text`,
+   *  `location_url`). Bez duplikace payloadu — data se čerpá přímo
+   *  z eventu, ať nedojde k drift mezi Nastavením a heroem. Default
+   *  false pro backwards-compat s hero bloky před 2026-09-20. */
+  show_location?: boolean;
 }
 
 export interface ProseBlockPayload {

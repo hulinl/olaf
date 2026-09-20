@@ -238,6 +238,9 @@ export default async function EventLandingPage({ params }: Props) {
                   heroCtaDisabledLabel={
                     cancelled ? "Akce zrušena" : "Přihlášky uzavřené"
                   }
+                  eventLocationText={event.location_text}
+                  eventMeetingPointText={event.meeting_point_text}
+                  eventLocationUrl={event.location_url}
                 />
               ))}
             </>

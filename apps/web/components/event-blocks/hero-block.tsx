@@ -20,6 +20,13 @@ interface Props {
   ctaDisabled?: boolean;
   /** Label pro disabled state (jinak fallback „Přihlášky uzavřené"). */
   ctaDisabledLabel?: string;
+  /** Event location fields — hero je čerpá přímo z eventu (single source
+   *  of truth s Nastavením akce), když `payload.show_location = true`.
+   *  Bez duplikace v payloadu → owner může měnit lokaci v Nastavení
+   *  a hero se auto-aktualizuje. */
+  eventLocationText?: string;
+  eventMeetingPointText?: string;
+  eventLocationUrl?: string;
 }
 
 export function HeroBlock({
@@ -32,7 +39,13 @@ export function HeroBlock({
   tone = "canvas",
   ctaDisabled = false,
   ctaDisabledLabel = "Přihlášky uzavřené",
+  eventLocationText = "",
+  eventMeetingPointText = "",
+  eventLocationUrl = "",
 }: Props) {
+  const showLocation =
+    payload.show_location === true &&
+    (eventLocationText.trim() !== "" || eventMeetingPointText.trim() !== "");
   const cover = assetUrl(payload.cover_url);
   const title = payload.title_override || fallbackTitle;
   const ctaLabel = payload.cta_label || fallbackCtaLabel;
@@ -222,7 +235,159 @@ export function HeroBlock({
             ))}
           </dl>
         )}
+
+        {showLocation && (
+          <HeroLocationCard
+            locationText={eventLocationText}
+            meetingPointText={eventMeetingPointText}
+            locationUrl={eventLocationUrl}
+            onDark={onDark}
+          />
+        )}
       </div>
     </section>
+  );
+}
+
+/** Kompaktní lokační karta v hero. Data přímo z event settings —
+ *  single source of truth s formulářem Nastavení. Když je zadaný
+ *  `location_url`, celá karta funguje jako link do externí mapy;
+ *  jinak je karta statická (jen text). Stylizovaná map-preview
+ *  ikona (SVG s pinem) nahrazuje reálný static map — API klíč zatím
+ *  nemáme, tohle vypadá záměrně, ne jako placeholder. */
+function HeroLocationCard({
+  locationText,
+  meetingPointText,
+  locationUrl,
+  onDark,
+}: {
+  locationText: string;
+  meetingPointText: string;
+  locationUrl: string;
+  onDark: boolean;
+}) {
+  const hasLink = locationUrl.trim() !== "";
+  const inner = (
+    <div className="flex items-center gap-4">
+      <MapPreviewIcon onDark={onDark} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {locationText && (
+          <span
+            className={[
+              "text-base font-semibold sm:text-lg",
+              onDark ? "text-ink-inverse" : "text-ink-900",
+            ].join(" ")}
+            style={{
+              textShadow: onDark ? "0 1px 8px rgba(0,0,0,0.5)" : undefined,
+            }}
+          >
+            {locationText}
+          </span>
+        )}
+        {meetingPointText && (
+          <span
+            className={[
+              "text-sm",
+              onDark ? "text-white/85" : "text-ink-500",
+            ].join(" ")}
+            style={{
+              textShadow: onDark ? "0 1px 8px rgba(0,0,0,0.5)" : undefined,
+            }}
+          >
+            Sraz: {meetingPointText}
+          </span>
+        )}
+        {hasLink && (
+          <span
+            className={[
+              "mt-1 inline-flex items-center gap-1 text-xs font-medium",
+              onDark ? "text-white" : "text-brand",
+            ].join(" ")}
+          >
+            Otevřít v mapě
+            <span aria-hidden>→</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+  const cardClasses = [
+    "mt-6 max-w-xl rounded-lg border p-4 backdrop-blur-sm transition-colors",
+    onDark
+      ? "border-white/20 bg-white/[0.08] hover:bg-white/[0.14]"
+      : "border-border bg-surface hover:bg-surface-muted",
+  ].join(" ");
+  if (hasLink) {
+    return (
+      <a
+        href={locationUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${cardClasses} focus-ring`}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return <div className={cardClasses}>{inner}</div>;
+}
+
+/** Stylizovaná mini-mapa jako SVG — grid pozadí + pin ve středu.
+ *  Bez externího assetu / API klíče. Až budeme mít Maps API klíč, dá
+ *  se nahradit reálným static map obrázkem beze změny okolí. */
+function MapPreviewIcon({ onDark }: { onDark: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={[
+        "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border sm:h-20 sm:w-20",
+        onDark
+          ? "border-white/20 bg-ink-900/60"
+          : "border-border bg-surface-muted",
+      ].join(" ")}
+    >
+      <svg
+        viewBox="0 0 80 80"
+        className="absolute inset-0 h-full w-full"
+        preserveAspectRatio="none"
+      >
+        {/* Map grid — zjednodušená mřížka jako z papírové mapy */}
+        <g
+          stroke={onDark ? "rgba(255,255,255,0.14)" : "rgba(15,23,42,0.12)"}
+          strokeWidth="1"
+        >
+          <line x1="0" y1="20" x2="80" y2="20" />
+          <line x1="0" y1="40" x2="80" y2="40" />
+          <line x1="0" y1="60" x2="80" y2="60" />
+          <line x1="20" y1="0" x2="20" y2="80" />
+          <line x1="40" y1="0" x2="40" y2="80" />
+          <line x1="60" y1="0" x2="60" y2="80" />
+        </g>
+        {/* Náznak cesty */}
+        <path
+          d="M6 66 Q 28 50, 40 42 T 74 20"
+          stroke={onDark ? "rgba(255,199,25,0.7)" : "rgba(255,159,10,0.85)"}
+          strokeWidth="2.5"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </svg>
+      {/* Pin uprostřed */}
+      <svg
+        viewBox="0 0 24 24"
+        className="relative m-auto block h-6 w-6 sm:h-7 sm:w-7"
+        style={{ marginTop: "22%" }}
+        aria-hidden
+      >
+        <path
+          d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Z"
+          fill="#ffc719"
+          stroke="#0f172a"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <circle cx="12" cy="9" r="2.5" fill="#0f172a" />
+      </svg>
+    </div>
   );
 }

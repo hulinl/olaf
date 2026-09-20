@@ -11,6 +11,13 @@ interface Props {
   onChange: (p: HeroBlockPayload) => void;
   workspaceSlug?: string;
   eventSlug?: string;
+  /** Event-level lokace pro preview toggle — hero se je čte přímo
+   *  z event.location_text / meeting_point_text / location_url. Ukazujeme
+   *  je pod checkboxem, aby user viděl, co se v hero objeví, aniž by
+   *  musel skákat mezi Nastavením a Obsahem. */
+  eventLocationText?: string;
+  eventMeetingPointText?: string;
+  eventLocationUrl?: string;
 }
 
 export function HeroForm({
@@ -18,6 +25,9 @@ export function HeroForm({
   onChange,
   workspaceSlug,
   eventSlug,
+  eventLocationText = "",
+  eventMeetingPointText = "",
+  eventLocationUrl = "",
 }: Props) {
   const meta = payload.meta ?? [];
 
@@ -113,6 +123,62 @@ export function HeroForm({
             }
           />
         </Field>
+      </div>
+
+      <div className="rounded-md border border-border bg-surface-muted/40 p-3">
+        <label className="flex items-start gap-3 text-sm text-ink-900">
+          <input
+            type="checkbox"
+            checked={payload.show_location === true}
+            onChange={(e) =>
+              onChange({ ...payload, show_location: e.target.checked })
+            }
+            className="mt-0.5 size-4 shrink-0 accent-brand"
+          />
+          <span className="flex flex-col gap-1">
+            <span className="font-medium">
+              Zobrazit místo a odkaz na mapu
+            </span>
+            <span className="text-xs text-ink-500">
+              Data se natáhnou přímo z Nastavení akce (Lokalita, Místo
+              srazu, Odkaz na mapu) — bez duplikace. Změny v nastavení se
+              tady projeví automaticky.
+            </span>
+            {payload.show_location && (
+              <span className="mt-1 flex flex-col gap-0.5 rounded-md border border-border bg-surface p-2 text-xs text-ink-700">
+                <span>
+                  <span className="text-ink-500">Lokalita:</span>{" "}
+                  {eventLocationText || (
+                    <span className="italic text-ink-500">
+                      není vyplněné v Nastavení
+                    </span>
+                  )}
+                </span>
+                <span>
+                  <span className="text-ink-500">Místo srazu:</span>{" "}
+                  {eventMeetingPointText || (
+                    <span className="italic text-ink-500">nevyplněno</span>
+                  )}
+                </span>
+                <span>
+                  <span className="text-ink-500">Odkaz na mapu:</span>{" "}
+                  {eventLocationUrl ? (
+                    <a
+                      href={eventLocationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand hover:underline"
+                    >
+                      {eventLocationUrl}
+                    </a>
+                  ) : (
+                    <span className="italic text-ink-500">nevyplněno</span>
+                  )}
+                </span>
+              </span>
+            )}
+          </span>
+        </label>
       </div>
 
       <div>

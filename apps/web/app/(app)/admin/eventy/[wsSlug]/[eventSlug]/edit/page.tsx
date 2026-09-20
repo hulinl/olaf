@@ -19,6 +19,7 @@ import {
   events,
   workspaces,
 } from "@/lib/api";
+import { useUser } from "@/lib/user-context";
 import { FormEvent } from "react";
 
 interface Props {
@@ -1075,6 +1076,7 @@ function CollaboratorsSection({
   const [adding, setAdding] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const confirmDialog = useConfirm();
+  const me = useUser();
 
   async function reload() {
     try {
@@ -1105,11 +1107,15 @@ function CollaboratorsSection({
 
   // Filtered suggestion list:
   // - exclude anyone already a collaborator
-  // - exclude the current user (handled implicitly — add API rejects them)
+  // - exclude the current user (přítelkyně reportovala, že vidí sama
+  //   sebe v pickeru; backend addByEmail by ji stejně odmítnul, ale
+  //   ukazovat ji tam bylo matoucí)
   // - free-text match on name + email
   const usedEmails = new Set((list ?? []).map((c) => c.email.toLowerCase()));
+  const myEmail = me.email.toLowerCase();
   const q = query.trim().toLowerCase();
   const suggestions = (people ?? [])
+    .filter((p) => p.email.toLowerCase() !== myEmail)
     .filter((p) => !usedEmails.has(p.email.toLowerCase()))
     .filter((p) => {
       if (!q) return true;

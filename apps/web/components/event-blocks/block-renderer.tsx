@@ -49,6 +49,12 @@ interface Props {
    *  HeroBlock. */
   heroCtaDisabled?: boolean;
   heroCtaDisabledLabel?: string;
+  /** Event location fields — když hero payload má `show_location=true`,
+   *  vykreslí lokační kartu s odkazem na mapu. Data se nikam neduplikují
+   *  → single source of truth s formulářem Nastavení. */
+  eventLocationText?: string;
+  eventMeetingPointText?: string;
+  eventLocationUrl?: string;
 }
 
 export function BlockRenderer({
@@ -64,6 +70,9 @@ export function BlockRenderer({
   organizersByUserId,
   heroCtaDisabled,
   heroCtaDisabledLabel,
+  eventLocationText,
+  eventMeetingPointText,
+  eventLocationUrl,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -77,6 +86,9 @@ export function BlockRenderer({
           tone={tone}
           ctaDisabled={heroCtaDisabled}
           ctaDisabledLabel={heroCtaDisabledLabel}
+          eventLocationText={eventLocationText}
+          eventMeetingPointText={eventMeetingPointText}
+          eventLocationUrl={eventLocationUrl}
         />
       );
     case "prose":
