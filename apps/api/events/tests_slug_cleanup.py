@@ -113,7 +113,7 @@ class DraftSlugAutoRegenTests(TestCase):
                 },
             ),
             data=payload,
-            content_type="application/json",
+            format="json",
         )
         self.assertEqual(r.status_code, 200, r.content)
         return r.json()
