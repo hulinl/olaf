@@ -130,36 +130,34 @@ export default function WorkspaceDetailPage({ params }: Props) {
           ]}
         />
 
-        <header className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div
-            className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface"
-            style={
-              workspace.accent_color
-                ? { backgroundColor: workspace.accent_color }
-                : undefined
-            }
-          >
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logo}
-                alt={`${workspace.name} logo`}
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              <span className="text-2xl font-semibold text-ink-inverse">
-                {workspace.name.charAt(0)}
-              </span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            {/* Titulek + badges + "veřejný profil" na jednom řádku.
-                External button dřív seděl mimo textblock a na mobilu
-                (flex-col) skončil pod social row jako samotný řádek —
-                user report 2026-09-10. Teď je součástí H1 flex-wrap
-                (`ml-auto` ho zarovná vpravo bez ohledu na počet
-                badges), takže na mobilu i desktopu drží vedle titulu. */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <header className="mt-4">
+          {/* Logo + název v jednom řádku, center-aligned na sobě.
+              User feedback 2026-09-20: logo mělo být zarovnané přímo
+              s H1 nadpisem, ne s celým sloupcem (title + meta + socials).
+              Meta line a socials tečou pod řádek s logem. */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div
+              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface"
+              style={
+                workspace.accent_color
+                  ? { backgroundColor: workspace.accent_color }
+                  : undefined
+              }
+            >
+              {logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logo}
+                  alt={`${workspace.name} logo`}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <span className="text-2xl font-semibold text-ink-inverse">
+                  {workspace.name.charAt(0)}
+                </span>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
               <h1 className="text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
                 {workspace.name}
               </h1>
@@ -192,13 +190,13 @@ export default function WorkspaceDetailPage({ params }: Props) {
                 </svg>
               </a>
             </div>
-            <WorkspaceMetaLine
-              location={workspace.location}
-              memberCount={workspace.member_count}
-              className="mt-1"
-            />
-            <WorkspaceSocialsRow workspace={workspace} className="mt-3" />
           </div>
+          <WorkspaceMetaLine
+            location={workspace.location}
+            memberCount={workspace.member_count}
+            className="mt-3"
+          />
+          <WorkspaceSocialsRow workspace={workspace} className="mt-3" />
         </header>
 
         {workspace.bio && (
