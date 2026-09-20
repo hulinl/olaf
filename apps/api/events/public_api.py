@@ -324,6 +324,84 @@ def public_event_by_hash(request, public_id: str) -> HttpResponse:
 
 
 @require_safe
+@cache_control(public=True, max_age=300, s_maxage=300)
+def public_workspace_references(request, slug: str) -> HttpResponse:
+    """GET /api/public/workspaces/{slug}/references
+
+    Všechny zveřejněné reference napříč akcemi komunity — pro externí
+    marketing web (např. `olafadventures.cz` widget „Co říkají
+    účastníci"). Bez auth, CORS `*`, 5 min cache.
+
+    Vrací JSON:
+    ```
+    {
+      "workspace": {"slug", "name"},
+      "summary": {"count", "average_rating"},
+      "references": [
+        {"id", "rating", "went_well", "display_name", "created_at",
+         "event": {"slug", "title", "public_id", "starts_at"}}
+      ]
+    }
+    ```
+    """
+    from workspaces.models import Workspace
+
+    from .models import EventFeedback
+    from .serializers import PublicReferenceSerializer
+
+    try:
+        workspace = Workspace.objects.get(slug=slug)
+    except Workspace.DoesNotExist:
+        return _cors_ok(
+            JsonResponse({"error": "Workspace not found"}, status=404)
+        )
+
+    qs = (
+        EventFeedback.objects.filter(
+            event__workspace=workspace,
+            is_public=True,
+            event__status__in=_PUBLIC_STATUSES,
+            event__deleted_at__isnull=True,
+        )
+        .select_related("event")
+        .order_by("-created_at")
+    )
+    base = PublicReferenceSerializer(qs, many=True).data
+    # Přidat event kontext ke každé referenci — externí web tak může
+    # linkovat zpět na akci nebo ukázat „z akce X".
+    references = []
+    for fb, row in zip(qs, base, strict=True):
+        event = fb.event
+        row["event"] = {
+            "slug": event.slug,
+            "title": event.title,
+            "public_id": event.public_id,
+            "starts_at": event.starts_at.isoformat() if event.starts_at else None,
+        }
+        references.append(row)
+
+    ratings = [r["rating"] for r in references]
+    summary = {
+        "count": len(references),
+        "average_rating": (
+            round(sum(ratings) / len(ratings), 2) if ratings else None
+        ),
+    }
+    return _cors_ok(
+        JsonResponse(
+            {
+                "workspace": {
+                    "slug": workspace.slug,
+                    "name": workspace.name,
+                },
+                "summary": summary,
+                "references": references,
+            }
+        )
+    )
+
+
+@require_safe
 @cache_control(public=True, max_age=60, s_maxage=60)
 def public_event_references(request, public_id: str) -> HttpResponse:
     """GET /api/public/events/e/{public_id}/references

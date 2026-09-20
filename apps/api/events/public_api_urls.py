@@ -38,6 +38,15 @@ urlpatterns = [
         name="public-event-references",
     ),
     path(
+        "workspaces/<slug:slug>/references",
+        require_http_methods(["GET", "OPTIONS"])(
+            lambda request, slug: public_api.public_events_options(request)
+            if request.method == "OPTIONS"
+            else public_api.public_workspace_references(request, slug=slug)
+        ),
+        name="public-workspace-references",
+    ),
+    path(
         "events/<slug:slug>",
         require_http_methods(["GET", "OPTIONS"])(
             lambda request, slug: public_api.public_events_options(request)
