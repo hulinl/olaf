@@ -57,9 +57,11 @@ interface Props {
   eventMeetingPointText?: string;
   eventLocationUrl?: string;
   /** Event dates — když hero payload má `show_dates=true`, vykreslí
-   *  systémovou meta dlaždici „Termín" s auto-formátovaným rozsahem. */
+   *  systémovou meta dlaždici „Termín" s auto-formátovaným rozsahem
+   *  a sub-řádkem s časem v cílové time zóně. */
   eventStartsAt?: string;
   eventEndsAt?: string;
+  eventTz?: string;
 }
 
 export function BlockRenderer({
@@ -80,6 +82,7 @@ export function BlockRenderer({
   eventLocationUrl,
   eventStartsAt,
   eventEndsAt,
+  eventTz,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -98,6 +101,7 @@ export function BlockRenderer({
           eventLocationUrl={eventLocationUrl}
           eventStartsAt={eventStartsAt}
           eventEndsAt={eventEndsAt}
+          eventTz={eventTz}
         />
       );
     case "prose":

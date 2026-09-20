@@ -65,6 +65,50 @@ export function formatCzDateRange(
   return `${sDay}.–${eDay}. ${monthFmt(s)} ${sYear}`;
 }
 
+/** Formát času (H:MM v CZ tvaru) v cílové time-zóně. Používá se v hero
+ *  systémové dlaždici „Termín" jako sub-řádek pod datumem. */
+export function formatCzTimeInTz(iso: string, tz: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return d.toLocaleTimeString("cs-CZ", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: tz || undefined,
+    });
+  } catch {
+    return d.toLocaleTimeString("cs-CZ", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+}
+
+/** Sub-řádek pod datumem v „Termín" dlaždici — čas startu (a konce,
+ *  pokud je akce jednodenní). Multi-day: „Start v 8:00", jednodenní:
+ *  „9:00–17:00". Prázdný `startsAt` = "". */
+export function formatCzTimeRange(
+  startsAt: string,
+  endsAt: string,
+  tz: string,
+): string {
+  if (!startsAt) return "";
+  const s = new Date(startsAt);
+  const e = endsAt ? new Date(endsAt) : null;
+  if (Number.isNaN(s.getTime())) return "";
+  const startTime = formatCzTimeInTz(startsAt, tz);
+  if (!e || Number.isNaN(e.getTime())) return `Start v ${startTime}`;
+  const sameDay =
+    s.getDate() === e.getDate() &&
+    s.getMonth() === e.getMonth() &&
+    s.getFullYear() === e.getFullYear();
+  if (sameDay) {
+    return `${startTime}–${formatCzTimeInTz(endsAt, tz)}`;
+  }
+  return `Start v ${startTime}`;
+}
+
 export interface HeroBlockPayload {
   cover_url?: string;
   /** Focal point 0–100 (obrázek zůstává celý, jen se posune uvnitř

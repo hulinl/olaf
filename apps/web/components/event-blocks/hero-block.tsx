@@ -5,6 +5,7 @@ import {
   type BlockTone,
   type HeroBlockPayload,
   formatCzDateRange,
+  formatCzTimeRange,
 } from "@/lib/event-blocks";
 
 interface Props {
@@ -32,9 +33,11 @@ interface Props {
   eventMeetingPointText?: string;
   eventLocationUrl?: string;
   /** Event date fields — když `payload.show_dates = true`, hero prepend-ne
-   *  meta tile „Termín" s auto-formátovaným rozsahem. */
+   *  meta tile „Termín" s auto-formátovaným rozsahem + sub-řádkem
+   *  s časem v `eventTz`. */
   eventStartsAt?: string;
   eventEndsAt?: string;
+  eventTz?: string;
 }
 
 export function HeroBlock({
@@ -52,6 +55,7 @@ export function HeroBlock({
   eventLocationUrl = "",
   eventStartsAt = "",
   eventEndsAt = "",
+  eventTz = "",
 }: Props) {
   // Systémové meta dlaždice (Místo / Termín) - auto z eventu, když
   // owner v hero-form zaškrtl příslušný toggle. Prepend-nou se před
@@ -59,7 +63,7 @@ export function HeroBlock({
   const systemTiles = buildSystemTiles(
     payload,
     { eventLocationText, eventMeetingPointText, eventLocationUrl },
-    { eventStartsAt, eventEndsAt },
+    { eventStartsAt, eventEndsAt, eventTz },
   );
   const allMeta = [...systemTiles, ...(payload.meta ?? [])];
   const cover = assetUrl(payload.cover_url);
@@ -247,6 +251,8 @@ interface HeroTile {
   /** Volitelný secondary řádek pod hlavní hodnotou — místo srazu
    *  vedle lokace apod. */
   sub?: string;
+  /** Volitelná ikona před labelem (typicky pro Místo → mapa). */
+  icon?: "map";
 }
 
 /** Jedna meta dlaždice v hero gridu. Když `tile.href`, vykreslí se
@@ -273,7 +279,17 @@ function HeroMetaTile({
 
   const body = (
     <>
-      <dt className={dtClasses}>{tile.k}</dt>
+      <dt className={dtClasses}>
+        {tile.icon === "map" && (
+          <MapPinIcon
+            className={[
+              "mr-1 inline-block h-3 w-3 -translate-y-px",
+              onDark ? "text-white/80" : "text-brand",
+            ].join(" ")}
+          />
+        )}
+        {tile.k}
+      </dt>
       <dd className={ddClasses} style={{ letterSpacing: "-0.02em" }}>
         {tile.v}
         {tile.href && (
@@ -310,13 +326,19 @@ function buildSystemTiles(
     eventMeetingPointText: string;
     eventLocationUrl: string;
   },
-  dates: { eventStartsAt: string; eventEndsAt: string },
+  dates: { eventStartsAt: string; eventEndsAt: string; eventTz: string },
 ): HeroTile[] {
   const tiles: HeroTile[] = [];
   if (payload.show_dates && dates.eventStartsAt) {
+    const timeSub = formatCzTimeRange(
+      dates.eventStartsAt,
+      dates.eventEndsAt,
+      dates.eventTz,
+    );
     tiles.push({
       k: "Termín",
       v: formatCzDateRange(dates.eventStartsAt, dates.eventEndsAt),
+      sub: timeSub || undefined,
     });
   }
   if (
@@ -331,8 +353,26 @@ function buildSystemTiles(
         ? `Sraz: ${loc.eventMeetingPointText}`
         : undefined,
       href: loc.eventLocationUrl.trim() || undefined,
+      icon: "map",
     });
   }
   return tiles;
+}
+
+/** Malá map-pin ikona pro „Místo" dlaždici — usnadňuje pochopení,
+ *  že tile je linkem na externí mapu. */
+function MapPinIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={className}
+      fill="currentColor"
+    >
+      <path
+        d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"
+      />
+    </svg>
+  );
 }
 

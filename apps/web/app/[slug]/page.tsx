@@ -123,50 +123,53 @@ export default async function WorkspaceProfilePage({ params }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col">
-        {/* HERO — Facebook-style: cover foto samostatně (bez textového
-            overlay), logo + jméno + lokace v profile-card pod ním
-            s logem přeraženým přes spodní hranu covera. Uživatelský
-            feedback 2026-09-20: dřívější design měl velký title
-            přímo na coveru, což zakrývalo fotku. */}
-        <section className="relative isolate">
-          {cover ? (
-            <div className="relative h-32 w-full overflow-hidden bg-ink-900 sm:h-44 md:h-56 lg:h-60">
+        {/* HERO — cover jako pozadí, logo + název překryté přes fotku
+            zdola (user request 2026-09-20 varianta 2: ne pod fotkou,
+            ale over-lay přes ni). Gradient tint drží kontrast pro
+            bílé texty. Bez coveru: solidní akcent barva. */}
+        <section
+          className={[
+            "relative isolate flex min-h-[220px] flex-col overflow-hidden sm:min-h-[280px] md:min-h-[320px]",
+          ].join(" ")}
+          style={
+            !cover
+              ? { backgroundColor: workspace.accent_color || "#0f172a" }
+              : undefined
+          }
+        >
+          {cover && (
+            <div className="absolute inset-0 -z-10 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={cover}
                 alt=""
                 className="h-full w-full object-cover"
                 style={{
-                  // Fallbacky pro případ, kdy backend ještě nemá
-                  // migraci 0014 aplikovanou - nová pole cover_focal_*
-                  // vrátí undefined, což by ze stylu udělalo NaN%.
+                  // Fallbacky - dokud backend nemá migraci 0014.
                   objectPosition: `${workspace.cover_focal_x ?? 50}% ${workspace.cover_focal_y ?? 50}%`,
                   transform: `scale(${(workspace.cover_zoom ?? 100) / 100})`,
                   transformOrigin: `${workspace.cover_focal_x ?? 50}% ${workspace.cover_focal_y ?? 50}%`,
                 }}
               />
+              {/* Darkening gradient pro čitelnost textu — stronger dole
+                  kde sedí logo + název. */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.10) 45%, rgba(0,0,0,0.75) 100%)",
+                }}
+              />
             </div>
-          ) : (
-            // Bez cover fotky drží horní strip barevný akcent / plný
-            // ink-900 fallback, ať profile-card níž nesedí na holé
-            // canvas ploše bez vizuálního oddělení.
-            <div
-              className="h-24 w-full sm:h-32"
-              style={{
-                backgroundColor: workspace.accent_color || "#0f172a",
-              }}
-            />
           )}
 
-          <div className="mx-auto max-w-5xl px-4">
-            <div className="flex flex-col items-start gap-4 pb-8 sm:flex-row sm:items-end sm:gap-6 sm:pb-10">
-              {/* Logo — přeraženo přes spodní hranu covera. Border
-                  matchuje FB avatar pattern (bílý rámeček oddělující
-                  od fotky). */}
+          {/* Content overlay - bottom-aligned. Logo vlevo, název +
+              lokace vpravo od loga. Vždy bílé (i bez fotky - accent
+              barva se počítá jako "dark surface"). */}
+          <div className="mt-auto w-full">
+            <div className="mx-auto flex max-w-5xl items-end gap-4 px-4 pb-6 sm:gap-5 sm:pb-8">
               <div
-                className={[
-                  "-mt-12 flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-canvas bg-surface shadow-lg sm:-mt-16 sm:h-32 sm:w-32",
-                ].join(" ")}
+                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white/90 bg-white shadow-lg sm:h-24 sm:w-24"
                 style={
                   workspace.accent_color && !logo
                     ? { backgroundColor: workspace.accent_color }
@@ -181,21 +184,29 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                     className="h-full w-full object-contain"
                   />
                 ) : (
-                  <span className="text-3xl font-semibold text-ink-300">
+                  <span className="text-2xl font-semibold text-ink-500">
                     {workspace.name.charAt(0)}
                   </span>
                 )}
               </div>
 
-              <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1 sm:pb-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-1">
                 <h1
-                  className="text-3xl font-semibold leading-tight text-ink-900 sm:text-4xl"
-                  style={{ letterSpacing: "-0.03em" }}
+                  className="text-2xl font-semibold leading-tight text-ink-inverse sm:text-3xl md:text-4xl"
+                  style={{
+                    letterSpacing: "-0.02em",
+                    textShadow: "0 2px 12px rgba(0,0,0,0.5)",
+                  }}
                 >
                   {workspace.name}
                 </h1>
                 {workspace.location && (
-                  <p className="text-sm text-ink-500 sm:text-base">
+                  <p
+                    className="text-sm text-white/90 sm:text-base"
+                    style={{
+                      textShadow: "0 1px 8px rgba(0,0,0,0.55)",
+                    }}
+                  >
                     {workspace.location}
                   </p>
                 )}

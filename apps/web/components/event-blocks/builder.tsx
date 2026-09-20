@@ -51,6 +51,7 @@ interface Props {
    *  auto-formátuje meta dlaždici „Termín". Preview v formu. */
   eventStartsAt?: string;
   eventEndsAt?: string;
+  eventTz?: string;
 }
 
 const ADD_OPTIONS: BlockType[] = [
@@ -78,6 +79,7 @@ export function Builder({
   eventMeetingPointText,
   eventStartsAt,
   eventEndsAt,
+  eventTz,
 }: Props) {
   // Default to all blocks collapsed — opening the builder with a
   // long page used to dump every form on screen at once, eating
@@ -202,6 +204,7 @@ export function Builder({
                   eventLocationUrl={eventLocationUrl}
                   eventStartsAt={eventStartsAt}
                   eventEndsAt={eventEndsAt}
+                  eventTz={eventTz}
                 />
               </div>
             )}
@@ -276,6 +279,7 @@ function BlockForm({
   eventLocationUrl,
   eventStartsAt,
   eventEndsAt,
+  eventTz,
 }: {
   block: EventBlock;
   onChange: (payload: EventBlock["payload"]) => void;
@@ -287,6 +291,7 @@ function BlockForm({
   eventLocationUrl?: string;
   eventStartsAt?: string;
   eventEndsAt?: string;
+  eventTz?: string;
 }) {
   switch (block.type) {
     case "hero":
@@ -301,6 +306,7 @@ function BlockForm({
           eventLocationUrl={eventLocationUrl}
           eventStartsAt={eventStartsAt}
           eventEndsAt={eventEndsAt}
+          eventTz={eventTz}
         />
       );
     case "prose":

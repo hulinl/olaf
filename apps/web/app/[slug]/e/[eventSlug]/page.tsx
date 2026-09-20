@@ -243,6 +243,7 @@ export default async function EventLandingPage({ params }: Props) {
                   eventLocationUrl={event.location_url}
                   eventStartsAt={event.starts_at}
                   eventEndsAt={event.ends_at}
+                  eventTz={event.tz}
                 />
               ))}
             </>

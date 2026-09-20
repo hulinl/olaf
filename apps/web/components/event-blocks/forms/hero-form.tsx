@@ -5,6 +5,7 @@ import { PhotoEditor } from "@/components/ui/photo-editor";
 import {
   type HeroBlockPayload,
   formatCzDateRange,
+  formatCzTimeRange,
 } from "@/lib/event-blocks";
 
 import { ImageUploadField } from "./_image-upload";
@@ -24,6 +25,7 @@ interface Props {
   eventLocationUrl?: string;
   eventStartsAt?: string;
   eventEndsAt?: string;
+  eventTz?: string;
 }
 
 export function HeroForm({
@@ -36,6 +38,7 @@ export function HeroForm({
   eventLocationUrl = "",
   eventStartsAt = "",
   eventEndsAt = "",
+  eventTz = "",
 }: Props) {
   const meta = payload.meta ?? [];
 
@@ -157,7 +160,16 @@ export function HeroForm({
               <span className="text-xs text-ink-500">
                 {eventStartsAt ? (
                   <>
-                    Zobrazí se: <strong>{formatCzDateRange(eventStartsAt, eventEndsAt)}</strong>
+                    Zobrazí se:{" "}
+                    <strong>
+                      {formatCzDateRange(eventStartsAt, eventEndsAt)}
+                    </strong>
+                    {formatCzTimeRange(eventStartsAt, eventEndsAt, eventTz) && (
+                      <>
+                        {" "}
+                        · {formatCzTimeRange(eventStartsAt, eventEndsAt, eventTz)}
+                      </>
+                    )}
                   </>
                 ) : (
                   <span className="italic">
