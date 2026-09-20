@@ -211,26 +211,35 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                   </p>
                 )}
               </div>
+
+              {/* Sociální ikony — desktop varianta vedle nadpisu vpravo.
+                  Na tmavém overlay používáme světlou variantu (bílé
+                  border + ikona), matchuje ostatní bílý text v hero.
+                  Mobile fallback níž. */}
+              <div className="hidden shrink-0 pb-1 sm:block">
+                <WorkspaceSocialsRow
+                  workspace={workspace}
+                  variant="on-dark"
+                />
+              </div>
             </div>
           </div>
         </section>
 
-        {/* SOCIÁLNÍ IKONY — kompaktní řada barevných ikon hned pod
-            hlavičkou (nadpis + logo). User request 2026-09-20: text
-            labels pryč, ikonu značky každý pozná; usnadní i mobile
-            layout. */}
-        <section className="bg-canvas">
-          <div className="mx-auto max-w-5xl px-4 pt-4 sm:pt-5">
+        {/* Mobile-only: socials pod hero (na mobilu není v hero řadě
+            místo, na desktop viz overlay vpravo). */}
+        <section className="bg-canvas sm:hidden">
+          <div className="mx-auto max-w-5xl px-4 pt-4">
             <WorkspaceSocialsRow workspace={workspace} />
           </div>
         </section>
 
-        {/* BIO — kompaktnější než dřív, řadíme ho hned pod hlavičku +
-            socials, aby uživatel dostal 1–3 věty o komunitě před akcí
+        {/* BIO — kompaktnější než dřív, řadíme ho hned pod hlavičku,
+            aby uživatel dostal 1–3 věty o komunitě před akcí
             seznamem. */}
         {workspace.bio && (
           <section className="bg-canvas">
-            <div className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pb-10 sm:pt-6">
+            <div className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pb-10 sm:pt-8">
               <p
                 className="max-w-2xl text-ink-700"
                 style={{ fontSize: 16, lineHeight: 1.6 }}
