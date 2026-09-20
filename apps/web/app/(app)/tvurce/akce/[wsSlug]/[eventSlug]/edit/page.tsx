@@ -9,17 +9,17 @@ import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Avatar } from "@/components/ui/avatar";
 import {
   ApiError,
   type Event as OlafEvent,
   type EventCollaborator,
+  type UserSearchResult,
   type Workspace,
-  type WorkspaceMemberSummary,
   auth,
   events,
   workspaces,
 } from "@/lib/api";
-import { useUser } from "@/lib/user-context";
 import { FormEvent } from "react";
 
 interface Props {
@@ -1069,14 +1069,17 @@ function CollaboratorsSection({
   eventSlug: string;
 }) {
   const [list, setList] = useState<EventCollaborator[] | null>(null);
-  const [people, setPeople] = useState<WorkspaceMemberSummary[] | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  // Global user search — debounced, server-side. Nahrazuje dřívější
+  // workspace-only filter (2026-09-20). User request: „najdi napříč
+  // všema olaf uživateli, ukaž fotku + mail + community badge".
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const confirmDialog = useConfirm();
-  const me = useUser();
 
   async function reload() {
     try {
@@ -1087,45 +1090,49 @@ function CollaboratorsSection({
     }
   }
 
-  // Lidé load lazily — most edits won't touch the spolutvůrci section, so
-  // we only fetch when the user actually opens the picker.
-  async function loadPeople() {
-    if (people !== null) return;
-    try {
-      const p = await workspaces.members(wsSlug);
-      setPeople(p);
-    } catch {
-      // Non-fatal: fall back to plain email input.
-      setPeople([]);
-    }
-  }
-
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsSlug, eventSlug]);
 
-  // Filtered suggestion list:
-  // - exclude anyone already a collaborator
-  // - exclude the current user (přítelkyně reportovala, že vidí sama
-  //   sebe v pickeru; backend addByEmail by ji stejně odmítnul, ale
-  //   ukazovat ji tam bylo matoucí)
-  // - free-text match on name + email
-  const usedEmails = new Set((list ?? []).map((c) => c.email.toLowerCase()));
-  const myEmail = me.email.toLowerCase();
-  const q = query.trim().toLowerCase();
-  const suggestions = (people ?? [])
-    .filter((p) => p.email.toLowerCase() !== myEmail)
-    .filter((p) => !usedEmails.has(p.email.toLowerCase()))
-    .filter((p) => {
-      if (!q) return true;
-      return (
-        p.email.toLowerCase().includes(q) ||
-        p.full_name.toLowerCase().includes(q)
-      );
-    })
-    .slice(0, 8);
+  // Debounced global search — 250ms po posledním keystroke voláme
+  // /api/auth/users/search/. Min 2 chars (backend to reject-uje
+  // ale nemá cenu ho tímhle bombardovat). Backend sám vyfiltruje
+  // aktuálního uživatele.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      auth
+        .searchUsers(q)
+        .then((res) => {
+          if (!cancelled) setSearchResults(res);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
+  const usedEmails = new Set(
+    (list ?? []).map((c) => c.email.toLowerCase()),
+  );
+  const suggestions = searchResults.filter(
+    (u) => !usedEmails.has(u.email.toLowerCase()),
+  );
+  const q = query.trim().toLowerCase();
   const queryLooksLikeEmail = /^\S+@\S+\.\S+$/.test(query.trim());
   const exactMatch = suggestions.find(
     (s) => s.email.toLowerCase() === q,
@@ -1185,12 +1192,12 @@ function CollaboratorsSection({
 
   function openPicker() {
     setAdding(true);
-    loadPeople();
   }
 
   function closePicker() {
     setAdding(false);
     setQuery("");
+    setSearchResults([]);
     setError(null);
     setHighlight(0);
   }
@@ -1201,8 +1208,8 @@ function CollaboratorsSection({
       <p className="mt-1 text-sm text-ink-500">
         Pozvi další lidi, kteří budou tuhle akci řídit s tebou. Uvidí ji
         u sebe v Tvůrci a budou ji moct upravovat, schvalovat registrace,
-        vystavovat faktury. Vyber ze seznamu Lidé (kdo se kdy přihlásil
-        na akci) nebo napiš e-mail kohokoliv jiného s účtem na olafu.
+        vystavovat faktury. Hledej napříč všemi olaf uživateli — kdo
+        s tebou sdílí komunitu, má badge.
       </p>
 
       <div className="mt-3 flex flex-col gap-2">
@@ -1251,13 +1258,9 @@ function CollaboratorsSection({
       ) : (
         <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-2">
           <Field
-            label="Najdi v Lidé nebo napiš e-mail"
+            label="Najdi uživatele"
             htmlFor="collab-search"
-            hint={
-              people && people.length === 0
-                ? "V této komunitě zatím nikdo nemá registraci. Napiš e-mail spolutvůrce — musí mít účet na olafu."
-                : "Začni psát jméno nebo e-mail. Někdo mimo seznam? Napiš celý e-mail a stiskni Enter."
-            }
+            hint="Hledáme napříč všemi olaf účty. Někdo bez účtu? Napiš celý e-mail a stiskni Enter — pošleme mu pozvánku."
           >
             <Input
               id="collab-search"
@@ -1286,7 +1289,7 @@ function CollaboratorsSection({
           {suggestions.length > 0 ? (
             <ul
               role="listbox"
-              className="max-h-64 overflow-y-auto rounded-md border border-border bg-surface"
+              className="max-h-80 overflow-y-auto rounded-md border border-border bg-surface"
             >
               {suggestions.map((p, i) => (
                 <li
@@ -1294,7 +1297,7 @@ function CollaboratorsSection({
                   role="option"
                   aria-selected={i === highlight}
                   className={[
-                    "cursor-pointer border-b border-border px-3 py-2 text-sm last:border-b-0",
+                    "flex cursor-pointer items-center gap-3 border-b border-border px-3 py-2 last:border-b-0",
                     i === highlight
                       ? "bg-brand/10"
                       : "hover:bg-surface-muted",
@@ -1302,27 +1305,54 @@ function CollaboratorsSection({
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => addByEmail(p.email)}
                 >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-medium text-ink-900">
-                      {p.full_name || p.email}
+                  <Avatar
+                    firstName={p.first_name}
+                    lastName={p.last_name}
+                    avatarUrl={p.avatar?.url}
+                    focalX={p.avatar?.focal_x}
+                    focalY={p.avatar?.focal_y}
+                    zoom={p.avatar?.zoom}
+                    size={36}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium text-ink-900">
+                      {p.full_name || p.display_name || p.email}
                     </span>
-                    {p.total_rsvps > 0 && (
-                      <span className="font-mono text-[10px] uppercase tracking-wide text-ink-500">
-                        {p.total_rsvps}× registrace
-                      </span>
-                    )}
+                    <span className="truncate text-xs text-ink-500">
+                      {p.email}
+                    </span>
                   </div>
-                  <span className="text-xs text-ink-500">{p.email}</span>
+                  {p.shared_workspaces.length > 0 && (
+                    <div className="hidden shrink-0 flex-wrap gap-1 sm:flex">
+                      {p.shared_workspaces.slice(0, 2).map((w) => (
+                        <span
+                          key={w.slug}
+                          className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand"
+                          title={
+                            w.role === "owner"
+                              ? "Vlastník"
+                              : w.role === "admin"
+                                ? "Spolutvůrce"
+                                : "Člen"
+                          }
+                        >
+                          {w.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
-          ) : q && people !== null ? (
+          ) : q.length >= 2 && !searching ? (
             <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-xs text-ink-500">
-              V Lidé nikoho takového nevidíme.{" "}
+              Žádný uživatel takového jména nebo e-mailu.{" "}
               {queryLooksLikeEmail
-                ? "Stiskni Enter pro pozvání e-mailem."
-                : "Napiš celý e-mail pro pozvání někoho mimo seznam."}
+                ? "Stiskni Enter — pošleme pozvánku na tenhle e-mail."
+                : "Napiš celý e-mail pro pozvání někoho bez účtu."}
             </p>
+          ) : searching ? (
+            <p className="text-xs text-ink-500">Hledám…</p>
           ) : null}
 
           <div className="flex flex-wrap items-end gap-2">

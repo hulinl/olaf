@@ -33,6 +33,7 @@ from .throttles import (
     PasswordResetThrottle,
     RegisterThrottle,
     ResendVerificationThrottle,
+    UserSearchThrottle,
 )
 
 
@@ -335,6 +336,119 @@ def user_public_profile(request: Request, user_key: str) -> Response:
         target, context={"request": request}
     )
     return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+@throttle_classes([UserSearchThrottle])
+def user_search(request: Request) -> Response:
+    """Global search across users. Auth-only endpoint pro pickery
+    v Tvůrci — přidání spolutvůrce k akci, přidání spolutvůrce do
+    komunity, tag people na organizera. Vrací kompaktní karty
+    (avatar, jméno, e-mail, komunity které sdílíme).
+
+    ## Query
+    - `q` — search string, min 2 chars. Splits on whitespace, all tokens
+      must match (AND) buď v `first_name`, `last_name`, `display_name`,
+      nebo `email`.
+
+    ## Response
+    Seznam do 20 uživatelů, order:
+    1. Exact email match (i case-insensitive) na první místo
+    2. Uživatelé se kterými sdílím workspace (owner/admin/member)
+    3. Ostatní matches
+
+    ## Privacy
+    E-mail se vrací vždycky (search pole = e-mail je expected — user
+    ho zadal aby ho našel). Avatar se vrací jen když je user má
+    `profile_show_avatar=True`, JINAK když sdílíme workspace (kontext
+    role-based access). Sebe ze search výsledků vyfiltruji.
+    """
+    from django.db.models import Q
+
+    from workspaces.models import WorkspaceMember
+
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        return Response([])
+
+    tokens = q.split()
+    query = Q()
+    for token in tokens:
+        query &= (
+            Q(first_name__icontains=token)
+            | Q(last_name__icontains=token)
+            | Q(display_name__icontains=token)
+            | Q(email__icontains=token)
+        )
+    matches = list(
+        User.objects.filter(query)
+        .exclude(pk=request.user.pk)
+        .order_by("first_name", "last_name")[:40]
+    )
+    if not matches:
+        return Response([])
+
+    # Bulk-load workspace memberships pro relevance ranking + shared-
+    # workspace badges. Zdroj: WorkspaceMember filtered na aktuálního
+    # usera + kandidáty. Pro každého kandidáta pak sesbírám workspace-y
+    # kde jsme oba aktivní členové.
+    my_ws_ids = set(
+        WorkspaceMember.objects.filter(
+            user=request.user, status=WorkspaceMember.STATUS_ACTIVE
+        ).values_list("workspace_id", flat=True)
+    )
+    candidate_memberships = WorkspaceMember.objects.filter(
+        user__in=matches,
+        workspace_id__in=my_ws_ids,
+        status=WorkspaceMember.STATUS_ACTIVE,
+    ).select_related("workspace")
+    shared_by_user: dict[int, list[dict]] = {}
+    for m in candidate_memberships:
+        shared_by_user.setdefault(m.user_id, []).append(
+            {
+                "slug": m.workspace.slug,
+                "name": m.workspace.name,
+                "role": m.role,
+            }
+        )
+
+    q_lower = q.lower()
+
+    def rank(u: User) -> tuple:
+        exact_email = 0 if u.email.lower() == q_lower else 1
+        has_shared = 0 if u.pk in shared_by_user else 1
+        return (exact_email, has_shared)
+
+    matches.sort(key=rank)
+    matches = matches[:20]
+
+    results = []
+    for u in matches:
+        shared = shared_by_user.get(u.pk, [])
+        avatar_visible = u.profile_show_avatar or bool(shared)
+        results.append(
+            {
+                "id": u.pk,
+                "profile_slug": u.profile_slug,
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "full_name": u.get_full_name(),
+                "display_name": u.display_name,
+                "avatar": {
+                    "url": u.avatar.url if (u.avatar and avatar_visible) else "",
+                    "focal_x": u.avatar_focal_x,
+                    "focal_y": u.avatar_focal_y,
+                    "zoom": u.avatar_zoom,
+                    "slug": u.profile_slug,
+                }
+                if u.avatar and avatar_visible
+                else None,
+                "shared_workspaces": shared,
+            }
+        )
+    return Response(results)
 
 
 @api_view(["GET"])

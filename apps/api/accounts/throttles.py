@@ -1,6 +1,6 @@
 import re
 
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 _RATE_RE = re.compile(r"^(\d+)/(\d*)([smhd])$")
 _DURATIONS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
@@ -44,3 +44,12 @@ class PasswordResetThrottle(_ConfigurableAnonThrottle):
     """5 password-reset requests per hour per IP."""
 
     scope = "password_reset"
+
+
+class UserSearchThrottle(UserRateThrottle):
+    """User search endpoint — 60/min per authenticated user. Ochrání
+    proti brute-force scraping user directory. Debounced typing v UI
+    zvládne pohodlně."""
+
+    scope = "user_search"
+    rate = "60/min"

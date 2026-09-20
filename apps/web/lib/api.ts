@@ -1003,6 +1003,28 @@ export interface EventCollaborator {
   created_at: string;
 }
 
+/** Kompaktní karta uživatele pro global picker (`auth.searchUsers`).
+ *  Vrací se ze `/api/auth/users/search/`. */
+export interface UserSearchResult {
+  id: number;
+  profile_slug: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  display_name: string;
+  /** Null když user má `profile_show_avatar=False` a se searchujícím
+   *  nesdílíme workspace (respekt privacy toggle). */
+  avatar: AuthorAvatar | null;
+  /** Workspaces, kde jsme oba aktivní členové — badge pro rychlé
+   *  poznání „jo, tohohle znám ze své komunity". */
+  shared_workspaces: {
+    slug: string;
+    name: string;
+    role: "owner" | "admin" | "member";
+  }[];
+}
+
 export interface UserPublicProfile {
   id: number;
   profile_slug: string;
@@ -2806,6 +2828,15 @@ export const auth = {
     apiFetch<User>("/api/auth/me/avatar/", { method: "DELETE" }),
   userProfile: (userKey: string | number) =>
     apiFetch<UserPublicProfile>(`/api/auth/users/${userKey}/profile/`),
+  /** Global user picker — hledá napříč všemi olaf uživateli. Min 2
+   *  chars, auth-only, rate-limited na 60/min. Order: exact-email
+   *  match → shared-workspace people → ostatní. */
+  searchUsers: (q: string) => {
+    const encoded = encodeURIComponent(q);
+    return apiFetch<UserSearchResult[]>(
+      `/api/auth/users/search/?q=${encoded}`,
+    );
+  },
   requestPasswordReset: (email: string) =>
     apiFetch<{ detail: string }>("/api/auth/password/reset/request/", {
       method: "POST",
