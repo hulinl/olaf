@@ -151,10 +151,15 @@ def calendar_links(event: Event) -> dict[str, str]:
     ).rstrip("/")
     dt_utc_google = f"{_fmt_utc(event.starts_at)}/{_fmt_utc(event.ends_at)}"
 
-    details_parts: list[str] = []
+    # URL uvádíme s prefixem a odstavcem před description. Kdyby URL
+    # visela na konci textu, Google Calendar description auto-linker
+    # v mobilu ořízne poslední znak — public_id končící číslicí (např.
+    # „A7K2M9P3") pak vede na 404. `\n\n` za URL ji spolehlivě
+    # ukončí, prefix „Odkaz: " ji drží mimo pozici posledního znaku.
+    public_url = _event_public_url(event)
+    details_parts: list[str] = [f"Odkaz na akci: {public_url}"]
     if event.description:
         details_parts.append(event.description)
-    details_parts.append(_event_public_url(event))
     details = "\n\n".join(details_parts)
 
     location_bits: list[str] = []
