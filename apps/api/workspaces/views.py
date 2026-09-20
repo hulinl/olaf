@@ -383,7 +383,16 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
     if file_field:
         file_field.delete(save=False)
     setattr(workspace, field, processed)
-    workspace.save(update_fields=[field])
+    update_fields = [field]
+    # Fresh cover = fresh crop. Reset focal na center + zoom 100 %,
+    # ať uživatel nedostane starý výřez na jiné fotce. Logo focal
+    # nemá (je to 1:1 kontejner na malý grafický prvek).
+    if field == "cover":
+        workspace.cover_focal_x = 50.0
+        workspace.cover_focal_y = 50.0
+        workspace.cover_zoom = 100.0
+        update_fields.extend(["cover_focal_x", "cover_focal_y", "cover_zoom"])
+    workspace.save(update_fields=update_fields)
     return Response(
         WorkspacePublicSerializer(workspace, context={"request": request}).data
     )

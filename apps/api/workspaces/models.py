@@ -33,6 +33,15 @@ class Workspace(models.Model):
     )
     logo = models.ImageField(upload_to="workspaces/logos/", blank=True)
     cover = models.ImageField(upload_to="workspaces/covers/", blank=True)
+    # Notion-style focal point + zoom pro cover — reuse of the pattern
+    # od profile avataru (User.avatar_focal_x/y/zoom). Frontend public
+    # stránka /<slug> renderuje cover přes <img> s object-position +
+    # transform:scale, ne přes background-image, aby user viděl přesně
+    # ten výřez, který nastavil v editoru. Reset na 50/50/100 se dělá
+    # při každém uploadu (fresh photo → fresh crop).
+    cover_focal_x = models.FloatField(default=50.0)
+    cover_focal_y = models.FloatField(default=50.0)
+    cover_zoom = models.FloatField(default=100.0)
     visibility = models.CharField(
         max_length=10, choices=VISIBILITY_CHOICES, default=VISIBILITY_PUBLIC
     )

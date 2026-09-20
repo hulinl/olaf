@@ -9,7 +9,17 @@ class WorkspaceWriteSerializer(serializers.ModelSerializer):
     Slug + logo + cover are NOT writable here: slug change would break URLs +
     bookmarks; images go through their own upload endpoints so the form can
     do multipart and previews independently.
+
+    Cover focal + zoom ale písatelné jsou — jsou to metadata na existující
+    fotce, ne binární upload. Editor UI je nakonci flushne přes běžný
+    profile-save.
     """
+
+    # Range 0–100 pro focal (% v ose), 100–300 pro zoom — matchuje
+    # `accounts.UserSerializer` a limity PhotoEditor komponenty.
+    cover_focal_x = serializers.FloatField(min_value=0, max_value=100, required=False)
+    cover_focal_y = serializers.FloatField(min_value=0, max_value=100, required=False)
+    cover_zoom = serializers.FloatField(min_value=100, max_value=300, required=False)
 
     class Meta:
         model = Workspace
@@ -25,6 +35,9 @@ class WorkspaceWriteSerializer(serializers.ModelSerializer):
             "payment_bank_name",
             "payment_due_days",
             "event_sharing_policy",
+            "cover_focal_x",
+            "cover_focal_y",
+            "cover_zoom",
         )
 
     def validate_social_links(self, value):
@@ -111,6 +124,9 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
             "accent_color",
             "logo_url",
             "cover_url",
+            "cover_focal_x",
+            "cover_focal_y",
+            "cover_zoom",
             "visibility",
             "default_tz",
             "payment_iban",

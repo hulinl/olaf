@@ -250,6 +250,13 @@ export interface Workspace {
   accent_color: string;
   logo_url: string | null;
   cover_url: string | null;
+  /** Notion-style focal point + zoom pro cover. Public stránka `/<slug>`
+   *  renderuje cover přes <img> s object-position + transform:scale,
+   *  aby seděl výřez, co user nastavil v editoru. Reset po každém
+   *  uploadu (backend, `_handle_workspace_image`). */
+  cover_focal_x: number;
+  cover_focal_y: number;
+  cover_zoom: number;
   visibility: "public" | "unlisted" | "private";
   default_tz: string;
   payment_iban: string;
@@ -1227,6 +1234,9 @@ export interface WorkspaceWritePayload {
   payment_bank_name?: string;
   payment_due_days?: number;
   event_sharing_policy?: "admin_only" | "members";
+  cover_focal_x?: number;
+  cover_focal_y?: number;
+  cover_zoom?: number;
 }
 
 export interface WorkspaceCreatePayload {

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Field, Input } from "@/components/ui/field";
+import { PhotoEditor } from "@/components/ui/photo-editor";
 import {
   ApiError,
   type Workspace,
@@ -16,7 +17,9 @@ import {
   auth,
   workspaces,
 } from "@/lib/api";
+import { lookupCzBankName } from "@/lib/cz-banks";
 import { SOCIAL_SERVICES } from "@/lib/social-services";
+import { timezoneGroups } from "@/lib/timezones";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -31,6 +34,20 @@ const SOCIAL_KEYS = SOCIAL_SERVICES.map((s) => ({
   label: s.label,
   placeholder: s.placeholder,
 }));
+
+// Doporučené brand barvy. User si stejně může vybrat cokoli přes hex
+// input nebo native color picker, ale palette umožní kliknout „jednu
+// z olaf-friendly" bez piplání s hex kódem.
+const ACCENT_PALETTE = [
+  "#ffc719",
+  "#f97316",
+  "#dc2626",
+  "#16a34a",
+  "#0284c7",
+  "#7c3aed",
+  "#0f172a",
+  "#64748b",
+];
 
 const VISIBILITY_OPTIONS: {
   value: Workspace["visibility"];
@@ -78,10 +95,25 @@ export default function WorkspaceEditPage({ params }: Props) {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const confirmDialog = useConfirm();
+  // Cover editor modal — otevře se po uploadu (fresh crop) nebo přes
+  // „Upravit rámování". Lokální state drží focal+zoom aby drag/zoom
+  // byl responzivní bez roundtripu; save flushne PATCH na workspace.
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false);
+  const [coverEditorFocal, setCoverEditorFocal] = useState({
+    x: 50,
+    y: 50,
+    zoom: 100,
+  });
+  const [coverEditorBusy, setCoverEditorBusy] = useState(false);
 
   const [paymentIban, setPaymentIban] = useState("");
   const [paymentBankName, setPaymentBankName] = useState("");
   const [paymentDueDays, setPaymentDueDays] = useState("14");
+  // Poslední auto-vyplněný název banky drží, jestli si user pole
+  // přepsal ručně. Když ano, další změna IBAN už mu do toho nesahá;
+  // když ne (pole prázdné nebo drží náš minulý návrh), replace-neme.
+  const lastAutoBankNameRef = useRef<string>("");
+  const tzGroups = timezoneGroups();
   const [eventSharingPolicy, setEventSharingPolicy] = useState<
     "admin_only" | "members"
   >("admin_only");
@@ -92,7 +124,7 @@ export default function WorkspaceEditPage({ params }: Props) {
       .detail(slug)
       .then(async (ws) => {
         if (cancelled) return;
-        if (ws.my_role !== "owner") {
+        if (ws.my_role !== "owner" && ws.my_role !== "admin") {
           try {
             await auth.me();
             router.replace(`/${slug}`);
@@ -111,9 +143,18 @@ export default function WorkspaceEditPage({ params }: Props) {
         setSocials(ws.social_links ?? {});
         setLogoUrl(ws.logo_url);
         setCoverUrl(ws.cover_url);
+        setCoverEditorFocal({
+          x: ws.cover_focal_x,
+          y: ws.cover_focal_y,
+          zoom: ws.cover_zoom,
+        });
         setPaymentIban(ws.payment_iban ?? "");
         setPaymentBankName(ws.payment_bank_name ?? "");
         setPaymentDueDays(String(ws.payment_due_days ?? 14));
+        // Když saved IBAN odpovídá známé bance, ulož si to jako
+        // baseline pro budoucí auto-doplňování — pokud user pole
+        // později přepíše ručně, poznáme to.
+        lastAutoBankNameRef.current = lookupCzBankName(ws.payment_iban ?? "") ?? "";
         setEventSharingPolicy(
           (ws.event_sharing_policy as "admin_only" | "members") ?? "admin_only",
         );
@@ -140,6 +181,21 @@ export default function WorkspaceEditPage({ params }: Props) {
 
   function updateSocial(key: string, value: string) {
     setSocials((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleIbanChange(raw: string) {
+    const upper = raw.toUpperCase();
+    setPaymentIban(upper);
+    const auto = lookupCzBankName(upper) ?? "";
+    // Auto-vyplnit název banky jen když si user ještě nic nenapsal,
+    // nebo mu tam náš minulý návrh sedí. Ruční přepis respektujeme.
+    if (
+      auto &&
+      (paymentBankName === "" || paymentBankName === lastAutoBankNameRef.current)
+    ) {
+      setPaymentBankName(auto);
+    }
+    lastAutoBankNameRef.current = auto;
   }
 
   async function handleLogoPick(file: File | null) {
@@ -184,11 +240,52 @@ export default function WorkspaceEditPage({ params }: Props) {
     try {
       const updated = await workspaces.uploadCover(slug, file);
       setCoverUrl(updated.cover_url);
+      // Backend resetnul focals na 50/50/100 — otevřeme editor hned,
+      // ať user rámuje čerstvou fotku (jinak by mohla mít auto-crop
+      // do středu, který se nevejde). Stejný flow jako avatar upload.
+      setCoverEditorFocal({
+        x: updated.cover_focal_x,
+        y: updated.cover_focal_y,
+        zoom: updated.cover_zoom,
+      });
+      setCoverEditorOpen(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.firstFieldError() ?? err.message : "Upload selhal.");
     } finally {
       setCoverBusy(false);
       if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  }
+
+  function openCoverEditor() {
+    if (!workspace) return;
+    setCoverEditorFocal({
+      x: workspace.cover_focal_x,
+      y: workspace.cover_focal_y,
+      zoom: workspace.cover_zoom,
+    });
+    setCoverEditorOpen(true);
+  }
+
+  async function saveCoverEditor() {
+    setCoverEditorBusy(true);
+    setError(null);
+    try {
+      const updated = await workspaces.update(slug, {
+        cover_focal_x: coverEditorFocal.x,
+        cover_focal_y: coverEditorFocal.y,
+        cover_zoom: coverEditorFocal.zoom,
+      });
+      setWorkspace(updated);
+      setCoverEditorOpen(false);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Uložení rámování selhalo.",
+      );
+    } finally {
+      setCoverEditorBusy(false);
     }
   }
 
@@ -368,18 +465,25 @@ export default function WorkspaceEditPage({ params }: Props) {
                   <p className="text-sm font-medium text-ink-900">Úvodní fotka</p>
                   <div className="mt-2 flex flex-col gap-2">
                     {coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={assetUrl(coverUrl)}
-                        alt="Cover"
-                        className="aspect-[16/9] w-full rounded-md border border-border object-cover"
-                      />
+                      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border border-border">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={assetUrl(coverUrl) ?? ""}
+                          alt="Cover"
+                          className="h-full w-full object-cover"
+                          style={{
+                            objectPosition: `${coverEditorFocal.x}% ${coverEditorFocal.y}%`,
+                            transform: `scale(${coverEditorFocal.zoom / 100})`,
+                            transformOrigin: `${coverEditorFocal.x}% ${coverEditorFocal.y}%`,
+                          }}
+                        />
+                      </div>
                     ) : (
                       <div className="flex aspect-[16/9] w-full items-center justify-center rounded-md border border-dashed border-border-strong bg-surface-muted/40 text-xs text-ink-500">
                         bez úvodní fotky
                       </div>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <input
                         ref={coverInputRef}
                         id="cover-input"
@@ -395,8 +499,17 @@ export default function WorkspaceEditPage({ params }: Props) {
                           coverBusy ? "pointer-events-none opacity-60" : "",
                         ].join(" ")}
                       >
-                        {coverBusy ? "Nahrávám…" : coverUrl ? "Vybrat jiný" : "Nahrát fotku"}
+                        {coverBusy ? "Nahrávám…" : coverUrl ? "Vyměnit" : "Nahrát fotku"}
                       </label>
+                      {coverUrl && !coverBusy && (
+                        <button
+                          type="button"
+                          onClick={openCoverEditor}
+                          className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-700 hover:bg-surface-muted focus-ring"
+                        >
+                          Upravit rámování
+                        </button>
+                      )}
                       {coverUrl && !coverBusy && (
                         <button
                           type="button"
@@ -413,27 +526,77 @@ export default function WorkspaceEditPage({ params }: Props) {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <Field
-                  label="Akcent (hex barva)"
+                  label="Akcent"
                   htmlFor="accent"
-                  hint="Volitelné. Použije se jako pozadí, když nemáš logo."
+                  hint="Volitelné. Použije se jako pozadí, když nemáš logo. Vyber ze palety nebo napiš vlastní hex."
                 >
-                  <Input
-                    id="accent"
-                    placeholder="#ffc719"
-                    value={accentColor}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                  />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        aria-label="Vybrat barvu"
+                        value={accentColor || "#ffc719"}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="h-11 w-14 cursor-pointer rounded-md border border-border bg-surface p-1 focus-ring"
+                      />
+                      <Input
+                        id="accent"
+                        placeholder="#ffc719"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
+                    <div
+                      role="listbox"
+                      aria-label="Nabídka barev"
+                      className="flex flex-wrap gap-1.5"
+                    >
+                      {ACCENT_PALETTE.map((color) => {
+                        const active =
+                          accentColor.toLowerCase() === color.toLowerCase();
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            role="option"
+                            aria-selected={active}
+                            title={color}
+                            onClick={() => setAccentColor(color)}
+                            className={[
+                              "h-7 w-7 rounded-md border transition-transform focus-ring hover:scale-110",
+                              active
+                                ? "border-ink-900 ring-2 ring-offset-1 ring-ink-900"
+                                : "border-border",
+                            ].join(" ")}
+                            style={{ backgroundColor: color }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
                 </Field>
                 <Field
                   label="Výchozí časové pásmo"
                   htmlFor="tz"
-                  hint="IANA timezone (Europe/Prague)."
+                  hint="Používá se pro časy akcí. Default Europe/Prague."
                 >
-                  <Input
+                  <select
                     id="tz"
                     value={defaultTz}
                     onChange={(e) => setDefaultTz(e.target.value)}
-                  />
+                    className="h-11 rounded-md border border-border bg-surface px-3 text-sm focus-ring"
+                  >
+                    {tzGroups.map((g) => (
+                      <optgroup key={g.label} label={g.label}>
+                        {g.values.map((tz) => (
+                          <option key={tz} value={tz}>
+                            {tz}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 </Field>
               </div>
             </CardSection>
@@ -476,24 +639,26 @@ export default function WorkspaceEditPage({ params }: Props) {
                   <Field
                     label="IBAN"
                     htmlFor="iban"
-                    hint="Český formát: CZ65 0800 0000 1920 0014 5399 (mezery povoleny)."
+                    hint="Český formát: CZ65 0800 0000 1920 0014 5399 (mezery povoleny). Podle kódu banky ti níž doplníme název."
                   >
                     <Input
                       id="iban"
                       value={paymentIban}
-                      onChange={(e) =>
-                        setPaymentIban(e.target.value.toUpperCase())
-                      }
+                      onChange={(e) => handleIbanChange(e.target.value)}
                       placeholder="CZ65 0800 0000 1920 0014 5399"
                     />
                   </Field>
                 </div>
-                <Field label="Název banky" htmlFor="bank-name">
+                <Field
+                  label="Název banky"
+                  htmlFor="bank-name"
+                  hint="Auto-doplní se z IBAN. Můžeš přepsat, pokud chceš vlastní tvar."
+                >
                   <Input
                     id="bank-name"
                     value={paymentBankName}
                     onChange={(e) => setPaymentBankName(e.target.value)}
-                    placeholder="ČS, FIO, ..."
+                    placeholder="Fio banka"
                   />
                 </Field>
                 <Field
@@ -603,6 +768,111 @@ export default function WorkspaceEditPage({ params }: Props) {
             </Button>
           </div>
       </form>
+
+      {coverEditorOpen && coverUrl && (
+        <CoverEditorModal
+          imageUrl={coverUrl}
+          focalX={coverEditorFocal.x}
+          focalY={coverEditorFocal.y}
+          zoom={coverEditorFocal.zoom}
+          onChange={(next) =>
+            setCoverEditorFocal({
+              x: next.focal_x,
+              y: next.focal_y,
+              zoom: next.zoom,
+            })
+          }
+          onCancel={() => setCoverEditorOpen(false)}
+          onSave={saveCoverEditor}
+          busy={coverEditorBusy}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Modal se sdíleným PhotoEditor v 16:9 aspektu — matchuje public
+ *  hero cover na /<slug>. Backdrop click / Esc zavírají; save flushne
+ *  focal+zoom přes WorkspaceWriteSerializer PATCH. Stejný pattern jako
+ *  AvatarEditorModal v settings/profile — jen jiný aspect ratio. */
+function CoverEditorModal({
+  imageUrl,
+  focalX,
+  focalY,
+  zoom,
+  onChange,
+  onCancel,
+  onSave,
+  busy,
+}: {
+  imageUrl: string;
+  focalX: number;
+  focalY: number;
+  zoom: number;
+  onChange: (next: {
+    focal_x: number;
+    focal_y: number;
+    zoom: number;
+  }) => void;
+  onCancel: () => void;
+  onSave: () => Promise<void>;
+  busy: boolean;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upravit rámování úvodní fotky"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 px-4 py-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="w-full max-w-2xl rounded-xl border border-border bg-surface p-5 shadow-lg">
+        <h3 className="text-lg font-semibold text-ink-900">
+          Upravit rámování
+        </h3>
+        <p className="mt-1 text-sm text-ink-500">
+          Přetáhni fotku a přiblíž, jak má být vidět na veřejné stránce
+          komunity. Formát je 16:9 — na mobilu se cover mírně ořezává,
+          drž důležitý obsah ve středu.
+        </p>
+        <div className="mt-4">
+          <PhotoEditor
+            imageUrl={imageUrl}
+            focalX={focalX}
+            focalY={focalY}
+            zoom={zoom}
+            aspectRatio="16/9"
+            previewShape="rect"
+            maxWidthClass="max-w-2xl"
+            label=""
+            hint=""
+            onChange={onChange}
+          />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            Zrušit
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => void onSave()}
+            loading={busy}
+          >
+            Uložit rámování
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
