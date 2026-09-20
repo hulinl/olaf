@@ -39,22 +39,26 @@ export function WorkspaceSocialsRow({ workspace, className }: Props) {
 
   return (
     <>
-      <div className={`flex flex-wrap gap-2 ${className ?? ""}`}>
+      <div className={`flex flex-wrap items-center gap-2 ${className ?? ""}`}>
         {items.map(({ service, href }) => {
           const { Icon, label } = service;
-          const baseClasses =
-            "inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring";
+          // Kompaktní icon-only pill — každou značku uživatel pozná
+          // podle ikony (user request 2026-09-20: „nechme jen barevnou
+          // ikonu, textový label neuvidíme"). Label zůstává jako
+          // aria-label + title pro tooltip.
+          const iconBtnClasses =
+            "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-ink-700 transition-colors hover:border-brand hover:bg-surface-muted hover:text-brand focus-ring";
           if (service.isContactForm) {
             return (
               <button
                 key={service.key}
                 type="button"
                 onClick={() => setContactOpen(true)}
-                className={baseClasses}
+                className={iconBtnClasses}
                 aria-label="Napsat komunitě"
+                title="Napsat komunitě"
               >
                 <Icon size={16} />
-                <span>Napsat komunitě</span>
               </button>
             );
           }
@@ -65,11 +69,11 @@ export function WorkspaceSocialsRow({ workspace, className }: Props) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className={baseClasses}
+              className={iconBtnClasses}
               aria-label={label}
+              title={label}
             >
               <Icon size={16} />
-              <span>{label}</span>
             </a>
           );
         })}

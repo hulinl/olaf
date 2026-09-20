@@ -260,6 +260,14 @@ function AdminEventDetail({ params }: Props) {
             Upravit akci
           </LinkButton>
           <LinkButton
+            href={`/admin/eventy/${wsSlug}/${eventSlug}/edit/obsah`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Upravit obsah stránky
+          </LinkButton>
+          <LinkButton
             href={`/admin/eventy/${wsSlug}/${eventSlug}/dokumenty`}
             variant="ghost"
             size="md"

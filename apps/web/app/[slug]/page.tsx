@@ -215,25 +215,28 @@ export default async function WorkspaceProfilePage({ params }: Props) {
           </div>
         </section>
 
-        {/* BIO — kompaktnější než dřív, řadíme ho hned pod profile card
-            aby uživatel dostal 1–3 věty o komunitě před akcí seznamem. */}
+        {/* SOCIÁLNÍ IKONY — kompaktní řada barevných ikon hned pod
+            hlavičkou (nadpis + logo). User request 2026-09-20: text
+            labels pryč, ikonu značky každý pozná; usnadní i mobile
+            layout. */}
+        <section className="bg-canvas">
+          <div className="mx-auto max-w-5xl px-4 pt-4 sm:pt-5">
+            <WorkspaceSocialsRow workspace={workspace} />
+          </div>
+        </section>
+
+        {/* BIO — kompaktnější než dřív, řadíme ho hned pod hlavičku +
+            socials, aby uživatel dostal 1–3 věty o komunitě před akcí
+            seznamem. */}
         {workspace.bio && (
           <section className="bg-canvas">
-            <div className="mx-auto max-w-5xl px-4 pb-8 sm:pb-10">
+            <div className="mx-auto max-w-5xl px-4 pb-8 pt-5 sm:pb-10 sm:pt-6">
               <p
                 className="max-w-2xl text-ink-700"
                 style={{ fontSize: 16, lineHeight: 1.6 }}
               >
                 {workspace.bio}
               </p>
-              <WorkspaceSocialsRow workspace={workspace} className="mt-6" />
-            </div>
-          </section>
-        )}
-        {!workspace.bio && (
-          <section className="bg-canvas">
-            <div className="mx-auto max-w-5xl px-4 pb-6">
-              <WorkspaceSocialsRow workspace={workspace} />
             </div>
           </section>
         )}
@@ -241,7 +244,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
         {/* UPCOMING */}
         <section className="bg-canvas">
           <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
-            <SectionHead eyebrow="Akce" title="Nadcházející" />
+            <SectionHead eyebrow="Akce" title="Nadcházející akce" />
             {upcoming.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-8 text-center text-ink-500">
                 Žádné nadcházející akce. Sleduj nás a budeme tu, až bude něco
