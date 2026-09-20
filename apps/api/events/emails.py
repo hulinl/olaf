@@ -53,6 +53,23 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
     else:
         subject = f"Tvoje registrace potvrzena — {event.title}"
 
+    # .ics + „Přidat do kalendáře" tlačítka posíláme jen pro confirmed
+    # RSVP. Waitlist/pending ještě nemají jistou účast, kalendárový
+    # event by tam byl matoucí.
+    attachments = None
+    cal_links: dict[str, str] = {}
+    if rsvp.status == RSVP.STATUS_YES:
+        from .calendar import build_ics, calendar_links
+
+        attachments = [
+            (
+                "event.ics",
+                build_ics(event, rsvp),
+                'text/calendar; method=REQUEST; charset="utf-8"',
+            )
+        ]
+        cal_links = calendar_links(event)
+
     send_branded_email(
         subject=subject,
         template_base="emails/rsvp_confirmation",
@@ -68,14 +85,22 @@ def send_rsvp_confirmation(rsvp: RSVP) -> None:
             "payment_due_str": format_payment_due(
                 rsvp.created_at, event.workspace.payment_due_days
             ),
+            "calendar_google_url": cal_links.get("google", ""),
+            "calendar_outlook_url": cal_links.get("outlook", ""),
+            "calendar_download_url": cal_links.get("download", ""),
         },
         recipient_list=[rsvp.user.email],
+        attachments=attachments,
     )
 
 
 def send_waitlist_promotion(rsvp: RSVP) -> None:
     """Notify a participant that they've been promoted from the waitlist."""
     event = rsvp.event
+    from .calendar import build_ics, calendar_links
+
+    ics_bytes = build_ics(event, rsvp)
+    cal_links = calendar_links(event)
     send_branded_email(
         subject=f"Místo se uvolnilo — jedeš s námi na {event.title}",
         template_base="emails/rsvp_promoted",
@@ -90,8 +115,18 @@ def send_waitlist_promotion(rsvp: RSVP) -> None:
             "payment_due_str": format_payment_due(
                 rsvp.created_at, event.workspace.payment_due_days
             ),
+            "calendar_google_url": cal_links.get("google", ""),
+            "calendar_outlook_url": cal_links.get("outlook", ""),
+            "calendar_download_url": cal_links.get("download", ""),
         },
         recipient_list=[rsvp.user.email],
+        attachments=[
+            (
+                "event.ics",
+                ics_bytes,
+                'text/calendar; method=REQUEST; charset="utf-8"',
+            )
+        ],
     )
 
 

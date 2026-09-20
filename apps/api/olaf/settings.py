@@ -205,6 +205,12 @@ REST_FRAMEWORK = {
 # Frontend base URL — embedded in email links (verification, password reset).
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 
+# Public-facing API URL — použité pro absolutní odkazy z e-mailů, které
+# míří na API (např. `/api/events/e/<public_id>.ics` download link
+# v potvrzovacím mailu). V prodě = `https://api.olaf.events`, v dev
+# fallback = `http://localhost:8000`.
+API_PUBLIC_URL = env("API_PUBLIC_URL", default="http://localhost:8000")
+
 # Dev session debug — wire the SessionDebugMiddleware logger to stdout.
 LOGGING = {
     "version": 1,

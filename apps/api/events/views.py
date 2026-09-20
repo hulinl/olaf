@@ -152,6 +152,39 @@ def _render_public_event(event: Event, request: Request) -> Response:
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def public_event_ics(request: Request, public_id: str) -> Response:
+    """Veřejný .ics download — link v potvrzovacím mailu, který funguje
+    v Outlook mobile / webmailu tam, kde attachment neumí být přidán
+    do jiného než defaultního kalendáře.
+
+    UID je generic per-event (bez user_id), aby odkaz šel sdílet i mimo
+    mail — kdyby to byl per-RSVP UID, dvě sdílení by v jednom kalendáři
+    kolidovala. Uživatel s attachmentem má stále per-user UID (upsert
+    při update), takže dva odlišné UIDy si nekopnou.
+    """
+    from django.http import HttpResponse
+
+    from .calendar import build_ics
+
+    event = (
+        Event.objects.select_related("workspace")
+        .filter(public_id=public_id, deleted_at__isnull=True)
+        .first()
+    )
+    if event is None:
+        return Response(
+            {"detail": "Event not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    body = build_ics(event, rsvp=None)
+    response = HttpResponse(body, content_type="text/calendar; charset=utf-8")
+    response["Content-Disposition"] = f'inline; filename="{public_id}.ics"'
+    response["Cache-Control"] = "public, max-age=300"
+    return response
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def public_event_by_hash(request: Request, public_id: str) -> Response:
     """Canonical share URL `/e/<public_id>/` — 2026-09-11 redesign.
     Krátký hash je stabilní přes rename, žije mimo workspace slug
@@ -692,6 +725,20 @@ def create_event(request: Request, workspace_slug: str) -> Response:
     if shared_workspace_slugs is not None:
         _set_event_shared_workspaces(
             event, shared_workspace_slugs, requesting_user=request.user
+        )
+
+    # Auto-registrace tvůrce jako organizátor. Bez tohohle by owner musel
+    # jít na public stránku, přihlásit se, a teprve pak by viděl vlastní
+    # akci v „Mé akce" + měl přístup na nástěnku. Owner je workspace_admin,
+    # takže create_for_event ho pošle rovnou do STATUS_YES a nastaví
+    # is_organizer=True (viz models.py:743). Auto-RSVP je convenience —
+    # capacity=0 v draftu apod. by mohlo hodit ValidationError; owner
+    # může dodělat ručně, takže selhání nezastavuje create akce.
+    import contextlib
+
+    with contextlib.suppress(Exception):
+        RSVP.create_for_event(
+            event=event, user=request.user, questionnaire_answers={}
         )
 
     from audit.models import AuditLog

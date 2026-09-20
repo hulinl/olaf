@@ -40,6 +40,14 @@ urlpatterns = [
         views.public_event_by_hash,
         name="public-by-hash",
     ),
+    # Veřejný .ics download — link v potvrzovacím mailu, který funguje
+    # cross-platform (Outlook mobile stáhne, uživatel si přes share sheet
+    # vybere svůj kalendář). Bez auth, cachovatelné.
+    path(
+        "e/<str:public_id>.ics",
+        views.public_event_ics,
+        name="public-ics",
+    ),
     path(
         "import-schema/",
         views.import_schema,

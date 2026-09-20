@@ -26,6 +26,7 @@ def send_branded_email(
     recipient_list: Iterable[str],
     reply_to: Iterable[str] | None = None,
     fail_silently: bool = False,
+    attachments: Iterable[tuple[str, bytes, str]] | None = None,
 ) -> int:
     """Render `<template_base>.txt` + `<template_base>.html` from a
     shared context and dispatch as multipart. Returns send count
@@ -37,6 +38,10 @@ def send_branded_email(
     `reply_to` se hodí pro workspace broadcast e-maily — owner pošle
     bulk-e-mail svým členům a chce, aby odpovědi šly zpět jemu, ne
     na platform inbox.
+
+    `attachments` je sekvence trojic `(filename, content_bytes,
+    mimetype)` — používá se pro .ics kalendárovou přílohu v approval
+    mailu, kterou Apple Mail / Gmail native detekují jako pozvánku.
     """
     site_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000").rstrip("/")
     enriched_context = {
@@ -58,4 +63,7 @@ def send_branded_email(
         reply_to=list(reply_to) if reply_to else None,
     )
     msg.attach_alternative(html_body, "text/html")
+    if attachments:
+        for filename, content, mimetype in attachments:
+            msg.attach(filename, content, mimetype)
     return msg.send(fail_silently=fail_silently)

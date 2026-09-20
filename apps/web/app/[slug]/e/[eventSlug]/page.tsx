@@ -115,6 +115,19 @@ export default async function EventLandingPage({ params }: Props) {
     new Date(event.ends_at).getTime() < Date.now();
   const cta_href = `/${event.workspace_slug}/e/${event.slug}/rsvp`;
 
+  // Viewer už na akci přihlášen (nebo čeká na schválení / je na waitlistu)
+  // → hero CTA přepneme na disabled label. Bez tohohle byl button pořád
+  // aktivní i pro potvrzeného účastníka a mátlo to („mám kliknout znovu?").
+  const myStatus = event.my_rsvp?.status ?? null;
+  const alreadyRegisteredLabel =
+    myStatus === "yes"
+      ? "Už jsi přihlášen"
+      : myStatus === "waitlist"
+        ? "Jsi na waitlistu"
+        : myStatus === "pending_approval"
+          ? "Čeká na schválení"
+          : null;
+
   return (
     <div data-theme="paper" className="bg-canvas text-ink-900">
       {isPast && !cancelled && (
@@ -175,7 +188,11 @@ export default async function EventLandingPage({ params }: Props) {
           // to fall off into an empty page where any other auto-section
           // (recommended gear list, etc) looked like the whole event —
           // confusing. Default: title, date, location, RSVP CTA.
-          <FallbackHero event={event} ctaHref={cta_href} />
+          <FallbackHero
+            event={event}
+            ctaHref={cta_href}
+            alreadyRegisteredLabel={alreadyRegisteredLabel}
+          />
         ) : null}
         {event.blocks && event.blocks.length > 0 && (() => {
           // Badge se drží JEN pro true status markery (VYPRODÁNO,
@@ -234,9 +251,15 @@ export default async function EventLandingPage({ params }: Props) {
                   }}
                   gearListsBySlug={event.gear_lists_by_slug}
                   organizersByUserId={event.organizers_by_user_id}
-                  heroCtaDisabled={isPast || cancelled}
+                  heroCtaDisabled={
+                    isPast || cancelled || alreadyRegisteredLabel !== null
+                  }
                   heroCtaDisabledLabel={
-                    cancelled ? "Akce zrušena" : "Přihlášky uzavřené"
+                    cancelled
+                      ? "Akce zrušena"
+                      : isPast
+                        ? "Přihlášky uzavřené"
+                        : (alreadyRegisteredLabel ?? undefined)
                   }
                   eventLocationText={event.location_text}
                   eventMeetingPointText={event.meeting_point_text}
@@ -362,9 +385,11 @@ function DraftPreviewPage({ preview }: { preview: EventDraftPreview }) {
 function FallbackHero({
   event,
   ctaHref,
+  alreadyRegisteredLabel,
 }: {
   event: Event;
   ctaHref: string;
+  alreadyRegisteredLabel: string | null;
 }) {
   const starts = new Date(event.starts_at);
   const ends = new Date(event.ends_at);
@@ -409,6 +434,13 @@ function FallbackHero({
               className="cursor-not-allowed select-none rounded-md bg-surface-muted px-5 py-2.5 text-sm font-semibold text-ink-500"
             >
               Přihlášky uzavřené
+            </span>
+          ) : alreadyRegisteredLabel ? (
+            <span
+              aria-disabled="true"
+              className="cursor-not-allowed select-none rounded-md bg-surface-muted px-5 py-2.5 text-sm font-semibold text-ink-500"
+            >
+              {alreadyRegisteredLabel}
             </span>
           ) : event.is_open_for_rsvp ? (
             <Link

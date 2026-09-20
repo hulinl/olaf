@@ -561,6 +561,18 @@ class CreateUpdateEventTests(TestCase):
         self.assertEqual(resp.json()["slug"], "podzimni-kemp-2026")
         self.assertEqual(resp.json()["workspace_slug"], "olafadventures")
 
+    def test_creator_is_auto_registered_as_organizer(self) -> None:
+        # Owner nemá muset po vytvoření akce ještě ručně kliknout
+        # „Přihlásit se", aby se dostal na nástěnku / do „Mé akce".
+        self.client.force_authenticate(self.owner)
+        url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
+        resp = self.client.post(url, self._create_payload(), format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.content)
+        event = Event.objects.get(slug="podzimni-kemp-2026")
+        rsvp = RSVP.objects.get(event=event, user=self.owner)
+        self.assertEqual(rsvp.status, RSVP.STATUS_YES)
+        self.assertTrue(rsvp.is_organizer)
+
     def test_non_owner_blocked_from_create(self) -> None:
         self.client.force_authenticate(self.outsider)
         url = reverse("events:create", kwargs={"workspace_slug": "olafadventures"})
@@ -1795,3 +1807,161 @@ class CompleteFinishedEventsTaskTests(TestCase):
         cancelled.refresh_from_db()
         self.assertEqual(draft.status, Event.STATUS_DRAFT)
         self.assertEqual(cancelled.status, Event.STATUS_CANCELLED)
+
+
+class CalendarHelpersTests(TestCase):
+    """Unit-level pokrytí `events.calendar` — build_ics + add-to-calendar
+    linky pro potvrzovací e-mail. Attachment behavior sedne v
+    ApprovalCalendarIntegrationTests níže."""
+
+    def setUp(self) -> None:
+        self.ws = Workspace.objects.create(
+            slug="olafadventures", name="Olaf Adventures"
+        )
+        self.event = _build_event(
+            self.ws,
+            location_text="Beskydy — chata Salajka",
+            meeting_point_text="parkoviště Bílá",
+        )
+        self.user = User.objects.create_user(
+            email="a@example.com",
+            password="pass-abcdef-1234",
+            first_name="Anna",
+            last_name="Novakova",
+            email_verified=True,
+        )
+        self.rsvp = RSVP.objects.create(
+            event=self.event, user=self.user, status=RSVP.STATUS_YES
+        )
+
+    def test_build_ics_contains_required_fields(self) -> None:
+        from .calendar import build_ics
+
+        data = build_ics(self.event, self.rsvp).decode("utf-8")
+        # RFC 5545 minimum
+        self.assertIn("BEGIN:VCALENDAR", data)
+        self.assertIn("END:VCALENDAR", data)
+        self.assertIn("BEGIN:VEVENT", data)
+        self.assertIn("METHOD:REQUEST", data)
+        self.assertIn("SUMMARY:Letní kemp 2026", data)
+        # Location má se zkombinovat s meeting_point.
+        self.assertIn("chata Salajka", data)
+        self.assertIn("parkoviště Bílá", data)
+        # RFC 5545 vyžaduje CRLF.
+        self.assertIn("\r\n", data)
+
+    def test_build_ics_uid_stable_across_calls(self) -> None:
+        # UID musí zůstat stejný pro (event, user) — druhý .ics
+        # s vyšším SEQUENCE potom v kalendáři upsert-uje původní event
+        # místo aby se duplikoval.
+        from .calendar import build_ics
+
+        first = build_ics(self.event, self.rsvp).decode("utf-8")
+        second = build_ics(self.event, self.rsvp, sequence=1).decode("utf-8")
+        uid_line_first = next(
+            line for line in first.splitlines() if line.startswith("UID:")
+        )
+        uid_line_second = next(
+            line for line in second.splitlines() if line.startswith("UID:")
+        )
+        self.assertEqual(uid_line_first, uid_line_second)
+        self.assertIn("SEQUENCE:0", first)
+        self.assertIn("SEQUENCE:1", second)
+
+    def test_calendar_links_have_expected_params(self) -> None:
+        from .calendar import calendar_links
+
+        links = calendar_links(self.event)
+        self.assertIn("calendar.google.com", links["google"])
+        self.assertIn("action=TEMPLATE", links["google"])
+        # dates=<startZ>/<endZ> — jen ověříme, že klíč a slash existují
+        self.assertIn("dates=", links["google"])
+        self.assertIn("%2F", links["google"])  # / URL-escaped
+        self.assertIn("outlook.live.com", links["outlook"])
+        self.assertIn("rru=addevent", links["outlook"])
+        # Download URL musí obsahovat public_id + .ics suffix.
+        self.assertTrue(self.event.public_id)
+        self.assertIn(f"/api/events/e/{self.event.public_id}.ics", links["download"])
+
+
+class PublicIcsEndpointTests(TestCase):
+    """GET /api/events/e/<public_id>.ics vrací platný VCALENDAR
+    stream s text/calendar Content-Type. Bez auth (link přijde v mailu
+    a chceme, aby byl klikatelný i pro guest / re-forward)."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.ws = Workspace.objects.create(
+            slug="olafadventures", name="Olaf Adventures"
+        )
+        self.event = _build_event(self.ws)
+
+    def test_download_returns_valid_ics(self) -> None:
+        url = f"/api/events/e/{self.event.public_id}.ics"
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp["Content-Type"].startswith("text/calendar"))
+        self.assertIn(".ics", resp["Content-Disposition"])
+        body = resp.content.decode("utf-8")
+        self.assertIn("BEGIN:VCALENDAR", body)
+        self.assertIn(f"SUMMARY:{self.event.title}", body)
+
+    def test_download_missing_event_returns_404(self) -> None:
+        resp = self.client.get("/api/events/e/nosuchid.ics")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ApprovalCalendarIntegrationTests(TestCase):
+    """Ověří, že approve_rsvp mail (nebo přímé volání
+    send_rsvp_confirmation pro YES) obsahuje .ics attachment + linky
+    v HTML těle. Pending/waitlist status .ics dostat nesmí."""
+
+    def setUp(self) -> None:
+        self.ws = Workspace.objects.create(
+            slug="olafadventures", name="Olaf Adventures"
+        )
+        self.event = _build_event(self.ws)
+        self.user = User.objects.create_user(
+            email="a@example.com",
+            password="pass-abcdef-1234",
+            first_name="Anna",
+            last_name="Novakova",
+            email_verified=True,
+        )
+        mail.outbox = []
+
+    def _send(self, status_value: str) -> mail.EmailMessage:
+        from .emails import send_rsvp_confirmation
+
+        rsvp = RSVP.objects.create(
+            event=self.event, user=self.user, status=status_value
+        )
+        send_rsvp_confirmation(rsvp)
+        self.assertEqual(len(mail.outbox), 1, mail.outbox)
+        return mail.outbox[0]
+
+    def test_confirmed_rsvp_email_has_ics_attachment(self) -> None:
+        message = self._send(RSVP.STATUS_YES)
+        self.assertEqual(len(message.attachments), 1)
+        filename, content, mimetype = message.attachments[0]
+        self.assertEqual(filename, "event.ics")
+        self.assertIn("text/calendar", mimetype)
+        self.assertIn("BEGIN:VCALENDAR", content)
+        # HTML body má tři add-to-calendar linky.
+        html_body = next(
+            body for body, mime in message.alternatives if mime == "text/html"
+        )
+        self.assertIn("calendar.google.com", html_body)
+        self.assertIn("outlook.live.com", html_body)
+
+    def test_pending_rsvp_email_omits_ics(self) -> None:
+        message = self._send(RSVP.STATUS_PENDING_APPROVAL)
+        self.assertEqual(message.attachments, [])
+        html_body = next(
+            body for body, mime in message.alternatives if mime == "text/html"
+        )
+        self.assertNotIn("calendar.google.com", html_body)
+
+    def test_waitlist_rsvp_email_omits_ics(self) -> None:
+        message = self._send(RSVP.STATUS_WAITLIST)
+        self.assertEqual(message.attachments, [])

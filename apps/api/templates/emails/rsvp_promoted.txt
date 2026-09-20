@@ -17,7 +17,12 @@ Variabilní symbol: {{ rsvp.variable_symbol }}
 Zpráva: {{ workspace.name }} — {{ event.title }}
 Splatnost: {% if payment_due_str %}{{ payment_due_str }}{% else %}{{ workspace.payment_due_days }} dní od potvrzení{% endif %}
 
-QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.{% endif %}
+QR kód pro okamžitou platbu najdeš po přihlášení na stránce akce.{% endif %}{% if calendar_google_url %}
+
+Přidat do kalendáře:
+Google: {{ calendar_google_url }}
+Outlook: {{ calendar_outlook_url }}{% if calendar_download_url %}
+Stáhnout .ics (Apple / Google Kalendář v mobilu): {{ calendar_download_url }}{% endif %}{% endif %}
 
 Pokud to nakonec nevyjde, dej prosím vědět co nejdřív — místo se uvolní pro dalšího z waitlistu.{% if cancel_url %}
 
