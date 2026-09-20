@@ -123,29 +123,46 @@ export default async function WorkspaceProfilePage({ params }: Props) {
       </header>
 
       <main className="flex flex-1 flex-col">
-        {/* HERO */}
-        <section
-          className={[
-            "relative isolate overflow-hidden",
-            cover ? "min-h-[400px] sm:min-h-[480px]" : "",
-          ].join(" ")}
-        >
-          {cover && (
+        {/* HERO — Facebook-style: cover foto samostatně (bez textového
+            overlay), logo + jméno + lokace v profile-card pod ním
+            s logem přeraženým přes spodní hranu covera. Uživatelský
+            feedback 2026-09-20: dřívější design měl velký title
+            přímo na coveru, což zakrývalo fotku. */}
+        <section className="relative isolate">
+          {cover ? (
+            <div className="relative aspect-[16/6] w-full overflow-hidden bg-ink-900 sm:aspect-[16/5]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={cover}
+                alt=""
+                className="h-full w-full object-cover"
+                style={{
+                  objectPosition: `${workspace.cover_focal_x}% ${workspace.cover_focal_y}%`,
+                  transform: `scale(${workspace.cover_zoom / 100})`,
+                  transformOrigin: `${workspace.cover_focal_x}% ${workspace.cover_focal_y}%`,
+                }}
+              />
+            </div>
+          ) : (
+            // Bez cover fotky drží horní strip barevný akcent / plný
+            // ink-900 fallback, ať profile-card níž nesedí na holé
+            // canvas ploše bez vizuálního oddělení.
             <div
-              className="absolute inset-0 -z-10"
+              className="h-32 w-full sm:h-40"
               style={{
-                backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.80) 100%), url(${cover})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
+                backgroundColor: workspace.accent_color || "#0f172a",
               }}
             />
           )}
-          <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 px-4 py-20 sm:py-24">
-            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-7">
+
+          <div className="mx-auto max-w-5xl px-4">
+            <div className="flex flex-col items-start gap-4 pb-8 sm:flex-row sm:items-end sm:gap-6 sm:pb-10">
+              {/* Logo — přeraženo přes spodní hranu covera. Border
+                  matchuje FB avatar pattern (bílý rámeček oddělující
+                  od fotky). */}
               <div
                 className={[
-                  "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 shadow-md sm:h-24 sm:w-24",
-                  cover ? "border-white/80 bg-white" : "border-canvas bg-surface",
+                  "-mt-12 flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-canvas bg-surface shadow-lg sm:-mt-16 sm:h-32 sm:w-32",
                 ].join(" ")}
                 style={
                   workspace.accent_color && !logo
@@ -161,55 +178,48 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                     className="h-full w-full object-contain"
                   />
                 ) : (
-                  <span className="text-2xl font-semibold text-ink-300">
+                  <span className="text-3xl font-semibold text-ink-300">
                     {workspace.name.charAt(0)}
                   </span>
                 )}
               </div>
-              <h1
-                className={[
-                  "max-w-3xl text-5xl font-semibold leading-[0.95] sm:text-6xl md:text-7xl",
-                  cover ? "text-ink-inverse" : "text-ink-900",
-                ].join(" ")}
-                style={{
-                  letterSpacing: "-0.035em",
-                  textShadow: cover ? "0 2px 24px rgba(0,0,0,0.45)" : undefined,
-                }}
-              >
-                {workspace.name}
-              </h1>
-            </div>
 
-            {workspace.location && (
-              <p
-                className={[
-                  "text-base sm:text-lg",
-                  cover ? "text-white/90" : "text-ink-500",
-                ].join(" ")}
-                style={
-                  cover
-                    ? { textShadow: "0 1px 12px rgba(0,0,0,0.5)" }
-                    : undefined
-                }
-              >
-                {workspace.location}
-              </p>
-            )}
+              <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1 sm:pb-2">
+                <h1
+                  className="text-3xl font-semibold leading-tight text-ink-900 sm:text-4xl"
+                  style={{ letterSpacing: "-0.03em" }}
+                >
+                  {workspace.name}
+                </h1>
+                {workspace.location && (
+                  <p className="text-sm text-ink-500 sm:text-base">
+                    {workspace.location}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* BIO */}
+        {/* BIO — kompaktnější než dřív, řadíme ho hned pod profile card
+            aby uživatel dostal 1–3 věty o komunitě před akcí seznamem. */}
         {workspace.bio && (
           <section className="bg-canvas">
-            <div className="mx-auto max-w-5xl px-4 py-14 sm:py-16">
-              <SectionHead eyebrow="O nás" title={workspace.name} />
+            <div className="mx-auto max-w-5xl px-4 pb-8 sm:pb-10">
               <p
                 className="max-w-2xl text-ink-700"
                 style={{ fontSize: 16, lineHeight: 1.6 }}
               >
                 {workspace.bio}
               </p>
-              <WorkspaceSocialsRow workspace={workspace} className="mt-8" />
+              <WorkspaceSocialsRow workspace={workspace} className="mt-6" />
+            </div>
+          </section>
+        )}
+        {!workspace.bio && (
+          <section className="bg-canvas">
+            <div className="mx-auto max-w-5xl px-4 pb-6">
+              <WorkspaceSocialsRow workspace={workspace} />
             </div>
           </section>
         )}
