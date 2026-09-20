@@ -130,7 +130,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
             přímo na coveru, což zakrývalo fotku. */}
         <section className="relative isolate">
           {cover ? (
-            <div className="relative aspect-[16/6] w-full overflow-hidden bg-ink-900 sm:aspect-[16/5]">
+            <div className="relative h-32 w-full overflow-hidden bg-ink-900 sm:h-44 md:h-56 lg:h-60">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={cover}
@@ -138,7 +138,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                 className="h-full w-full object-cover"
                 style={{
                   // Fallbacky pro případ, kdy backend ještě nemá
-                  // migraci 0014 aplikovanou — nová pole cover_focal_*
+                  // migraci 0014 aplikovanou - nová pole cover_focal_*
                   // vrátí undefined, což by ze stylu udělalo NaN%.
                   objectPosition: `${workspace.cover_focal_x ?? 50}% ${workspace.cover_focal_y ?? 50}%`,
                   transform: `scale(${(workspace.cover_zoom ?? 100) / 100})`,
@@ -151,7 +151,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
             // ink-900 fallback, ať profile-card níž nesedí na holé
             // canvas ploše bez vizuálního oddělení.
             <div
-              className="h-32 w-full sm:h-40"
+              className="h-24 w-full sm:h-32"
               style={{
                 backgroundColor: workspace.accent_color || "#0f172a",
               }}

@@ -465,7 +465,7 @@ export default function WorkspaceEditPage({ params }: Props) {
                   <p className="text-sm font-medium text-ink-900">Úvodní fotka</p>
                   <div className="mt-2 flex flex-col gap-2">
                     {coverUrl ? (
-                      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border border-border">
+                      <div className="relative aspect-[3/1] w-full overflow-hidden rounded-md border border-border">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={assetUrl(coverUrl) ?? ""}
@@ -479,7 +479,7 @@ export default function WorkspaceEditPage({ params }: Props) {
                         />
                       </div>
                     ) : (
-                      <div className="flex aspect-[16/9] w-full items-center justify-center rounded-md border border-dashed border-border-strong bg-surface-muted/40 text-xs text-ink-500">
+                      <div className="flex aspect-[3/1] w-full items-center justify-center rounded-md border border-dashed border-border-strong bg-surface-muted/40 text-xs text-ink-500">
                         bez úvodní fotky
                       </div>
                     )}
@@ -837,8 +837,8 @@ function CoverEditorModal({
         </h3>
         <p className="mt-1 text-sm text-ink-500">
           Přetáhni fotku a přiblíž, jak má být vidět na veřejné stránce
-          komunity. Formát je 16:9 — na mobilu se cover mírně ořezává,
-          drž důležitý obsah ve středu.
+          komunity. FB-style banner — 3:1 aspect. Rámečky uvnitř ukazují,
+          co bude vidět na desktopu vs. mobilu.
         </p>
         <div className="mt-4">
           <PhotoEditor
@@ -846,11 +846,23 @@ function CoverEditorModal({
             focalX={focalX}
             focalY={focalY}
             zoom={zoom}
-            aspectRatio="16/9"
+            aspectRatio="3/1"
             previewShape="rect"
             maxWidthClass="max-w-2xl"
             label=""
-            hint=""
+            hint="Přetáhni fotku a slider dole zoomni. Rámečky ukazují, co bude vidět na desktopu vs. mobilu — cover je na public stránce FB-style banner."
+            viewportGuides={[
+              // Desktop cover na public /<slug>: h-60 (240px) při
+              // typické šířce 1024-1280px → aspect ~4-5:1.
+              { label: "Desktop", aspectRatio: 4.5, colorClass: "border-brand" },
+              // Mobile cover: h-32 (128px) při ~375-400px → aspect
+              // ~2.9-3:1 (blíž ke stěně editor 3/1).
+              {
+                label: "Mobil",
+                aspectRatio: 2.9,
+                colorClass: "border-warning",
+              },
+            ]}
             onChange={onChange}
           />
         </div>
