@@ -137,9 +137,12 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                 alt=""
                 className="h-full w-full object-cover"
                 style={{
-                  objectPosition: `${workspace.cover_focal_x}% ${workspace.cover_focal_y}%`,
-                  transform: `scale(${workspace.cover_zoom / 100})`,
-                  transformOrigin: `${workspace.cover_focal_x}% ${workspace.cover_focal_y}%`,
+                  // Fallbacky pro případ, kdy backend ještě nemá
+                  // migraci 0014 aplikovanou — nová pole cover_focal_*
+                  // vrátí undefined, což by ze stylu udělalo NaN%.
+                  objectPosition: `${workspace.cover_focal_x ?? 50}% ${workspace.cover_focal_y ?? 50}%`,
+                  transform: `scale(${(workspace.cover_zoom ?? 100) / 100})`,
+                  transformOrigin: `${workspace.cover_focal_x ?? 50}% ${workspace.cover_focal_y ?? 50}%`,
                 }}
               />
             </div>

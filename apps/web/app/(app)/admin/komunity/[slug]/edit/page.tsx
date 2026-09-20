@@ -144,9 +144,9 @@ export default function WorkspaceEditPage({ params }: Props) {
         setLogoUrl(ws.logo_url);
         setCoverUrl(ws.cover_url);
         setCoverEditorFocal({
-          x: ws.cover_focal_x,
-          y: ws.cover_focal_y,
-          zoom: ws.cover_zoom,
+          x: ws.cover_focal_x ?? 50,
+          y: ws.cover_focal_y ?? 50,
+          zoom: ws.cover_zoom ?? 100,
         });
         setPaymentIban(ws.payment_iban ?? "");
         setPaymentBankName(ws.payment_bank_name ?? "");
@@ -244,9 +244,9 @@ export default function WorkspaceEditPage({ params }: Props) {
       // ať user rámuje čerstvou fotku (jinak by mohla mít auto-crop
       // do středu, který se nevejde). Stejný flow jako avatar upload.
       setCoverEditorFocal({
-        x: updated.cover_focal_x,
-        y: updated.cover_focal_y,
-        zoom: updated.cover_zoom,
+        x: updated.cover_focal_x ?? 50,
+        y: updated.cover_focal_y ?? 50,
+        zoom: updated.cover_zoom ?? 100,
       });
       setCoverEditorOpen(true);
     } catch (err) {
@@ -260,9 +260,9 @@ export default function WorkspaceEditPage({ params }: Props) {
   function openCoverEditor() {
     if (!workspace) return;
     setCoverEditorFocal({
-      x: workspace.cover_focal_x,
-      y: workspace.cover_focal_y,
-      zoom: workspace.cover_zoom,
+      x: workspace.cover_focal_x ?? 50,
+      y: workspace.cover_focal_y ?? 50,
+      zoom: workspace.cover_zoom ?? 100,
     });
     setCoverEditorOpen(true);
   }
