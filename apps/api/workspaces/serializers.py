@@ -15,7 +15,7 @@ class WorkspaceWriteSerializer(serializers.ModelSerializer):
     profile-save.
     """
 
-    # Range 0–100 pro focal (% v ose), 100–300 pro zoom — matchuje
+    # Range 0-100 pro focal (% v ose), 100-300 pro zoom - matchuje
     # `accounts.UserSerializer` a limity PhotoEditor komponenty.
     cover_focal_x = serializers.FloatField(min_value=0, max_value=100, required=False)
     cover_focal_y = serializers.FloatField(min_value=0, max_value=100, required=False)
