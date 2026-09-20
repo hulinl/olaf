@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useEffect } from "react";
 
 import { Alert } from "@/components/ui/card";
-import { ApiError, type EventFeedback, auth, events } from "@/lib/api";
+import { ApiError, type EventFeedback, events } from "@/lib/api";
 
 type FilterState = {
   publicOnly: boolean;
@@ -33,7 +33,7 @@ export default function ReferencesPage() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await auth.allReferences();
+        const list = await events.allReferences();
         if (cancelled) return;
         setRows(list);
       } catch (err) {
