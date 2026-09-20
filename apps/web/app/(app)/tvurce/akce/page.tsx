@@ -59,7 +59,7 @@ export default function AdminEventyTablePage() {
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
-          router.replace("/login?next=/tvurce/eventy");
+          router.replace("/login?next=/tvurce/akce");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Načtení selhalo.");

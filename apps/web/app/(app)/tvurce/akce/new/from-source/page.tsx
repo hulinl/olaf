@@ -96,7 +96,7 @@ export default function NewEventFromSourcePage() {
   }
 
   const crumbs = [
-    { label: "Akce", href: "/tvurce/eventy" },
+    { label: "Akce", href: "/tvurce/akce" },
     { label: "Nová z odkazu" },
   ];
 

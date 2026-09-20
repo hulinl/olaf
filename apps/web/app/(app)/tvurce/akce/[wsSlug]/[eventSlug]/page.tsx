@@ -165,11 +165,11 @@ function AdminEventDetail({ params }: Props) {
           return;
         }
         if (err instanceof ApiError && err.status === 404) {
-          router.replace("/tvurce/eventy");
+          router.replace("/tvurce/akce");
           return;
         }
         if (err instanceof ApiError && err.status === 403) {
-          router.replace("/tvurce/eventy");
+          router.replace("/tvurce/akce");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Něco se pokazilo.");
@@ -230,7 +230,7 @@ function AdminEventDetail({ params }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <Link
-        href="/tvurce/eventy"
+        href="/tvurce/akce"
         className="text-sm text-ink-500 hover:text-ink-900"
       >
         ← Zpět na seznam akcí

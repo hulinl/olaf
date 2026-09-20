@@ -15,7 +15,7 @@ interface NavItem {
 // consumed by the mobile drawer (see ui/app-header.tsx) so the order
 // stays consistent across surfaces.
 export const ADMIN_NAV: NavItem[] = [
-  { href: "/tvurce/eventy", label: "Akce" },
+  { href: "/tvurce/akce", label: "Akce" },
   { href: "/tvurce/ukoly", label: "Úkoly" },
   { href: "/tvurce/komunity", label: "Komunity" },
   { href: "/tvurce/lide", label: "Lidé" },

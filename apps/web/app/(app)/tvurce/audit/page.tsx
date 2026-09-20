@@ -290,7 +290,7 @@ export default function AuditPage() {
             Aktivita se začne plnit od chvíle, kdy někdo něco udělá v
             tomto workspace.{" "}
             <Link
-              href="/tvurce/eventy"
+              href="/tvurce/akce"
               className="text-brand hover:underline focus-ring"
             >
               Otevři akce

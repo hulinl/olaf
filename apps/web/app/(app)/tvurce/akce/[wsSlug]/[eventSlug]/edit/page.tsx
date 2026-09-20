@@ -87,7 +87,7 @@ export default function EventEditCockpitPage({ params }: Props) {
           return;
         }
         if (err instanceof ApiError && err.status === 404) {
-          router.replace("/tvurce/eventy");
+          router.replace("/tvurce/akce");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Něco se pokazilo.");

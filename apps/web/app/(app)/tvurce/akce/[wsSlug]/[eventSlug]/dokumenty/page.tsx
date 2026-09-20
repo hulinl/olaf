@@ -174,7 +174,7 @@ export default function EventDocumentsPage({ params }: Props) {
     <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
-          { label: "Akce", href: "/tvurce/eventy" },
+          { label: "Akce", href: "/tvurce/akce" },
           {
             label: "Detail akce",
             href: `/tvurce/akce/${wsSlug}/${eventSlug}`,

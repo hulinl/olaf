@@ -103,7 +103,7 @@ export default function EventTrashPage() {
         </p>
         <p className="mt-3 text-sm">
           <Link
-            href="/tvurce/eventy"
+            href="/tvurce/akce"
             className="text-brand hover:underline focus-ring"
           >
             ← Zpět na moje akce

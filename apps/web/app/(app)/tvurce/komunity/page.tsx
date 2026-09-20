@@ -15,7 +15,7 @@ const VISIBILITY_LABEL: Record<Workspace["visibility"], string> = {
 };
 
 /**
- * Level 1 admin view of owned workspaces — table mirrors the /tvurce/eventy
+ * Level 1 admin view of owned workspaces — table mirrors the /tvurce/akce
  * layout so the owner sees the same drilldown affordances across agendas.
  * Row hover lights up the whole line with the brand amber accent.
  */

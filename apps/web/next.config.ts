@@ -30,6 +30,18 @@ const nextConfig: NextConfig = {
         destination: "/tvurce/akce",
         permanent: true,
       },
+      // Intermediate rename: `admin` → `tvurce` proběhl, ale `eventy`
+      // ještě mohli hitnout uživatelé mezi deployem. Pojistka.
+      {
+        source: "/tvurce/eventy/:path*",
+        destination: "/tvurce/akce/:path*",
+        permanent: true,
+      },
+      {
+        source: "/tvurce/eventy",
+        destination: "/tvurce/akce",
+        permanent: true,
+      },
       {
         source: "/admin/:path*",
         destination: "/tvurce/:path*",

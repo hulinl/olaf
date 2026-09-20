@@ -71,7 +71,7 @@ export default function EventGalleryPage({ params }: Props) {
           return;
         }
         if (err instanceof ApiError && err.status === 404) {
-          router.replace("/tvurce/eventy");
+          router.replace("/tvurce/akce");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
@@ -226,7 +226,7 @@ export default function EventGalleryPage({ params }: Props) {
 
       <Breadcrumbs
         items={[
-          { label: "Akce", href: "/tvurce/eventy" },
+          { label: "Akce", href: "/tvurce/akce" },
           {
             label: event.title,
             href: `/tvurce/akce/${wsSlug}/${eventSlug}/edit`,

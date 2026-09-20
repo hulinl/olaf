@@ -61,7 +61,7 @@ export default function FakturyListPage({ params }: Props) {
           return;
         }
         if (err instanceof ApiError && err.status === 404) {
-          router.replace("/tvurce/eventy");
+          router.replace("/tvurce/akce");
           return;
         }
         setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
@@ -87,7 +87,7 @@ export default function FakturyListPage({ params }: Props) {
     <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
-          { label: "Akce", href: "/tvurce/eventy" },
+          { label: "Akce", href: "/tvurce/akce" },
           {
             label: eventTitle || eventSlug,
             href: `/tvurce/akce/${wsSlug}/${eventSlug}/edit`,

@@ -126,7 +126,7 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
   // akce do nadcházejících. User report 2026-06-25 — sjednoceno s
   // public viewem (apps/web/app/[slug]/page.tsx): jen `published`
   // (a `completed` v archivu), dělení podle `starts_at`. Pro správu
-  // všech statusů má owner /tvurce/eventy.
+  // všech statusů má owner /tvurce/akce.
   const now = new Date();
   const todayStart = new Date(
     now.getFullYear(),

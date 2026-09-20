@@ -57,7 +57,7 @@ export default function NewEventPage() {
   }, [router]);
 
   const crumbs = [
-    { label: "Akce", href: "/tvurce/eventy" },
+    { label: "Akce", href: "/tvurce/akce" },
     { label: "Nová akce" },
   ];
 
