@@ -158,13 +158,13 @@ function InviteByEmail({
       if (r.mode === "direct") {
         setMsg(
           `Účet existuje — uživatel byl rovnou přidán${
-            role === "admin" ? " jako admin" : ""
+            role === "admin" ? " jako spolutvůrce" : ""
           }.`,
         );
       } else {
         setMsg(
           `Pozvánka odeslána na ${r.email}${
-            role === "admin" ? " (po přijetí získá admin práva)" : ""
+            role === "admin" ? " (po přijetí získá práva spolutvůrce)" : ""
           }.`,
         );
       }
@@ -210,7 +210,7 @@ function InviteByEmail({
             className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
           >
             <option value="member">Člen</option>
-            <option value="admin">Admin</option>
+            <option value="admin">Spolutvůrce</option>
           </select>
         </Field>
         <Button type="submit" variant="primary" size="md" loading={busy}>
@@ -430,7 +430,7 @@ function BulkInvitePanel({
                 className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
               >
                 <option value="member">Člen</option>
-                <option value="admin">Admin</option>
+                <option value="admin">Spolutvůrce</option>
               </select>
             </Field>
             <Button
@@ -592,7 +592,7 @@ function AddFromLide({
       const person = members?.find((m) => m.id === pickedId);
       setMsg(
         `Přidáno: ${person?.full_name || person?.email}${
-          role === "admin" ? " jako admin" : ""
+          role === "admin" ? " jako spolutvůrce" : ""
         }`,
       );
       setPickedId(null);
@@ -638,7 +638,7 @@ function AddFromLide({
             className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
           >
             <option value="member">Člen</option>
-            <option value="admin">Admin</option>
+            <option value="admin">Spolutvůrce</option>
           </select>
           <Button
             type="button"

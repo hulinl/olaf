@@ -27,7 +27,9 @@ export default function NewTemplatePage() {
     let cancelled = false;
     workspaces.mine().then((mine) => {
       if (cancelled) return;
-      const owned = mine.filter((w) => w.my_role === "owner");
+      const owned = mine.filter(
+        (w) => w.my_role === "owner" || w.my_role === "admin",
+      );
       if (owned.length > 0) setWorkspace(owned[0]);
     });
     return () => {

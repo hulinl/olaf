@@ -26,7 +26,10 @@ export function OwnerCockpitLink({ workspaceSlug, eventSlug }: Props) {
     workspaces
       .detail(workspaceSlug)
       .then((ws) => {
-        if (!cancelled && ws.my_role === "owner") setIsOwner(true);
+        // Admin má stejné cockpit privilege jako owner (jen komunitu
+        // nesmaže / neřídí ownership) — pustíme oba na admin view link.
+        if (!cancelled && (ws.my_role === "owner" || ws.my_role === "admin"))
+          setIsOwner(true);
       })
       .catch((err) => {
         if (err instanceof ApiError) return;

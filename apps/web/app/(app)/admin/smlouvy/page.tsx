@@ -30,11 +30,13 @@ export default function SmlouvyPage() {
     (async () => {
       try {
         const mine = await workspaces.mine();
-        const owned = mine.filter((w) => w.my_role === "owner");
+        const owned = mine.filter(
+          (w) => w.my_role === "owner" || w.my_role === "admin",
+        );
         if (cancelled) return;
         if (owned.length === 0) {
           setError(
-            "Pro správu smluv potřebuješ vlastnit alespoň jednu komunitu.",
+            "Pro správu smluv potřebuješ být owner nebo admin alespoň jedné komunity.",
           );
           return;
         }

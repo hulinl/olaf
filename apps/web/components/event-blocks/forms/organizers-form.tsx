@@ -131,8 +131,8 @@ export function OrganizersForm({
                           {u.role === "owner"
                             ? "Zakladatel"
                             : u.role === "admin"
-                              ? "Admin"
-                              : "Spolutvůrce"}
+                              ? "Spolutvůrce komunity"
+                              : "Spolutvůrce akce"}
                         </span>
                       </div>
                       {u.bio ? (

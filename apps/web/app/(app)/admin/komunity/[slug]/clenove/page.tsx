@@ -670,7 +670,7 @@ function useMemberRoleActions({
   async function handleDemote() {
     const ok = await confirmDialog({
       title: `Snížit ${name} na člena?`,
-      description: "Ztratí admin práva. Pak ho můžeš odebrat z komunity.",
+      description: "Ztratí práva spolutvůrce. Pak ho můžeš odebrat z komunity.",
       confirmLabel: "Snížit",
     });
     if (!ok) return;
@@ -708,7 +708,7 @@ function useMemberRoleActions({
     const ok = await confirmDialog({
       title: `Předat vlastnictví ${name}?`,
       description:
-        "Ty se staneš adminem a ztratíš právo mazat komunitu nebo měnit role.\n\n" +
+        "Ty se staneš spolutvůrcem a ztratíš právo mazat komunitu nebo měnit role.\n\n" +
         "Nový vlastník ti to může vrátit, ale nemusí.",
       confirmLabel: "Předat vlastnictví",
       variant: "danger",
@@ -1013,7 +1013,7 @@ function MemberMobileCard({
             )}
             {member.role === "admin" && (
               <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
-                Admin
+                Spolutvůrce
               </span>
             )}
           </div>
@@ -1170,7 +1170,7 @@ function MemberRow({
               )}
               {member.role === "admin" && (
                 <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
-                  Admin
+                  Spolutvůrce
                 </span>
               )}
             </div>
@@ -1412,7 +1412,7 @@ function MemberCrmEditor({
                 <>
                   <RoleActionButton
                     icon="★"
-                    label="Povýšit na admina"
+                    label="Povýšit na spolutvůrce"
                     onClick={onPromote}
                     disabled={!!roleBusy}
                     variant="primary"

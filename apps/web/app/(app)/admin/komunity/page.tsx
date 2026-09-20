@@ -30,7 +30,13 @@ export default function AdminKomunityTablePage() {
     workspaces
       .mine()
       .then((ws) => {
-        if (!cancelled) setMyWorkspaces(ws.filter((w) => w.my_role === "owner"));
+        // Owner i admin patří do Tvůrce shellu — admin má skoro stejná
+        // práva, jen komunitu nesmaže / neřídí ownership. Bez tohohle
+        // filtru admin nikdy neviděl komunitu, do které byl přizván.
+        if (!cancelled)
+          setMyWorkspaces(
+            ws.filter((w) => w.my_role === "owner" || w.my_role === "admin"),
+          );
       })
       .catch((err) => {
         if (cancelled) return;

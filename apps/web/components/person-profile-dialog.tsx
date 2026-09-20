@@ -363,7 +363,7 @@ function HidePersonAction({
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Vlastník",
-  admin: "Admin",
+  admin: "Spolutvůrce",
   member: "Člen",
 };
 

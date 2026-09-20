@@ -72,20 +72,17 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
           workspaces.eventsFor(slug),
         ]);
         if (cancelled) return;
-        if (ws.my_role !== "owner") {
+        if (ws.my_role !== "owner" && ws.my_role !== "admin") {
           try {
             await auth.me();
-            // Member (nebo admin) tady nemá co dělat — /admin/komunity je
-            // pro ownera. Redirect na in-app member landing (má tab
-            // Nástěnka i seznam akcí), NE na public /<slug>, kde
-            // nástěnka není a member by přišel o kontext komunity.
-            // Non-member skončí na public landing. User report
-            // 2026-09-09: starý e-mail vedl na /admin/… a member byl
-            // odkloněn na public view bez nástěnky.
+            // Member (ne-admin) tady nemá co dělat — /admin/komunity je
+            // Tvůrce shell. Admin je full-fledged komunity správce
+            // s téměř stejnými právy jako owner (chybí mu jen ownership
+            // handover + community delete), takže tady projde. Member
+            // dostane in-app member landing s nástěnkou + akcemi;
+            // non-member skončí na public landing.
             const target =
-              ws.my_role === "admin" || ws.my_role === "member"
-                ? `/workspaces/${slug}`
-                : `/${slug}`;
+              ws.my_role === "member" ? `/workspaces/${slug}` : `/${slug}`;
             router.replace(target);
           } catch {
             router.replace(`/login?next=/admin/komunity/${slug}`);
@@ -205,7 +202,7 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
       <nav
         role="tablist"
         aria-label="Sekce komunity"
-        className="sticky top-14 z-10 -mx-4 flex gap-1 overflow-x-auto border-y border-border bg-canvas/85 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-md sm:border"
+        className="-mx-4 flex gap-1 overflow-x-auto border-y border-border bg-canvas px-4 py-2 sm:mx-0 sm:rounded-md sm:border"
       >
         <TabBtn active={tab === "dashboard"} onClick={() => setTab("dashboard")}>
           Dashboard

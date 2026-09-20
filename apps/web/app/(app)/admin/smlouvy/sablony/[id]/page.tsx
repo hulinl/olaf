@@ -110,7 +110,9 @@ export default function TemplateEditPage({ params }: Props) {
     (async () => {
       try {
         const mine = await workspaces.mine();
-        const owned = mine.filter((w) => w.my_role === "owner");
+        const owned = mine.filter(
+          (w) => w.my_role === "owner" || w.my_role === "admin",
+        );
         if (cancelled || owned.length === 0) return;
         const home = owned[0];
         setWorkspace(home);
