@@ -241,6 +241,8 @@ export default async function EventLandingPage({ params }: Props) {
                   eventLocationText={event.location_text}
                   eventMeetingPointText={event.meeting_point_text}
                   eventLocationUrl={event.location_url}
+                  eventStartsAt={event.starts_at}
+                  eventEndsAt={event.ends_at}
                 />
               ))}
             </>

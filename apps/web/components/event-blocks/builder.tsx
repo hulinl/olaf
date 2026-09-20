@@ -47,6 +47,10 @@ interface Props {
    *  ať user vidí, co bude v hero vidět. */
   eventLocationText?: string;
   eventMeetingPointText?: string;
+  /** Event-level datum akce — hero přes `show_dates=true` z toho
+   *  auto-formátuje meta dlaždici „Termín". Preview v formu. */
+  eventStartsAt?: string;
+  eventEndsAt?: string;
 }
 
 const ADD_OPTIONS: BlockType[] = [
@@ -72,6 +76,8 @@ export function Builder({
   eventLocationUrl,
   eventLocationText,
   eventMeetingPointText,
+  eventStartsAt,
+  eventEndsAt,
 }: Props) {
   // Default to all blocks collapsed — opening the builder with a
   // long page used to dump every form on screen at once, eating
@@ -194,6 +200,8 @@ export function Builder({
                   eventLocationText={eventLocationText}
                   eventMeetingPointText={eventMeetingPointText}
                   eventLocationUrl={eventLocationUrl}
+                  eventStartsAt={eventStartsAt}
+                  eventEndsAt={eventEndsAt}
                 />
               </div>
             )}
@@ -266,6 +274,8 @@ function BlockForm({
   eventLocationText,
   eventMeetingPointText,
   eventLocationUrl,
+  eventStartsAt,
+  eventEndsAt,
 }: {
   block: EventBlock;
   onChange: (payload: EventBlock["payload"]) => void;
@@ -275,6 +285,8 @@ function BlockForm({
   eventLocationText?: string;
   eventMeetingPointText?: string;
   eventLocationUrl?: string;
+  eventStartsAt?: string;
+  eventEndsAt?: string;
 }) {
   switch (block.type) {
     case "hero":
@@ -287,6 +299,8 @@ function BlockForm({
           eventLocationText={eventLocationText}
           eventMeetingPointText={eventMeetingPointText}
           eventLocationUrl={eventLocationUrl}
+          eventStartsAt={eventStartsAt}
+          eventEndsAt={eventEndsAt}
         />
       );
     case "prose":

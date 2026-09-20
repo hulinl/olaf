@@ -29,6 +29,42 @@ export interface BlockDay {
   image_url?: string;
 }
 
+/** CZ formát rozsahu dat — sdílený mezi hero-block renderem + hero-form
+ *  previewem. Formát matchuje běžný český úzus:
+ *  - Stejný den:        „16. dubna 2026"
+ *  - Stejný měsíc:      „16.–19. dubna 2026"
+ *  - Různý měsíc:       „30. dubna – 2. května 2026"
+ *  - Různý rok:         „30. prosince 2026 – 2. ledna 2027"
+ *  Prázdný `endsAt` → jen datum startu. */
+export function formatCzDateRange(
+  startsAt: string,
+  endsAt: string,
+): string {
+  const s = new Date(startsAt);
+  if (Number.isNaN(s.getTime())) return "";
+  const e = endsAt ? new Date(endsAt) : null;
+  const sDay = s.getDate();
+  const sMonth = s.getMonth();
+  const sYear = s.getFullYear();
+  const monthFmt = (d: Date) =>
+    d.toLocaleDateString("cs-CZ", { month: "long" });
+  if (!e || Number.isNaN(e.getTime())) {
+    return `${sDay}. ${monthFmt(s)} ${sYear}`;
+  }
+  const eDay = e.getDate();
+  const eMonth = e.getMonth();
+  const eYear = e.getFullYear();
+  const sameDay = sDay === eDay && sMonth === eMonth && sYear === eYear;
+  if (sameDay) return `${sDay}. ${monthFmt(s)} ${sYear}`;
+  if (sYear !== eYear) {
+    return `${sDay}. ${monthFmt(s)} ${sYear} – ${eDay}. ${monthFmt(e)} ${eYear}`;
+  }
+  if (sMonth !== eMonth) {
+    return `${sDay}. ${monthFmt(s)} – ${eDay}. ${monthFmt(e)} ${sYear}`;
+  }
+  return `${sDay}.–${eDay}. ${monthFmt(s)} ${sYear}`;
+}
+
 export interface HeroBlockPayload {
   cover_url?: string;
   /** Focal point 0–100 (obrázek zůstává celý, jen se posune uvnitř
@@ -44,12 +80,13 @@ export interface HeroBlockPayload {
   meta?: BlockMetaTile[];
   cta_label?: string;
   cta_href?: string;
-  /** Když true, hero ukáže lokaci + sraz + click-through na mapu z
-   *  event settings (`location_text`, `meeting_point_text`,
-   *  `location_url`). Bez duplikace payloadu — data se čerpá přímo
-   *  z eventu, ať nedojde k drift mezi Nastavením a heroem. Default
-   *  false pro backwards-compat s hero bloky před 2026-09-20. */
+  /** Systémová meta dlaždice „Místo" — když true, hero prepend-ne
+   *  tile s `location_text` + odkazem na `location_url` z Nastavení
+   *  akce. Data se nikde neduplikují, drift není možný. Default false. */
   show_location?: boolean;
+  /** Systémová meta dlaždice „Termín" — auto-formátuje `starts_at` +
+   *  `ends_at` do CZ tvaru („16.–19. dubna 2026"). Default false. */
+  show_dates?: boolean;
 }
 
 export interface ProseBlockPayload {

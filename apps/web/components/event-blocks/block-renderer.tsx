@@ -50,11 +50,16 @@ interface Props {
   heroCtaDisabled?: boolean;
   heroCtaDisabledLabel?: string;
   /** Event location fields — když hero payload má `show_location=true`,
-   *  vykreslí lokační kartu s odkazem na mapu. Data se nikam neduplikují
-   *  → single source of truth s formulářem Nastavení. */
+   *  vykreslí systémovou meta dlaždici „Místo" s odkazem na mapu. Data
+   *  se nikam neduplikují → single source of truth s formulářem
+   *  Nastavení. */
   eventLocationText?: string;
   eventMeetingPointText?: string;
   eventLocationUrl?: string;
+  /** Event dates — když hero payload má `show_dates=true`, vykreslí
+   *  systémovou meta dlaždici „Termín" s auto-formátovaným rozsahem. */
+  eventStartsAt?: string;
+  eventEndsAt?: string;
 }
 
 export function BlockRenderer({
@@ -73,6 +78,8 @@ export function BlockRenderer({
   eventLocationText,
   eventMeetingPointText,
   eventLocationUrl,
+  eventStartsAt,
+  eventEndsAt,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -89,6 +96,8 @@ export function BlockRenderer({
           eventLocationText={eventLocationText}
           eventMeetingPointText={eventMeetingPointText}
           eventLocationUrl={eventLocationUrl}
+          eventStartsAt={eventStartsAt}
+          eventEndsAt={eventEndsAt}
         />
       );
     case "prose":

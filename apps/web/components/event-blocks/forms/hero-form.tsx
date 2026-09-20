@@ -2,7 +2,10 @@
 
 import { Field, Input } from "@/components/ui/field";
 import { PhotoEditor } from "@/components/ui/photo-editor";
-import type { HeroBlockPayload } from "@/lib/event-blocks";
+import {
+  type HeroBlockPayload,
+  formatCzDateRange,
+} from "@/lib/event-blocks";
 
 import { ImageUploadField } from "./_image-upload";
 
@@ -11,13 +14,16 @@ interface Props {
   onChange: (p: HeroBlockPayload) => void;
   workspaceSlug?: string;
   eventSlug?: string;
-  /** Event-level lokace pro preview toggle — hero se je čte přímo
-   *  z event.location_text / meeting_point_text / location_url. Ukazujeme
-   *  je pod checkboxem, aby user viděl, co se v hero objeví, aniž by
-   *  musel skákat mezi Nastavením a Obsahem. */
+  /** Event-level lokace + termíny pro preview toggle-ů. Hero je čte
+   *  přímo z eventu (location_text, meeting_point_text, location_url,
+   *  starts_at, ends_at); tady je ukazujeme pod checkboxem, aby user
+   *  viděl, co se v hero objeví, aniž by musel skákat mezi Nastavením
+   *  a Obsahem. */
   eventLocationText?: string;
   eventMeetingPointText?: string;
   eventLocationUrl?: string;
+  eventStartsAt?: string;
+  eventEndsAt?: string;
 }
 
 export function HeroForm({
@@ -28,6 +34,8 @@ export function HeroForm({
   eventLocationText = "",
   eventMeetingPointText = "",
   eventLocationUrl = "",
+  eventStartsAt = "",
+  eventEndsAt = "",
 }: Props) {
   const meta = payload.meta ?? [];
 
@@ -126,59 +134,74 @@ export function HeroForm({
       </div>
 
       <div className="rounded-md border border-border bg-surface-muted/40 p-3">
-        <label className="flex items-start gap-3 text-sm text-ink-900">
-          <input
-            type="checkbox"
-            checked={payload.show_location === true}
-            onChange={(e) =>
-              onChange({ ...payload, show_location: e.target.checked })
-            }
-            className="mt-0.5 size-4 shrink-0 accent-brand"
-          />
-          <span className="flex flex-col gap-1">
-            <span className="font-medium">
-              Zobrazit místo a odkaz na mapu
-            </span>
-            <span className="text-xs text-ink-500">
-              Data se natáhnou přímo z Nastavení akce (Lokalita, Místo
-              srazu, Odkaz na mapu) — bez duplikace. Změny v nastavení se
-              tady projeví automaticky.
-            </span>
-            {payload.show_location && (
-              <span className="mt-1 flex flex-col gap-0.5 rounded-md border border-border bg-surface p-2 text-xs text-ink-700">
-                <span>
-                  <span className="text-ink-500">Lokalita:</span>{" "}
-                  {eventLocationText || (
-                    <span className="italic text-ink-500">
-                      není vyplněné v Nastavení
-                    </span>
-                  )}
-                </span>
-                <span>
-                  <span className="text-ink-500">Místo srazu:</span>{" "}
-                  {eventMeetingPointText || (
-                    <span className="italic text-ink-500">nevyplněno</span>
-                  )}
-                </span>
-                <span>
-                  <span className="text-ink-500">Odkaz na mapu:</span>{" "}
-                  {eventLocationUrl ? (
-                    <a
-                      href={eventLocationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-brand hover:underline"
-                    >
-                      {eventLocationUrl}
-                    </a>
-                  ) : (
-                    <span className="italic text-ink-500">nevyplněno</span>
-                  )}
-                </span>
+        <p className="text-sm font-medium text-ink-900">
+          Systémové dlaždice
+        </p>
+        <p className="mt-1 text-xs text-ink-500">
+          Připnou se před tvoje vlastní meta dlaždice a berou data
+          přímo z Nastavení akce — žádná duplikace, změny se propíšou
+          automaticky.
+        </p>
+        <div className="mt-3 flex flex-col gap-3">
+          <label className="flex items-start gap-3 text-sm text-ink-900">
+            <input
+              type="checkbox"
+              checked={payload.show_dates === true}
+              onChange={(e) =>
+                onChange({ ...payload, show_dates: e.target.checked })
+              }
+              className="mt-0.5 size-4 shrink-0 accent-brand"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium">Termín</span>
+              <span className="text-xs text-ink-500">
+                {eventStartsAt ? (
+                  <>
+                    Zobrazí se: <strong>{formatCzDateRange(eventStartsAt, eventEndsAt)}</strong>
+                  </>
+                ) : (
+                  <span className="italic">
+                    Nastav datum v Detailech akce, ať se dá zobrazit.
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-        </label>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 text-sm text-ink-900">
+            <input
+              type="checkbox"
+              checked={payload.show_location === true}
+              onChange={(e) =>
+                onChange({ ...payload, show_location: e.target.checked })
+              }
+              className="mt-0.5 size-4 shrink-0 accent-brand"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium">Místo</span>
+              <span className="text-xs text-ink-500">
+                {eventLocationText || eventMeetingPointText ? (
+                  <>
+                    Zobrazí se:{" "}
+                    <strong>
+                      {eventLocationText || eventMeetingPointText}
+                    </strong>
+                    {eventLocationText && eventMeetingPointText && (
+                      <>
+                        {" "}(sraz: {eventMeetingPointText})
+                      </>
+                    )}
+                    {eventLocationUrl && " · klikatelné na mapu"}
+                  </>
+                ) : (
+                  <span className="italic">
+                    Vyplň Lokalitu nebo Místo srazu v Detailech.
+                  </span>
+                )}
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
 
       <div>
