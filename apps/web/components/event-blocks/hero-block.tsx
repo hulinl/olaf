@@ -38,6 +38,11 @@ interface Props {
   eventStartsAt?: string;
   eventEndsAt?: string;
   eventTz?: string;
+  /** Event.description — fallback pro subtitle. Owner v Nastavení
+   *  editace „Krátký intro" a čeká, že se to na public projeví; když
+   *  hero payload nemá vlastní subtitle, použijeme description. Držíme
+   *  tak single source of truth mezi Nastavením a landingem. */
+  eventDescription?: string;
 }
 
 export function HeroBlock({
@@ -56,7 +61,9 @@ export function HeroBlock({
   eventStartsAt = "",
   eventEndsAt = "",
   eventTz = "",
+  eventDescription = "",
 }: Props) {
+  const subtitle = payload.subtitle || eventDescription;
   // Systémové meta dlaždice (Místo / Termín) - auto z eventu, když
   // owner v hero-form zaškrtl příslušný toggle. Prepend-nou se před
   // custom `payload.meta`, aby stály v gridu jako první.
@@ -171,10 +178,10 @@ export function HeroBlock({
           </h1>
         </div>
 
-        {payload.subtitle && (
+        {subtitle && (
           <p
             className={[
-              "max-w-2xl text-lg sm:text-xl",
+              "max-w-2xl whitespace-pre-line text-lg sm:text-xl",
               onDark ? "text-white/95" : "text-ink-700",
             ].join(" ")}
             style={{
@@ -184,7 +191,7 @@ export function HeroBlock({
               textShadow: cover ? "0 1px 12px rgba(0,0,0,0.5)" : undefined,
             }}
           >
-            {payload.subtitle}
+            {subtitle}
           </p>
         )}
 

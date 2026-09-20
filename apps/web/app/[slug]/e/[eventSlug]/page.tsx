@@ -244,6 +244,7 @@ export default async function EventLandingPage({ params }: Props) {
                   eventStartsAt={event.starts_at}
                   eventEndsAt={event.ends_at}
                   eventTz={event.tz}
+                  eventDescription={event.description}
                 />
               ))}
             </>

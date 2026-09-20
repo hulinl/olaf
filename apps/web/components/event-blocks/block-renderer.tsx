@@ -62,6 +62,9 @@ interface Props {
   eventStartsAt?: string;
   eventEndsAt?: string;
   eventTz?: string;
+  /** Event.description — hero použije jako fallback subtitle, když
+   *  vlastní subtitle v payloadu není. */
+  eventDescription?: string;
 }
 
 export function BlockRenderer({
@@ -83,6 +86,7 @@ export function BlockRenderer({
   eventStartsAt,
   eventEndsAt,
   eventTz,
+  eventDescription,
 }: Props) {
   switch (block.type) {
     case "hero":
@@ -102,6 +106,7 @@ export function BlockRenderer({
           eventStartsAt={eventStartsAt}
           eventEndsAt={eventEndsAt}
           eventTz={eventTz}
+          eventDescription={eventDescription}
         />
       );
     case "prose":

@@ -502,7 +502,7 @@ export function EventForm({
               <Field
                 label="Krátký intro"
                 htmlFor="desc"
-                hint="Jedna věta nebo dva odstavce. Plný obsah landingu se skládá v sekci Obsah stránky."
+                hint="Ukáže se v hero landing stránky pod nadpisem (pokud v Obsahu stránky nemáš vlastní podtitulek). Zároveň se použije jako popis v share cards (WhatsApp, Instagram, atd.)."
               >
                 <textarea
                   id="desc"
