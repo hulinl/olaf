@@ -12,7 +12,32 @@ const nextConfig: NextConfig = {
       // 2026-05-20 so it lives next to Akce / Komunity / Lidé.
       {
         source: "/settings/gear",
-        destination: "/admin/vybaveni",
+        destination: "/tvurce/vybaveni",
+        permanent: true,
+      },
+      // 2026-09-20: URL redesign — `/admin/*` → `/tvurce/*`
+      // (Tvůrce místo admin) a `admin/eventy` → `akce`. Zachováváme
+      // 308 redirecty na staré URL, aby bookmarky, staré e-mailové
+      // odkazy z checklisty / reminderů + externí sdílené linky
+      // fungovaly.
+      {
+        source: "/admin/eventy/:path*",
+        destination: "/tvurce/akce/:path*",
+        permanent: true,
+      },
+      {
+        source: "/admin/eventy",
+        destination: "/tvurce/akce",
+        permanent: true,
+      },
+      {
+        source: "/admin/:path*",
+        destination: "/tvurce/:path*",
+        permanent: true,
+      },
+      {
+        source: "/admin",
+        destination: "/tvurce",
         permanent: true,
       },
     ];

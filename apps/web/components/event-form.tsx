@@ -937,7 +937,7 @@ export function EventForm({
                 Nemáš další komunitu, kam by se akce dala sdílet. Vytvoř
                 si komunitu nebo se přidej do existující v sekci{" "}
                 <a
-                  href="/admin/komunity"
+                  href="/tvurce/komunity"
                   className="font-medium text-ink-700 underline hover:text-ink-900"
                 >
                   Komunity
@@ -965,7 +965,7 @@ export function EventForm({
             <div className="mt-4 rounded-md border border-dashed border-border bg-surface-muted/40 px-3 py-3 text-sm text-ink-500">
               Zatím nemáš žádnou šablonu smlouvy. Vytvoř si ji v sekci{" "}
               <a
-                href="/admin/smlouvy"
+                href="/tvurce/smlouvy"
                 className="font-medium text-ink-700 underline hover:text-ink-900"
               >
                 Smlouvy

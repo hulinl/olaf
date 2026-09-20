@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { ADMIN_NAV } from "@/app/(app)/admin/layout";
+import { ADMIN_NAV } from "@/app/(app)/tvurce/layout";
 import { type Workspace, workspaces as workspacesApi } from "@/lib/api";
 
 import { Logo } from "./logo";
@@ -126,10 +126,10 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
 
           <div className="flex items-center gap-2">
             <Link
-              href="/admin"
+              href="/tvurce"
               className={[
                 "hidden items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-ring lg:inline-flex",
-                pathname.startsWith("/admin")
+                pathname.startsWith("/tvurce")
                   ? "border-brand bg-brand text-brand-ink"
                   : "border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900",
               ].join(" ")}
@@ -137,7 +137,7 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
               <span
                 aria-hidden
                 className={
-                  pathname.startsWith("/admin") ? "text-brand-ink" : "text-brand"
+                  pathname.startsWith("/tvurce") ? "text-brand-ink" : "text-brand"
                 }
                 style={{ fontSize: "0.7em", lineHeight: 1 }}
               >

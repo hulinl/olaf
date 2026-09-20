@@ -235,7 +235,7 @@ class ImportEndpointSemanticsTests(TestCase):
     def test_response_includes_edit_and_public_urls(self) -> None:
         r = self.client.post(self.url, _make_payload(), format="json")
         body = r.json()
-        self.assertIn("/admin/events/beskydy-spring-camp/edit", body["edit_url"])
+        self.assertIn("/tvurce/events/beskydy-spring-camp/edit", body["edit_url"])
         self.assertIn(
             f"/{self.ws.slug}/e/beskydy-spring-camp", body["public_url"]
         )

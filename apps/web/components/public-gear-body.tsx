@@ -50,7 +50,7 @@ export function PublicGearBody({ list }: Props) {
   const categories = [...byCategory.keys()];
 
   // Filter then keep the category grouping in the items table — same
-  // structure the owner sees in /admin/vybaveni list-card view.
+  // structure the owner sees in /tvurce/vybaveni list-card view.
   const filteredEntries =
     categoryFilter == null
       ? list.entries

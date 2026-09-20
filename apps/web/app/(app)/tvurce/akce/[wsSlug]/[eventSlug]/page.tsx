@@ -1,0 +1,1529 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, use, useEffect, useState } from "react";
+
+import { EventChecklist } from "@/components/event-checklist";
+import { ParticipantProfileDialog } from "@/components/participant-profile-dialog";
+import { Avatar } from "@/components/ui/avatar";
+import { LinkButton } from "@/components/ui/button";
+import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ShareButton } from "@/components/ui/share-button";
+import {
+  ApiError,
+  contracts,
+  type Event as OlafEvent,
+  type RSVPRecord,
+  events,
+} from "@/lib/api";
+import { computeRsvpAlerts, type RsvpAlert } from "@/lib/rsvp-alerts";
+
+type Filter = "all" | "yes" | "waitlist" | "pending_approval" | "cancelled";
+
+type SortKey = "name" | "status" | "payment" | "created";
+type SortDir = "asc" | "desc";
+interface SortState {
+  key: SortKey;
+  dir: SortDir;
+}
+
+const STATUS_ORDER: Record<RSVPRecord["status"], number> = {
+  yes: 0,
+  pending_approval: 1,
+  waitlist: 2,
+  maybe: 3,
+  no: 4,
+  cancelled: 5,
+};
+
+const PAYMENT_ORDER: Record<RSVPRecord["payment_status"], number> = {
+  pending: 0,
+  paid: 1,
+  waived: 2,
+  refunded: 3,
+};
+
+function compareRsvps(a: RSVPRecord, b: RSVPRecord, sort: SortState): number {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  switch (sort.key) {
+    case "name":
+      return (
+        a.user_full_name.localeCompare(b.user_full_name, "cs", {
+          sensitivity: "base",
+        }) * dir
+      );
+    case "status":
+      return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) * dir;
+    case "payment":
+      return (
+        (PAYMENT_ORDER[a.payment_status] - PAYMENT_ORDER[b.payment_status]) *
+        dir
+      );
+    case "created":
+      return (
+        (new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()) *
+        dir
+      );
+  }
+}
+
+const RSVP_STATUS_LABEL: Record<RSVPRecord["status"], string> = {
+  yes: "Potvrzeno",
+  maybe: "Možná",
+  no: "Odmítl",
+  waitlist: "Waitlist",
+  pending_approval: "Čeká na schválení",
+  cancelled: "Zrušeno",
+};
+
+const CANCELLATION_REASON_LABEL: Record<
+  Exclude<RSVPRecord["cancellation_reason"], "">,
+  string
+> = {
+  self: "Sám zrušil",
+  by_token: "Mailem",
+  owner: "Zrušil pořadatel",
+};
+
+const RSVP_STATUS_TONE: Record<RSVPRecord["status"], string> = {
+  yes: "bg-success/15 text-success",
+  maybe: "bg-surface-muted text-ink-500",
+  no: "bg-surface-muted text-ink-500",
+  waitlist: "bg-warning/15 text-warning",
+  pending_approval: "bg-warning/15 text-warning",
+  cancelled: "bg-danger-soft text-danger",
+};
+
+interface Props {
+  params: Promise<{ wsSlug: string; eventSlug: string }>;
+}
+
+/**
+ * Level 2 admin view — roster table for a single event. Columns owner
+ * cares about when chasing missing items: payment, waiver/contract,
+ * insurance. Backed today by RSVP.questionnaire_answers; the placeholder
+ * columns get wired when RSVP.payment_status + RSVP.required_docs land.
+ */
+export default function AdminEventDetailPage(props: Props) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-12">
+          <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+        </div>
+      }
+    >
+      <AdminEventDetail {...props} />
+    </Suspense>
+  );
+}
+
+function AdminEventDetail({ params }: Props) {
+  const { wsSlug, eventSlug } = use(params);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const filterParam = searchParams.get("filter") as Filter | null;
+  const filter: Filter =
+    filterParam &&
+    ["all", "yes", "waitlist", "pending_approval", "cancelled"].includes(
+      filterParam,
+    )
+      ? filterParam
+      : "all";
+  const [event, setEvent] = useState<OlafEvent | null>(null);
+  const [rsvps, setRsvps] = useState<RSVPRecord[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profileRsvpId, setProfileRsvpId] = useState<number | null>(null);
+  // Default sort = nejnovější přihlášky nahoře. Owner v praxi
+  // sleduje "co se za poslední dny stalo" víc než abeceda, takže
+  // chronologie sestupně sedí jako landing state. Klik na hlavičku
+  // toggluje směr / přepíná na jiný klíč.
+  const [sort, setSort] = useState<SortState>({
+    key: "created",
+    dir: "desc",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ev, list] = await Promise.all([
+          events.publicEvent(wsSlug, eventSlug),
+          events.rsvpList(wsSlug, eventSlug),
+        ]);
+        if (cancelled) return;
+        setEvent(ev);
+        setRsvps(list);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?next=/tvurce/akce/${wsSlug}/${eventSlug}`);
+          return;
+        }
+        if (err instanceof ApiError && err.status === 404) {
+          router.replace("/tvurce/eventy");
+          return;
+        }
+        if (err instanceof ApiError && err.status === 403) {
+          router.replace("/tvurce/eventy");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Něco se pokazilo.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [wsSlug, eventSlug, router]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+      </div>
+    );
+  }
+  if (error) return <Alert variant="danger">{error}</Alert>;
+  if (!event || !rsvps) return null;
+
+  const confirmed = rsvps.filter((r) => r.status === "yes");
+  const waitlist = rsvps.filter((r) => r.status === "waitlist");
+  const pending = rsvps.filter((r) => r.status === "pending_approval");
+  const cancelled = rsvps.filter((r) => r.status === "cancelled");
+  // "Vše" v hlavním rosteru = aktivní registrace; zrušené mají
+  // dedikovaný stat tile a vlastní filtr, aby nepřekážely v denní
+  // práci ownera. Když user explicitně klikne na "Zrušeno", uvidí
+  // jen je.
+  const filteredRsvps = (
+    filter === "all"
+      ? rsvps.filter((r) => r.status !== "cancelled")
+      : rsvps.filter((r) => r.status === filter)
+  )
+    .slice()
+    .sort((a, b) => compareRsvps(a, b, sort));
+
+  function toggleSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "name" ? "asc" : "desc" },
+    );
+  }
+
+  const starts = new Date(event.starts_at);
+  const ends = new Date(event.ends_at);
+  const sameDay = starts.toDateString() === ends.toDateString();
+  const dateLabel = sameDay
+    ? starts.toLocaleDateString("cs-CZ", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : `${starts.toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })} – ${ends.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}`;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Link
+        href="/tvurce/eventy"
+        className="text-sm text-ink-500 hover:text-ink-900"
+      >
+        ← Zpět na seznam akcí
+      </Link>
+
+      <header className="flex flex-col gap-4">
+        <div>
+          <p className="text-sm font-medium text-brand">Akce</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+            {event.title}
+          </h1>
+          <p className="mt-2 text-sm text-ink-500">
+            {dateLabel}
+            {event.location_text && ` · ${event.location_text}`}
+          </p>
+        </div>
+        {/* Sjednocená pill toolbar — všechny nav-item buttons stejný
+            styl (ghost + border), aby vypadaly jako sourozenci. Share
+            je vpravo zvlášť (jiný typ akce). */}
+        <div className="flex flex-wrap gap-2">
+          <LinkButton
+            href={`/tvurce/akce/${wsSlug}/${eventSlug}/edit`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Upravit akci
+          </LinkButton>
+          <LinkButton
+            href={`/tvurce/akce/${wsSlug}/${eventSlug}/edit/obsah`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Upravit obsah stránky
+          </LinkButton>
+          <LinkButton
+            href={`/tvurce/akce/${wsSlug}/${eventSlug}/dokumenty`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Dokumenty
+          </LinkButton>
+          <LinkButton
+            href={`/tvurce/akce/${wsSlug}/${eventSlug}/edit#odkazy`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Odkazy
+          </LinkButton>
+          <LinkButton
+            href={`/tvurce/akce/${wsSlug}/${eventSlug}/kalkulace`}
+            variant="ghost"
+            size="md"
+            className="border border-border"
+          >
+            Kalkulace
+          </LinkButton>
+          <a
+            href={`/${wsSlug}/e/${eventSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            Veřejný náhled ↗
+          </a>
+          <ShareButton
+            url={`/${wsSlug}/e/${eventSlug}`}
+            title={event.title}
+            text={`${event.title} — ${dateLabel}`}
+            label="Sdílet akci"
+          />
+        </div>
+      </header>
+
+      <div className="grid grid-cols-4 items-stretch gap-2 sm:gap-3">
+        <StatTile
+          label="Přihlášeno"
+          value={(() => {
+            // Hlavní číslo: počet platících účastníků (bez organizátorů).
+            // Drobný subtitle: celkem vč. organizátorů (= údaj pro
+            // kapacitu ubytování atd.). User report 2026-06-26:
+            // „nejdůležitější je přihlášeno bez, to s organizátory
+            // jen malým".
+            const paying = confirmed.filter((r) => !r.is_organizer).length;
+            const total = confirmed.length;
+            return event.capacity != null
+              ? `${paying} / ${event.capacity}`
+              : String(paying);
+          })()}
+          subValue={(() => {
+            const paying = confirmed.filter((r) => !r.is_organizer).length;
+            const total = confirmed.length;
+            return total !== paying ? `celkem ${total}` : undefined;
+          })()}
+          href={`/tvurce/akce/${wsSlug}/${eventSlug}?filter=yes`}
+          active={filter === "yes"}
+        />
+        <StatTile
+          label="Waitlist"
+          value={String(waitlist.length)}
+          tone={waitlist.length > 0 ? "warning" : undefined}
+          href={`/tvurce/akce/${wsSlug}/${eventSlug}?filter=waitlist`}
+          active={filter === "waitlist"}
+        />
+        <StatTile
+          label="Ke schválení"
+          value={String(pending.length)}
+          tone={pending.length > 0 ? "warning" : undefined}
+          href={`/tvurce/akce/${wsSlug}/${eventSlug}?filter=pending_approval`}
+          active={filter === "pending_approval"}
+        />
+        <StatTile
+          label="Zrušeno"
+          value={String(cancelled.length)}
+          href={`/tvurce/akce/${wsSlug}/${eventSlug}?filter=cancelled`}
+          active={filter === "cancelled"}
+        />
+      </div>
+
+      <EventChecklist workspaceSlug={wsSlug} eventSlug={eventSlug} />
+
+      {filter !== "all" && (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-ink-500">Filtr aktivní.</span>
+          <Link
+            href={`/tvurce/akce/${wsSlug}/${eventSlug}`}
+            className="font-medium text-brand hover:underline"
+          >
+            Zobrazit všechny ×
+          </Link>
+        </div>
+      )}
+
+      {filteredRsvps.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
+          <h3 className="text-base font-semibold text-ink-900">
+            {filter === "all"
+              ? "Zatím žádné registrace"
+              : "Žádné záznamy v tomto filtru"}
+          </h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+            {filter === "all"
+              ? "Až se někdo přihlásí, uvidíš ho tady."
+              : "Zkus jiný filtr nebo zobraz všechny."}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile: card list. The 7-col table on a phone forced
+              horizontal scroll AND hid the approve/reject CTAs that
+              are critical for pending_approval flows. */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {filteredRsvps.map((r) => (
+              <RsvpCard
+                key={r.id}
+                rsvp={r}
+                wsSlug={wsSlug}
+                eventSlug={eventSlug}
+                onUpdate={(updated) =>
+                  setRsvps((prev) =>
+                    prev
+                      ? prev.map((x) => (x.id === updated.id ? updated : x))
+                      : prev,
+                  )
+                }
+                onRemove={(removedId) =>
+                  setRsvps((prev) =>
+                    prev ? prev.filter((x) => x.id !== removedId) : prev,
+                  )
+                }
+                onOpenProfile={() => setProfileRsvpId(r.id)}
+              />
+            ))}
+          </div>
+          {/* sm+: full table */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted/60">
+                <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                  <SortableTh
+                    label="Účastník"
+                    sortKey="name"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
+                  {/* Info — alerts z RSVP dotazníku (alergie, dieta,
+                      photo opt-out, začátečník). Safety-critical, aby
+                      organizátorovi neuniklo, že se s tou přihláškou
+                      musí nějak zabývat. */}
+                  <th
+                    className="px-3 py-3 text-left"
+                    aria-label="Alerty z RSVP dotazníku"
+                    title="Alerty z RSVP dotazníku (najeď na ikonku pro detail)"
+                  >
+                    Info
+                  </th>
+                  <SortableTh
+                    label="Status"
+                    sortKey="status"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
+                  <SortableTh
+                    label="Platba"
+                    sortKey="payment"
+                    active={sort}
+                    onClick={toggleSort}
+                    align="right"
+                  />
+                  <th className="px-4 py-3 text-right">Faktura</th>
+                  <th className="px-4 py-3 text-right">Smlouva</th>
+                  <th className="px-4 py-3 text-right">Pojištění</th>
+                  <SortableTh
+                    label="Přihlášen"
+                    sortKey="created"
+                    active={sort}
+                    onClick={toggleSort}
+                  />
+                  {/* Akční sloupec na pravém konci řádku — daleko od
+                      dat, snižuje riziko misclick-u při procházení
+                      rosteru. Hlavička prázdná, ikona-only buttony
+                      v rowu (popelnice). */}
+                  <th className="px-2 py-3" aria-label="Akce" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredRsvps.map((r) => (
+                  <RsvpRow
+                    key={r.id}
+                    rsvp={r}
+                    wsSlug={wsSlug}
+                    eventSlug={eventSlug}
+                    requiredDocs={event.required_documents ?? []}
+                    onUpdate={(updated) =>
+                      setRsvps((prev) =>
+                        prev
+                          ? prev.map((x) =>
+                              x.id === updated.id ? updated : x,
+                            )
+                          : prev,
+                      )
+                    }
+                    onRemove={(removedId) =>
+                      setRsvps((prev) =>
+                        prev
+                          ? prev.filter((x) => x.id !== removedId)
+                          : prev,
+                      )
+                    }
+                    onOpenProfile={() => setProfileRsvpId(r.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <ParticipantProfileDialog
+        workspaceSlug={wsSlug}
+        eventSlug={eventSlug}
+        rsvpId={profileRsvpId}
+        onClose={() => setProfileRsvpId(null)}
+      />
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  subValue,
+  tone,
+  href,
+  active,
+}: {
+  label: string;
+  value: string;
+  /** Drobný subtitle POD hlavní hodnotou — např. „celkem 4" když
+   *  hlavní value je platící count a chceme info o celku. Vždycky
+   *  rezervujeme jeden řádek pro něj (i prázdný), aby velká čísla
+   *  napříč všemi tiles byla zarovnaná na stejné vertikále. */
+  subValue?: string;
+  tone?: "warning";
+  href?: string;
+  active?: boolean;
+}) {
+  const body = (
+    <div
+      className={[
+        "flex h-full flex-col rounded-xl border bg-surface p-2.5 transition-colors sm:rounded-2xl sm:p-5",
+        active
+          ? "border-brand bg-brand/5"
+          : tone === "warning"
+            ? "border-warning/30"
+            : "border-border",
+        href ? "hover:border-brand hover:bg-brand/10" : "",
+      ].join(" ")}
+    >
+      <p className="text-[10px] font-medium uppercase tracking-wide text-ink-500 sm:text-xs">
+        {label}
+      </p>
+      <div className="mt-auto pt-1 sm:pt-2">
+        <p
+          className={[
+            "text-lg font-semibold leading-tight sm:text-3xl",
+            tone === "warning" ? "text-warning" : "text-ink-900",
+          ].join(" ")}
+        >
+          {value}
+        </p>
+        {/* Subtitle řádek je VŽDYCKY rendered (i prázdný), aby velké
+            číslo bylo na stejné vertikále napříč tiles. */}
+        <p className="mt-0.5 text-[10px] leading-tight text-ink-500 sm:text-xs">
+          {subValue || " "}
+        </p>
+      </div>
+    </div>
+  );
+  if (href) return <Link href={href} className="block h-full focus-ring">{body}</Link>;
+  return body;
+}
+
+function RsvpRow({
+  rsvp,
+  wsSlug,
+  eventSlug,
+  requiredDocs,
+  onUpdate,
+  onRemove,
+  onOpenProfile,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+  requiredDocs: { key: string; label: string; required: boolean }[];
+  onUpdate: (updated: RSVPRecord) => void;
+  onRemove: (removedId: number) => void;
+  onOpenProfile: () => void;
+}) {
+  const [busy, setBusy] = useState<
+    "paid" | "approve" | "reject" | "organizer" | "remove" | null
+  >(null);
+  const confirmDialog = useConfirm();
+  const created = new Date(rsvp.created_at);
+  const requiredKeys = new Set(requiredDocs.map((d) => d.key));
+  const uploadedKeys = new Set(rsvp.uploaded_doc_keys);
+  const verifiedKeys = new Set(rsvp.verified_doc_keys);
+
+  async function handleMarkPaid() {
+    if (busy) return;
+    const ok = await confirmDialog({
+      title: "Označit jako zaplaceno?",
+      description:
+        "Změnu uvidí účastník (přestane mu chodit reminder o platbě). Audit log si pamatuje kdo a kdy označil.",
+      confirmLabel: "Označit zaplaceno",
+    });
+    if (!ok) return;
+    setBusy("paid");
+    try {
+      const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      // Quietly fail; admin can retry.
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleToggleOrganizer() {
+    if (busy) return;
+    const next = !rsvp.is_organizer;
+    const ok = next
+      ? await confirmDialog({
+          title: `Označit ${
+            rsvp.user_full_name || rsvp.user_email
+          } jako organizátora?`,
+          description:
+            "Nebude se počítat do kapacity ani se po něm nebude chtít platba.",
+          confirmLabel: "Označit jako organizátora",
+        })
+      : await confirmDialog({
+          title: "Odebrat roli organizátora?",
+          description:
+            "Bude opět účastník — započítá se do kapacity, případně dostane požadavek na platbu.",
+          confirmLabel: "Odebrat roli",
+          variant: "danger",
+        });
+    if (!ok) return;
+    setBusy("organizer");
+    try {
+      const updated = await events.toggleRsvpOrganizer(
+        wsSlug,
+        eventSlug,
+        rsvp.id,
+        next,
+      );
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleApprove() {
+    if (busy) return;
+    setBusy("approve");
+    try {
+      const updated = await events.approveRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet, admin can retry */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleReject() {
+    if (busy) return;
+    const ok = await confirmDialog({
+      title: "Zamítnout tuto registraci?",
+      description:
+        "Účastník dostane e-mail o zamítnutí. Registrace přejde do stavu cancelled — pokud si přihlášku rozmyslíš, můžeš ho znovu přidat ručně.",
+      confirmLabel: "Zamítnout",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setBusy("reject");
+    try {
+      const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRemove() {
+    if (busy) return;
+    const who = rsvp.user_full_name || rsvp.user_email;
+    const ok = await confirmDialog({
+      title: `Odebrat ${who} z akce?`,
+      description:
+        'Účastníka i případnou roli organizátora smažeme. Pokud se znovu přihlásí, půjde jako úplně nová registrace (projde schvalováním, pokud je nastavené). Historie zůstane v auditu.',
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setBusy("remove");
+    try {
+      await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
+      onRemove(rsvp.id);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDismissDuplicate() {
+    try {
+      const updated = await events.dismissDuplicateHint(
+        wsSlug,
+        eventSlug,
+        rsvp.id,
+      );
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    }
+  }
+
+  return (
+    <tr className="group hover:bg-brand/10">
+      <td className="px-4 py-3">
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            aria-label={`Detail účastníka ${rsvp.user_full_name || rsvp.user_email}`}
+            className="shrink-0 rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <RosterAvatar rsvp={rsvp} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex min-w-0 flex-col items-start gap-0.5 rounded text-left transition-colors focus-ring hover:text-brand"
+          >
+            <span className="font-medium text-ink-900 group-hover:underline">
+              {rsvp.user_full_name || "—"}
+            </span>
+            <span className="text-xs text-ink-500">{rsvp.user_email}</span>
+            {rsvp.user_phone && (
+              <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
+            )}
+          </button>
+          {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
+            <DuplicateBadge
+              hints={rsvp.duplicate_hints}
+              onDismiss={handleDismissDuplicate}
+            />
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-3 align-top">
+        {(() => {
+          const alerts = computeRsvpAlerts(rsvp.questionnaire_answers);
+          if (alerts.length === 0)
+            return <span className="text-xs text-ink-300">—</span>;
+          return <RsvpAlertBadges rsvp={rsvp} compact />;
+        })()}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3">
+        <div className="flex flex-col gap-1.5">
+          {rsvp.is_organizer ? (
+            <span className="inline-flex w-fit rounded bg-brand/15 px-2 py-0.5 text-xs font-medium text-brand">
+              Organizátor
+            </span>
+          ) : (
+            <span
+              className={[
+                "inline-flex w-fit rounded px-2 py-0.5 text-xs font-medium",
+                RSVP_STATUS_TONE[rsvp.status],
+              ].join(" ")}
+            >
+              {RSVP_STATUS_LABEL[rsvp.status]}
+              {rsvp.waitlist_position != null && (
+                <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+              )}
+            </span>
+          )}
+          {rsvp.status === "cancelled" && rsvp.cancellation_reason !== "" && (
+            <span className="text-[11px] text-ink-500">
+              {CANCELLATION_REASON_LABEL[rsvp.cancellation_reason]}
+            </span>
+          )}
+          {rsvp.status === "pending_approval" && !rsvp.is_organizer && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={busy !== null}
+                className="rounded-md bg-success px-2 py-0.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-50 focus-ring"
+              >
+                {busy === "approve" ? "..." : "Schválit"}
+              </button>
+              <button
+                type="button"
+                onClick={handleReject}
+                disabled={busy !== null}
+                className="rounded-md border border-danger/40 bg-surface px-2 py-0.5 text-[11px] font-medium text-danger hover:bg-danger-soft disabled:opacity-50 focus-ring"
+              >
+                {busy === "reject" ? "..." : "Zamítnout"}
+              </button>
+            </div>
+          )}
+          {/* Akce na účastníkovi mají smysl jen dokud je registrace
+              aktivní. Cancelled row ukazuje jen status badge —
+              organizer toggle mizí, jinak by tam zůstaly klikatelné
+              kontroly nad zrušenou registrací. Remove (popelnice) je
+              v dedikovaném sloupci na konci řádku. */}
+          {rsvp.can_toggle_organizer && (
+            <button
+              type="button"
+              onClick={handleToggleOrganizer}
+              disabled={busy !== null}
+              className="text-left text-[11px] font-medium text-ink-500 hover:text-brand disabled:opacity-50"
+            >
+              {busy === "organizer"
+                ? "..."
+                : rsvp.is_organizer
+                  ? "Odebrat organizátora"
+                  : "Označit organizátorem"}
+            </button>
+          )}
+        </div>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <PaymentCell rsvp={rsvp} onMarkPaid={handleMarkPaid} marking={busy === "paid"} />
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <InvoiceCell rsvp={rsvp} wsSlug={wsSlug} eventSlug={eventSlug} />
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
+          <span className="text-ink-300">—</span>
+        ) : rsvp.contract?.configured ? (
+          <ContractCell
+            rsvp={rsvp}
+            wsSlug={wsSlug}
+            eventSlug={eventSlug}
+            onUpdate={onUpdate}
+          />
+        ) : (
+          <DocCell
+            docKey="smlouva"
+            required={requiredKeys.has("smlouva")}
+            uploaded={uploadedKeys.has("smlouva")}
+            verified={verifiedKeys.has("smlouva")}
+          />
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-right">
+        {rsvp.is_organizer || rsvp.status === "cancelled" ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <DocCell
+            docKey="pojisteni"
+            required={requiredKeys.has("pojisteni")}
+            uploaded={uploadedKeys.has("pojisteni")}
+            verified={verifiedKeys.has("pojisteni")}
+          />
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-ink-500">
+        {created.toLocaleDateString("cs-CZ", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })}
+      </td>
+      <td className="whitespace-nowrap px-2 py-3 text-right">
+        {rsvp.can_be_removed && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={busy !== null}
+            title="Odebrat z akce"
+            aria-label="Odebrat z akce"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
+          >
+            {busy === "remove" ? (
+              <span className="text-[10px]">…</span>
+            ) : (
+              <TrashIcon className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function RsvpAlertBadges({
+  rsvp,
+  compact = false,
+}: {
+  rsvp: RSVPRecord;
+  /** Compact = jen ikony s native `title` tooltipem, žádný popover.
+   *  Používáme v desktop tabulce, kde jsme přišli o horizontální
+   *  prostor a floating popovery se stackovaly ("můžu klikat na
+   *  další a zůstávají všechny otevřené"). Full mode zůstává na
+   *  mobile kartách, kde je místo. */
+  compact?: boolean;
+}) {
+  const alerts = computeRsvpAlerts(rsvp.questionnaire_answers);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  if (alerts.length === 0) return null;
+
+  if (compact) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {alerts.map((a) => (
+          <span
+            key={a.kind}
+            title={`${a.label}: ${a.detail}`}
+            aria-label={`${a.label}: ${a.detail}`}
+            className={[
+              "inline-flex h-6 w-6 items-center justify-center rounded text-sm",
+              alertToneClass(a.tone),
+            ].join(" ")}
+          >
+            <span aria-hidden>{a.icon}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex flex-wrap gap-1">
+      {alerts.map((a, i) => (
+        <button
+          key={a.kind}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpenIdx(openIdx === i ? null : i);
+          }}
+          title={a.detail}
+          className={[
+            "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium focus-ring",
+            alertToneClass(a.tone),
+          ].join(" ")}
+        >
+          <span aria-hidden>{a.icon}</span>
+          <span>{a.label}</span>
+        </button>
+      ))}
+      {openIdx !== null && (
+        <div
+          role="dialog"
+          className="absolute left-0 top-full z-10 mt-1 max-w-xs rounded-md border border-border bg-surface p-3 text-xs text-ink-900 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="font-medium">{alerts[openIdx].label}</p>
+          <p className="mt-1 whitespace-pre-wrap text-ink-700">
+            {alerts[openIdx].detail}
+          </p>
+          <button
+            type="button"
+            onClick={() => setOpenIdx(null)}
+            className="mt-2 text-[10px] font-medium text-ink-500 hover:text-ink-900"
+          >
+            Zavřít
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function alertToneClass(tone: RsvpAlert["tone"]): string {
+  switch (tone) {
+    case "safety":
+      return "bg-danger-soft text-danger hover:bg-danger/15";
+    case "brand":
+      return "bg-brand/15 text-brand hover:bg-brand/25";
+    case "muted":
+    default:
+      return "bg-surface-muted text-ink-700 hover:bg-surface-muted/80";
+  }
+}
+
+function DuplicateBadge({
+  hints,
+  onDismiss,
+}: {
+  hints: ("same_phone" | "same_name")[];
+  /** Owner-side dismiss — když je otec se synem, klik ✕ to schová.
+   *  Když není předán, badge je read-only (např. v starých surfaces). */
+  onDismiss?: () => void;
+}) {
+  const tooltipParts: string[] = [];
+  if (hints.includes("same_phone")) {
+    tooltipParts.push("stejný telefon jako jiná přihláška");
+  }
+  if (hints.includes("same_name")) {
+    tooltipParts.push("stejné jméno jako jiná přihláška");
+  }
+  return (
+    <span
+      title={`Možný duplikát: ${tooltipParts.join(" + ")}`}
+      className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning"
+    >
+      ⚠ Duplikát?
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDismiss();
+          }}
+          title="Není to duplikát"
+          aria-label="Není to duplikát"
+          className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-warning/70 hover:bg-warning/30 hover:text-warning focus-ring"
+        >
+          <span aria-hidden className="text-[10px] leading-none">×</span>
+        </button>
+      )}
+    </span>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  // Inline SVG popelnice — žádný extra dep, snadno barvitelný přes
+  // currentColor (text-* tailwind classy).
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6l-1.5 13.5a2 2 0 0 1-2 1.8h-7a2 2 0 0 1-2-1.8L5 6" />
+      <path d="M9 6V4a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 4v2" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+function InvoiceCell({
+  rsvp,
+  wsSlug,
+  eventSlug,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+}) {
+  if (!rsvp.invoice_id) {
+    return <span className="text-ink-300">—</span>;
+  }
+  return (
+    <Link
+      href={`/tvurce/akce/${wsSlug}/${eventSlug}/edit/faktury/${rsvp.invoice_id}`}
+      className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/15 text-success hover:bg-success/25"
+    >
+      Vystaveno →
+    </Link>
+  );
+}
+
+const CONTRACT_STATUS_LABEL: Record<
+  NonNullable<RSVPRecord["contract"]>["status"],
+  string
+> = {
+  not_sent: "Neposláno",
+  pending: "Připraveno",
+  sent: "K podpisu",
+  signed: "Podepsáno",
+  rejected: "Odmítnuto",
+  expired: "Vypršelo",
+};
+
+const CONTRACT_STATUS_TONE: Record<
+  NonNullable<RSVPRecord["contract"]>["status"],
+  string
+> = {
+  not_sent: "bg-ink-100 text-ink-700",
+  pending: "bg-warning/15 text-warning",
+  sent: "bg-brand/15 text-brand",
+  signed: "bg-success/15 text-success",
+  rejected: "bg-danger-soft text-danger",
+  expired: "bg-ink-100 text-ink-500",
+};
+
+function ContractCell({
+  rsvp,
+  wsSlug,
+  eventSlug,
+  onUpdate,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+  onUpdate: (updated: RSVPRecord) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const contract = rsvp.contract;
+  if (!contract) return <span className="text-ink-300">—</span>;
+
+  async function sendForSigning() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // Backend vrátí RSVPContract; my refreshneme RSVP record přes
+      // light request, ať se status v UI updatne. Simpler: backend
+      // mark + caller updatne pomocí onUpdate.
+      const rc = await contracts.sendRsvpContract(wsSlug, eventSlug, rsvp.id);
+      onUpdate({
+        ...rsvp,
+        contract: {
+          configured: true,
+          template_name: contract!.template_name,
+          rsvp_contract_id: rc.id,
+          status: rc.status,
+          signing_url: rc.signing_url,
+          signed_at: rc.signed_at,
+          sent_at: rc.sent_at,
+        },
+      });
+    } catch {
+      /* quietly fail */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span
+        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${CONTRACT_STATUS_TONE[contract.status]}`}
+      >
+        {CONTRACT_STATUS_LABEL[contract.status]}
+      </span>
+      {contract.status === "not_sent" && (
+        <button
+          type="button"
+          onClick={sendForSigning}
+          disabled={busy}
+          className="text-[11px] font-medium text-brand hover:text-brand-hover disabled:opacity-50"
+        >
+          {busy ? "..." : "Poslat k podpisu"}
+        </button>
+      )}
+      {contract.status === "sent" && contract.signing_url && (
+        <a
+          href={contract.signing_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] font-medium text-ink-500 hover:text-ink-900"
+        >
+          Otevřít link ↗
+        </a>
+      )}
+    </div>
+  );
+}
+
+function DocCell({
+  docKey: _docKey,
+  required,
+  uploaded,
+  verified,
+}: {
+  docKey: string;
+  required: boolean;
+  uploaded: boolean;
+  verified: boolean;
+}) {
+  if (!required) {
+    return <span className="text-ink-300">—</span>;
+  }
+  if (verified) {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/15 text-success">
+        Ověřeno
+      </span>
+    );
+  }
+  if (uploaded) {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/10 text-success">
+        Doloženo
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-warning/15 text-warning">
+      Chybí
+    </span>
+  );
+}
+
+function PaymentCell({
+  rsvp,
+  onMarkPaid,
+  marking,
+}: {
+  rsvp: RSVPRecord;
+  onMarkPaid: () => void;
+  marking: boolean;
+}) {
+  if (rsvp.payment_status === "waived") {
+    return <span className="text-ink-300">—</span>;
+  }
+  if (rsvp.payment_status === "paid") {
+    return (
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-success/15 text-success">
+        Zaplaceno
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-warning/15 text-warning">
+        Čeká
+      </span>
+      <button
+        type="button"
+        onClick={onMarkPaid}
+        disabled={marking}
+        className="text-[11px] font-medium text-ink-500 hover:text-ink-900 disabled:opacity-50"
+      >
+        {marking ? "..." : "Označit zaplaceno"}
+      </button>
+    </div>
+  );
+}
+
+function RsvpCard({
+  rsvp,
+  wsSlug,
+  eventSlug,
+  onUpdate,
+  onRemove,
+  onOpenProfile,
+}: {
+  rsvp: RSVPRecord;
+  wsSlug: string;
+  eventSlug: string;
+  onUpdate: (updated: RSVPRecord) => void;
+  onRemove: (removedId: number) => void;
+  onOpenProfile: () => void;
+}) {
+  const [busy, setBusy] = useState<
+    "paid" | "approve" | "reject" | "remove" | null
+  >(null);
+  const confirmDialog = useConfirm();
+
+  async function handleApprove() {
+    setBusy("approve");
+    try {
+      const updated = await events.approveRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function handleReject() {
+    const ok = await confirmDialog({
+      title: "Zamítnout tuto registraci?",
+      description:
+        "Účastník dostane e-mail o zamítnutí. Registrace přejde do stavu cancelled.",
+      confirmLabel: "Zamítnout",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setBusy("reject");
+    try {
+      const updated = await events.rejectRsvp(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function handleMarkPaid() {
+    const ok = await confirmDialog({
+      title: "Označit jako zaplaceno?",
+      description:
+        "Změnu uvidí účastník (přestane mu chodit reminder o platbě). Audit log si pamatuje kdo a kdy označil.",
+      confirmLabel: "Označit zaplaceno",
+    });
+    if (!ok) return;
+    setBusy("paid");
+    try {
+      const updated = await events.markRsvpPaid(wsSlug, eventSlug, rsvp.id);
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function handleRemove() {
+    const who = rsvp.user_full_name || rsvp.user_email;
+    const ok = await confirmDialog({
+      title: `Odebrat ${who} z akce?`,
+      description:
+        'Účastníka i případnou roli organizátora smažeme. Pokud se znovu přihlásí, půjde jako úplně nová registrace. Historie zůstane v auditu.',
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setBusy("remove");
+    try {
+      await events.removeRsvp(wsSlug, eventSlug, rsvp.id);
+      onRemove(rsvp.id);
+    } catch {
+      /* keep quiet */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDismissDuplicate() {
+    try {
+      const updated = await events.dismissDuplicateHint(
+        wsSlug,
+        eventSlug,
+        rsvp.id,
+      );
+      onUpdate(updated);
+    } catch {
+      /* keep quiet */
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            aria-label={`Detail účastníka ${rsvp.user_full_name || rsvp.user_email}`}
+            className="shrink-0 rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <RosterAvatar rsvp={rsvp} />
+          </button>
+        <div className="flex min-w-0 flex-col items-start gap-1">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex flex-col items-start gap-0.5 text-left focus-ring"
+          >
+          <span className="text-sm font-semibold text-ink-900">
+            {rsvp.user_full_name || "—"}
+          </span>
+          <span className="text-xs text-ink-500">{rsvp.user_email}</span>
+          {rsvp.user_phone && (
+            <span className="text-xs text-ink-500">{rsvp.user_phone}</span>
+          )}
+          </button>
+          {rsvp.duplicate_hints && rsvp.duplicate_hints.length > 0 && (
+            <DuplicateBadge
+              hints={rsvp.duplicate_hints}
+              onDismiss={handleDismissDuplicate}
+            />
+          )}
+          <RsvpAlertBadges rsvp={rsvp} />
+        </div>
+        </div>
+        {rsvp.is_organizer ? (
+          <span className="inline-flex shrink-0 rounded bg-brand/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
+            Organizátor
+          </span>
+        ) : (
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span
+              className={[
+                "inline-flex rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                RSVP_STATUS_TONE[rsvp.status],
+              ].join(" ")}
+            >
+              {RSVP_STATUS_LABEL[rsvp.status]}
+              {rsvp.waitlist_position != null && (
+                <span className="ml-1 opacity-80">#{rsvp.waitlist_position}</span>
+              )}
+            </span>
+            {rsvp.status === "cancelled" && rsvp.cancellation_reason !== "" && (
+              <span className="text-[10px] text-ink-500">
+                {CANCELLATION_REASON_LABEL[rsvp.cancellation_reason]}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {rsvp.status === "pending_approval" && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleApprove}
+            disabled={busy !== null}
+            className="flex-1 rounded-md bg-success px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 focus-ring"
+          >
+            {busy === "approve" ? "..." : "Schválit"}
+          </button>
+          <button
+            type="button"
+            onClick={handleReject}
+            disabled={busy !== null}
+            className="flex-1 rounded-md border border-danger/40 bg-surface px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft disabled:opacity-50 focus-ring"
+          >
+            {busy === "reject" ? "..." : "Zamítnout"}
+          </button>
+        </div>
+      )}
+
+      {rsvp.payment_status !== "waived" && rsvp.status !== "cancelled" && (
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="text-ink-500">Platba</span>
+          {rsvp.payment_status === "paid" ? (
+            <span className="inline-flex rounded bg-success/15 px-2 py-0.5 font-medium text-success">
+              Zaplaceno
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleMarkPaid}
+              disabled={busy !== null}
+              className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
+            >
+              {busy === "paid" ? "..." : "Označit zaplaceno"}
+            </button>
+          )}
+        </div>
+      )}
+      {rsvp.can_be_removed && (
+        <button
+          type="button"
+          onClick={handleRemove}
+          disabled={busy !== null}
+          title="Odebrat z akce"
+          aria-label="Odebrat z akce"
+          className="inline-flex h-8 w-8 items-center justify-center self-end rounded-md text-ink-400 hover:bg-danger-soft hover:text-danger disabled:opacity-50 focus-ring"
+        >
+          {busy === "remove" ? (
+            <span className="text-xs">…</span>
+          ) : (
+            <TrashIcon className="h-4 w-4" />
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  active,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: SortState;
+  onClick: (key: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = active.key === sortKey;
+  const arrow = isActive ? (active.dir === "asc" ? "↑" : "↓") : "";
+  return (
+    <th
+      scope="col"
+      className={
+        align === "right" ? "px-4 py-3 text-right" : "px-4 py-3 text-left"
+      }
+      aria-sort={
+        isActive
+          ? active.dir === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={[
+          "inline-flex items-center gap-1 font-medium uppercase tracking-wide focus-ring rounded-sm",
+          isActive ? "text-ink-900" : "text-ink-500 hover:text-ink-900",
+        ].join(" ")}
+      >
+        <span>{label}</span>
+        <span
+          aria-hidden="true"
+          className={["text-[10px]", isActive ? "opacity-100" : "opacity-30"].join(
+            " ",
+          )}
+        >
+          {arrow || "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
+/** Avatar v roster řádku — používá inline `user_avatar` payload z
+ *  RSVPSerializer (avatar url + focal + zoom). Iniciály vzaté z celého
+ *  jména; fallback „?" u anonymních prošlých registrací. Bez userId
+ *  prop protože wrap-button už drží onClick pro dialog. */
+function RosterAvatar({ rsvp }: { rsvp: RSVPRecord }) {
+  const [first = "", last = ""] = (rsvp.user_full_name || "").split(/\s+/, 2);
+  return (
+    <Avatar
+      firstName={first}
+      lastName={last}
+      avatarUrl={rsvp.user_avatar?.url}
+      focalX={rsvp.user_avatar?.focal_x}
+      focalY={rsvp.user_avatar?.focal_y}
+      zoom={rsvp.user_avatar?.zoom}
+      size={36}
+    />
+  );
+}

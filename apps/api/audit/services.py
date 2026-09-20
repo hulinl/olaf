@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Audit is append-only but unbounded growth would eventually slow the
-# `/admin/audit` viewer. 18 months keeps two camp seasons of history
+# `/tvurce/audit` viewer. 18 months keeps two camp seasons of history
 # (May-Sep cycle) - enough to retroactively spot anything that needs
 # digging out. Bumpable per workspace later if anyone wants longer.
 DEFAULT_RETENTION_DAYS = 18 * 30

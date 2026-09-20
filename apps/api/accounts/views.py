@@ -794,7 +794,7 @@ def anthropic_integration(request: Request) -> Response:
 @permission_classes([IsAuthenticated])
 def creator_references(request: Request) -> Response:
     """Aggregate view — všechny zpětné vazby napříč akcemi ve všech
-    workspacech, kde je user owner. Frontend `/admin/reference` z toho
+    workspacech, kde je user owner. Frontend `/tvurce/reference` z toho
     rendruje tabulku s toggle „zveřejnit / skrýt".
     """
     from events.models import EventFeedback

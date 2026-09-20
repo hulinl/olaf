@@ -10,7 +10,7 @@ import { sortPast, sortUpcoming } from "@/lib/event-sort";
 
 /**
  * Consumer view — events the signed-in user is RSVPed to. Owner / creator
- * surface lives at /admin/events and uses `events.owner()`.
+ * surface lives at /tvurce/events and uses `events.owner()`.
  */
 export default function MyEventsPage() {
   const [list, setList] = useState<EventSummary[] | null>(null);

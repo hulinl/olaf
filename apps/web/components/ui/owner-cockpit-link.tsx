@@ -23,7 +23,7 @@ interface Props {
  *
  * Předtím dělal jenom event scope („Owner view"); teď funguje na
  * public workspace page i in-app workspace page (bez eventSlug =
- * míří do `/admin/komunity/<slug>`), aby owner/admin nikdy nemusel
+ * míří do `/tvurce/komunity/<slug>`), aby owner/admin nikdy nemusel
  * skákat přes global nav do Tvůrce.
  */
 export function OwnerCockpitLink({
@@ -56,8 +56,8 @@ export function OwnerCockpitLink({
   if (!canManage) return null;
 
   const href = eventSlug
-    ? `/admin/eventy/${workspaceSlug}/${eventSlug}/edit`
-    : `/admin/komunity/${workspaceSlug}`;
+    ? `/tvurce/akce/${workspaceSlug}/${eventSlug}/edit`
+    : `/tvurce/komunity/${workspaceSlug}`;
   const label = eventSlug ? "Spravovat akci" : "Spravovat komunitu";
 
   const classes =

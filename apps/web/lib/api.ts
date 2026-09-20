@@ -392,8 +392,8 @@ export interface PublicReference {
 }
 
 /** Owner surface — plný feedback payload včetně `is_public` toggle
- *  a odkazu na akci. Používá to `/admin/eventy/<ws>/<slug>/zpetne-vazby/`
- *  + `/admin/reference/`. */
+ *  a odkazu na akci. Používá to `/tvurce/akce/<ws>/<slug>/zpetne-vazby/`
+ *  + `/tvurce/reference/`. */
 export interface EventFeedback {
   id: number;
   email: string;
@@ -1943,7 +1943,7 @@ export const events = {
     ),
   /** Owner toggle — zveřejnit nebo skrýt jednotlivou zpětnou vazbu
    *  jako referenci. Frontend používá landing sekce „Reference"
-   *  + admin overview `/admin/reference`. */
+   *  + admin overview `/tvurce/reference`. */
   publishFeedback: (
     workspaceSlug: string,
     eventSlug: string,
@@ -2235,7 +2235,7 @@ export const events = {
     ),
   people: () => apiFetch<PersonSummary[]>("/api/auth/me/people/"),
   /** Aggregate — všechny zpětné vazby napříč akcemi vlastněných
-   *  workspaces. Pro `/admin/reference` overview. */
+   *  workspaces. Pro `/tvurce/reference` overview. */
   allReferences: () =>
     apiFetch<EventFeedback[]>("/api/auth/me/references/"),
   person: (userId: number) =>

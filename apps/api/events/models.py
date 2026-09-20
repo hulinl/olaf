@@ -1426,7 +1426,7 @@ class EventLink(models.Model):
     mapa, cokoli, s čím organizátor a účastníci pracují mimo aplikaci.
 
     Dva typy podle `is_public`:
-    - `False` (default) — vidí jen organizátor a spolutvůrci v `/admin/*`.
+    - `False` (default) — vidí jen organizátor a spolutvůrci v `/tvurce/*`.
       Interní pracovní odkazy (bookkeeping sheet, checklist doc, ...).
     - `True` — zobrazí se i účastníkům na veřejné stránce akce v tabu
       „Odkazy". Vhodné pro veřejný Google Doc s programem, foto galerii

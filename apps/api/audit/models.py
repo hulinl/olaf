@@ -68,7 +68,7 @@ class AuditLog(models.Model):
         help_text=(
             "Tenant scope. NULL only for cross-tenant or platform-"
             "wide actions (none today). Used as the filter axis for "
-            "the /admin/audit viewer."
+            "the /tvurce/audit viewer."
         ),
     )
     target_type = models.CharField(

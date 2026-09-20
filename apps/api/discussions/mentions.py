@@ -123,7 +123,7 @@ def _comment_link(comment: Comment) -> str:
     """Deep-link přímo na konkrétní komentář v threadu — pro bell
     notifikace o zmínce. Sdílí implementaci s discussions.emails
     (member deep-link `/workspaces/<slug>/nastenka/<id>#comment-<pk>`),
-    aby workspace member neskončil na owner-only `/admin/…` URL.
+    aby workspace member neskončil na owner-only `/tvurce/…` URL.
     User report 2026-09-09/10."""
     from .emails import _comment_url
 

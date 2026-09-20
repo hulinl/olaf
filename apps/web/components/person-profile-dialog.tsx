@@ -245,7 +245,7 @@ export function PersonProfileDialog({ userId, onClose, onHidden }: Props) {
                       key={`${e.workspace_slug}/${e.event_slug}-${e.rsvp_created_at}`}
                     >
                       <Link
-                        href={`/admin/eventy/${e.workspace_slug}/${e.event_slug}`}
+                        href={`/tvurce/akce/${e.workspace_slug}/${e.event_slug}`}
                         className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-muted focus-ring"
                         onClick={onClose}
                       >

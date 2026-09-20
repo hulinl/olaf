@@ -246,7 +246,7 @@ function WorkspaceTabs({
   upcoming: EventSummary[];
   past: EventSummary[];
   isOwner: boolean;
-  /** True pro každého, kdo je součástí komunity (owner/admin/member).
+  /** True pro každého, kdo je součástí komunity (owner/tvurce/member).
    *  Backend can_access_workspace_wall povoluje read+write všem
    *  WorkspaceMemberům, gate na isOwner byl zbytek z V1, kdy komunita
    *  ještě neměla explicitní členy. User report 2026-09-09: přítelkyně
@@ -354,7 +354,7 @@ function WorkspaceTabs({
                     </p>
                     {isOwner && (
                       <LinkButton
-                        href="/admin/eventy/new"
+                        href="/tvurce/akce/new"
                         variant="primary"
                         size="md"
                         className="mt-5"
@@ -463,7 +463,7 @@ function EventCard({
 }) {
   const starts = new Date(event.starts_at);
   // Href priority:
-  //  1) Owner view = /admin/eventy/... (organizátorská konzole)
+  //  1) Owner view = /tvurce/akce/... (organizátorská konzole)
   //  2) Registrovaný user (yes/waitlist/pending) = /events/<ws>/<slug>
   //     (in-app "moje účast" — QR platba, dokumenty, checklist,
   //     nástěnka akce). Public landing má odkud odsud otevřít v novém
@@ -476,7 +476,7 @@ function EventCard({
     event.my_rsvp_status === "waitlist" ||
     event.my_rsvp_status === "pending_approval";
   const href = showStatus
-    ? `/admin/eventy/${workspaceSlug}/${event.slug}`
+    ? `/tvurce/akce/${workspaceSlug}/${event.slug}`
     : hasActiveRsvp
       ? `/events/${workspaceSlug}/${event.slug}`
       : `/${workspaceSlug}/e/${event.slug}`;

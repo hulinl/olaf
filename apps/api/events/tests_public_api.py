@@ -428,7 +428,7 @@ class PublicEventsGuidesTests(TestCase):
         self.assertEqual(body["guides"][0]["name"], "Owner One")
 
     def test_guides_skips_users_outside_pool(self) -> None:
-        # Vytvořený user, ale není owner/admin/collaborator té workspace
+        # Vytvořený user, ale není owner/tvurce/collaborator té workspace
         # → block ho drží, ale API má vrátit prázdné pole.
         stranger = User.objects.create_user(
             email="stranger@example.com",

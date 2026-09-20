@@ -128,7 +128,7 @@ export default function DashboardPage() {
                 <EmptyState
                   title="Zatím nejsi v žádné komunitě"
                   body="Vytvoř si vlastní komunitu pro tvoje akce, nebo počkej až tě někdo pozve do svojí."
-                  cta={{ label: "+ Vytvořit komunitu", href: "/admin/komunity" }}
+                  cta={{ label: "+ Vytvořit komunitu", href: "/tvurce/komunity" }}
                 />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -259,7 +259,7 @@ function EventMini({
   const cover = assetUrl(event.cover_url);
   const price = formatEventPrice(event.price_amount, event.price_currency);
   const href = ownerView
-    ? `/admin/eventy/${event.workspace_slug}/${event.slug}`
+    ? `/tvurce/akce/${event.workspace_slug}/${event.slug}`
     : `/events/${event.workspace_slug}/${event.slug}`;
 
   // Cinematic variant when a cover photo exists — mirrors the public

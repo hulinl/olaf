@@ -1,0 +1,1864 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  type MouseEvent as ReactMouseEvent,
+  use,
+  useEffect,
+  useState,
+} from "react";
+
+import { Avatar } from "@/components/ui/avatar";
+import { Alert } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { WorkspaceInviteSection } from "@/components/workspace-invite-section";
+import {
+  ApiError,
+  type PersonTag,
+  type Workspace,
+  type WorkspaceMemberSummary,
+  type WorkspaceParticipantSummary,
+  type WorkspaceRemovedMemberSummary,
+  type WorkspaceRole,
+  workspaces,
+} from "@/lib/api";
+
+interface Props {
+  params: Promise<{ slug: string }>;
+}
+
+/**
+ * Standalone /tvurce/komunity/[slug]/clenove route — back-link header
+ * around the CRM view. Same view is mounted inside the "Členové" tab
+ * of /tvurce/komunity/[slug] so the two surfaces stay in lockstep.
+ */
+export default function KomunityMembersPage({ params }: Props) {
+  const { slug } = use(params);
+  return (
+    <div className="flex flex-col gap-6">
+      <Link
+        href={`/tvurce/komunity/${slug}`}
+        className="text-sm text-ink-500 hover:text-ink-900"
+      >
+        ← Zpět na komunitu
+      </Link>
+      <MembersCrmView slug={slug} />
+    </div>
+  );
+}
+
+/**
+ * Members of a komunita — V1 definition: anyone who's registered for at
+ * least one event in this workspace (owned or shared) OR carries an
+ * explicit role. The owner uses this page as a CRM: poznámky, tagy,
+ * CSV export.
+ */
+export function MembersCrmView({ slug }: { slug: string }) {
+  const router = useRouter();
+  const confirmDialog = useConfirm();
+  const [members, setMembers] = useState<WorkspaceMemberSummary[] | null>(null);
+  const [participants, setParticipants] = useState<
+    WorkspaceParticipantSummary[] | null
+  >(null);
+  const [removedMembers, setRemovedMembers] = useState<
+    WorkspaceRemovedMemberSummary[] | null
+  >(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [tags, setTags] = useState<PersonTag[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [invitePanelOpen, setInvitePanelOpen] = useState(false);
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
+  const [filterTagIds, setFilterTagIds] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+  // V2 — Účastníci sub-section: separate selection set, independent of
+  // member-level multi-select used for bulk email/tagging.
+  const [participantSelected, setParticipantSelected] = useState<Set<number>>(
+    new Set(),
+  );
+  const [participantBusy, setParticipantBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      workspaces.members(slug),
+      workspaces.detail(slug),
+      workspaces.listTags(slug).catch(() => []),
+      workspaces.participants(slug).catch(() => [] as WorkspaceParticipantSummary[]),
+      workspaces
+        .removedMembers(slug)
+        .catch(() => [] as WorkspaceRemovedMemberSummary[]),
+    ])
+      .then(([list, ws, t, parts, removed]) => {
+        if (cancelled) return;
+        setMembers(list);
+        setWorkspace(ws);
+        setTags(t);
+        setParticipants(parts);
+        setRemovedMembers(removed);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace(`/login?next=/tvurce/komunity/${slug}/clenove`);
+          return;
+        }
+        if (err instanceof ApiError && err.status === 403) {
+          router.replace(`/tvurce/komunity/${slug}`);
+          return;
+        }
+        if (err instanceof ApiError && err.status === 404) {
+          router.replace("/tvurce/komunity");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "Načtení selhalo.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, router]);
+
+  function patchMember(memberId: number, patch: Partial<WorkspaceMemberSummary>) {
+    setMembers((prev) =>
+      prev ? prev.map((m) => (m.id === memberId ? { ...m, ...patch } : m)) : prev,
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+      </div>
+    );
+  }
+  if (error) return <Alert variant="danger">{error}</Alert>;
+  if (!members || !tags) return null;
+
+  const isOwner = workspace?.my_role === "owner";
+  const isOwnerOrAdmin =
+    workspace?.my_role === "owner" || workspace?.my_role === "admin";
+
+  async function refreshMembers() {
+    const list = await workspaces.members(slug).catch(() => null);
+    if (list) setMembers(list);
+  }
+
+  async function refreshParticipants() {
+    const list = await workspaces
+      .participants(slug)
+      .catch(() => null);
+    if (list) setParticipants(list);
+  }
+
+  async function refreshRemovedMembers() {
+    const list = await workspaces
+      .removedMembers(slug)
+      .catch(() => null);
+    if (list) setRemovedMembers(list);
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-4">
+        <div>
+          <p className="text-sm font-medium text-brand">Členové</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+            Členové komunity
+          </h1>
+          <p className="mt-2 max-w-2xl text-ink-500">
+            Členové, které jsi do komunity přidal — buď ručně, nebo
+            povýšením z účastníků akcí. Klikni na řádek pro profil +
+            historii registrací; pravým sloupcem můžeš přiřadit tagy
+            a napsat si poznámku.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              onClick={() => setInvitePanelOpen((v) => !v)}
+              className="inline-flex items-center justify-center rounded-md border border-brand bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90 focus-ring"
+            >
+              {invitePanelOpen ? "Skrýt pozvánky" : "+ Pozvat člena"}
+            </button>
+          )}
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              onClick={() => setTagManagerOpen(true)}
+              className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+            >
+              Spravovat tagy ({tags.length})
+            </button>
+          )}
+          <a
+            href={workspaces.membersCsvUrl(slug)}
+            className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
+          >
+            Export CSV ↓
+          </a>
+        </div>
+      </header>
+
+      {invitePanelOpen && isOwnerOrAdmin && (
+        <WorkspaceInviteSection
+          wsSlug={slug}
+          defaultOpen
+          onInvited={refreshMembers}
+        />
+      )}
+
+      <div className="relative">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Hledat podle jména nebo e-mailu…"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 pl-9 text-sm text-ink-900 focus-ring sm:max-w-md"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500"
+        >
+          ⌕
+        </span>
+      </div>
+
+      {tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Filtr
+          </span>
+          {tags.map((t) => {
+            const on = filterTagIds.has(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setFilterTagIds((prev) => {
+                    const next = new Set(prev);
+                    if (on) next.delete(t.id);
+                    else next.add(t.id);
+                    return next;
+                  });
+                }}
+                className={[
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  on
+                    ? "border-brand bg-brand/15 text-brand"
+                    : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
+                ].join(" ")}
+                style={
+                  on && t.color
+                    ? { borderColor: t.color, color: t.color }
+                    : undefined
+                }
+              >
+                {on && <span aria-hidden>✓</span>}
+                {t.name}
+              </button>
+            );
+          })}
+          {filterTagIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterTagIds(new Set())}
+              className="text-xs font-medium text-ink-500 hover:text-ink-900"
+            >
+              Vymazat filtr
+            </button>
+          )}
+        </div>
+      )}
+
+      {(() => {
+        // OR-mode tag filter combined with a substring search across
+        // full_name + email. Both narrowings run in series so the owner
+        // can search inside a tag-filtered subset (or vice versa).
+        const q = searchQuery.trim().toLowerCase();
+        const filtered = members
+          .filter((m) =>
+            filterTagIds.size === 0
+              ? true
+              : (m.tag_ids ?? []).some((id) => filterTagIds.has(id)),
+          )
+          .filter((m) => {
+            if (!q) return true;
+            return (
+              m.full_name.toLowerCase().includes(q) ||
+              m.email.toLowerCase().includes(q)
+            );
+          });
+
+        async function bulkToggle(tagId: number) {
+          // Snapshot current members so TS narrowing survives across
+          // awaits inside this async closure.
+          const snapshot = members ?? [];
+          const ids = [...selectedIds];
+          if (ids.length === 0) return;
+          // Apply if ANY selected member doesn't have the tag yet —
+          // otherwise detach. Mirrors the gmail "apply label" semantics.
+          const someoneMissing = ids.some(
+            (id) =>
+              !(snapshot.find((m) => m.id === id)?.tag_ids ?? []).includes(
+                tagId,
+              ),
+          );
+          setBulkBusy(true);
+          try {
+            for (const memberId of ids) {
+              const m = snapshot.find((x) => x.id === memberId);
+              if (!m) continue;
+              const has = (m.tag_ids ?? []).includes(tagId);
+              if (someoneMissing && !has) {
+                const r = await workspaces.attachMemberTag(
+                  slug,
+                  memberId,
+                  tagId,
+                );
+                patchMember(memberId, { tag_ids: r.tag_ids });
+              } else if (!someoneMissing && has) {
+                const r = await workspaces.detachMemberTag(
+                  slug,
+                  memberId,
+                  tagId,
+                );
+                patchMember(memberId, { tag_ids: r.tag_ids });
+              }
+            }
+          } finally {
+            setBulkBusy(false);
+          }
+        }
+
+        return (
+          <>
+            {selectedIds.size > 0 && (
+              <div className="sticky top-14 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
+                <span className="text-xs font-medium text-brand">
+                  {selectedIds.size} vybráno
+                </span>
+                {tags.length > 0 && (
+                  <>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                      Tagy
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => bulkToggle(t.id)}
+                          disabled={bulkBusy}
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-surface-muted disabled:opacity-50"
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setBulkEmailOpen(true)}
+                  disabled={bulkBusy}
+                  className="rounded-md border border-brand bg-brand px-3 py-1 text-xs font-semibold text-brand-ink hover:opacity-90 disabled:opacity-50"
+                >
+                  ✉ Odeslat e-mail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="ml-auto text-xs font-medium text-ink-500 hover:text-ink-900"
+                >
+                  Zrušit výběr
+                </button>
+              </div>
+            )}
+
+            {filtered.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border-strong bg-surface-muted/40 p-10 text-center">
+                <h3 className="text-base font-semibold text-ink-900">
+                  {members.length === 0
+                    ? "Zatím žádní členové"
+                    : "Žádné lidi v aktivním filtru"}
+                </h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                  {members.length === 0
+                    ? "Jakmile se někdo přihlásí na akci, objeví se tady."
+                    : "Zruš filtr nahoře nebo zvol jiný tag."}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Mobile: card list. The 9-column CRM table is way
+                    too wide for a phone and horizontal-scroll hides
+                    half the columns. Cards keep all info visible. */}
+                <div className="flex flex-col gap-2 sm:hidden">
+                  {filtered.map((m) => (
+                    <MemberMobileCard
+                      key={m.id}
+                      member={m}
+                      wsSlug={slug}
+                      tags={tags}
+                      iAmSuperAdmin={isOwner}
+                      expanded={expandedRowId === m.id}
+                      onToggleExpand={() =>
+                        setExpandedRowId(
+                          expandedRowId === m.id ? null : m.id,
+                        )
+                      }
+                      onPatch={(patch) => patchMember(m.id, patch)}
+                      onRemoved={async () => {
+                        await Promise.all([
+                          refreshMembers(),
+                          refreshParticipants(),
+                          refreshRemovedMembers(),
+                        ]);
+                      }}
+                      selected={selectedIds.has(m.id)}
+                      onToggleSelected={() =>
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(m.id)) next.delete(m.id);
+                          else next.add(m.id);
+                          return next;
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+                {/* sm+: full table. */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm sm:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-surface-muted/60">
+                      <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                        <th className="w-8 px-3 py-3">
+                          <input
+                            type="checkbox"
+                            aria-label="Vybrat vše"
+                            checked={
+                              filtered.length > 0 &&
+                              filtered.every((m) => selectedIds.has(m.id))
+                            }
+                            onChange={(e) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) {
+                                  filtered.forEach((m) => next.add(m.id));
+                                } else {
+                                  filtered.forEach((m) => next.delete(m.id));
+                                }
+                                return next;
+                              });
+                            }}
+                          />
+                        </th>
+                        <th className="px-4 py-3">Člen</th>
+                        <th className="px-4 py-3">Kontakt</th>
+                        <th className="px-4 py-3">Tagy</th>
+                        <th className="px-4 py-3 text-right">Celkem</th>
+                        <th className="px-4 py-3 text-right">Nadch.</th>
+                        <th className="px-4 py-3 text-right">Min.</th>
+                        <th className="px-4 py-3">Poslední</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filtered.map((m) => (
+                        <MemberRow
+                          key={m.id}
+                          member={m}
+                          wsSlug={slug}
+                          tags={tags}
+                          iAmSuperAdmin={isOwner}
+                          expanded={expandedRowId === m.id}
+                          onToggleExpand={() =>
+                            setExpandedRowId(
+                              expandedRowId === m.id ? null : m.id,
+                            )
+                          }
+                          onPatch={(patch) => patchMember(m.id, patch)}
+                          onRemoved={async () => {
+                            await Promise.all([
+                              refreshMembers(),
+                              refreshParticipants(),
+                              refreshRemovedMembers(),
+                            ]);
+                          }}
+                          selected={selectedIds.has(m.id)}
+                          onToggleSelected={() =>
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(m.id)) next.delete(m.id);
+                              else next.add(m.id);
+                              return next;
+                            })
+                          }
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        );
+      })()}
+
+      {isOwnerOrAdmin && participants && participants.length > 0 && (
+        <ParticipantsSection
+          wsSlug={slug}
+          participants={participants}
+          selectedIds={participantSelected}
+          onToggle={(id) => {
+            setParticipantSelected((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) {
+                next.delete(id);
+              } else {
+                next.add(id);
+              }
+              return next;
+            });
+          }}
+          onSelectAll={() => {
+            setParticipantSelected(new Set(participants.map((p) => p.id)));
+          }}
+          onClearSelection={() => setParticipantSelected(new Set())}
+          busy={participantBusy}
+          onAddSelected={async () => {
+            if (participantSelected.size === 0) return;
+            const ok = await confirmDialog({
+              title: `Přidat ${participantSelected.size} účastníků?`,
+              description:
+                "Stanou se členy komunity. Jejich přihlášky na akce zůstávají; nedostanou e-mailovou notifikaci.",
+              confirmLabel: "Přidat do komunity",
+            });
+            if (!ok) return;
+            setParticipantBusy(true);
+            try {
+              await workspaces.addMembers(
+                slug,
+                Array.from(participantSelected),
+              );
+              setParticipantSelected(new Set());
+              await Promise.all([
+                refreshMembers(),
+                refreshParticipants(),
+                refreshRemovedMembers(),
+              ]);
+            } catch {
+              // Network/permission errors surface as alert on row.
+            } finally {
+              setParticipantBusy(false);
+            }
+          }}
+          onAddOne={async (userId) => {
+            setParticipantBusy(true);
+            try {
+              await workspaces.addMembers(slug, [userId]);
+              await Promise.all([
+                refreshMembers(),
+                refreshParticipants(),
+                refreshRemovedMembers(),
+              ]);
+            } catch {
+              // ignore
+            } finally {
+              setParticipantBusy(false);
+            }
+          }}
+        />
+      )}
+
+      {isOwnerOrAdmin && removedMembers && removedMembers.length > 0 && (
+        <RemovedMembersSection
+          removed={removedMembers}
+          busy={participantBusy}
+          onRestore={async (userId) => {
+            const ok = await confirmDialog({
+              title: "Vrátit zpátky do komunity?",
+              description: "Bude opět v seznamu členů.",
+              confirmLabel: "Vrátit",
+            });
+            if (!ok) return;
+            setParticipantBusy(true);
+            try {
+              await workspaces.addMembers(slug, [userId]);
+              await Promise.all([
+                refreshMembers(),
+                refreshParticipants(),
+                refreshRemovedMembers(),
+              ]);
+            } catch {
+              // ignore
+            } finally {
+              setParticipantBusy(false);
+            }
+          }}
+        />
+      )}
+
+      {tagManagerOpen && (
+        <TagManageDialog
+          wsSlug={slug}
+          tags={tags}
+          onChange={(next) => setTags(next)}
+          onClose={() => setTagManagerOpen(false)}
+        />
+      )}
+
+      {bulkEmailOpen && (
+        <BulkEmailDialog
+          wsSlug={slug}
+          recipients={(members ?? []).filter((m) =>
+            selectedIds.has(m.id),
+          )}
+          onClose={() => setBulkEmailOpen(false)}
+          onSent={() => {
+            setBulkEmailOpen(false);
+            setSelectedIds(new Set());
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Shared role-action handlers for MemberRow + MemberMobileCard. Both
+ * render MemberCrmEditor and need the same Promote / Demote / Remove /
+ * Handover semantics; keeping them in a hook means the two row variants
+ * stay in lockstep instead of slowly drifting.
+ */
+function useMemberRoleActions({
+  member,
+  wsSlug,
+  onPatch,
+  onRemoved,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  onRemoved: () => void | Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const confirmDialog = useConfirm();
+  const name = member.full_name || member.email;
+
+  async function handlePromote() {
+    setBusy(true);
+    try {
+      const r = await workspaces.promoteMember(wsSlug, member.id);
+      onPatch({ role: r.role });
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleDemote() {
+    const ok = await confirmDialog({
+      title: `Snížit ${name} na člena?`,
+      description: "Ztratí práva spolutvůrce. Pak ho můžeš odebrat z komunity.",
+      confirmLabel: "Snížit",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await workspaces.demoteMember(wsSlug, member.id);
+      onPatch({ role: r.role });
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleRemove() {
+    const ok = await confirmDialog({
+      title: `Odebrat ${name} z komunity?`,
+      description:
+        "Přihlášky na akce a faktury zůstanou; přestane být v seznamu členů. " +
+        "Žádná notifikace ani e-mail mu o tom nepřijde.",
+      confirmLabel: "Odebrat",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await workspaces.removeMember(wsSlug, member.id);
+      await onRemoved();
+    } catch {
+      /* keep silent — visible via list refresh */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleHandover() {
+    const ok = await confirmDialog({
+      title: `Předat vlastnictví ${name}?`,
+      description:
+        "Ty se staneš spolutvůrcem a ztratíš právo mazat komunitu nebo měnit role.\n\n" +
+        "Nový vlastník ti to může vrátit, ale nemusí.",
+      confirmLabel: "Předat vlastnictví",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await workspaces.handoverOwnership(wsSlug, member.id);
+      window.location.reload();
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  return {
+    busy,
+    handlePromote,
+    handleDemote,
+    handleRemove,
+    handleHandover,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Účastníci sub-section — V2 "Přidat do komunity" workflow
+// ---------------------------------------------------------------------------
+
+function RemovedMembersSection({
+  removed,
+  busy,
+  onRestore,
+}: {
+  removed: WorkspaceRemovedMemberSummary[];
+  busy: boolean;
+  onRestore: (userId: number) => Promise<void> | void;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-500 hover:text-ink-900">
+            <span className="transition-transform group-open:rotate-90">
+              ▸
+            </span>
+            Odebraní členové ({removed.length})
+          </span>
+        </summary>
+        <p className="mt-2 max-w-2xl text-sm text-ink-500">
+          Lidé, které jsi z komunity odebral. Kdyby šlo o překlep nebo
+          si někoho chceš pozvat zpátky, klikni „Vrátit".
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-muted/60">
+              <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+                <th className="px-4 py-3">Jméno</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3 text-right">Akce</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {removed.map((m) => (
+                <tr key={m.id}>
+                  <td className="px-4 py-3 font-medium text-ink-900">
+                    {m.full_name || "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+                    {m.email}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRestore(m.id)}
+                      disabled={busy}
+                      className="text-[12px] font-medium text-brand hover:underline disabled:opacity-50"
+                    >
+                      Vrátit do komunity
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  );
+}
+
+function ParticipantsSection({
+  wsSlug,
+  participants,
+  selectedIds,
+  onToggle,
+  onSelectAll,
+  onClearSelection,
+  busy,
+  onAddSelected,
+  onAddOne,
+}: {
+  wsSlug: string;
+  participants: WorkspaceParticipantSummary[];
+  selectedIds: Set<number>;
+  onToggle: (id: number) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  busy: boolean;
+  onAddSelected: () => Promise<void> | void;
+  onAddOne: (userId: number) => Promise<void> | void;
+}) {
+  const allSelected =
+    participants.length > 0 && participants.every((p) => selectedIds.has(p.id));
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-ink-900">
+            Účastníci akcí ({participants.length})
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-ink-500">
+            Lidé, kteří se přihlásili na některou z akcí, ale nejsou
+            zatím členové komunity. Vyber je a klikni „Přidat vybrané"
+            — nebo nech být, pokud šlo o casual one-time účast.
+          </p>
+        </div>
+      </div>
+      {selectedIds.size > 0 && (
+        <div className="sticky top-14 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-3 py-2 shadow-sm">
+          <span className="text-sm font-medium text-brand">
+            Vybráno {selectedIds.size}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={onClearSelection}
+            disabled={busy}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring disabled:opacity-50"
+          >
+            Zrušit výběr
+          </button>
+          <button
+            type="button"
+            onClick={onAddSelected}
+            disabled={busy}
+            className="rounded-md border border-brand bg-brand px-3 py-1.5 text-sm font-semibold text-brand-ink hover:opacity-90 focus-ring disabled:opacity-50"
+          >
+            {busy ? "Přidávám…" : "Přidat vybrané do komunity"}
+          </button>
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-muted/60">
+            <tr className="text-left text-xs font-medium uppercase tracking-wide text-ink-500">
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Vybrat všechny účastníky"
+                  checked={allSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      onSelectAll();
+                    } else {
+                      onClearSelection();
+                    }
+                  }}
+                />
+              </th>
+              <th className="px-4 py-3">Jméno</th>
+              <th className="px-4 py-3">Kontakt</th>
+              <th className="px-4 py-3 text-right">Přihlášek</th>
+              <th className="px-4 py-3 text-right">Akce</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {participants.map((p) => {
+              const selected = selectedIds.has(p.id);
+              return (
+                <tr key={p.id} className={selected ? "bg-brand/5" : ""}>
+                  <td className="px-3 py-3 align-top">
+                    <input
+                      type="checkbox"
+                      aria-label={`Vybrat ${p.full_name || p.email}`}
+                      checked={selected}
+                      onChange={() => onToggle(p.id)}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-ink-900">
+                        {p.full_name || "—"}
+                      </span>
+                      {p.upcoming_rsvps > 0 && (
+                        <span className="mt-0.5 text-[11px] uppercase tracking-wide text-brand">
+                          {p.upcoming_rsvps} nadcházející
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+                    <div className="flex flex-col">
+                      <span>{p.email}</span>
+                      {p.phone && (
+                        <span className="text-xs text-ink-500">
+                          {p.phone}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+                    {p.total_rsvps}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onAddOne(p.id)}
+                      disabled={busy}
+                      className="text-[12px] font-medium text-brand hover:underline disabled:opacity-50"
+                    >
+                      Přidat do komunity
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Row
+// ---------------------------------------------------------------------------
+
+function MemberMobileCard({
+  member,
+  wsSlug,
+  tags,
+  iAmSuperAdmin,
+  expanded,
+  onToggleExpand,
+  onPatch,
+  onRemoved,
+  selected,
+  onToggleSelected,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  tags: PersonTag[];
+  iAmSuperAdmin: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  onRemoved: () => void | Promise<void>;
+  selected: boolean;
+  onToggleSelected: () => void;
+}) {
+  const profileHref = `/tvurce/komunity/${wsSlug}/clenove/${member.id}`;
+  const lastAt = member.last_rsvp_at ? new Date(member.last_rsvp_at) : null;
+  const memberTagIds = new Set(member.tag_ids ?? []);
+  const memberTags = tags.filter((t) => memberTagIds.has(t.id));
+  const hasNote = Boolean((member.note ?? "").trim());
+  const {
+    busy: roleBusy,
+    handlePromote,
+    handleDemote,
+    handleRemove,
+    handleHandover,
+  } = useMemberRoleActions({ member, wsSlug, onPatch, onRemoved });
+
+  return (
+    <div
+      className={[
+        "rounded-xl border bg-surface shadow-sm transition-colors",
+        selected ? "border-brand/60 bg-brand/5" : "border-border",
+      ].join(" ")}
+    >
+      <div className="flex gap-3 p-4">
+        <input
+          type="checkbox"
+          aria-label={`Vybrat ${member.full_name || member.email}`}
+          checked={selected}
+          onChange={onToggleSelected}
+          className="mt-1 h-4 w-4 shrink-0 accent-brand"
+        />
+        <Link
+          href={profileHref}
+          className="flex min-w-0 flex-1 items-start gap-3 focus-ring"
+        >
+          <MemberAvatar member={member} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="font-medium text-ink-900">
+              {member.full_name || member.email}
+            </span>
+            {member.role === "owner" && (
+              <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                Owner
+              </span>
+            )}
+            {member.role === "admin" && (
+              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                Spolutvůrce
+              </span>
+            )}
+          </div>
+          {member.full_name && (
+            <span className="text-xs text-ink-500">{member.email}</span>
+          )}
+          {member.phone && (
+            <span className="text-xs text-ink-500">{member.phone}</span>
+          )}
+          {memberTags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {memberTags.map((t) => (
+                <TagChip key={t.id} tag={t} />
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-baseline gap-x-3 text-xs text-ink-500">
+            <span>
+              <strong className="text-ink-900 tabular-nums">
+                {member.total_rsvps}
+              </strong>{" "}
+              {member.total_rsvps === 1
+                ? "akce"
+                : member.total_rsvps < 5
+                  ? "akce"
+                  : "akcí"}
+            </span>
+            {member.upcoming_rsvps > 0 && (
+              <span>
+                <strong className="tabular-nums">{member.upcoming_rsvps}</strong>{" "}
+                nadcházejících
+              </span>
+            )}
+            {lastAt && (
+              <span>
+                poslední{" "}
+                {lastAt.toLocaleDateString("cs-CZ", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            )}
+          </div>
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className={[
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring",
+            hasNote ? "ring-1 ring-brand/40" : "",
+          ].join(" ")}
+          aria-label="Tagy a poznámka"
+        >
+          {hasNote ? "●" : "+"}
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-border bg-surface-muted/40 p-4">
+          <MemberCrmEditor
+            member={member}
+            wsSlug={wsSlug}
+            tags={tags}
+            onPatch={onPatch}
+            iAmSuperAdmin={iAmSuperAdmin}
+            onPromote={handlePromote}
+            onDemote={handleDemote}
+            onRemove={handleRemove}
+            onHandover={handleHandover}
+            roleBusy={roleBusy}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MemberRow({
+  member,
+  wsSlug,
+  tags,
+  iAmSuperAdmin,
+  expanded,
+  onToggleExpand,
+  onPatch,
+  onRemoved,
+  selected,
+  onToggleSelected,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  tags: PersonTag[];
+  iAmSuperAdmin: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  onRemoved: () => void | Promise<void>;
+  selected: boolean;
+  onToggleSelected: () => void;
+}) {
+  const router = useRouter();
+  const profileHref = `/tvurce/komunity/${wsSlug}/clenove/${member.id}`;
+  const lastAt = member.last_rsvp_at ? new Date(member.last_rsvp_at) : null;
+  const memberTagIds = new Set(member.tag_ids ?? []);
+  const memberTags = tags.filter((t) => memberTagIds.has(t.id));
+  const hasNote = Boolean((member.note ?? "").trim());
+  const {
+    busy,
+    handlePromote,
+    handleDemote,
+    handleRemove,
+    handleHandover,
+  } = useMemberRoleActions({ member, wsSlug, onPatch, onRemoved });
+
+  function openProfileFromRowClick(e: ReactMouseEvent<HTMLTableRowElement>) {
+    const target = e.target as HTMLElement;
+    // Keep row-click → profile, but don't hijack clicks inside the CRM
+    // controls (tag chips, expand toggle, role buttons).
+    if (target.closest("a, button, input, label, select, textarea")) return;
+    router.push(profileHref);
+  }
+
+  return (
+    <>
+      <tr
+        onClick={openProfileFromRowClick}
+        className={[
+          "group cursor-pointer hover:bg-brand/10",
+          selected ? "bg-brand/5" : "",
+        ].join(" ")}
+      >
+        <td className="px-3 py-3 align-top">
+          <input
+            type="checkbox"
+            aria-label={`Vybrat ${member.full_name || member.email}`}
+            checked={selected}
+            onChange={onToggleSelected}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </td>
+        <td className="px-4 py-3">
+          <Link href={profileHref} className="flex items-start gap-3 focus-ring">
+            <MemberAvatar member={member} />
+            <div className="flex flex-col">
+            <div className="flex items-baseline gap-2">
+              <span className="font-medium text-ink-900">
+                {member.full_name || "—"}
+              </span>
+              {member.role === "owner" && (
+                <span className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                  Owner
+                </span>
+              )}
+              {member.role === "admin" && (
+                <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                  Spolutvůrce
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-ink-500">{member.email}</span>
+            {/* Role action buttons (Povýšit / Odebrat / Předat / Snížit)
+                jsou schválně schované — najdeš je v expand panelu
+                (klik na "+" v posledním sloupci). Plochá tlačítka na
+                každém řádku sváděla k chybnému kliknutí. */}
+            </div>
+          </Link>
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-ink-700">
+          {member.phone || "—"}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex max-w-[260px] flex-wrap gap-1">
+            {memberTags.length === 0 ? (
+              <span className="text-xs text-ink-300">—</span>
+            ) : (
+              memberTags.map((t) => <TagChip key={t.id} tag={t} />)
+            )}
+          </div>
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-ink-900">
+          {member.total_rsvps}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+          {member.upcoming_rsvps > 0 ? member.upcoming_rsvps : "—"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right text-ink-700">
+          {member.past_rsvps > 0 ? member.past_rsvps : "—"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-ink-500">
+          {lastAt
+            ? lastAt.toLocaleDateString("cs-CZ", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })
+            : "—"}
+        </td>
+        <td className="whitespace-nowrap px-4 py-3 text-right">
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className={[
+              "inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 hover:bg-surface-muted hover:text-ink-900 focus-ring",
+              hasNote ? "ring-1 ring-brand/40" : "",
+            ].join(" ")}
+            title={
+              expanded
+                ? "Skrýt editor tagů + poznámky"
+                : hasNote
+                  ? "Upravit tagy / poznámku (poznámka uložená)"
+                  : "Upravit tagy / poznámku"
+            }
+            aria-label="Tagy a poznámka"
+          >
+            {hasNote ? "●" : "+"}
+          </button>
+        </td>
+      </tr>
+
+      {expanded && (
+        <tr className="bg-surface-muted/40">
+          <td colSpan={9} className="px-4 py-3">
+            <MemberCrmEditor
+              member={member}
+              wsSlug={wsSlug}
+              tags={tags}
+              onPatch={onPatch}
+              iAmSuperAdmin={iAmSuperAdmin}
+              onPromote={handlePromote}
+              onDemote={handleDemote}
+              onRemove={handleRemove}
+              onHandover={handleHandover}
+              roleBusy={busy}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline CRM editor (tags + note)
+// ---------------------------------------------------------------------------
+
+function MemberCrmEditor({
+  member,
+  wsSlug,
+  tags,
+  onPatch,
+  iAmSuperAdmin,
+  onPromote,
+  onDemote,
+  onRemove,
+  onHandover,
+  roleBusy,
+}: {
+  member: WorkspaceMemberSummary;
+  wsSlug: string;
+  tags: PersonTag[];
+  onPatch: (patch: Partial<WorkspaceMemberSummary>) => void;
+  /** Když nedostaneme role props, panel "Správa role" se nevykreslí
+   *  (mobilní karta tu nemá místo, takže to nechává prázdné). */
+  iAmSuperAdmin?: boolean;
+  onPromote?: () => void;
+  onDemote?: () => void;
+  onRemove?: () => void;
+  onHandover?: () => void;
+  roleBusy?: boolean;
+}) {
+  const [note, setNote] = useState(member.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const memberTagIds = new Set(member.tag_ids ?? []);
+
+  async function toggleTag(tagId: number) {
+    const already = memberTagIds.has(tagId);
+    try {
+      const r = already
+        ? await workspaces.detachMemberTag(wsSlug, member.id, tagId)
+        : await workspaces.attachMemberTag(wsSlug, member.id, tagId);
+      onPatch({ tag_ids: r.tag_ids });
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function saveNote() {
+    setBusy(true);
+    try {
+      const r = await workspaces.setMemberNote(wsSlug, member.id, note);
+      onPatch({ note: r.note });
+    } catch {
+      /* keep silent */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+      <div className="flex flex-1 flex-col gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Tagy
+        </p>
+        {tags.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            Žádné tagy zatím nejsou — vytvoř je tlačítkem „Spravovat tagy"
+            nahoře.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((t) => {
+              const on = memberTagIds.has(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleTag(t.id)}
+                  className={[
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    on
+                      ? "border-brand bg-brand/15 text-brand"
+                      : "border-border bg-surface text-ink-700 hover:bg-surface-muted",
+                  ].join(" ")}
+                  style={
+                    on && t.color
+                      ? { borderColor: t.color, color: t.color }
+                      : undefined
+                  }
+                >
+                  <span aria-hidden>{on ? "✓" : "+"}</span>
+                  {t.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          Poznámka
+        </p>
+        <textarea
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Cokoli užitečného — co řešili, kdo doporučil, alergie, atd."
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={saveNote}
+            disabled={busy || note === (member.note ?? "")}
+            className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+          >
+            {busy ? "Ukládám…" : "Uložit poznámku"}
+          </button>
+          {note !== (member.note ?? "") && (
+            <span className="text-xs text-ink-500">Neuložené změny</span>
+          )}
+        </div>
+      </div>
+    </div>
+      {iAmSuperAdmin &&
+        member.role !== "owner" &&
+        onPromote &&
+        onDemote &&
+        onRemove &&
+        onHandover && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              Správa role
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {member.role === "admin" ? (
+                <>
+                  <RoleActionButton
+                    icon="↑"
+                    label="Předat vlastnictví"
+                    onClick={onHandover}
+                    disabled={!!roleBusy}
+                    variant="primary"
+                  />
+                  <RoleActionButton
+                    icon="↓"
+                    label="Snížit na člena"
+                    onClick={onDemote}
+                    disabled={!!roleBusy}
+                    variant="neutral"
+                  />
+                </>
+              ) : (
+                <>
+                  <RoleActionButton
+                    icon="★"
+                    label="Povýšit na spolutvůrce"
+                    onClick={onPromote}
+                    disabled={!!roleBusy}
+                    variant="primary"
+                  />
+                  <RoleActionButton
+                    icon="✕"
+                    label="Odebrat z komunity"
+                    onClick={onRemove}
+                    disabled={!!roleBusy}
+                    variant="danger"
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+    </div>
+  );
+}
+
+function RoleActionButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+  variant,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  variant: "primary" | "neutral" | "danger";
+}) {
+  const style = {
+    primary: "border-brand/50 text-brand hover:bg-brand/10",
+    neutral: "border-border text-ink-700 hover:bg-surface-muted hover:text-ink-900",
+    danger: "border-danger/40 text-danger hover:bg-danger-soft",
+  }[variant];
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+      disabled={disabled}
+      className={[
+        "inline-flex items-center gap-2 rounded-md border bg-surface px-3 py-1.5 text-xs font-medium transition-colors focus-ring disabled:opacity-50",
+        style,
+      ].join(" ")}
+    >
+      <span aria-hidden className="text-sm">
+        {icon}
+      </span>
+      {label}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tag CRUD dialog
+// ---------------------------------------------------------------------------
+
+function TagManageDialog({
+  wsSlug,
+  tags,
+  onChange,
+  onClose,
+}: {
+  wsSlug: string;
+  tags: PersonTag[];
+  onChange: (next: PersonTag[]) => void;
+  onClose: () => void;
+}) {
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState("");
+  const confirmDialog = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function create() {
+    const n = newName.trim();
+    if (!n) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const t = await workspaces.createTag(wsSlug, {
+        name: n,
+        color: newColor.trim(),
+      });
+      onChange([...tags.filter((x) => x.id !== t.id), t].sort(
+        (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
+      ));
+      setNewName("");
+      setNewColor("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Vytvoření selhalo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rename(t: PersonTag, name: string) {
+    try {
+      const updated = await workspaces.updateTag(wsSlug, t.id, { name });
+      onChange(tags.map((x) => (x.id === t.id ? updated : x)));
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function recolor(t: PersonTag, color: string) {
+    try {
+      const updated = await workspaces.updateTag(wsSlug, t.id, { color });
+      onChange(tags.map((x) => (x.id === t.id ? updated : x)));
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  async function remove(t: PersonTag) {
+    const ok = await confirmDialog({
+      title: `Smazat tag „${t.name}"?`,
+      description:
+        "Tag se odebere ze všech lidí, ale samotní lidi v komunitě zůstanou. Jen ztratí toto označení.",
+      confirmLabel: "Smazat",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await workspaces.deleteTag(wsSlug, t.id);
+      onChange(tags.filter((x) => x.id !== t.id));
+    } catch {
+      /* keep silent */
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink-900">Spravovat tagy</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-ink-500 hover:text-ink-900"
+          >
+            Zavřít ×
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {tags.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border-strong bg-surface-muted/40 p-3 text-sm text-ink-500">
+              Žádné tagy. Vytvoř první níže.
+            </p>
+          ) : (
+            tags.map((t) => (
+              <TagEditorRow
+                key={t.id}
+                tag={t}
+                onRename={(name) => rename(t, name)}
+                onRecolor={(color) => recolor(t, color)}
+                onDelete={() => remove(t)}
+              />
+            ))
+          )}
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Nový tag
+          </p>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="např. Stálice"
+              maxLength={40}
+              className="flex-1 min-w-[150px] rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+            <input
+              type="text"
+              value={newColor}
+              onChange={(e) => setNewColor(e.target.value)}
+              placeholder="#22c55e"
+              maxLength={20}
+              className="w-28 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+            <button
+              type="button"
+              onClick={create}
+              disabled={busy || !newName.trim()}
+              className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+            >
+              {busy ? "..." : "Přidat"}
+            </button>
+          </div>
+          {error && <Alert variant="danger">{error}</Alert>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TagEditorRow({
+  tag,
+  onRename,
+  onRecolor,
+  onDelete,
+}: {
+  tag: PersonTag;
+  onRename: (name: string) => Promise<void>;
+  onRecolor: (color: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [name, setName] = useState(tag.name);
+  const [color, setColor] = useState(tag.color);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+      <TagChip tag={{ ...tag, name, color }} />
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => {
+          if (name !== tag.name && name.trim()) onRename(name.trim());
+        }}
+        maxLength={40}
+        className="flex-1 min-w-[120px] rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
+      />
+      <input
+        type="text"
+        value={color}
+        onChange={(e) => setColor(e.target.value)}
+        onBlur={() => {
+          if (color !== tag.color) onRecolor(color);
+        }}
+        placeholder="#22c55e"
+        maxLength={20}
+        className="w-24 rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-900 focus-ring"
+      />
+      <button
+        type="button"
+        onClick={onDelete}
+        className="text-xs font-medium text-ink-500 hover:text-danger"
+      >
+        Smazat
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tag chip — used in both the row + the editor preview
+// ---------------------------------------------------------------------------
+
+function TagChip({ tag }: { tag: Pick<PersonTag, "name" | "color"> }) {
+  const accent = tag.color || undefined;
+  return (
+    <span
+      className="inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand"
+      style={
+        accent
+          ? { borderColor: `${accent}55`, color: accent, background: `${accent}1a` }
+          : undefined
+      }
+    >
+      {tag.name}
+    </span>
+  );
+}
+
+function BulkEmailDialog({
+  wsSlug,
+  recipients,
+  onClose,
+  onSent,
+}: {
+  wsSlug: string;
+  recipients: WorkspaceMemberSummary[];
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    sent: number;
+    skipped: number;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!subject.trim() || !body.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await workspaces.bulkEmailMembers(wsSlug, {
+        user_ids: recipients.map((m) => m.id),
+        subject: subject.trim(),
+        body: body.trim(),
+      });
+      setResult(r);
+      // Auto-close after a moment so the owner sees the count.
+      setTimeout(() => onSent(), 1500);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.firstFieldError() ?? err.message
+          : "Odeslání selhalo.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold text-ink-900">
+            Odeslat e-mail
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-ink-500 hover:text-ink-900"
+          >
+            Zavřít ×
+          </button>
+        </div>
+
+        <p className="text-sm text-ink-500">
+          Odešle se {recipients.length}{" "}
+          {recipients.length === 1
+            ? "příjemci"
+            : recipients.length < 5
+              ? "příjemcům"
+              : "příjemcům"}
+          . Každý dostane samostatný e-mail (vidí jen sebe). Odpovědi
+          chodí na tvůj e-mail jako Reply-To.
+        </p>
+
+        <div className="max-h-24 overflow-y-auto rounded-md border border-border bg-surface-muted/30 px-3 py-2 text-xs text-ink-500">
+          {recipients.slice(0, 8).map((r) => (
+            <div key={r.id}>
+              {r.full_name || "—"} · {r.email}
+            </div>
+          ))}
+          {recipients.length > 8 && (
+            <div className="mt-1 italic">
+              + {recipients.length - 8} dalších…
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-ink-700">
+              Předmět
+            </span>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={200}
+              placeholder="Krátká věta, co je uvnitř"
+              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-ink-700">
+              Text e-mailu
+            </span>
+            <textarea
+              rows={8}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Napiš text… (podpis se přidá automaticky)"
+              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-900 focus-ring"
+            />
+          </label>
+        </div>
+
+        {error && <Alert variant="danger">{error}</Alert>}
+        {result && (
+          <Alert variant="success">
+            Odesláno: {result.sent}
+            {result.skipped > 0 && ` · přeskočeno: ${result.skipped}`}
+          </Alert>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy || !subject.trim() || !body.trim()}
+            className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-90 disabled:opacity-50 focus-ring"
+          >
+            {busy ? "Odesílám…" : `Odeslat (${recipients.length})`}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-muted"
+          >
+            Zrušit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Member avatar helper — 36px na desktop card, iniciály z celého
+ *  jména jako fallback. Wrap Link nemá — obklopující Link (na profile
+ *  dialog) drží klik. Ale visual je stejný jako v CRM / roster. */
+function MemberAvatar({ member }: { member: WorkspaceMemberSummary }) {
+  return (
+    <Avatar
+      firstName={member.first_name}
+      lastName={member.last_name}
+      avatarUrl={member.avatar?.url}
+      focalX={member.avatar?.focal_x}
+      focalY={member.avatar?.focal_y}
+      zoom={member.avatar?.zoom}
+      size={40}
+    />
+  );
+}

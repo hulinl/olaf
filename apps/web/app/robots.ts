@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
         // Authenticated areas behind login — no point indexing them.
         disallow: [
-          "/admin/",
+          "/tvurce/",
           "/dashboard",
           "/settings/",
           "/login",

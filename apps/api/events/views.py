@@ -741,7 +741,7 @@ def import_event(request: Request, workspace_slug: str) -> Response:
     Behaviour:
       * Always lands as status=draft. The endpoint never publishes
         directly; the owner reviews and flips the status in
-        /admin/events/<slug>/edit. Keeps the public site safe from a
+        /tvurce/events/<slug>/edit. Keeps the public site safe from a
         misconfigured skript.
       * Idempotent on `external_ref`: a stable string picked by the
         caller per event source (e.g. "beskydy-spring-camp-2026"). A
@@ -871,7 +871,7 @@ def import_event(request: Request, workspace_slug: str) -> Response:
             "external_ref": external_ref,
             "status": event.status,
             "created": was_created,
-            "edit_url": f"{frontend_url}/admin/events/{event.slug}/edit",
+            "edit_url": f"{frontend_url}/tvurce/events/{event.slug}/edit",
             "public_url": f"{frontend_url}/{workspace.slug}/e/{event.slug}",
         },
         status=(
@@ -4072,7 +4072,7 @@ def event_feedback_publish(
 def workspace_references(request: Request, workspace_slug: str) -> Response:
     """Owner přehled všech zpětných vazeb napříč akcemi workspacu —
     včetně flagu, jestli je konkrétní reference zveřejněná. Používá
-    to `/admin/reference` stránka.
+    to `/tvurce/reference` stránka.
 
     Gate: owner/admin workspacu (kdokoli kdo může spravovat aspoň
     jednu akci; v praxi = workspace owner).

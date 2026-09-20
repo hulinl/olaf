@@ -1,4 +1,4 @@
-"""Audit list endpoint for the /admin/audit page.
+"""Audit list endpoint for the /tvurce/audit page.
 
 Workspace-scoped read. Anyone the user can `manage` (owner/admin on
 the workspace) can see the workspace's audit feed. No global feed —

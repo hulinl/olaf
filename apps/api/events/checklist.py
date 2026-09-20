@@ -33,11 +33,11 @@ class AutoChecklistItem:
 def auto_items_for_event(event: Event) -> list[AutoChecklistItem]:
     """All auto-derived checklist items in display order."""
     ws_slug = event.workspace.slug
-    edit_base = f"/admin/eventy/{ws_slug}/{event.slug}/edit"
+    edit_base = f"/tvurce/akce/{ws_slug}/{event.slug}/edit"
     detaily = f"{edit_base}/detaily"
     obsah = f"{edit_base}/obsah"
     galerie = f"{edit_base}/galerie"
-    komunita_edit = f"/admin/komunity/{ws_slug}/edit"
+    komunita_edit = f"/tvurce/komunity/{ws_slug}/edit"
 
     items: list[AutoChecklistItem] = []
 

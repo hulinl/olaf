@@ -26,7 +26,7 @@ def _frontend_url(path: str) -> str:
 def _event_cockpit_url(item: EventChecklistItem) -> str:
     event = item.event
     return _frontend_url(
-        f"/admin/komunity/{event.workspace.slug}/akce/{event.slug}/checklist"
+        f"/tvurce/akce/{event.workspace.slug}/{event.slug}/edit"
     )
 
 

@@ -547,13 +547,13 @@ class EventWallPendingApprovalTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# _topic_url — member deep-link, not the owner-only /admin/... route
+# _topic_url — member deep-link, not the owner-only /tvurce/... route
 # ---------------------------------------------------------------------------
 
 
 class TopicUrlTests(TestCase):
     """Regression 2026-09-09: community topic e-mails were routing all
-    recipients (including plain members) to `/admin/komunity/<slug>`,
+    recipients (including plain members) to `/tvurce/komunity/<slug>`,
     which is organizer-only. Members ended up on the stripped public
     view without the wall. The URL must be the member deep-link that
     both roles can open."""
@@ -582,4 +582,4 @@ class TopicUrlTests(TestCase):
         # Feed rework 2026-09-10: URL vede na wall page s ?t=<id>
         # deep-linkem místo standalone thread page routy.
         self.assertIn(f"/workspaces/running-club?tab=nastenka&t={topic.pk}", url)
-        self.assertNotIn("/admin/komunity/", url)
+        self.assertNotIn("/tvurce/komunity/", url)

@@ -172,7 +172,7 @@ class TenantResolverMiddlewareTests(TestCase):
         self.assertIsNone(self._resolve("/api/workspaces/acme-team/"))
 
     def test_ignores_admin_paths(self) -> None:
-        self.assertIsNone(self._resolve("/admin/"))
+        self.assertIsNone(self._resolve("/tvurce/"))
 
     def test_ignores_media_paths(self) -> None:
         self.assertIsNone(self._resolve("/media/foo.jpg"))

@@ -42,9 +42,9 @@ export default function NewWorkspacePage() {
     try {
       const ws = await workspaces.create({ slug, name, location, bio });
       // Drop them straight into the owner cockpit for the new komunita —
-      // the edit form moved under /admin/komunity/<slug>/edit when the
+      // the edit form moved under /tvurce/komunity/<slug>/edit when the
       // Tvůrce shell consolidated.
-      router.push(`/admin/komunity/${ws.slug}/edit`);
+      router.push(`/tvurce/komunity/${ws.slug}/edit`);
     } catch (err) {
       setError(
         err instanceof ApiError

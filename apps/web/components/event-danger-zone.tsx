@@ -29,7 +29,7 @@ export function EventDangerZone({ event, workspaceSlug, onCancelled }: Props) {
     setDeleteError(null);
     try {
       await events.softDelete(workspaceSlug, event.slug);
-      router.push("/admin/eventy/kos");
+      router.push("/tvurce/akce/kos");
     } catch (err) {
       setDeleteError(
         err instanceof ApiError

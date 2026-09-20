@@ -3,7 +3,7 @@
 Signi.cz je český e-signature service, podobně jako DocuSign ale
 levnější + lokální. API auth přes Bearer token (per-workspace
 nastavený přes Signi.cz dashboard, owner ho vloží do
-`/admin/integrace`).
+`/tvurce/integrace`).
 
 Tahle vrstva drží surovou komunikaci se Signi API. Vyšší vrstva
 (views/services) ji volá a překládá si stavy do našich

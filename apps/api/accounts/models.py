@@ -555,7 +555,7 @@ class PushSubscription(models.Model):
 
 
 class OwnerHiddenPerson(models.Model):
-    """An owner has explicitly hidden a person from their /admin/lide/
+    """An owner has explicitly hidden a person from their /tvurce/lide/
     view.
 
     Lidé is the cross-workspace CRM view — every user who's RSVPed to

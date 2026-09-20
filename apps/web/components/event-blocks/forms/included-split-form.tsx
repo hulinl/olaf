@@ -68,7 +68,7 @@ export function IncludedSplitForm({
 
   const detailsHref =
     workspaceSlug && eventSlug
-      ? `/admin/eventy/${workspaceSlug}/${eventSlug}/edit/detaily`
+      ? `/tvurce/akce/${workspaceSlug}/${eventSlug}/edit/detaily`
       : null;
 
   return (
