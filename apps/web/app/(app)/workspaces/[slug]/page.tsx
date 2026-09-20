@@ -8,6 +8,7 @@ import { DiscussionWall } from "@/components/discussion-wall";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { WorkspaceMetaLine } from "@/components/ui/workspace-meta-line";
 import { WorkspaceSocialsRow } from "@/components/workspace-socials-row";
 import { useUser } from "@/lib/user-context";
@@ -166,29 +167,35 @@ export default function WorkspaceDetailPage({ params }: Props) {
                   Owner
                 </span>
               )}
-              <a
-                href={`/${workspace.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Veřejný profil"
-                aria-label="Otevřít veřejný profil v novém okně"
-                className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              {/* Ml-auto → toolbar (veřejný profil + spravovat) padne
+                  vpravo v řadě s H1. OwnerCockpitLink se sám schová
+                  pro ne-adminy. */}
+              <div className="ml-auto flex items-center gap-2">
+                <OwnerCockpitLink workspaceSlug={workspace.slug} />
+                <a
+                  href={`/${workspace.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Veřejný profil"
+                  aria-label="Otevřít veřejný profil v novém okně"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-ink-700 hover:bg-surface-muted hover:text-ink-900 focus-ring"
                 >
-                  <path d="M14 3h7v7" />
-                  <path d="M10 14L21 3" />
-                  <path d="M21 14v7H3V3h7" />
-                </svg>
-              </a>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M14 3h7v7" />
+                    <path d="M10 14L21 3" />
+                    <path d="M21 14v7H3V3h7" />
+                  </svg>
+                </a>
+              </div>
             </div>
           </div>
           <WorkspaceMetaLine

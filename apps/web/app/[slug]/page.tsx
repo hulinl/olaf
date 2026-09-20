@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 
 import { AppFooter } from "@/components/ui/app-footer";
 import { Logo } from "@/components/ui/logo";
+import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
 import { ShareButton } from "@/components/ui/share-button";
@@ -117,6 +118,7 @@ export default async function WorkspaceProfilePage({ params }: Props) {
               text={workspace.bio || workspace.name}
               variant="soft"
             />
+            <OwnerCockpitLink workspaceSlug={workspace.slug} />
             <PublicAuthIndicator />
           </div>
         </div>

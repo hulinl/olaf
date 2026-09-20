@@ -7,29 +7,43 @@ import { ApiError, workspaces } from "@/lib/api";
 
 interface Props {
   workspaceSlug: string;
-  eventSlug: string;
+  /** Když set, link míří do event admin cockpitu; jinak do community
+   *  admin cockpitu. Použití: na public event landing s eventSlug,
+   *  na workspace pages bez eventSlug. */
+  eventSlug?: string;
+  /** Barevná varianta — `on-dark` pro overlay nad tmavým cover-em
+   *  (bílý translucent), default pro světlý surface. */
+  variant?: "default" | "on-dark";
 }
 
 /**
- * Small client island for public event / workspace pages. Renders nothing
- * unless the viewer is the owner of this workspace — in which case it shows
- * a discreet "Owner view" link back to the admin cockpit.
+ * Malý shortcut z uživatelské / veřejné stránky do Tvůrce shellu.
+ * Zobrazí se jen tehdy, když má viewer roli owner / admin na daném
+ * workspace-u — anonymním nebo běžným členům zůstává schovaný.
  *
- * Quietly swallows auth / fetch errors: anonymous visitors get a 401, the
- * component just stays hidden.
+ * Předtím dělal jenom event scope („Owner view"); teď funguje na
+ * public workspace page i in-app workspace page (bez eventSlug =
+ * míří do `/admin/komunity/<slug>`), aby owner/admin nikdy nemusel
+ * skákat přes global nav do Tvůrce.
  */
-export function OwnerCockpitLink({ workspaceSlug, eventSlug }: Props) {
-  const [isOwner, setIsOwner] = useState(false);
+export function OwnerCockpitLink({
+  workspaceSlug,
+  eventSlug,
+  variant = "default",
+}: Props) {
+  const [canManage, setCanManage] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     workspaces
       .detail(workspaceSlug)
       .then((ws) => {
-        // Admin má stejné cockpit privilege jako owner (jen komunitu
-        // nesmaže / neřídí ownership) — pustíme oba na admin view link.
-        if (!cancelled && (ws.my_role === "owner" || ws.my_role === "admin"))
-          setIsOwner(true);
+        if (
+          !cancelled &&
+          (ws.my_role === "owner" || ws.my_role === "admin")
+        ) {
+          setCanManage(true);
+        }
       })
       .catch((err) => {
         if (err instanceof ApiError) return;
@@ -39,19 +53,24 @@ export function OwnerCockpitLink({ workspaceSlug, eventSlug }: Props) {
     };
   }, [workspaceSlug]);
 
-  if (!isOwner) return null;
+  if (!canManage) return null;
+
+  const href = eventSlug
+    ? `/admin/eventy/${workspaceSlug}/${eventSlug}/edit`
+    : `/admin/komunity/${workspaceSlug}`;
+  const label = eventSlug ? "Spravovat akci" : "Spravovat komunitu";
+
+  const classes =
+    variant === "on-dark"
+      ? "inline-flex items-center gap-1.5 rounded-md border border-white/40 bg-white/10 px-3 py-1.5 text-xs font-medium text-ink-inverse backdrop-blur-sm transition-colors hover:border-white/70 hover:bg-white/20 focus-ring"
+      : "inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-brand hover:bg-surface-muted hover:text-brand focus-ring";
 
   return (
-    <Link
-      href={`/admin/eventy/${workspaceSlug}/${eventSlug}/edit`}
-      title="Owner view"
-      aria-label="Owner view"
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-border-strong hover:text-ink-900 focus-ring sm:px-3"
-    >
+    <Link href={href} title={label} aria-label={label} className={classes}>
       <CogIcon />
-      {/* Label hidden on the cramped mobile public-event header where
-          ShareButton + PublicAuthIndicator already take their share. */}
-      <span className="hidden sm:inline">Owner view →</span>
+      {/* Label schovaný na velmi úzkém viewportu (share + auth pill
+          už tam berou místo). */}
+      <span className="hidden sm:inline">{label}</span>
     </Link>
   );
 }
