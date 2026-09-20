@@ -91,7 +91,7 @@ export function Builder({
   const confirmDialog = useConfirm();
 
   function add(type: BlockType) {
-    const block = makeBlock(type, { eventLocationUrl });
+    const block = makeBlock(type);
     onChange([...blocks, block]);
     setOpenId(block.id);
     setPickerOpen(false);
@@ -363,10 +363,7 @@ function BlockForm({
   }
 }
 
-function makeBlock(
-  type: BlockType,
-  defaults: { eventLocationUrl?: string } = {},
-): EventBlock {
+function makeBlock(type: BlockType): EventBlock {
   const id =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
@@ -386,14 +383,10 @@ function makeBlock(
     case "gallery":
       return { id, type, payload: {} };
     case "map":
-      // Prefill z event.location_url když ho user vyplnil v Detaily —
-      // ušetří mu druhý paste. Sync v backendu pak drží oba fieldy
-      // konzistentní.
-      return {
-        id,
-        type,
-        payload: { map_url: defaults.eventLocationUrl ?? "" },
-      };
+      // Prázdný `map_url` — user request 2026-09-20: Map block má
+      // vlastní URL (trasa), nesmí se prefillovat z `event.location_url`
+      // (to je odkaz na místo srazu, viz hero systémová dlaždice).
+      return { id, type, payload: { map_url: "" } };
     case "faq":
       return { id, type, payload: { items: [] } };
     case "practical":

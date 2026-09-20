@@ -620,11 +620,12 @@ class CreateUpdateEventTests(TestCase):
         resp = self.client.patch(url, {"title": "Hack"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_location_url_syncs_to_existing_map_block(self) -> None:
-        # User chce jeden zdroj pravdy pro URL mapy. Když uloží
-        # Detaily form s `location_url`, backend rozsynchronizuje
-        # existující Map block tak, aby `map_url` v něm sedl.
+    def test_location_url_does_not_overwrite_map_block(self) -> None:
+        # 2026-09-20: sync `event.location_url` -> Map block `map_url`
+        # byl odstraněn. `location_url` = odkaz na místo srazu,
+        # `map_url` v Map bloku = odkaz na trasu — nezávislé pole.
         event = _build_event(self.ws, slug="sync-detaily-2026")
+        original_map_url = "https://mapy.com/route/old"
         event.blocks = [
             {
                 "id": "m1",
@@ -633,7 +634,7 @@ class CreateUpdateEventTests(TestCase):
                     "title": "Trasa",
                     "eyebrow": "Mapa",
                     "caption": "",
-                    "map_url": "https://mapy.com/old",
+                    "map_url": original_map_url,
                 },
             }
         ]
@@ -647,21 +648,25 @@ class CreateUpdateEventTests(TestCase):
                 "event_slug": "sync-detaily-2026",
             },
         )
-        new_url = "https://maps.app.goo.gl/abc123"
+        meeting_point_url = "https://maps.app.goo.gl/meeting-spot"
         resp = self.client.patch(
-            url, {"location_url": new_url}, format="json"
+            url, {"location_url": meeting_point_url}, format="json"
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
         event.refresh_from_db()
-        self.assertEqual(event.location_url, new_url)
-        self.assertEqual(event.blocks[0]["payload"]["map_url"], new_url)
+        self.assertEqual(event.location_url, meeting_point_url)
+        # Map block URL musí zůstat netknuté — dva různé konceptuální
+        # linky.
+        self.assertEqual(
+            event.blocks[0]["payload"]["map_url"], original_map_url
+        )
 
-    def test_map_block_url_syncs_back_to_location_url(self) -> None:
-        # Druhý směr: user uloží Obsah s novým `map_url`, backend
-        # propíše do `event.location_url`, aby Detaily form ukazoval
-        # stejné. Bez tohohle uživatel viděl divergovaná pole.
+    def test_map_block_url_does_not_overwrite_location_url(self) -> None:
+        # Druhý směr téhož: Obsah save s novým `map_url` v Map bloku
+        # nesahá na `event.location_url` (odkaz na místo srazu).
         event = _build_event(self.ws, slug="sync-obsah-2026")
-        event.location_url = "https://mapy.com/old"
+        meeting_point_url = "https://maps.app.goo.gl/meeting"
+        event.location_url = meeting_point_url
         event.save(update_fields=["location_url"])
 
         self.client.force_authenticate(self.owner)
@@ -672,7 +677,7 @@ class CreateUpdateEventTests(TestCase):
                 "event_slug": "sync-obsah-2026",
             },
         )
-        new_url = "https://maps.app.goo.gl/xyz789"
+        route_url = "https://maps.app.goo.gl/route-xyz"
         resp = self.client.patch(
             url,
             {
@@ -684,7 +689,7 @@ class CreateUpdateEventTests(TestCase):
                             "title": "Trasa",
                             "eyebrow": "Mapa",
                             "caption": "",
-                            "map_url": new_url,
+                            "map_url": route_url,
                         },
                     }
                 ]
@@ -693,8 +698,9 @@ class CreateUpdateEventTests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.content)
         event.refresh_from_db()
-        self.assertEqual(event.location_url, new_url)
-        self.assertEqual(event.blocks[0]["payload"]["map_url"], new_url)
+        # location_url zůstává na místě srazu, nezaválí to route URL.
+        self.assertEqual(event.location_url, meeting_point_url)
+        self.assertEqual(event.blocks[0]["payload"]["map_url"], route_url)
 
 
 class RsvpCancelByTokenTests(TestCase):
