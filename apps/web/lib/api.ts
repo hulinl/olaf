@@ -1839,10 +1839,22 @@ export const communities = {
       `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/role/`,
       { method: "POST", body: JSON.stringify({ role }) },
     ),
-  join: (workspaceSlug: string, communitySlug: string) =>
+  join: (
+    workspaceSlug: string,
+    communitySlug: string,
+    account?: {
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone?: string;
+    },
+  ) =>
     apiFetch<CommunityJoinResult>(
       `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/join/`,
-      { method: "POST" },
+      {
+        method: "POST",
+        body: account ? JSON.stringify({ account }) : undefined,
+      },
     ),
   approveMember: (
     workspaceSlug: string,

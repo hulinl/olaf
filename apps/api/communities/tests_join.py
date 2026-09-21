@@ -128,9 +128,75 @@ class CommunityJoinTests(TestCase):
     def _join_url(self, c: Community) -> str:
         return f"/api/communities/workspaces/{self.ws.slug}/{c.slug}/join/"
 
-    def test_anon_cannot_join(self) -> None:
+    def test_anon_without_account_gets_400(self) -> None:
+        # Bez account payloadu je anon POST invalid — potřebujeme aspoň
+        # email + jméno + příjmení, jinak nemáme koho zaznamenat.
         resp = self.client.post(self._join_url(self.public))
-        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_anon_can_join_with_account_payload(self) -> None:
+        # Mirror RSVP anon flow — public join vytvoří guest usera
+        # (email_verified=False, unusable password) a pending
+        # CommunityMember. User pak dokončí signup později.
+        resp = self.client.post(
+            self._join_url(self.public),
+            {
+                "account": {
+                    "email": "anon@join.cm",
+                    "first_name": "Anna",
+                    "last_name": "Nová",
+                }
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data["status"], "pending")
+        guest = User.objects.get(email="anon@join.cm")
+        self.assertFalse(guest.email_verified)
+        self.assertFalse(guest.has_usable_password())
+        row = CommunityMember.objects.get(community=self.public, user=guest)
+        self.assertEqual(row.status, CommunityMember.STATUS_PENDING)
+        # Owner dostal bell notifikaci — anon žádost se propíše stejně
+        # jako přihlášený user.
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.owner,
+                kind=Notification.KIND_COMMUNITY_JOIN_REQUEST,
+            ).exists()
+        )
+
+    def test_anon_with_verified_email_gets_409(self) -> None:
+        # Anon submitter nesmí přepsat cizí session ani modifikovat
+        # cizí data. Backend vrací 409 code=email_has_account, frontend
+        # pak zobrazí "Přihlas se" prompt s pre-fill emailem.
+        User.objects.create_user(
+            email="already@join.cm",
+            password="alpine-hike-2026",
+            first_name="Al",
+            last_name="Ready",
+            email_verified=True,
+        )
+        resp = self.client.post(
+            self._join_url(self.public),
+            {
+                "account": {
+                    "email": "already@join.cm",
+                    "first_name": "Any",
+                    "last_name": "Body",
+                }
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(resp.data.get("code"), "email_has_account")
+        # Membership se nevytvořil (protection: nedáváme cizímu člověku
+        # cizí data).
+        self.assertFalse(
+            CommunityMember.objects.filter(
+                community=self.public,
+                user__email="already@join.cm",
+            ).exists()
+        )
 
     def test_auth_user_can_join_public(self) -> None:
         self.client.force_authenticate(user=self.joe)

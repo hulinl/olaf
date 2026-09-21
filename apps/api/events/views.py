@@ -14,6 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from accounts.light_user import ExistingVerifiedUserError, create_light_user
 from accounts.models import User
 from communities.models import Community
 from workspaces.models import Workspace
@@ -222,79 +223,8 @@ def public_event(request: Request, workspace_slug: str, event_slug: str) -> Resp
     return _render_public_event(event, request)
 
 
-class _ExistingVerifiedUser(Exception):
-    """Raised když anon RSVP odkazuje na e-mail, který patří plnohodnotnému
-    (verified) accountu. Předtím se v tomhle případě accountu zalogoval
-    pod RSVP-em — což znamenalo, že kdokoli znalý cizího mailu mohl
-    submitnout RSVP formulář a dostat se do session toho usera. Teď to
-    odmítáme a frontend ukáže "Tenhle e-mail už má účet, přihlas se."
-    """
-
-
-def _create_light_user(account_payload: dict) -> User | None:
-    """Najít nebo vytvořit guest usera pro public RSVP flow.
-
-    Předtím tahle funkce dělala dvě věci: vytvářela auto-verified usera
-    s random heslem A registrovala ho do session přes `login()` ve view.
-    User pak po submitu RSVP formuláře skončil v aplikaci jako přihlášený,
-    což zaskočilo všechny, kteří si chtěli jen RSVPnout a aplikaci
-    používat zatím nehodlali.
-
-    Po refaktoru: guest user je `email_verified=False` s unusable
-    password. Žádný auto-login. Pokud si user později vytvoří účet
-    (signup s tím samým e-mailem), endpoint signup detekuje existující
-    unverified row a převezme ho — nastaví heslo, pošle ověřovací mail,
-    a všechna jeho předchozí RSVPs (přivázaná FK na User row) zůstávají
-    nadále jeho.
-
-    Vrací `None` když chybí povinná pole. Hází `_ExistingVerifiedUser`
-    když email patří verified accountu — anon submitter nesmí přepsat
-    cizí session.
-    """
-    email = (account_payload.get("email") or "").strip().lower()
-    first_name = (account_payload.get("first_name") or "").strip()
-    last_name = (account_payload.get("last_name") or "").strip()
-    phone = (account_payload.get("phone") or "").strip()
-
-    if not (email and first_name and last_name):
-        return None
-
-    try:
-        existing = User.objects.get(email=email)
-    except User.DoesNotExist:
-        existing = None
-
-    if existing is not None:
-        if existing.email_verified:
-            raise _ExistingVerifiedUser()
-        # Reuse unverified ("guest") row. Doplň prázdná pole — uživatel
-        # mohl uvést telefon u druhé akce, který nezadal u první.
-        updates: list[str] = []
-        if phone and not existing.phone:
-            existing.phone = phone
-            updates.append("phone")
-        if first_name and not existing.first_name:
-            existing.first_name = first_name
-            updates.append("first_name")
-        if last_name and not existing.last_name:
-            existing.last_name = last_name
-            updates.append("last_name")
-        if updates:
-            existing.save(update_fields=updates)
-        return existing
-
-    user = User.objects.create(
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-        phone=phone,
-        email_verified=False,
-    )
-    # Unusable password = login se nepovede dokud user nepřejde přes
-    # signup nebo reset-password flow.
-    user.set_unusable_password()
-    user.save(update_fields=["password"])
-    return user
+# Guest user helper je sdílený s community-join flow — bydlí v
+# `accounts.light_user`. Import viz nahoru.
 
 
 @api_view(["POST"])
@@ -346,8 +276,8 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            user = _create_light_user(account)
-        except _ExistingVerifiedUser:
+            user = create_light_user(account)
+        except ExistingVerifiedUserError:
             # Frontend ten kód detekuje a ukáže "Tento e-mail už má účet,
             # přihlas se" link. Nezakládáme cizímu uživateli session ani
             # nezavoláme jakoukoli akci, která by jeho data změnila.

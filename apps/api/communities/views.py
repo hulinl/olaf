@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from accounts.light_user import ExistingVerifiedUserError, create_light_user
 from accounts.models import User
 from events.permissions import is_workspace_owner
 from workspaces.models import Workspace
@@ -326,16 +327,27 @@ def community_member_role(
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def community_join(
     request: Request, workspace_slug: str, community_slug: str
 ) -> Response:
     """Public community join request.
 
-    Any authenticated user může požádat o vstup do `visibility=public`
-    komunity. Vytvoří CommunityMember se statusem `pending` a pingne
-    community adminy + workspace ownera do bell feedu. Admin pak
-    schvaluje přes `community_member_approve`.
+    Kdokoli může požádat o vstup do `visibility=public` komunity.
+    Vytvoří CommunityMember se statusem `pending` a pingne community
+    adminy + workspace ownera do bell feedu. Admin pak schvaluje přes
+    `community_member_approve`.
+
+    Anon flow (mirror RSVP flow — apps/api/events/views.py::rsvp_event):
+    - Kdo není přihlášený, musí poslat `account: {email, first_name,
+      last_name, phone?}`. Backend vytvoří guest User (unverified,
+      unusable password) a naváže na něj pending CommunityMember. User
+      dokončí signup později přes /signup s tím samým e-mailem —
+      accounts.views.signup detekuje existující unverified row a
+      převezme ho.
+    - Pokud e-mail patří verified účtu, vracíme 409
+      `code=email_has_account`. Frontend pak zobrazí "Přihlas se"
+      dialog místo aby anonyma dostal do session vlastníka e-mailu.
 
     Idempotence:
     - existing member → 200 `{status: "already_member"}`
@@ -356,8 +368,36 @@ def community_join(
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    user = request.user if request.user.is_authenticated else None
+    if user is None:
+        account = request.data.get("account") or {}
+        try:
+            user = create_light_user(account)
+        except ExistingVerifiedUserError:
+            return Response(
+                {
+                    "account": {
+                        "email": (
+                            "Tento e-mail už má účet. Přihlas se, prosím."
+                        ),
+                    },
+                    "code": "email_has_account",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if user is None:
+            return Response(
+                {
+                    "account": (
+                        "Pro žádost o vstup potřebujeme e-mail, jméno a"
+                        " příjmení."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     existing = CommunityMember.objects.filter(
-        community=community, user=request.user
+        community=community, user=user
     ).first()
     if existing is not None:
         if existing.status == CommunityMember.STATUS_MEMBER:
@@ -393,7 +433,7 @@ def community_join(
 
     member = CommunityMember.objects.create(
         community=community,
-        user=request.user,
+        user=user,
         status=CommunityMember.STATUS_PENDING,
     )
 
