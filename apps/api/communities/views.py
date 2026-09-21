@@ -1,10 +1,12 @@
 """Community endpoints — list/CRUD for workspace owners + roster + invite."""
 from __future__ import annotations
 
+import contextlib
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -73,17 +75,50 @@ def workspace_communities(request: Request, workspace_slug: str) -> Response:
 
 
 @api_view(["GET", "PATCH", "DELETE"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def community_detail(
     request: Request, workspace_slug: str, community_slug: str
 ) -> Response:
-    """Retrieve / update / delete a single community."""
+    """Retrieve / update / delete a single community.
+
+    GET je otevřený anonymnímu uživateli pro `visibility in {public,
+    unlisted}` — potřebuje to public landing page (`/<ws>/k/<c>`). Pro
+    private komunity a anon usera vracíme 404 (tzn. neexistuje pro tebe),
+    ať neúmyslně nepotvrzujeme existenci privátních komunit.
+
+    PATCH/DELETE stále vyžadují auth + can_manage_community /
+    workspace-owner gate. AllowAny na dekorátoru → permission gate je
+    v těle metody podle akce."""
     community, err = _community_or_404(workspace_slug, community_slug)
     if err:
         return err
 
     if request.method == "GET":
-        return Response(CommunitySerializer(community).data)
+        # Anonymous can see public/unlisted only. Private komunita se
+        # anonymu tváří jako 404 (soft-hide).
+        if community.visibility == Community.VISIBILITY_PRIVATE and (
+            not request.user.is_authenticated
+            or not can_manage_community(request.user, community)
+        ):
+            # Members of a private community by měli vidět svou komunitu
+            # taky přes tenhle endpoint (dashboard fetch). Když je auth
+            # user aktivní member → povolit read.
+            if not request.user.is_authenticated:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            is_member = CommunityMember.objects.filter(
+                community=community,
+                user=request.user,
+                status=CommunityMember.STATUS_MEMBER,
+            ).exists()
+            if not is_member:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            CommunitySerializer(community, context={"request": request}).data
+        )
+
+    # Write akce potřebují auth.
+    if not request.user.is_authenticated:
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
 
     # DELETE je destructive — drží se na úrovni workspace ownera, ne
     # community admina. Community admin smí editovat, ne mazat celou
@@ -98,7 +133,9 @@ def community_detail(
     if not can_manage_community(request.user, community):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
-    serializer = CommunitySerializer(community, data=request.data, partial=True)
+    serializer = CommunitySerializer(
+        community, data=request.data, partial=True, context={"request": request}
+    )
     serializer.is_valid(raise_exception=True)
     new_slug = serializer.validated_data.get("slug")
     if (
@@ -113,7 +150,9 @@ def community_detail(
             status=status.HTTP_400_BAD_REQUEST,
         )
     community = serializer.save()
-    return Response(CommunitySerializer(community).data)
+    return Response(
+        CommunitySerializer(community, context={"request": request}).data
+    )
 
 
 @api_view(["GET", "POST"])
@@ -283,4 +322,219 @@ def community_member_role(
             "new_role": new_role,
         },
     )
+    return Response(CommunityMemberSerializer(member).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def community_join(
+    request: Request, workspace_slug: str, community_slug: str
+) -> Response:
+    """Public community join request.
+
+    Any authenticated user může požádat o vstup do `visibility=public`
+    komunity. Vytvoří CommunityMember se statusem `pending` a pingne
+    community adminy + workspace ownera do bell feedu. Admin pak
+    schvaluje přes `community_member_approve`.
+
+    Idempotence:
+    - existing member → 200 `{status: "already_member"}`
+    - existing pending → 200 `{status: "already_pending"}`
+    - existing declined/removed → přepnout zpět na pending + notif.
+    """
+    community, err = _community_or_404(workspace_slug, community_slug)
+    if err:
+        return err
+
+    if community.visibility != Community.VISIBILITY_PUBLIC:
+        # Unlisted i private → join přes tenhle endpoint blokovaný.
+        # Unlisted "link-only" znamená share odkaz, ale členství si
+        # owner drží pod kontrolou (invite). Public je jediný self-serve
+        # kanál v V1.
+        return Response(
+            {"detail": "Do této komunity se nelze samostatně přihlásit."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    existing = CommunityMember.objects.filter(
+        community=community, user=request.user
+    ).first()
+    if existing is not None:
+        if existing.status == CommunityMember.STATUS_MEMBER:
+            return Response(
+                {
+                    "status": "already_member",
+                    "membership": CommunityMemberSerializer(existing).data,
+                }
+            )
+        if existing.status == CommunityMember.STATUS_PENDING:
+            return Response(
+                {
+                    "status": "already_pending",
+                    "membership": CommunityMemberSerializer(existing).data,
+                }
+            )
+        # declined / removed → re-request. Přepneme na pending, decided_at
+        # nulujeme (nová žádost = nové rozhodnutí čeká).
+        existing.status = CommunityMember.STATUS_PENDING
+        existing.decided_at = None
+        existing.save(update_fields=["status", "decided_at"])
+        with contextlib.suppress(Exception):
+            from .notifications import notify_community_join_request
+
+            notify_community_join_request(existing)
+        return Response(
+            {
+                "status": "pending",
+                "membership": CommunityMemberSerializer(existing).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    member = CommunityMember.objects.create(
+        community=community,
+        user=request.user,
+        status=CommunityMember.STATUS_PENDING,
+    )
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_community_join_request
+
+        notify_community_join_request(member)
+
+    return Response(
+        {
+            "status": "pending",
+            "membership": CommunityMemberSerializer(member).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def community_member_approve(
+    request: Request,
+    workspace_slug: str,
+    community_slug: str,
+    member_id: int,
+) -> Response:
+    """Approve a pending community membership request."""
+    community, err = _community_or_404(workspace_slug, community_slug)
+    if err:
+        return err
+
+    if not can_manage_community(request.user, community):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        member = community.memberships.select_related("user").get(pk=member_id)
+    except CommunityMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if member.status != CommunityMember.STATUS_PENDING:
+        return Response(
+            {"detail": "Členství není ve stavu pending."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    member.status = CommunityMember.STATUS_MEMBER
+    member.decided_at = timezone.now()
+    member.save(update_fields=["status", "decided_at"])
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_community_member_approved
+
+        notify_community_member_approved(member)
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    applicant_name = (
+        member.user.get_full_name() or member.user.email
+        if member.user_id
+        else "(neznámý)"
+    )
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_COMMUNITY_MEMBER_APPROVE,
+        workspace=community.workspace,
+        target_type="community_member",
+        target_id=member.pk,
+        summary=(
+            f'Schválil žádost {applicant_name} '
+            f'o vstup do komunity „{community.name}".'
+        ),
+        payload={
+            "community_id": community.pk,
+            "community_slug": community.slug,
+        },
+    )
+
+    return Response(CommunityMemberSerializer(member).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def community_member_reject(
+    request: Request,
+    workspace_slug: str,
+    community_slug: str,
+    member_id: int,
+) -> Response:
+    """Reject a pending community membership request."""
+    community, err = _community_or_404(workspace_slug, community_slug)
+    if err:
+        return err
+
+    if not can_manage_community(request.user, community):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        member = community.memberships.select_related("user").get(pk=member_id)
+    except CommunityMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if member.status != CommunityMember.STATUS_PENDING:
+        return Response(
+            {"detail": "Členství není ve stavu pending."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    reason = (request.data.get("reason") or "").strip()
+
+    member.status = CommunityMember.STATUS_DECLINED
+    member.decided_at = timezone.now()
+    member.save(update_fields=["status", "decided_at"])
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_community_member_rejected
+
+        notify_community_member_rejected(member, reason=reason)
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    applicant_name = (
+        member.user.get_full_name() or member.user.email
+        if member.user_id
+        else "(neznámý)"
+    )
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_COMMUNITY_MEMBER_REJECT,
+        workspace=community.workspace,
+        target_type="community_member",
+        target_id=member.pk,
+        summary=(
+            f'Zamítl žádost {applicant_name} '
+            f'o vstup do komunity „{community.name}".'
+        ),
+        payload={
+            "community_id": community.pk,
+            "community_slug": community.slug,
+            "reason": reason,
+        },
+    )
+
     return Response(CommunityMemberSerializer(member).data)

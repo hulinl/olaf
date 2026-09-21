@@ -30,4 +30,19 @@ urlpatterns = [
         views.community_member_role,
         name="member-role",
     ),
+    path(
+        "workspaces/<slug:workspace_slug>/<slug:community_slug>/join/",
+        views.community_join,
+        name="join",
+    ),
+    path(
+        "workspaces/<slug:workspace_slug>/<slug:community_slug>/members/<int:member_id>/approve/",
+        views.community_member_approve,
+        name="member-approve",
+    ),
+    path(
+        "workspaces/<slug:workspace_slug>/<slug:community_slug>/members/<int:member_id>/reject/",
+        views.community_member_reject,
+        name="member-reject",
+    ),
 ]

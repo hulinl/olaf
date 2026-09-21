@@ -38,6 +38,9 @@ class Notification(models.Model):
     KIND_RSVP_APPROVED = "rsvp_approved"
     KIND_RSVP_REJECTED = "rsvp_rejected"
     KIND_PAYMENT_RECEIVED = "payment_received"
+    KIND_COMMUNITY_JOIN_REQUEST = "community_join_request"
+    KIND_COMMUNITY_MEMBER_APPROVED = "community_member_approved"
+    KIND_COMMUNITY_MEMBER_REJECTED = "community_member_rejected"
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -142,9 +142,12 @@ class CommunityDetailEndpointTests(TestCase):
         )
         self.client = APIClient()
 
-    def test_anon_cannot_read(self) -> None:
+    def test_anon_can_read_public(self) -> None:
+        # 2026-09-21: GET je otevřený anonymu pro public/unlisted (viz
+        # tests_join.CommunityPublicDetailTests) — public landing page
+        # `/<ws>/k/<c>` fetchuje bez auth. Private se anonymu vrací 404.
         resp = self.client.get(self.url)
-        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
     def test_authenticated_outsider_can_read_public(self) -> None:
         # Once authenticated, any user can read any community in the

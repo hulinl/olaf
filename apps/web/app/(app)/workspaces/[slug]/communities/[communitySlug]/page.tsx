@@ -17,6 +17,31 @@ import {
   workspaces,
 } from "@/lib/api";
 
+const VISIBILITY_OPTIONS: {
+  value: Community["visibility"];
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "public",
+    label: "Veřejná",
+    description:
+      "Kdokoli si stránku otevře a může poslat žádost o vstup. Ty schvaluješ.",
+  },
+  {
+    value: "unlisted",
+    label: "Skrytá s odkazem",
+    description:
+      "Stránka je dostupná jen přes přímý odkaz. Nikdo se nepřidává sám.",
+  },
+  {
+    value: "private",
+    label: "Soukromá",
+    description:
+      "Vidí ji jen členové. Nové členy přidáváš ručně přes seznam níž.",
+  },
+];
+
 interface Props {
   params: Promise<{ slug: string; communitySlug: string }>;
 }
@@ -59,6 +84,18 @@ export default function CommunityDetailPage({ params }: Props) {
   const [lastInvite, setLastInvite] = useState<CommunityInviteResult | null>(
     null,
   );
+  const [decidingMemberId, setDecidingMemberId] = useState<number | null>(null);
+
+  // Settings karta má vlastní state, aby změny visibility/policy uživatel
+  // uviděl okamžitě (bez čekání na refetch) a mohl klikat Uložit až když
+  // je hotový. Souběžně synchronizujeme s `community` po fetch/save.
+  const [settingsVisibility, setSettingsVisibility] = useState<
+    Community["visibility"]
+  >("private");
+  const [settingsPolicy, setSettingsPolicy] =
+    useState<Community["membership_policy"]>("approval");
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +113,8 @@ export default function CommunityDetailPage({ params }: Props) {
         }
         setWorkspace(ws);
         setCommunity(c);
+        setSettingsVisibility(c.visibility);
+        setSettingsPolicy(c.membership_policy);
         setMembers(m);
       } catch (err) {
         if (cancelled) return;
@@ -178,6 +217,84 @@ export default function CommunityDetailPage({ params }: Props) {
     }
   }
 
+  async function handleApprove(member: CommunityMemberRecord) {
+    setDecidingMemberId(member.id);
+    setError(null);
+    try {
+      const updated = await communitiesApi.approveMember(
+        wsSlug,
+        communitySlug,
+        member.id,
+      );
+      setMembers((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, ...updated } : m)),
+      );
+      // member_count je server-computed, refetch komunity aby se badge
+      // v hlavičce srovnal.
+      try {
+        const c = await communitiesApi.detail(wsSlug, communitySlug);
+        setCommunity(c);
+      } catch {
+        // Když refetch spadne, drží se stará hodnota — schvalování
+        // samotné už proběhlo úspěšně a member v listu už je "member".
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Schválení selhalo.");
+    } finally {
+      setDecidingMemberId(null);
+    }
+  }
+
+  async function handleReject(member: CommunityMemberRecord) {
+    const ok = await confirmDialog({
+      title: `Zamítnout žádost ${member.user_full_name}?`,
+      description:
+        "Uživatel dostane oznámení. O vstup může požádat znovu, dokud komunita zůstává veřejná.",
+      confirmLabel: "Zamítnout",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setDecidingMemberId(member.id);
+    setError(null);
+    try {
+      const updated = await communitiesApi.rejectMember(
+        wsSlug,
+        communitySlug,
+        member.id,
+      );
+      setMembers((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, ...updated } : m)),
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Zamítnutí selhalo.");
+    } finally {
+      setDecidingMemberId(null);
+    }
+  }
+
+  async function handleSaveSettings() {
+    if (!community) return;
+    setSavingSettings(true);
+    setSettingsSaved(false);
+    setError(null);
+    try {
+      const updated = await communitiesApi.update(wsSlug, communitySlug, {
+        visibility: settingsVisibility,
+        membership_policy: settingsPolicy,
+      });
+      setCommunity(updated);
+      setSettingsSaved(true);
+      // Auto-hide "Uloženo" hlášky po pár vteřinách, ať se nehromadí.
+      window.setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Uložení nastavení selhalo.",
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="flex flex-1 items-center justify-center">
@@ -187,9 +304,11 @@ export default function CommunityDetailPage({ params }: Props) {
   }
   if (!workspace || !community) return null;
 
-  const activeMembers = members.filter(
-    (m) => m.status === "member" || m.status === "pending",
-  );
+  const pendingRequests = members.filter((m) => m.status === "pending");
+  const activeMembers = members.filter((m) => m.status === "member");
+  const settingsDirty =
+    settingsVisibility !== community.visibility ||
+    settingsPolicy !== community.membership_policy;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -226,6 +345,63 @@ export default function CommunityDetailPage({ params }: Props) {
           <div className="mb-6">
             <Alert variant="danger">{error}</Alert>
           </div>
+        )}
+
+        {pendingRequests.length > 0 && (
+          <Card className="mb-6 border-warning/40">
+            <CardSection>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-ink-900">
+                  Žádosti o členství
+                </h2>
+                <span className="rounded bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                  {pendingRequests.length} čeká
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-ink-500">
+                Uživatelé, kteří kliknuli na „Přidat se ke komunitě" na
+                veřejné stránce. Uprav nastavení komunity níž, pokud toto
+                CTA na veřejné stránce nechceš.
+              </p>
+              <ul className="mt-4 divide-y divide-border">
+                {pendingRequests.map((m) => (
+                  <li
+                    key={m.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink-900">
+                        {m.user_full_name}
+                      </p>
+                      <p className="truncate text-sm text-ink-500">
+                        {m.user_email}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="md"
+                        onClick={() => handleApprove(m)}
+                        loading={decidingMemberId === m.id}
+                      >
+                        Schválit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="md"
+                        onClick={() => handleReject(m)}
+                        disabled={decidingMemberId === m.id}
+                      >
+                        Zamítnout
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardSection>
+          </Card>
         )}
 
         <Card>
@@ -342,6 +518,78 @@ export default function CommunityDetailPage({ params }: Props) {
             </ul>
           </Card>
         )}
+
+        <h2 className="mt-10 text-lg font-semibold text-ink-900">
+          Nastavení komunity
+        </h2>
+        <Card className="mt-3">
+          <CardSection>
+            <div>
+              <p className="text-sm font-medium text-ink-900">Viditelnost</p>
+              <p className="mt-1 text-sm text-ink-500">
+                Určuje, kdo si otevře veřejnou stránku a jestli se lidé mohou
+                sami hlásit.
+              </p>
+              <fieldset className="mt-3 space-y-2">
+                {VISIBILITY_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={[
+                      "flex cursor-pointer items-start gap-3 rounded-md border p-3",
+                      settingsVisibility === opt.value
+                        ? "border-brand bg-brand/5"
+                        : "border-border bg-surface hover:bg-surface-muted",
+                    ].join(" ")}
+                  >
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value={opt.value}
+                      checked={settingsVisibility === opt.value}
+                      onChange={() => setSettingsVisibility(opt.value)}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-ink-900">
+                        {opt.label}
+                      </p>
+                      <p className="text-sm text-ink-500">{opt.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </fieldset>
+              {settingsVisibility === "public" && (
+                <p className="mt-3 rounded-md bg-info/10 p-3 text-sm text-ink-700">
+                  Veřejná adresa:{" "}
+                  <a
+                    href={`/${wsSlug}/k/${communitySlug}`}
+                    className="font-mono text-brand underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    /{wsSlug}/k/{communitySlug}
+                  </a>
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleSaveSettings}
+                loading={savingSettings}
+                disabled={!settingsDirty}
+              >
+                Uložit nastavení
+              </Button>
+              {settingsSaved && (
+                <span className="text-sm text-success">Uloženo.</span>
+              )}
+            </div>
+          </CardSection>
+        </Card>
       </section>
     </main>
   );

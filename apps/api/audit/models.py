@@ -39,6 +39,8 @@ class AuditLog(models.Model):
     ACTION_MEMBER_ADD = "workspace_member.add"
     ACTION_MEMBER_REMOVE = "workspace_member.remove"
     ACTION_COMMUNITY_MEMBER_ROLE_CHANGE = "community_member.role_change"
+    ACTION_COMMUNITY_MEMBER_APPROVE = "community_member.approve"
+    ACTION_COMMUNITY_MEMBER_REJECT = "community_member.reject"
     ACTION_TOPIC_DELETE = "discussion.topic.delete"
     ACTION_COMMENT_DELETE = "discussion.comment.delete"
 

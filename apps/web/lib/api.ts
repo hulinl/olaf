@@ -1725,6 +1725,14 @@ export const workspaces = {
     apiFetch<Workspace>(`/api/workspaces/${slug}/cover/`, { method: "DELETE" }),
 };
 
+export type CommunityMemberStatus =
+  | "pending"
+  | "member"
+  | "declined"
+  | "removed";
+
+export type CommunityMemberRole = "admin" | "member";
+
 export interface Community {
   id: number;
   slug: string;
@@ -1736,19 +1744,31 @@ export interface Community {
   workspace_slug: string;
   workspace_name: string;
   member_count: number;
+  my_membership: {
+    status: CommunityMemberStatus;
+    role: CommunityMemberRole;
+  } | null;
   created_at: string;
 }
 
-export type CommunityMemberRole = "admin" | "member";
-
 export interface CommunityMemberRecord {
   id: number;
-  status: "pending" | "member" | "declined" | "removed";
+  status: CommunityMemberStatus;
   role: CommunityMemberRole;
   joined_at: string;
   decided_at: string | null;
   user_email: string;
   user_full_name: string;
+}
+
+export type CommunityJoinStatus =
+  | "pending"
+  | "already_pending"
+  | "already_member";
+
+export interface CommunityJoinResult {
+  status: CommunityJoinStatus;
+  membership: CommunityMemberRecord;
 }
 
 export interface CommunityWritePayload {
@@ -1818,6 +1838,33 @@ export const communities = {
     apiFetch<CommunityMemberRecord>(
       `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/role/`,
       { method: "POST", body: JSON.stringify({ role }) },
+    ),
+  join: (workspaceSlug: string, communitySlug: string) =>
+    apiFetch<CommunityJoinResult>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/join/`,
+      { method: "POST" },
+    ),
+  approveMember: (
+    workspaceSlug: string,
+    communitySlug: string,
+    memberId: number,
+  ) =>
+    apiFetch<CommunityMemberRecord>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/approve/`,
+      { method: "POST" },
+    ),
+  rejectMember: (
+    workspaceSlug: string,
+    communitySlug: string,
+    memberId: number,
+    reason?: string,
+  ) =>
+    apiFetch<CommunityMemberRecord>(
+      `/api/communities/workspaces/${workspaceSlug}/${communitySlug}/members/${memberId}/reject/`,
+      {
+        method: "POST",
+        body: JSON.stringify(reason ? { reason } : {}),
+      },
     ),
 };
 
