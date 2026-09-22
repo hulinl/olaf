@@ -280,6 +280,23 @@ export interface Workspace {
     status: "active" | "pending" | "removed";
     role: "owner" | "admin" | "member";
   } | null;
+  /** „Kdo vede komunitu" — první owner-role active member. Public
+   *  landing má sekci s Avatar + jménem + linkem na /u/<slug> (kde
+   *  jsou i kontakty podle jeho profile toggles). Bez emailu/telefonu
+   *  přímo tady — public profile page má vlastní gate. */
+  owner?: {
+    id: number;
+    profile_slug: string;
+    first_name: string;
+    last_name: string;
+    display_name: string;
+    full_name: string;
+    bio: string;
+    avatar_url: string | null;
+    avatar_focal_x: number;
+    avatar_focal_y: number;
+    avatar_zoom: number;
+  } | null;
 }
 
 export type WorkspaceJoinStatus =

@@ -10,8 +10,6 @@ import { ShareButton } from "@/components/ui/share-button";
 import { assetUrl, type Community, type Workspace } from "@/lib/api";
 import { serverFetch } from "@/lib/server-api";
 
-import { JoinCommunityCTA } from "./JoinCommunityCTA";
-
 interface Props {
   params: Promise<{ slug: string; communitySlug: string }>;
 }
@@ -141,32 +139,45 @@ export default async function PublicCommunityPage({ params }: Props) {
                 {community.member_count}{" "}
                 {community.member_count === 1 ? "člen" : "členů"}
               </p>
+              {/* Compact join CTA — dedikovaná stránka drží celý flow. */}
+              {community.visibility === "public" &&
+                (!community.my_membership ||
+                  community.my_membership.status === "removed" ||
+                  community.my_membership.status === "declined") && (
+                  <div className="mt-3">
+                    <Link
+                      href={`/${slug}/k/${communitySlug}/join`}
+                      className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3.5 py-1.5 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-white focus-ring"
+                    >
+                      Přidej se do komunity →
+                    </Link>
+                  </div>
+                )}
+              {community.visibility === "public" &&
+                community.my_membership?.status === "pending" && (
+                  <div className="mt-3">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/90 px-3.5 py-1.5 text-sm font-semibold text-ink-900">
+                      Čekáš na schválení
+                    </span>
+                  </div>
+                )}
             </div>
           </div>
         </section>
 
-        {/* DESCRIPTION + JOIN CTA */}
-        <section className="bg-canvas">
-          <div className="mx-auto max-w-4xl px-4 py-10 sm:py-14">
-            {community.description && (
+        {/* DESCRIPTION */}
+        {community.description && (
+          <section className="bg-canvas">
+            <div className="mx-auto max-w-4xl px-4 py-10 sm:py-14">
               <p
                 className="max-w-2xl whitespace-pre-line text-ink-700"
                 style={{ fontSize: 16, lineHeight: 1.6 }}
               >
                 {community.description}
               </p>
-            )}
-
-            <div className="mt-8">
-              <JoinCommunityCTA
-                workspaceSlug={slug}
-                communitySlug={communitySlug}
-                visibility={community.visibility}
-                myMembership={community.my_membership}
-              />
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <AppFooter />
       </main>

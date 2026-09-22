@@ -24,7 +24,10 @@ function LoginForm() {
   const nextParam = searchParams.get("next");
   // Only allow same-origin relative paths so a crafted ?next= can't redirect off-site.
   const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
-  const [email, setEmail] = useState("");
+  // `?email=` prefill (např. z join-page 409 email_has_account redirect) —
+  // user nemusí adresu psát znovu.
+  const emailParam = searchParams.get("email") ?? "";
+  const [email, setEmail] = useState(emailParam);
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

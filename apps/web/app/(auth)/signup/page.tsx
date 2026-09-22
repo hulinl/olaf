@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 
 import { AuthShell } from "@/components/ui/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,22 @@ function SignupForm() {
   // PrerenderError na useSearchParams.
   const searchParams = useSearchParams();
   const prefilledEmail = searchParams.get("email") ?? "";
+  // `?next=` — kam po verify email redirectovat. Signup + verify jsou
+  // rozdělené flow (auth server pošle verify link mailem), takže si
+  // next musíme dropnout do localStorage a verify ho vyzvedne. Origin
+  // je stejný, takže to funguje pro > 90 % uživatelů (kliknou z mailu
+  // ve stejném browseru). Ostatní fallnou na /dashboard.
+  useEffect(() => {
+    const next = searchParams.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      try {
+        localStorage.setItem("post_signup_next", next);
+      } catch {
+        // localStorage nedostupné (private mode) — smůla, fallneme na
+        // /dashboard po verify.
+      }
+    }
+  }, [searchParams]);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");

@@ -115,6 +115,10 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
     # vědět, jestli je requester už člen, čeká na schválení, nebo
     # nikdo. `null` pro anon i pro plně cizí authenticated usery.
     my_membership = serializers.SerializerMethodField()
+    # Owner ("kdo komunitu vede") — public landing má sekci s Avatar +
+    # jménem + linkem na /u/<slug>. Vrací první owner-role active
+    # membera; když nemá (zbytkové edge případy), `null`.
+    owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Workspace
@@ -139,6 +143,7 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
             "event_sharing_policy",
             "created_at",
             "my_membership",
+            "owner",
         )
         read_only_fields = fields
 
@@ -185,3 +190,39 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
         if m is None:
             return None
         return {"status": m.status, "role": m.role}
+
+    def get_owner(self, obj: Workspace) -> dict | None:
+        """První owner-role active member — public "kdo vede komunitu".
+
+        Vrací minimální payload pro landing sekci: display info + link
+        na /u/<slug>. Kontakty (email, phone) tady neexposujeme — pro
+        soukromí by je user musel explicitně zveřejnit přes public
+        profile toggles. Public landing pošle usera na /u/<slug>, kde
+        UserPublicProfileSerializer respektuje `profile_show_*` toggles.
+        """
+        m = (
+            WorkspaceMember.objects.filter(
+                workspace=obj,
+                role=WorkspaceMember.ROLE_OWNER,
+                status=WorkspaceMember.STATUS_ACTIVE,
+            )
+            .select_related("user")
+            .order_by("created_at")
+            .first()
+        )
+        if m is None or m.user is None:
+            return None
+        u = m.user
+        return {
+            "id": u.pk,
+            "profile_slug": u.profile_slug or "",
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "display_name": u.display_name,
+            "full_name": u.get_full_name(),
+            "bio": u.bio,
+            "avatar_url": u.avatar.url if u.avatar else None,
+            "avatar_focal_x": u.avatar_focal_x,
+            "avatar_focal_y": u.avatar_focal_y,
+            "avatar_zoom": u.avatar_zoom,
+        }

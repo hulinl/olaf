@@ -3,13 +3,13 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { AppFooter } from "@/components/ui/app-footer";
+import { Avatar } from "@/components/ui/avatar";
 import { Logo } from "@/components/ui/logo";
 import { OwnerCockpitLink } from "@/components/ui/owner-cockpit-link";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
 import { ShareButton } from "@/components/ui/share-button";
 import { WorkspaceSocialsRow } from "@/components/workspace-socials-row";
-import { JoinWorkspaceCTA } from "./JoinWorkspaceCTA";
 import {
   assetUrl,
   type EventSummary,
@@ -213,6 +213,34 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                     {workspace.location}
                   </p>
                 )}
+                {/* Compact join CTA — jen pro non-members na public workspacu.
+                    Vede na dedikovanou /[slug]/join/ stránku, ať velký form
+                    nezasáhne vyladěnou landing. */}
+                {workspace.visibility === "public" &&
+                  (!workspace.my_membership ||
+                    workspace.my_membership.status === "removed") && (
+                    <div className="mt-3">
+                      <Link
+                        href={`/${workspace.slug}/join`}
+                        className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3.5 py-1.5 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-white focus-ring"
+                      >
+                        Přidej se do komunity →
+                      </Link>
+                    </div>
+                  )}
+                {workspace.visibility === "public" &&
+                  workspace.my_membership?.status === "pending" && (
+                    <div className="mt-3">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-warning/90 px-3.5 py-1.5 text-sm font-semibold text-ink-900"
+                        style={{
+                          textShadow: "none",
+                        }}
+                      >
+                        Čekáš na schválení
+                      </span>
+                    </div>
+                  )}
               </div>
 
               {/* Sociální ikony — desktop varianta vedle nadpisu vpravo.
@@ -249,22 +277,6 @@ export default async function WorkspaceProfilePage({ params }: Props) {
               >
                 {workspace.bio}
               </p>
-            </div>
-          </section>
-        )}
-
-        {/* JOIN CTA — self-serve join do public workspacu. Klient
-            komponenta detekuje anon vs auth a rozhodne mezi formulářem,
-            "čekáš na schválení" a "jsi člen" (skryje se). */}
-        {workspace.visibility === "public" && (
-          <section className="bg-canvas">
-            <div className="mx-auto max-w-5xl px-4 pb-2 pt-2 sm:pb-4">
-              <JoinWorkspaceCTA
-                workspaceSlug={workspace.slug}
-                workspaceName={workspace.name}
-                visibility={workspace.visibility}
-                myMembership={workspace.my_membership ?? null}
-              />
             </div>
           </section>
         )}
@@ -317,6 +329,59 @@ export default async function WorkspaceProfilePage({ params }: Props) {
             )}
           </div>
         </section>
+
+        {/* OWNER — „kdo vede komunitu". Klik jde na public profile
+            /u/<slug>, kde jsou kontakty podle jeho profile toggles.
+            Kontakty tady na landingu neexposujeme — každý user rozhoduje
+            sám, co je viditelné. */}
+        {workspace.owner && (
+          <section className="bg-canvas">
+            <div className="mx-auto max-w-5xl px-4 py-10 sm:py-14">
+              <SectionHead eyebrow="Kontakt" title="Kdo vede komunitu" />
+              <div className="mt-6 max-w-md rounded-2xl border border-border bg-surface p-5">
+                <div className="flex items-start gap-4">
+                  <Avatar
+                    firstName={workspace.owner.first_name}
+                    lastName={workspace.owner.last_name}
+                    avatarUrl={workspace.owner.avatar_url ?? undefined}
+                    focalX={workspace.owner.avatar_focal_x}
+                    focalY={workspace.owner.avatar_focal_y}
+                    zoom={workspace.owner.avatar_zoom}
+                    size={72}
+                    userId={workspace.owner.id}
+                    userSlug={workspace.owner.profile_slug || null}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold text-ink-900">
+                      {workspace.owner.display_name ||
+                        workspace.owner.full_name}
+                    </p>
+                    {workspace.owner.bio && (
+                      <p
+                        className="mt-2 whitespace-pre-line text-sm text-ink-600"
+                        style={{ lineHeight: 1.5 }}
+                      >
+                        {workspace.owner.bio}
+                      </p>
+                    )}
+                    <div className="mt-3">
+                      <Link
+                        href={
+                          workspace.owner.profile_slug
+                            ? `/u/${workspace.owner.profile_slug}`
+                            : `/u/${workspace.owner.id}`
+                        }
+                        className="text-sm font-medium text-brand underline underline-offset-2 hover:text-brand-hover"
+                      >
+                        Zobrazit profil a kontakty →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <AppFooter />
       </main>

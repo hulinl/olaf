@@ -26,14 +26,31 @@ export default function VerifyEmailPage({
         await auth.verifyEmail(token);
         if (cancelled) return;
         setStatus("success");
-        setMessage("Hotovo, přesouváme tě do aplikace…");
+        // Post-signup redirect: pokud signup shodil `?next=` do
+        // localStorage (např. z /[slug]/join přes „Zaregistrovat se"
+        // tlačítko), poslusžeme tam. Fallback na dashboard, když next
+        // není přítomný (běžný signup) nebo je nevalidní.
+        let nextPath = "/dashboard";
+        try {
+          const stored = localStorage.getItem("post_signup_next");
+          if (stored && stored.startsWith("/") && !stored.startsWith("//")) {
+            nextPath = stored;
+          }
+          localStorage.removeItem("post_signup_next");
+        } catch {
+          /* localStorage nedostupné — fallback drží */
+        }
+        setMessage(
+          nextPath === "/dashboard"
+            ? "Hotovo, přesouváme tě do aplikace…"
+            : "Hotovo, pokračujeme…",
+        );
         // Auto-login: backend nastavuje session přímo na verify (viz
-        // accounts.views.verify_email 2026-09-11). Přesměrujeme
-        // rovnou do dashboardu, ať user nemusí znovu zadávat heslo.
-        // Redirect přes plné navigation (assign) — SPA push by
-        // nepřevzalo novou session cookie do fetch layeru.
+        // accounts.views.verify_email 2026-09-11). Redirect přes plné
+        // navigation (assign) — SPA push by nepřevzalo novou session
+        // cookie do fetch layeru.
         setTimeout(() => {
-          if (!cancelled) window.location.assign("/dashboard");
+          if (!cancelled) window.location.assign(nextPath);
         }, 400);
       } catch (err) {
         if (cancelled) return;
