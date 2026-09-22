@@ -171,27 +171,46 @@ export default async function WorkspaceProfilePage({ params }: Props) {
               barva se počítá jako "dark surface"). */}
           <div className="mt-auto w-full">
             <div className="mx-auto flex max-w-5xl items-end gap-4 px-4 pb-6 sm:gap-5 sm:pb-8">
-              <div
-                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white/90 bg-white shadow-lg sm:h-24 sm:w-24"
-                style={
-                  workspace.accent_color && !logo
-                    ? { backgroundColor: workspace.accent_color }
-                    : undefined
-                }
-              >
-                {logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+              {/* Logo container má dvě varianty:
+                  - `logo_transparent=true` (transparent PNG): bez bg,
+                    bez borderu — logo splyne s hero overlay, nevytváří
+                    fake bílý čtverec kolem kruhového znaku.
+                  - default (framed): bílý rounded-2xl + border-4 jako
+                    mask pro plná (JPEG) loga.
+                  Iniciálový fallback používá framed styl pořád — jsou
+                  to písmena, potřebují background. */}
+              {logo && workspace.logo_transparent ? (
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center sm:h-24 sm:w-24">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={logo}
                     alt={`${workspace.name} logo`}
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
                   />
-                ) : (
-                  <span className="text-2xl font-semibold text-ink-500">
-                    {workspace.name.charAt(0)}
-                  </span>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div
+                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white/90 bg-white shadow-lg sm:h-24 sm:w-24"
+                  style={
+                    workspace.accent_color && !logo
+                      ? { backgroundColor: workspace.accent_color }
+                      : undefined
+                  }
+                >
+                  {logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={logo}
+                      alt={`${workspace.name} logo`}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-2xl font-semibold text-ink-500">
+                      {workspace.name.charAt(0)}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-1">
                 <h1

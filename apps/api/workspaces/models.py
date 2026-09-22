@@ -32,6 +32,11 @@ class Workspace(models.Model):
         max_length=7, blank=True, help_text="Hex like #RRGGBB."
     )
     logo = models.ImageField(upload_to="workspaces/logos/", blank=True)
+    # Autoset při uploadu podle Pillow alpha detekce — hero pak
+    # renderuje logo bez bílého kruh/rám containeru, aby transparent
+    # logo (typicky monochromatická ikona bez pozadí) nedostalo
+    # nechtěný viditelný rámeček přes overlay.
+    logo_transparent = models.BooleanField(default=False)
     cover = models.ImageField(upload_to="workspaces/covers/", blank=True)
     # Notion-style focal point + zoom pro cover — reuse of the pattern
     # od profile avataru (User.avatar_focal_x/y/zoom). Frontend public

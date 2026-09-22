@@ -131,6 +131,7 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
             "has_contact_form",
             "accent_color",
             "logo_url",
+            "logo_transparent",
             "cover_url",
             "cover_focal_x",
             "cover_focal_y",

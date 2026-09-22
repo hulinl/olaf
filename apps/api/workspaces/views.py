@@ -350,7 +350,11 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
         if file_field:
             file_field.delete(save=False)
             setattr(workspace, field, None)
-            workspace.save(update_fields=[field])
+            del_fields = [field]
+            if field == "logo":
+                workspace.logo_transparent = False
+                del_fields.append("logo_transparent")
+            workspace.save(update_fields=del_fields)
         return Response(
             WorkspacePublicSerializer(workspace, context={"request": request}).data
         )
@@ -373,10 +377,35 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
     # Logos are usually small (rare for someone to upload a 4000px
     # logo), but the helper short-circuits when the source is already
     # under max_dim so calling it costs nothing in the common case.
-    from events.image_utils import UnsupportedImageError, downscale_upload
+    #
+    # Logo path: `preserve_alpha=True` — když má zdroj skutečnou
+    # transparency (typicky monochromatická ikona), uložíme PNG s
+    # alpha místo JPEG s bílým composite. Landing pak render bez
+    # bílého rám containeru → user nedostane „černý rámeček kolem
+    # kruhu" artefakt.
+    from events.image_utils import (
+        UnsupportedImageError,
+        _detect_alpha,
+        downscale_upload,
+    )
+
+    is_logo = field == "logo"
+    logo_has_alpha = False
+    if is_logo:
+        # Sanity-detekce alpha PŘED downscale — potřebujeme flag pro
+        # DB, downscale_upload sám flag nevrací.
+        try:
+            from PIL import Image, ImageOps
+
+            upload.seek(0)
+            _probe = ImageOps.exif_transpose(Image.open(upload))
+            logo_has_alpha = _detect_alpha(_probe)
+        except Exception:
+            # Corrupt / unsupported — downscale to zachytí a vrátí 400.
+            logo_has_alpha = False
 
     try:
-        processed = downscale_upload(upload)
+        processed = downscale_upload(upload, preserve_alpha=is_logo)
     except UnsupportedImageError as exc:
         return Response(
             {"detail": str(exc)},
@@ -395,6 +424,9 @@ def _handle_workspace_image(request: Request, slug: str, *, field: str) -> Respo
         workspace.cover_focal_y = 50.0
         workspace.cover_zoom = 100.0
         update_fields.extend(["cover_focal_x", "cover_focal_y", "cover_zoom"])
+    if is_logo:
+        workspace.logo_transparent = logo_has_alpha
+        update_fields.append("logo_transparent")
     workspace.save(update_fields=update_fields)
     return Response(
         WorkspacePublicSerializer(workspace, context={"request": request}).data

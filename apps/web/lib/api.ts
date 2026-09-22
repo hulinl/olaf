@@ -249,6 +249,11 @@ export interface Workspace {
   has_contact_form?: boolean;
   accent_color: string;
   logo_url: string | null;
+  /** Autoset backendem podle Pillow alpha detekce při uploadu. Když je
+   *  true, hero rendruje logo bez bílého kruh/rám containeru (transparent
+   *  logo splyne s hero pozadím). Když false (default) použije se
+   *  původní bílý rounded-2xl container jako mask pro plné loga. */
+  logo_transparent?: boolean;
   cover_url: string | null;
   /** Notion-style focal point + zoom pro cover. Public stránka `/<slug>`
    *  renderuje cover přes <img> s object-position + transform:scale,

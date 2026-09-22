@@ -36,12 +36,43 @@ class UnsupportedImageError(Exception):
     a 400 with a Czech hint, místo aby tiše uložily nečitelný soubor."""
 
 
-def downscale_upload(upload, *, max_dim: int = 1600, quality: int = 82):
-    """Return a Django InMemoryUploadedFile, downscaled + re-encoded
-    as JPEG. Raises ``UnsupportedImageError`` když Pillow soubor
-    neumí otevřít — view to převede na 400. Předtím se v takovém
-    případě uložil raw upload a user dostal "úspěšný" upload se
-    zlomenou fotkou v galerii.
+def _detect_alpha(img) -> bool:
+    """True když má obrázek reálně průhledné pixely (ne jen alpha kanál).
+
+    Rozdíl: `mode='RGBA'` říká, že alpha kanál existuje, ale všechny
+    pixely můžou mít alpha=255 (plně kryté). Zajímá nás jen skutečná
+    transparency — kdyby ne, drop alpha na RGB je bez ztráty.
+    """
+    if img.mode not in ("RGBA", "LA", "PA"):
+        # P-mode s "transparency" v info je taky transparent (palette
+        # s index-based průhledností — typicky GIF).
+        return img.mode == "P" and "transparency" in img.info
+    alpha = img.split()[-1]
+    return alpha.getextrema()[0] < 255
+
+
+def downscale_upload(
+    upload,
+    *,
+    max_dim: int = 1600,
+    quality: int = 82,
+    preserve_alpha: bool = False,
+):
+    """Return a Django InMemoryUploadedFile, downscaled + re-encoded.
+
+    Default: JPEG output. Když `preserve_alpha=True` a input má
+    skutečně průhledné pixely (viz `_detect_alpha`), zachováváme PNG
+    (s alpha) — použito pro workspace logo, aby transparent kruh /
+    ikona nedostala fake bílé/černé pozadí.
+
+    Když má input alpha ale `preserve_alpha=False` (nebo je RGB), pixely
+    přes alpha=0 dostanou bílý composite — jinak by `convert("RGB")`
+    nechalo RGB=(0,0,0,0) transparent pixely černé (typický artefakt:
+    "kolem loga se objeví černý rámeček").
+
+    Raises ``UnsupportedImageError`` když Pillow soubor neumí otevřít —
+    view to převede na 400. Předtím se v takovém případě uložil raw
+    upload a user dostal "úspěšný" upload se zlomenou fotkou v galerii.
 
     EXIF orientation: phones save portrait JPEGs as landscape pixels
     + an "Orientation=6" EXIF tag telling viewers to rotate 90°.
@@ -59,22 +90,45 @@ def downscale_upload(upload, *, max_dim: int = 1600, quality: int = 82):
         # Apply EXIF rotation BEFORE conversion + resize, jinak bychom
         # pracovali s unrotated pixel daty.
         img = ImageOps.exif_transpose(img)
-        img = img.convert("RGB")  # Drop alpha; JPEG output anyway.
+
+        has_alpha = _detect_alpha(img)
+
+        if has_alpha and preserve_alpha:
+            # Zachovat alpha → PNG output. Normalize na RGBA (P/LA →
+            # RGBA), ať save() nemusí guess-ovat.
+            img = img.convert("RGBA")
+        elif has_alpha:
+            # Composite přes bílé pozadí — transparent pixely (typicky
+            # RGB=(0,0,0,0)) by po drop alpha zůstaly černé a viewer
+            # by viděl "černý rámeček kolem loga".
+            rgba = img.convert("RGBA")
+            background = Image.new("RGB", rgba.size, (255, 255, 255))
+            background.paste(rgba, mask=rgba.split()[3])
+            img = background
+        else:
+            img = img.convert("RGB")
+
         w, h = img.size
         scale = min(1.0, max_dim / max(w, h))
         if scale < 1.0:
             new_size = (int(w * scale), int(h * scale))
             img = img.resize(new_size, Image.LANCZOS)
+
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        if has_alpha and preserve_alpha:
+            img.save(buf, format="PNG", optimize=True)
+            ext, mime = "png", "image/png"
+        else:
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            ext, mime = "jpg", "image/jpeg"
         buf.seek(0)
         original_name = getattr(upload, "name", "image") or "image"
         stem = original_name.rsplit(".", 1)[0][:60]
         return InMemoryUploadedFile(
             buf,
             "image",
-            f"{stem}.jpg",
-            "image/jpeg",
+            f"{stem}.{ext}",
+            mime,
             buf.getbuffer().nbytes,
             None,
         )
