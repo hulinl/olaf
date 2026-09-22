@@ -9,6 +9,7 @@ import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
 import { SectionHead } from "@/components/ui/section-head";
 import { ShareButton } from "@/components/ui/share-button";
 import { WorkspaceSocialsRow } from "@/components/workspace-socials-row";
+import { JoinWorkspaceCTA } from "./JoinWorkspaceCTA";
 import {
   assetUrl,
   type EventSummary,
@@ -248,6 +249,22 @@ export default async function WorkspaceProfilePage({ params }: Props) {
               >
                 {workspace.bio}
               </p>
+            </div>
+          </section>
+        )}
+
+        {/* JOIN CTA — self-serve join do public workspacu. Klient
+            komponenta detekuje anon vs auth a rozhodne mezi formulářem,
+            "čekáš na schválení" a "jsi člen" (skryje se). */}
+        {workspace.visibility === "public" && (
+          <section className="bg-canvas">
+            <div className="mx-auto max-w-5xl px-4 pb-2 pt-2 sm:pb-4">
+              <JoinWorkspaceCTA
+                workspaceSlug={workspace.slug}
+                workspaceName={workspace.name}
+                visibility={workspace.visibility}
+                myMembership={workspace.my_membership ?? null}
+              />
             </div>
           </section>
         )}

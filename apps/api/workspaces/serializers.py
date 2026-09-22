@@ -111,6 +111,10 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
     # serverside. Místo `email` exposujeme jen flag `has_contact_form`.
     social_links = serializers.SerializerMethodField()
     has_contact_form = serializers.SerializerMethodField()
+    # Viewerův vztah k workspace — public join CTA na landing potřebuje
+    # vědět, jestli je requester už člen, čeká na schválení, nebo
+    # nikdo. `null` pro anon i pro plně cizí authenticated usery.
+    my_membership = serializers.SerializerMethodField()
 
     class Meta:
         model = Workspace
@@ -134,6 +138,7 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
             "payment_due_days",
             "event_sharing_policy",
             "created_at",
+            "my_membership",
         )
         read_only_fields = fields
 
@@ -169,3 +174,14 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
         # True iff má email v social_links → ContactFormDialog se na
         # public stránce zobrazí jako "Napsat komunitě" tlačítko.
         return bool((obj.social_links or {}).get("email"))
+
+    def get_my_membership(self, obj: Workspace) -> dict | None:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        m = WorkspaceMember.objects.filter(
+            workspace=obj, user=request.user
+        ).first()
+        if m is None:
+            return None
+        return {"status": m.status, "role": m.role}

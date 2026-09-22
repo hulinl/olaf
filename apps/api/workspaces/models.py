@@ -144,11 +144,18 @@ class WorkspaceMember(models.Model):
     # removed them. Removed rows are kept (not deleted) so RSVPs and
     # audit trail stay intact, and re-adding the same person is a
     # status flip rather than a fresh row.
+    #
+    # 2026-09-22: `pending` přidán pro self-serve join z veřejné
+    # workspace landing (mirror CommunityMember). Anon (nebo přihlášený
+    # ne-člen) POSTne `/join/`, dostaneme guest usera + pending
+    # WorkspaceMember, admin approve/reject flipne na active/removed.
     STATUS_ACTIVE = "active"
     STATUS_REMOVED = "removed"
+    STATUS_PENDING = "pending"
     STATUS_CHOICES = [
         (STATUS_ACTIVE, "Active"),
         (STATUS_REMOVED, "Removed"),
+        (STATUS_PENDING, "Pending — awaiting approval"),
     ]
 
     workspace = models.ForeignKey(
@@ -172,6 +179,10 @@ class WorkspaceMember(models.Model):
     # Used in the CRM listing and the audit payload. Backfill sets it
     # equal to created_at; new joins stamp `now()`.
     joined_at = models.DateTimeField(default=timezone.now)
+    # Kdy admin schválil/zamítl žádost o vstup (pending → active/removed).
+    # NULL u řádků, které nikdy pending stavem neprošly (owner, invited,
+    # existující bulk-added řady) — přidán s pending statusem 2026-09-22.
+    decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "workspaces_workspace_member"

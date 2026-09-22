@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Alert } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { WorkspaceInviteSection } from "@/components/workspace-invite-section";
+import { WorkspacePendingMembersSection } from "@/components/workspace-pending-members";
 import {
   ApiError,
   type PersonTag,
@@ -213,6 +214,13 @@ export function MembersCrmView({ slug }: { slug: string }) {
           wsSlug={slug}
           defaultOpen
           onInvited={refreshMembers}
+        />
+      )}
+
+      {isOwnerOrAdmin && (
+        <WorkspacePendingMembersSection
+          workspaceSlug={slug}
+          onApproved={refreshMembers}
         />
       )}
 

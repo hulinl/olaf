@@ -1,6 +1,7 @@
 import contextlib
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
@@ -13,6 +14,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
+
+from accounts.light_user import ExistingVerifiedUserError, create_light_user
 
 from .models import Workspace, WorkspaceMember, WorkspaceSlugAlias
 from .serializers import (
@@ -2262,3 +2265,295 @@ def public_invite_accept(request: Request, token: str) -> Response:
             "created": created,
         }
     )
+
+
+def _serialize_workspace_member(member: WorkspaceMember) -> dict:
+    """Minimal workspace member payload — používají workspace_join +
+    approve/reject endpointy. `role`, `status`, timestamps, +
+    denormalizované jméno / e-mail pro admin cockpit."""
+    user = member.user
+    return {
+        "id": member.pk,
+        "user_id": user.pk if user else None,
+        "email": user.email if user else None,
+        "first_name": user.first_name if user else "",
+        "last_name": user.last_name if user else "",
+        "role": member.role,
+        "status": member.status,
+        "joined_at": member.joined_at.isoformat(),
+        "decided_at": (
+            member.decided_at.isoformat() if member.decided_at else None
+        ),
+    }
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def workspace_join(request: Request, slug: str) -> Response:
+    """Public workspace join request.
+
+    Kdokoli (anon i přihlášený ne-member) může požádat o vstup do
+    `visibility=public` workspacu. Vytvoří WorkspaceMember status=pending
+    a pošle bell notif všem workspace owners/admins. Owner pak schvaluje
+    přes `workspace_member_approve`.
+
+    Anon flow (mirror community_join / rsvp_event):
+    - Bez auth headeru musí user poslat `account: {email, first_name,
+      last_name, phone?}`. Backend vytvoří guest User (unverified,
+      unusable password) a naváže na něj pending WorkspaceMember.
+    - Pokud e-mail patří verified účtu, vrací 409 `code=email_has_account`.
+      Frontend zobrazí "Přihlas se" dialog místo aby anonyma dostal do
+      session vlastníka e-mailu.
+
+    Idempotence:
+    - existing active member → 200 `{status: "already_member"}`
+    - existing pending → 200 `{status: "already_pending"}`
+    - existing removed → přepnout zpět na pending + notif.
+    """
+    try:
+        workspace = _get_workspace_or_alias(slug)
+    except Workspace.DoesNotExist:
+        return Response(
+            {"detail": "Workspace not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if workspace.visibility != Workspace.VISIBILITY_PUBLIC:
+        # Unlisted i private → self-serve join blokovaný. Unlisted
+        # "link-only" znamená share odkaz, ale členství si owner drží
+        # pod kontrolou (invite / public_invite_token). Public je jediný
+        # self-serve kanál.
+        return Response(
+            {"detail": "Do této komunity se nelze samostatně přihlásit."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    user = request.user if request.user.is_authenticated else None
+    if user is None:
+        account = request.data.get("account") or {}
+        try:
+            user = create_light_user(account)
+        except ExistingVerifiedUserError:
+            return Response(
+                {
+                    "account": {
+                        "email": (
+                            "Tento e-mail už má účet. Přihlas se, prosím."
+                        ),
+                    },
+                    "code": "email_has_account",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if user is None:
+            return Response(
+                {
+                    "account": (
+                        "Pro žádost o vstup potřebujeme e-mail, jméno a"
+                        " příjmení."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    existing = WorkspaceMember.objects.filter(
+        workspace=workspace, user=user
+    ).first()
+    if existing is not None:
+        if existing.status == WorkspaceMember.STATUS_ACTIVE:
+            return Response(
+                {
+                    "status": "already_member",
+                    "membership": _serialize_workspace_member(existing),
+                }
+            )
+        if existing.status == WorkspaceMember.STATUS_PENDING:
+            return Response(
+                {
+                    "status": "already_pending",
+                    "membership": _serialize_workspace_member(existing),
+                }
+            )
+        # removed → re-request. Přepneme na pending, decided_at nulujeme
+        # (nová žádost = nové rozhodnutí čeká).
+        existing.status = WorkspaceMember.STATUS_PENDING
+        existing.decided_at = None
+        existing.save(update_fields=["status", "decided_at"])
+        with contextlib.suppress(Exception):
+            from .notifications import notify_workspace_join_request
+
+            notify_workspace_join_request(existing)
+        return Response(
+            {
+                "status": "pending",
+                "membership": _serialize_workspace_member(existing),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    member = WorkspaceMember.objects.create(
+        workspace=workspace,
+        user=user,
+        role=WorkspaceMember.ROLE_MEMBER,
+        status=WorkspaceMember.STATUS_PENDING,
+    )
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_workspace_join_request
+
+        notify_workspace_join_request(member)
+
+    return Response(
+        {
+            "status": "pending",
+            "membership": _serialize_workspace_member(member),
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def workspace_pending_members(request: Request, slug: str) -> Response:
+    """List pending workspace membership requests — admin cockpit."""
+    try:
+        workspace = _get_workspace_or_alias(slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+    rows = (
+        WorkspaceMember.objects.filter(
+            workspace=workspace, status=WorkspaceMember.STATUS_PENDING
+        )
+        .select_related("user")
+        .order_by("-joined_at")
+    )
+    return Response([_serialize_workspace_member(m) for m in rows])
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_member_approve(
+    request: Request, slug: str, member_id: int
+) -> Response:
+    """Approve a pending workspace membership request."""
+    try:
+        workspace = _get_workspace_or_alias(slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        member = workspace.members.select_related("user").get(pk=member_id)
+    except WorkspaceMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if member.status != WorkspaceMember.STATUS_PENDING:
+        return Response(
+            {"detail": "Členství není ve stavu pending."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    member.status = WorkspaceMember.STATUS_ACTIVE
+    member.decided_at = timezone.now()
+    member.joined_at = timezone.now()
+    member.save(update_fields=["status", "decided_at", "joined_at"])
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_workspace_member_approved
+
+        notify_workspace_member_approved(member)
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    applicant_name = (
+        member.user.get_full_name() or member.user.email
+        if member.user_id
+        else "(neznámý)"
+    )
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_WORKSPACE_MEMBER_APPROVE,
+        workspace=workspace,
+        target_type="workspace_member",
+        target_id=member.pk,
+        summary=(
+            f"Schválil žádost {applicant_name} "
+            f'o vstup do komunity „{workspace.name}".'
+        ),
+        payload={
+            "workspace_id": workspace.pk,
+            "workspace_slug": workspace.slug,
+        },
+    )
+
+    return Response(_serialize_workspace_member(member))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_member_reject(
+    request: Request, slug: str, member_id: int
+) -> Response:
+    """Reject a pending workspace membership request."""
+    try:
+        workspace = _get_workspace_or_alias(slug)
+    except Workspace.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not _is_owner(request.user, workspace):
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        member = workspace.members.select_related("user").get(pk=member_id)
+    except WorkspaceMember.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if member.status != WorkspaceMember.STATUS_PENDING:
+        return Response(
+            {"detail": "Členství není ve stavu pending."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    reason = (request.data.get("reason") or "").strip()
+
+    # Reject → status=removed (WorkspaceMember nemá dedicated "declined";
+    # removed row zůstává pro re-request idempotence a audit trail).
+    member.status = WorkspaceMember.STATUS_REMOVED
+    member.decided_at = timezone.now()
+    member.save(update_fields=["status", "decided_at"])
+
+    with contextlib.suppress(Exception):
+        from .notifications import notify_workspace_member_rejected
+
+        notify_workspace_member_rejected(member, reason=reason)
+
+    from audit.models import AuditLog
+    from audit.services import log as audit_log
+
+    applicant_name = (
+        member.user.get_full_name() or member.user.email
+        if member.user_id
+        else "(neznámý)"
+    )
+    audit_log(
+        actor=request.user,
+        action=AuditLog.ACTION_WORKSPACE_MEMBER_REJECT,
+        workspace=workspace,
+        target_type="workspace_member",
+        target_id=member.pk,
+        summary=(
+            f"Zamítl žádost {applicant_name} "
+            f'o vstup do komunity „{workspace.name}".'
+            + (f" Důvod: {reason}" if reason else "")
+        ),
+        payload={
+            "workspace_id": workspace.pk,
+            "workspace_slug": workspace.slug,
+            "reason": reason,
+        },
+    )
+
+    return Response(_serialize_workspace_member(member))

@@ -129,4 +129,20 @@ urlpatterns = [
         views.workspace_members_bulk_email,
         name="members-bulk-email",
     ),
+    path("<slug:slug>/join/", views.workspace_join, name="join"),
+    path(
+        "<slug:slug>/pending-members/",
+        views.workspace_pending_members,
+        name="pending-members",
+    ),
+    path(
+        "<slug:slug>/members/<int:member_id>/approve/",
+        views.workspace_member_approve,
+        name="member-approve",
+    ),
+    path(
+        "<slug:slug>/members/<int:member_id>/reject/",
+        views.workspace_member_reject,
+        name="member-reject",
+    ),
 ]

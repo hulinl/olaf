@@ -41,6 +41,9 @@ class Notification(models.Model):
     KIND_COMMUNITY_JOIN_REQUEST = "community_join_request"
     KIND_COMMUNITY_MEMBER_APPROVED = "community_member_approved"
     KIND_COMMUNITY_MEMBER_REJECTED = "community_member_rejected"
+    KIND_WORKSPACE_JOIN_REQUEST = "workspace_join_request"
+    KIND_WORKSPACE_MEMBER_APPROVED = "workspace_member_approved"
+    KIND_WORKSPACE_MEMBER_REJECTED = "workspace_member_rejected"
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,

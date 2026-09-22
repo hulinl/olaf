@@ -273,6 +273,35 @@ export interface Workspace {
   /** Computed (na `/mine/`): true iff user smí do téhle komunity sdílet
    *  eventy. Owner/admin = vždy, member jen pokud `policy=members`. */
   can_share_events?: boolean;
+  /** Viewerův vztah k workspace — `null` pro anon i pro cizí auth
+   *  usery. Public join CTA na landing to používá k rozhodnutí, zda
+   *  ukázat formulář / „čekáš na schválení" / „jsi člen". */
+  my_membership?: {
+    status: "active" | "pending" | "removed";
+    role: "owner" | "admin" | "member";
+  } | null;
+}
+
+export type WorkspaceJoinStatus =
+  | "pending"
+  | "already_pending"
+  | "already_member";
+
+export interface WorkspaceMemberRecord {
+  id: number;
+  user_id: number | null;
+  email: string | null;
+  first_name: string;
+  last_name: string;
+  role: "owner" | "admin" | "member";
+  status: "active" | "pending" | "removed";
+  joined_at: string;
+  decided_at: string | null;
+}
+
+export interface WorkspaceJoinResult {
+  status: WorkspaceJoinStatus;
+  membership: WorkspaceMemberRecord;
 }
 
 export interface EventSummary {
@@ -1723,6 +1752,36 @@ export const workspaces = {
   },
   deleteCover: (slug: string) =>
     apiFetch<Workspace>(`/api/workspaces/${slug}/cover/`, { method: "DELETE" }),
+  join: (
+    slug: string,
+    account?: {
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone?: string;
+    },
+  ) =>
+    apiFetch<WorkspaceJoinResult>(`/api/workspaces/${slug}/join/`, {
+      method: "POST",
+      body: account ? JSON.stringify({ account }) : undefined,
+    }),
+  pendingMembers: (slug: string) =>
+    apiFetch<WorkspaceMemberRecord[]>(
+      `/api/workspaces/${slug}/pending-members/`,
+    ),
+  approveMember: (slug: string, memberId: number) =>
+    apiFetch<WorkspaceMemberRecord>(
+      `/api/workspaces/${slug}/members/${memberId}/approve/`,
+      { method: "POST" },
+    ),
+  rejectMember: (slug: string, memberId: number, reason?: string) =>
+    apiFetch<WorkspaceMemberRecord>(
+      `/api/workspaces/${slug}/members/${memberId}/reject/`,
+      {
+        method: "POST",
+        body: JSON.stringify(reason ? { reason } : {}),
+      },
+    ),
 };
 
 export type CommunityMemberStatus =
