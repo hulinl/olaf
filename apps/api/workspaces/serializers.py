@@ -192,7 +192,10 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
         return {"status": m.status, "role": m.role}
 
     def get_owner(self, obj: Workspace) -> dict | None:
-        """První owner-role active member — public "kdo vede komunitu".
+        """"Kdo vede komunitu" — první owner-role active member; pokud
+        neexistuje, fallneme na admina. (Některé workspace založené z
+        Notion importu nebo dřívějších migrací nemají explicit owner
+        row, ale mají admina, který komunitu spravuje.)
 
         Vrací minimální payload pro landing sekci: display info + link
         na /u/<slug>. Kontakty (email, phone) tady neexposujeme — pro
@@ -200,14 +203,26 @@ class WorkspacePublicSerializer(serializers.ModelSerializer):
         profile toggles. Public landing pošle usera na /u/<slug>, kde
         UserPublicProfileSerializer respektuje `profile_show_*` toggles.
         """
+        from django.db.models import Case, IntegerField, When
+
         m = (
             WorkspaceMember.objects.filter(
                 workspace=obj,
-                role=WorkspaceMember.ROLE_OWNER,
                 status=WorkspaceMember.STATUS_ACTIVE,
+                role__in=[
+                    WorkspaceMember.ROLE_OWNER,
+                    WorkspaceMember.ROLE_ADMIN,
+                ],
             )
             .select_related("user")
-            .order_by("created_at")
+            .annotate(
+                _prio=Case(
+                    When(role=WorkspaceMember.ROLE_OWNER, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                ),
+            )
+            .order_by("_prio", "created_at")
             .first()
         )
         if m is None or m.user is None:
