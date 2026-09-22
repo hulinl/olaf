@@ -6,7 +6,8 @@ import { FormEvent, use, useState } from "react";
 import { AuthShell } from "@/components/ui/auth-shell";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
-import { Field, Input } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ApiError, auth } from "@/lib/api";
 
 export default function ResetPasswordPage({
@@ -65,11 +66,11 @@ export default function ResetPasswordPage({
         <Field
           label="Nové heslo"
           htmlFor="password"
-          hint="Aspoň 10 znaků, s písmenem a číslicí."
+          hint="Aspoň 10 znaků. Browser ti nabídne vygenerovat silné heslo."
         >
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
+            name="new-password"
             required
             minLength={10}
             autoComplete="new-password"

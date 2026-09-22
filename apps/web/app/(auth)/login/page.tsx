@@ -8,6 +8,7 @@ import { AuthShell } from "@/components/ui/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ApiError, auth } from "@/lib/api";
 
 export default function LoginPage() {
@@ -100,9 +101,10 @@ function LoginForm() {
         <Field label="E-mail" htmlFor="email">
           <Input
             id="email"
+            name="email"
             type="email"
             required
-            autoComplete="email"
+            autoComplete="username email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -122,9 +124,9 @@ function LoginForm() {
           }
           htmlFor="password"
         >
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
+            name="password"
             required
             autoComplete="current-password"
             value={password}

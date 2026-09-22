@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ApiError, type User, auth } from "@/lib/api";
 
 interface Props {
@@ -103,9 +104,10 @@ export function InlineLoginDialog({
           <Field label="E-mail" htmlFor="inline-login-email">
             <Input
               id="inline-login-email"
+              name="email"
               type="email"
               required
-              autoComplete="email"
+              autoComplete="username email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -125,9 +127,9 @@ export function InlineLoginDialog({
             }
             htmlFor="inline-login-password"
           >
-            <Input
+            <PasswordInput
               id="inline-login-password"
-              type="password"
+              name="password"
               required
               autoComplete="current-password"
               autoFocus

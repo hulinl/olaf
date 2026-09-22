@@ -8,6 +8,7 @@ import { AuthShell } from "@/components/ui/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ApiError, auth } from "@/lib/api";
 
 export default function SignupPage() {
@@ -129,6 +130,7 @@ function SignupForm() {
           <Field label="Jméno" htmlFor="first_name">
             <Input
               id="first_name"
+              name="first_name"
               type="text"
               required
               autoComplete="given-name"
@@ -139,6 +141,7 @@ function SignupForm() {
           <Field label="Příjmení" htmlFor="last_name">
             <Input
               id="last_name"
+              name="last_name"
               type="text"
               required
               autoComplete="family-name"
@@ -151,9 +154,10 @@ function SignupForm() {
         <Field label="E-mail" htmlFor="email">
           <Input
             id="email"
+            name="email"
             type="email"
             required
-            autoComplete="email"
+            autoComplete="username email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -162,11 +166,11 @@ function SignupForm() {
         <Field
           label="Heslo"
           htmlFor="password"
-          hint="Aspoň 10 znaků, s písmenem a číslicí."
+          hint="Aspoň 10 znaků. Chrome / Safari ti nabídne vygenerovat silné heslo."
         >
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
+            name="password"
             required
             minLength={10}
             autoComplete="new-password"
