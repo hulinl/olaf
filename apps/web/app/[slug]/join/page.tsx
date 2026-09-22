@@ -10,6 +10,7 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
 import { Logo } from "@/components/ui/logo";
 import { PublicAuthIndicator } from "@/components/ui/public-auth-indicator";
+import { WorkspaceAvatar } from "@/components/ui/workspace-avatar";
 import {
   ApiError,
   type User,
@@ -253,6 +254,12 @@ export default function WorkspaceJoinPage({ params }: Props) {
         {header}
         <main className="mx-auto flex max-w-3xl flex-col px-4 py-12">
           <div className="mx-auto w-full max-w-lg">
+            <div className="mb-4 flex items-center gap-3">
+              <WorkspaceAvatar workspace={workspace} size="lg" />
+              <span className="text-sm font-medium text-ink-500">
+                {workspace.name}
+              </span>
+            </div>
             <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
               Přidej se do komunity {workspace.name}
             </h1>
@@ -293,6 +300,12 @@ export default function WorkspaceJoinPage({ params }: Props) {
       {header}
       <main className="mx-auto flex max-w-3xl flex-col px-4 py-12">
         <div className="mx-auto w-full max-w-lg">
+          <div className="mb-4 flex items-center gap-3">
+            <WorkspaceAvatar workspace={workspace} size="lg" />
+            <span className="text-sm font-medium text-ink-500">
+              {workspace.name}
+            </span>
+          </div>
           <h1 className="text-3xl font-semibold tracking-tight text-ink-900">
             Přidej se do komunity {workspace.name}
           </h1>

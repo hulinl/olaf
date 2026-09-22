@@ -6,6 +6,7 @@ import { type MouseEvent as ReactMouseEvent, useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
 import { Alert } from "@/components/ui/card";
+import { WorkspaceAvatar } from "@/components/ui/workspace-avatar";
 import { ApiError, type Workspace, workspaces } from "@/lib/api";
 
 const VISIBILITY_LABEL: Record<Workspace["visibility"], string> = {
@@ -139,9 +140,14 @@ function KomunityCard({ workspace: w }: { workspace: Workspace }) {
       href={href}
       className="group flex flex-col gap-2 rounded-xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand hover:shadow-md focus-ring"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-base font-semibold text-ink-900">{w.name}</p>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <WorkspaceAvatar workspace={w} size="md" />
+          <p className="truncate text-base font-semibold text-ink-900">
+            {w.name}
+          </p>
+        </div>
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-ink-500">
           {VISIBILITY_LABEL[w.visibility]}
         </span>
       </div>
@@ -182,12 +188,15 @@ function KomunityRow({ workspace: w }: { workspace: Workspace }) {
       <td className="px-4 py-3">
         <Link
           href={href}
-          className="flex flex-col gap-0.5 focus-ring"
+          className="flex items-center gap-3 focus-ring"
         >
-          <span className="font-medium text-ink-900">{w.name}</span>
-          {w.bio && (
-            <span className="line-clamp-1 text-xs text-ink-500">{w.bio}</span>
-          )}
+          <WorkspaceAvatar workspace={w} size="sm" />
+          <span className="flex flex-col gap-0.5">
+            <span className="font-medium text-ink-900">{w.name}</span>
+            {w.bio && (
+              <span className="line-clamp-1 text-xs text-ink-500">{w.bio}</span>
+            )}
+          </span>
         </Link>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-ink-700">

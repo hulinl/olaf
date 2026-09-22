@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { LinkButton } from "@/components/ui/button";
 import { Alert, Card, CardSection } from "@/components/ui/card";
+import { WorkspaceAvatar } from "@/components/ui/workspace-avatar";
 import {
   ApiError,
   type EventSummary,
@@ -204,33 +205,12 @@ function EmptyState({
 }
 
 function WorkspaceMini({ workspace }: { workspace: Workspace }) {
-  const logo = assetUrl(workspace.logo_url);
   return (
     <Link
       href={`/workspaces/${workspace.slug}`}
       className="group flex items-center gap-3 rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:shadow-sm focus-ring"
     >
-      <div
-        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surface-strong"
-        style={
-          workspace.accent_color
-            ? { backgroundColor: workspace.accent_color }
-            : undefined
-        }
-      >
-        {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logo}
-            alt={`${workspace.name} logo`}
-            className="h-full w-full object-contain"
-          />
-        ) : (
-          <span className="text-base font-semibold text-ink-inverse">
-            {workspace.name.charAt(0)}
-          </span>
-        )}
-      </div>
+      <WorkspaceAvatar workspace={workspace} size="md" />
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
           <p className="truncate font-medium text-ink-900">{workspace.name}</p>

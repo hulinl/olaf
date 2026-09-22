@@ -10,6 +10,7 @@ import { type Workspace, workspaces as workspacesApi } from "@/lib/api";
 import { Logo } from "./logo";
 import { NotificationBell } from "./notification-bell";
 import { UserMenu } from "./user-menu";
+import { WorkspaceAvatar } from "./workspace-avatar";
 
 interface AppHeaderProps {
   user: { first_name: string; last_name: string; email: string };
@@ -112,7 +113,10 @@ export function AppHeader({ user, onSignOut, signingOut }: AppHeaderProps) {
                       key={w.slug}
                       href={`/workspaces/${w.slug}`}
                     >
-                      {w.name}
+                      <span className="flex items-center gap-2">
+                        <WorkspaceAvatar workspace={w} size="xs" />
+                        <span className="truncate">{w.name}</span>
+                      </span>
                     </DropdownLink>
                   ))
                 )}
@@ -372,7 +376,10 @@ function MobileDrawer({
                 pathname={pathname}
                 onClose={onClose}
               >
-                {w.name}
+                <span className="flex items-center gap-2">
+                  <WorkspaceAvatar workspace={w} size="xs" />
+                  <span className="truncate">{w.name}</span>
+                </span>
               </DrawerSubLink>
             ))}
             <DrawerSubLink

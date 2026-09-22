@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Alert, Card, CardSection } from "@/components/ui/card";
-import { ApiError, type Workspace, assetUrl, workspaces } from "@/lib/api";
+import { WorkspaceAvatar } from "@/components/ui/workspace-avatar";
+import { ApiError, type Workspace, workspaces } from "@/lib/api";
 
 export default function CommunitiesPage() {
   const [list, setList] = useState<Workspace[] | null>(null);
@@ -85,34 +86,13 @@ export default function CommunitiesPage() {
 }
 
 function WorkspaceCard({ workspace }: { workspace: Workspace }) {
-  const logo = assetUrl(workspace.logo_url);
   return (
     <Link
       href={`/workspaces/${workspace.slug}`}
       className="group block rounded-lg border border-border bg-surface p-5 transition-colors hover:border-border-strong hover:shadow-md focus-ring"
     >
       <div className="flex items-start gap-4">
-        <div
-          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-surface-strong"
-          style={
-            workspace.accent_color
-              ? { backgroundColor: workspace.accent_color }
-              : undefined
-          }
-        >
-          {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logo}
-              alt={`${workspace.name} logo`}
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <span className="text-lg font-semibold text-ink-inverse">
-              {workspace.name.charAt(0)}
-            </span>
-          )}
-        </div>
+        <WorkspaceAvatar workspace={workspace} size="lg" />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
