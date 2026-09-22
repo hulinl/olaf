@@ -213,41 +213,30 @@ export default async function WorkspaceProfilePage({ params }: Props) {
                     {workspace.location}
                   </p>
                 )}
-                {/* Compact join CTA — jen pro non-members na public workspacu.
-                    Vede na dedikovanou /[slug]/join/ stránku, ať velký form
-                    nezasáhne vyladěnou landing. */}
+              </div>
+
+              {/* Desktop: join pill + sociální ikony vedle sebe vpravo v
+                  hero. Na tmavém overlay používáme amber brand color
+                  (jediné místo v produktu, kde je amber povoleno = CTA,
+                  viz OLAF brand v1). Socials matchují bílý overlay text.
+                  Mobile fallback níž. */}
+              <div className="hidden shrink-0 items-center gap-3 pb-1 sm:flex">
                 {workspace.visibility === "public" &&
                   (!workspace.my_membership ||
                     workspace.my_membership.status === "removed") && (
-                    <div className="mt-3">
-                      <Link
-                        href={`/${workspace.slug}/join`}
-                        className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3.5 py-1.5 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-white focus-ring"
-                      >
-                        Přidej se do komunity →
-                      </Link>
-                    </div>
+                    <Link
+                      href={`/${workspace.slug}/join`}
+                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-hover focus-ring"
+                    >
+                      Přidej se do komunity →
+                    </Link>
                   )}
                 {workspace.visibility === "public" &&
                   workspace.my_membership?.status === "pending" && (
-                    <div className="mt-3">
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full bg-warning/90 px-3.5 py-1.5 text-sm font-semibold text-ink-900"
-                        style={{
-                          textShadow: "none",
-                        }}
-                      >
-                        Čekáš na schválení
-                      </span>
-                    </div>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning/90 px-4 py-2 text-sm font-semibold text-ink-900">
+                      Čekáš na schválení
+                    </span>
                   )}
-              </div>
-
-              {/* Sociální ikony — desktop varianta vedle nadpisu vpravo.
-                  Na tmavém overlay používáme světlou variantu (bílé
-                  border + ikona), matchuje ostatní bílý text v hero.
-                  Mobile fallback níž. */}
-              <div className="hidden shrink-0 pb-1 sm:block">
                 <WorkspaceSocialsRow
                   workspace={workspace}
                   variant="on-dark"
@@ -257,10 +246,27 @@ export default async function WorkspaceProfilePage({ params }: Props) {
           </div>
         </section>
 
-        {/* Mobile-only: socials pod hero (na mobilu není v hero řadě
-            místo, na desktop viz overlay vpravo). */}
+        {/* Mobile-only: join pill + socials pod hero. Pill je vlevo,
+            socials vpravo — společný řádek, ať nezabírá další řádek. */}
         <section className="bg-canvas sm:hidden">
-          <div className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 pt-4">
+            {workspace.visibility === "public" &&
+            (!workspace.my_membership ||
+              workspace.my_membership.status === "removed") ? (
+              <Link
+                href={`/${workspace.slug}/join`}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-hover focus-ring"
+              >
+                Přidej se do komunity →
+              </Link>
+            ) : workspace.visibility === "public" &&
+              workspace.my_membership?.status === "pending" ? (
+              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning/90 px-4 py-2 text-sm font-semibold text-ink-900">
+                Čekáš na schválení
+              </span>
+            ) : (
+              <span />
+            )}
             <WorkspaceSocialsRow workspace={workspace} />
           </div>
         </section>
