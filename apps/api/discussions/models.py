@@ -60,8 +60,18 @@ class Topic(models.Model):
 
     class Meta:
         db_table = "discussions_topic"
-        ordering = ["-pinned", "-last_activity_at"]
+        # Nejnovější příspěvek dole se špatně čte — na feedu chceme nový
+        # nahoře jako Facebook / Twitter. Řadíme podle `created_at` (kdy
+        # vlákno vzniklo), ne `last_activity_at` (kdy někdo naposledy
+        # komentoval), takže staré vlákno s čerstvým komentářem už
+        # nebublá nahoru. Pinned zůstává na vrchol. User request
+        # 2026-09-25.
+        ordering = ["-pinned", "-created_at"]
         indexes = [
+            models.Index(fields=["parent_type", "parent_id", "-created_at"]),
+            # Legacy index — držíme, protože ho pořád používá anti-bubble
+            # feed a některé raw statistiky. Migraci na drop necháváme
+            # na moment, kdy nikde jinde nebude referenced.
             models.Index(fields=["parent_type", "parent_id", "-last_activity_at"]),
         ]
 
