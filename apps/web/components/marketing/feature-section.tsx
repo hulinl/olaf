@@ -1,17 +1,25 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { ExpandableBullets } from "@/components/marketing/expandable-bullets";
 import type { FeatureEntry } from "@/lib/site-config";
 
 /**
  * One feature section on the homepage. Renders alternating left/right
- * screenshot vs copy on lg+, single column on mobile.
+ * visual vs copy on lg+, single column on mobile.
  *
- * Screenshots are sourced from /public/screenshots — for now those are
- * SVG placeholders; real PNGs will swap in via the same paths so this
- * component doesn't change when we capture them.
+ * `visual` slot přijme JSX (typicky device frame + screen mockup z
+ * `components/marketing/mockups/`). Pokud nedodáš, fallback je SVG
+ * placeholder z `/public/screenshots/…` — zůstává pro backward-compat,
+ * ale nový landing v2 posílá reálné HTML mockupy.
  */
-export function FeatureSection({ feature }: { feature: FeatureEntry }) {
+export function FeatureSection({
+  feature,
+  visual,
+}: {
+  feature: FeatureEntry;
+  visual?: ReactNode;
+}) {
   const copy = (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.18em] text-brand">
@@ -44,14 +52,13 @@ export function FeatureSection({ feature }: { feature: FeatureEntry }) {
     </div>
   );
 
-  const visual = (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface shadow-lg shadow-black/5">
+  const fallbackVisual = (
+    <div className="relative overflow-hidden rounded-sm border border-border bg-surface shadow-lg shadow-black/5">
       <div className="aspect-[16/10] w-full bg-surface-muted">
-        {/* SVG mockupy renderujem jako native <img> — next/image
-            přidává URL transformace přes /_next/image které u SVG v
-            public/ na SWA neumí (vrací 404 nebo nesprávný MIME).
-            <img> je pro statický asset bez paramterů ten správný
-            primitiv. */}
+        {/* SVG placeholder fallback (legacy). Nový landing dodává
+            `visual` prop s reálným HTML mockupem, tenhle path se
+            aktivuje jen když někdo přidá novou FEATURES entry a
+            zapomene visual. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={feature.screenshot}
@@ -65,11 +72,12 @@ export function FeatureSection({ feature }: { feature: FeatureEntry }) {
       </div>
     </div>
   );
+  const visualBlock = visual ?? fallbackVisual;
 
   return (
     <section
       id={feature.id}
-      className="scroll-mt-20 border-t border-border-strong/20 bg-canvas"
+      className="scroll-mt-20 border-t border-border bg-canvas"
     >
       <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
         <div
@@ -79,7 +87,7 @@ export function FeatureSection({ feature }: { feature: FeatureEntry }) {
           ].join(" ")}
         >
           {copy}
-          {visual}
+          {visualBlock}
         </div>
       </div>
     </section>
@@ -92,7 +100,7 @@ function renderHighlighted(title: string, highlight: string) {
   return (
     <>
       {title.slice(0, idx)}
-      <span className="text-brand">{title.slice(idx, idx + highlight.length)}</span>
+      <span className="text-amber-glow">{title.slice(idx, idx + highlight.length)}</span>
       {title.slice(idx + highlight.length)}
     </>
   );
