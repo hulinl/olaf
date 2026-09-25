@@ -161,7 +161,13 @@ export function NotificationBell() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-2 w-80 max-w-[90vw] origin-top-right overflow-hidden rounded-md border border-border bg-surface shadow-lg"
+          // Na mobilu kotvíme dropdown k viewportu (`fixed inset-x-2`),
+          // ne k trigger buttonu — trigger má napravo od sebe `UserMenu`,
+          // takže absolute right-0 posunul dropdown mimo viewport doleva
+          // na úzkých obrazovkách (iPhone SE / mini). Od sm+ šířky se
+          // vracíme k původnímu absolute anchoru u trigger buttonu, kde
+          // je desktop layout dost široký a wide dropdown se vejde.
+          className="fixed inset-x-2 top-14 z-30 origin-top-right overflow-hidden rounded-md border border-border bg-surface shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[90vw]"
         >
           <div className="flex items-baseline justify-between border-b border-border px-4 py-3">
             <p className="text-sm font-semibold text-ink-900">Notifikace</p>
