@@ -11,7 +11,7 @@ from __future__ import annotations
 from django.conf import settings
 
 from accounts.models import User
-from events.models import RSVP, Event
+from events.models import RSVP, Event, EventCollaborator
 from workspaces.models import Workspace, WorkspaceMember
 
 from .models import Comment, Topic
@@ -62,18 +62,98 @@ def _parent_label(topic: Topic) -> str:
     return event.title if event else "Akce"
 
 
-def send_comment_notification(comment: Comment) -> None:
-    """Email + push the topic author when someone replies. Skips when:
-    - the comment author IS the topic author (no self-pings),
-    - the topic author opted out,
-    - the topic author is missing.
+def _reply_audience(comment: Comment) -> list[tuple[User, bool]]:
+    """Users who should get a reply notification for ``comment``.
+
+    Vrací (user, is_mandatory) — ``is_mandatory=True`` obchází
+    ``notify_on_discussion_reply`` opt-out. Rezervováno pro event
+    creatora + spolutvůrce (parita s ``send_topic_announce`` — když
+    „oznámení nové téma" bypassuje opt-out pro organizátory, ať to
+    dělá i „odpověď ve vlákně na jejich akci", jinak by o rozjeté
+    diskuzi nevěděli).
+
+    Audience:
+    - Autor topicu (pokud sám nekomentuje)
+    - Všichni předchozí komentátoři threadu, deduplikovaní
+    - Event scope: workspace owner + ``EventCollaborator`` (mandatory)
+
+    Commentera vždy z každé skupiny vyloučíme — žádné self-pingy.
     """
     topic = comment.topic
-    if topic.author_id is None or topic.author_id == comment.author_id:
-        return
-    if not topic.author.notify_on_discussion_reply:
+    commenter_id = comment.author_id
+
+    # user_id → is_mandatory. Když se user objeví v víc skupinách,
+    # mandatory vyhrává (organizátor je organizátor, i kdyby zároveň
+    # ve vlákně jen jednou komentoval).
+    audience: dict[int, bool] = {}
+
+    if topic.author_id and topic.author_id != commenter_id:
+        audience[topic.author_id] = False
+
+    prior_commenter_ids = (
+        Comment.objects.filter(topic_id=topic.pk)
+        .exclude(pk=comment.pk)
+        .exclude(author_id__isnull=True)
+        .exclude(author_id=commenter_id)
+        .values_list("author_id", flat=True)
+        .distinct()
+    )
+    for uid in prior_commenter_ids:
+        audience.setdefault(uid, False)
+
+    if topic.parent_type == Topic.PARENT_EVENT:
+        event = (
+            Event.objects.select_related("workspace")
+            .filter(pk=topic.parent_id)
+            .first()
+        )
+        if event is not None:
+            owner_id = (
+                WorkspaceMember.objects.filter(
+                    workspace=event.workspace,
+                    role=WorkspaceMember.ROLE_OWNER,
+                )
+                .values_list("user_id", flat=True)
+                .first()
+            )
+            if owner_id and owner_id != commenter_id:
+                audience[owner_id] = True
+            collab_ids = (
+                EventCollaborator.objects.filter(event=event)
+                .exclude(user_id=commenter_id)
+                .values_list("user_id", flat=True)
+            )
+            for uid in collab_ids:
+                audience[uid] = True
+
+    if not audience:
+        return []
+
+    users_by_id = {
+        u.id: u for u in User.objects.filter(id__in=list(audience.keys()))
+    }
+    return [
+        (users_by_id[uid], mandatory)
+        for uid, mandatory in audience.items()
+        if uid in users_by_id
+    ]
+
+
+def send_comment_notification(comment: Comment) -> None:
+    """Notifikuj účastníky vlákna (autor + předchozí komentátoři) +
+    pro event topic navíc creatora/spolutvůrce, když v threadu
+    přistane nová odpověď. Každý adresát dostane e-mail + push + bell.
+
+    - Non-mandatory adresáti respektují ``notify_on_discussion_reply``.
+    - Mandatory (event creator/collaborators) opt-out bypassují —
+      organizátor potřebuje jistotu, že o dění na své akci ví.
+    - Commenter je z audience vždy vyfiltrovaný; žádné self-pingy.
+    """
+    audience = _reply_audience(comment)
+    if not audience:
         return
 
+    topic = comment.topic
     author_name = (
         comment.author.get_full_name()
         if comment.author
@@ -84,52 +164,58 @@ def send_comment_notification(comment: Comment) -> None:
     # očekávají, není důvod přejmenovávat, obsah je stále „kam se má
     # kliknout na e-mail".
     comment_url = _comment_url(comment)
-    context = {
-        "topic": topic,
-        "comment": comment,
-        "topic_url": comment_url,
-        "parent_label": _parent_label(topic),
-        "author_name": author_name,
-    }
-    from notifications.email_sender import send_branded_email
+    parent_label = _parent_label(topic)
 
-    send_branded_email(
-        subject=f"Nová odpověď: {topic.title}",
-        template_base="discussions/comment_added",
-        context=context,
-        recipient_list=[topic.author.email],
-    )
-    # Push on top of e-mail. Best-effort; failure here doesn't unwind
-    # the e-mail send. Import lazily so the discussions app doesn't
-    # take a hard dependency on the optional notifications.push.
+    from notifications.email_sender import send_branded_email
+    from notifications.models import Notification
     from notifications.push import send_push_to_user
 
-    send_push_to_user(
-        topic.author,
-        title=f"Nová odpověď: {topic.title}",
-        body=f"{author_name}: {(comment.body or '')[:140]}",
-        url=comment_url,
-        tag=f"comment-{comment.pk}",
-    )
+    subject = f"Nová odpověď: {topic.title}"
+    push_body = f"{author_name}: {(comment.body or '')[:140]}"
+    bell_title = f'{author_name} odpověděl na „{topic.title}"'
+    bell_body = (comment.body or "")[:280]
+    bell_payload = {
+        "topic_id": topic.pk,
+        "comment_id": comment.pk,
+        "parent_type": topic.parent_type,
+        "parent_id": topic.parent_id,
+    }
 
-    # In-app bell feed entry. Created alongside e-mail + push so the
-    # three channels stay in sync (one opt-out gate, one trigger
-    # site).
-    from notifications.models import Notification
+    for user, is_mandatory in audience:
+        if not is_mandatory and not user.notify_on_discussion_reply:
+            continue
 
-    Notification.objects.create(
-        recipient=topic.author,
-        kind=Notification.KIND_DISCUSSION_REPLY,
-        title=f'{author_name} odpověděl na „{topic.title}"',
-        body=(comment.body or "")[:280],
-        link=comment_url,
-        payload={
-            "topic_id": topic.pk,
-            "comment_id": comment.pk,
-            "parent_type": topic.parent_type,
-            "parent_id": topic.parent_id,
-        },
-    )
+        context = {
+            "topic": topic,
+            "comment": comment,
+            "topic_url": comment_url,
+            "parent_label": parent_label,
+            "author_name": author_name,
+        }
+        send_branded_email(
+            subject=subject,
+            template_base="discussions/comment_added",
+            context=context,
+            recipient_list=[user.email],
+            fail_silently=True,  # jedna špatná adresa nesmí položit zbytek
+        )
+        # Push je best-effort — když VAPID není nakonfigurovaný nebo
+        # se to nepodaří, e-mail + bell už jsou stejně na cestě.
+        send_push_to_user(
+            user,
+            title=subject,
+            body=push_body,
+            url=comment_url,
+            tag=f"comment-{comment.pk}",
+        )
+        Notification.objects.create(
+            recipient=user,
+            kind=Notification.KIND_DISCUSSION_REPLY,
+            title=bell_title,
+            body=bell_body,
+            link=comment_url,
+            payload=bell_payload,
+        )
 
 
 def _audience_for_topic(topic: Topic) -> list[User]:
