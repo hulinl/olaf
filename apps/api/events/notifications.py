@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from notifications.models import Notification
 
-from .models import RSVP, Event
+from .models import RSVP, Event, EventCollaborator
 
 # Fields whose change is worth pinging every active RSVPed user
 # about. Owner-internal fields (blocks layout, risk_checklist, etc.)
@@ -50,6 +50,116 @@ def diff_changed_fields(before: dict, after: dict) -> list[str]:
 
 def _event_link(event: Event) -> str:
     return f"/events/{event.workspace.slug}/{event.slug}"
+
+
+def _event_admin_link(event: Event) -> str:
+    """Tvůrce shell URL na cockpit akce — roster tab, kde organizátor
+    vidí novou přihlášku. Používá tvurce/ route group, ne public
+    landing (user preference: owner klik nikdy ne na public landing)."""
+    return f"/tvurce/akce/{event.workspace.slug}/{event.slug}"
+
+
+def _organizer_recipient_ids(event: Event, *, exclude_user_id: int | None = None) -> list[int]:
+    """Vrátí user IDs, kterým se má poslat organizátorská RSVP notifikace:
+    workspace owner + všechny `EventCollaborator`ky téhle akce, deduplikované,
+    bez `exclude_user_id` (typicky commenter / self-registrant).
+
+    Mandatory audience — nekontroluje `notify_on_*` opt-out. Organizátor
+    musí o dění na svojí akci vědět, i kdyby si generic notif preferences
+    vypnul. Parita s `send_topic_announce` mandatory-event-scope
+    semantikou a s `send_comment_notification` mandatory bypass.
+    """
+    from workspaces.models import WorkspaceMember
+
+    ids: set[int] = set()
+    owner_id = (
+        WorkspaceMember.objects.filter(
+            workspace=event.workspace,
+            role=WorkspaceMember.ROLE_OWNER,
+        )
+        .values_list("user_id", flat=True)
+        .first()
+    )
+    if owner_id:
+        ids.add(owner_id)
+    ids.update(
+        EventCollaborator.objects.filter(event=event).values_list(
+            "user_id", flat=True
+        )
+    )
+    if exclude_user_id is not None:
+        ids.discard(exclude_user_id)
+    return list(ids)
+
+
+_RSVP_STATUS_HEADLINE = {
+    RSVP.STATUS_YES: "Nová potvrzená přihláška",
+    RSVP.STATUS_PENDING_APPROVAL: "Nová přihláška ke schválení",
+    RSVP.STATUS_WAITLIST: "Nový záznam na waitlistu",
+}
+
+
+def notify_rsvp_created(rsvp: RSVP) -> int:
+    """Bulk-create Notification řádky pro organizátory (owner +
+    EventCollaborators) o nové přihlášce. Vrací počet vytvořených.
+
+    Skip cases:
+    - RSVP je organizátorská auto-registrace (`is_organizer=True`) —
+      to je „owner se sám přihlásil na vlastní akci", žádný signal
+    - Žádný recipient (self-registrant je zároveň jediný owner)
+    """
+    if rsvp.is_organizer:
+        return 0
+
+    event = rsvp.event
+    exclude_id = rsvp.user_id  # skip self-notification kdyby se
+    # zaregistroval user, který je zároveň owner/collaborator této akce
+    recipient_ids = _organizer_recipient_ids(event, exclude_user_id=exclude_id)
+    if not recipient_ids:
+        return 0
+
+    headline = _RSVP_STATUS_HEADLINE.get(rsvp.status, "Nová přihláška")
+    display_name = (
+        rsvp.user.get_full_name() if rsvp.user else "Neznámý účastník"
+    )
+    body_parts = [f'{display_name} se přihlásil/a na „{event.title}".']
+    if rsvp.status == RSVP.STATUS_PENDING_APPROVAL:
+        body_parts.append("Čeká na tvoje schválení.")
+    elif rsvp.status == RSVP.STATUS_WAITLIST:
+        body_parts.append("Kapacita je plná, přidán na waitlist.")
+
+    body = " ".join(body_parts)
+    link = _event_admin_link(event)
+
+    notifs = [
+        Notification(
+            recipient_id=uid,
+            kind=Notification.KIND_RSVP_NEW,
+            title=headline,
+            body=body,
+            link=link,
+            payload={
+                "event_id": event.pk,
+                "event_slug": event.slug,
+                "workspace_slug": event.workspace.slug,
+                "rsvp_id": rsvp.id,
+                "rsvp_status": rsvp.status,
+                "participant_user_id": rsvp.user_id,
+            },
+        )
+        for uid in recipient_ids
+    ]
+    Notification.objects.bulk_create(notifs)
+
+    # Mail + push k organizátorům. Dispatch přes Celery task — v prod
+    # běží EAGER (viz project_olaf_perf_celery_eager memory), takže
+    # sync fan-out ~300 ms krát počet organizátorů. Fine pro V1
+    # (owner+ +málo collaborators). Best-effort — bell notifikace už
+    # dorazila, i kdyby mail/push cesta padla.
+    from .tasks import send_rsvp_new_to_organizers_task
+
+    send_rsvp_new_to_organizers_task.delay(rsvp.pk, recipient_ids)
+    return len(notifs)
 
 
 def notify_event_updated(event: Event, changed_fields: list[str], *, actor=None) -> int:

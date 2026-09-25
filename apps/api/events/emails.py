@@ -43,6 +43,91 @@ def _frontend_feedback_url(rsvp: RSVP) -> str:
     return f"{base}/feedback/{rsvp.feedback_token}"
 
 
+def send_rsvp_new_to_organizers(
+    rsvp: RSVP, recipient_ids: list[int]
+) -> None:
+    """E-mail + push všem organizátorům (owner + `EventCollaborator`ky)
+    dané akce o nové přihlášce. Bell entry se stará `notify_rsvp_created`;
+    tady jen mirror mail + push kanály.
+
+    Skip bez dalšího zpracování:
+    - `recipient_ids` prázdný (nikdo k notifikaci)
+    - RSVP je organizer auto-registrace (double-check; caller už filtruje)
+    """
+    if rsvp.is_organizer or not recipient_ids:
+        return
+
+    from accounts.models import User
+    from notifications.push import send_push_to_user
+
+    event = rsvp.event
+    display_name = (
+        rsvp.user.get_full_name() if rsvp.user else "Neznámý účastník"
+    )
+    participant_email = (
+        rsvp.user.email if rsvp.user else ""
+    )
+    participant_phone = (
+        (rsvp.user.phone or "") if rsvp.user else ""
+    )
+    event_when = format_event_dt(event.starts_at, event.tz)
+    admin_url = (
+        f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000').rstrip('/')}"
+        f"/tvurce/akce/{event.workspace.slug}/{event.slug}"
+    )
+
+    if rsvp.status == RSVP.STATUS_PENDING_APPROVAL:
+        subject = f"Nová přihláška ke schválení: {event.title}"
+        push_title = "Nová přihláška ke schválení"
+        status_label = "Čeká na tvoje schválení"
+    elif rsvp.status == RSVP.STATUS_WAITLIST:
+        subject = f"Nový záznam na waitlistu: {event.title}"
+        push_title = "Nový záznam na waitlistu"
+        status_label = "Kapacita je plná, přidán na waitlist"
+    else:
+        subject = f"Nová přihláška: {event.title}"
+        push_title = "Nová přihláška"
+        status_label = "Přihláška potvrzena"
+
+    push_body = f"{display_name} — {event.title}"
+
+    recipients = list(
+        User.objects.filter(id__in=recipient_ids).only(
+            "id", "email", "first_name", "last_name"
+        )
+    )
+    if not recipients:
+        return
+
+    for recipient in recipients:
+        # Per-adresát render, aby v šabloně mohl být osobní oslovení.
+        send_branded_email(
+            subject=subject,
+            template_base="emails/rsvp_new_for_organizer",
+            context={
+                "recipient": recipient,
+                "participant_name": display_name,
+                "participant_email": participant_email,
+                "participant_phone": participant_phone,
+                "event": event,
+                "event_when": event_when,
+                "workspace": event.workspace,
+                "status": rsvp.status,
+                "status_label": status_label,
+                "admin_url": admin_url,
+            },
+            recipient_list=[recipient.email],
+            fail_silently=True,  # jeden špatný adresát nesmí položit ostatní
+        )
+        send_push_to_user(
+            recipient,
+            title=push_title,
+            body=push_body,
+            url=admin_url,
+            tag=f"rsvp-{rsvp.pk}",
+        )
+
+
 def send_rsvp_confirmation(rsvp: RSVP) -> None:
     """Email a participant that their RSVP was recorded."""
     event = rsvp.event

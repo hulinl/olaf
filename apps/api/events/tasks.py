@@ -10,6 +10,7 @@ from .emails import (
     send_event_update_notification,
     send_feedback_request,
     send_rsvp_confirmation,
+    send_rsvp_new_to_organizers,
     send_waitlist_promotion,
 )
 from .models import RSVP, Event, EventChecklistItem
@@ -36,6 +37,22 @@ def send_waitlist_promotion_task(rsvp_id: int) -> None:
     except RSVP.DoesNotExist:
         return
     send_waitlist_promotion(rsvp)
+
+
+@shared_task(name="events.send_rsvp_new_to_organizers")
+def send_rsvp_new_to_organizers_task(
+    rsvp_id: int, recipient_ids: list[int]
+) -> None:
+    """Fan-out organizátorské notifikace o nové přihlášce — e-mail +
+    push. Bell entry se vytváří přímo ve view volajícím
+    `notify_rsvp_created` (fast path), tady jen mirror mail + push."""
+    try:
+        rsvp = RSVP.objects.select_related(
+            "event", "event__workspace", "user"
+        ).get(pk=rsvp_id)
+    except RSVP.DoesNotExist:
+        return
+    send_rsvp_new_to_organizers(rsvp, recipient_ids)
 
 
 @shared_task(name="events.fan_out_event_cancellation")

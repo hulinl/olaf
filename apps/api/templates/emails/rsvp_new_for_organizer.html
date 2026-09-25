@@ -1,0 +1,82 @@
+{% extends "emails/_base.html" %}
+{% load czech %}
+
+{% block subject %}Nová přihláška: {{ event.title }}{% endblock %}
+
+{% block body %}
+  <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1a1a1a;">
+    Ahoj {{ recipient.first_name|czech_vocative }},
+  </p>
+
+  <p style="margin:0 0 20px;">
+    na akci <strong>„{{ event.title }}"</strong> se právě přihlásil/a
+    <strong>{{ participant_name }}</strong>.
+  </p>
+
+  {# Účastník detail — jméno, e-mail, telefon, status #}
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;background-color:#faf8f4;border:1px solid #f0ede5;border-radius:10px;">
+    <tr>
+      <td style="padding:16px 18px;">
+        <div style="margin-bottom:8px;">
+          <span style="display:inline-block;width:80px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Účastník</span>
+          <span style="font-size:14px;color:#1a1a1a;">{{ participant_name }}</span>
+        </div>
+        {% if participant_email %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:80px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">E-mail</span>
+            <a href="mailto:{{ participant_email }}" style="font-size:14px;color:#1a1a1a;text-decoration:underline;">{{ participant_email }}</a>
+          </div>
+        {% endif %}
+        {% if participant_phone %}
+          <div style="margin-bottom:8px;">
+            <span style="display:inline-block;width:80px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Telefon</span>
+            <a href="tel:{{ participant_phone }}" style="font-size:14px;color:#1a1a1a;text-decoration:underline;">{{ participant_phone }}</a>
+          </div>
+        {% endif %}
+        <div style="margin-bottom:8px;">
+          <span style="display:inline-block;width:80px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Status</span>
+          <span style="font-size:14px;color:#1a1a1a;">{{ status_label }}</span>
+        </div>
+        {% if event_when %}
+          <div>
+            <span style="display:inline-block;width:80px;font-size:12px;color:#737373;text-transform:uppercase;letter-spacing:0.04em;">Termín</span>
+            <span style="font-size:14px;color:#1a1a1a;">{{ event_when }}</span>
+          </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  {% if status == 'pending_approval' %}
+    <p style="margin:0 0 16px;">
+      Registrace čeká na tvoje schválení — otevři cockpit akce a
+      rozhodni, zda pustit dál.
+    </p>
+  {% elif status == 'waitlist' %}
+    <p style="margin:0 0 16px;">
+      Kapacita akce je naplněná, tenhle záznam sedí na waitlistu.
+      V cockpitu vidíš pořadí.
+    </p>
+  {% else %}
+    <p style="margin:0 0 16px;">
+      Přihláška je rovnou potvrzená. V cockpitu vidíš přehled
+      všech účastníků.
+    </p>
+  {% endif %}
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+    <tr>
+      <td align="center" style="background-color:#ffc719;border-radius:8px;">
+        <a href="{{ admin_url }}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#1a1a1a;text-decoration:none;">Otevřít cockpit akce</a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:20px 0 0;font-size:13px;color:#737373;">
+    Tuhle notifikaci dostáváš jako organizátor akce.
+    {% if recipient.email %}
+      Preference notifikací můžeš upravit v
+      <a href="{{ site_url }}/settings/notifications" style="color:#dc2626;text-decoration:underline;">nastavení notifikací</a>.
+    {% endif %}
+  </p>
+{% endblock %}

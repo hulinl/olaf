@@ -1,0 +1,16 @@
+{% load czech %}Ahoj {{ recipient.first_name|czech_vocative }},
+
+na akci „{{ event.title }}" se právě přihlásil/a {{ participant_name }}.
+
+Účastník: {{ participant_name }}{% if participant_email %}
+E-mail: {{ participant_email }}{% endif %}{% if participant_phone %}
+Telefon: {{ participant_phone }}{% endif %}
+Status: {{ status_label }}{% if event_when %}
+Termín: {{ event_when }}{% endif %}
+
+{% if status == 'pending_approval' %}Registrace čeká na tvoje schválení — otevři cockpit akce a rozhodni.{% elif status == 'waitlist' %}Kapacita akce je naplněná, záznam sedí na waitlistu.{% else %}Přihláška je rovnou potvrzená.{% endif %}
+
+Cockpit akce: {{ admin_url }}
+
+—
+Tuhle notifikaci dostáváš jako organizátor akce. Preferences: {{ site_url }}/settings/notifications

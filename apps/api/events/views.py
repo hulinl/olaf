@@ -340,6 +340,17 @@ def rsvp_event(request: Request, workspace_slug: str, event_slug: str) -> Respon
     # the Celery broker latency is longer than the request commit.
     send_rsvp_confirmation_task.delay(rsvp.pk)
 
+    # Organizer notification — mail + bell + push všem tvůrcům (owner +
+    # EventCollaborators). Bez tohoto Olaf reálně nevěděl o dítěti,
+    # které se přihlásilo v den akce a přišlo na místo (report 2026-09-25).
+    # Best-effort — RSVP samotné už je uložené, případný fail fan-outu
+    # nesmí uživateli položit submit.
+    import contextlib
+    with contextlib.suppress(Exception):
+        from .notifications import notify_rsvp_created
+
+        notify_rsvp_created(rsvp)
+
     return Response(
         MyRSVPSerializer(rsvp, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
