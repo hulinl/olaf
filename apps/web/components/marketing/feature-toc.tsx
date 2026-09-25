@@ -91,9 +91,7 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
       aria-hidden={fadeOut}
     >
       <div className="flex flex-col gap-1 border-l border-border pl-5">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-500">
-          Prohlídka
-        </p>
+        <p className="mono-tag text-ink-500">Prohlídka</p>
         <ul className="mt-3 flex flex-col gap-2">
           {features.map((f) => {
             const isActive = active === f.id;
@@ -102,13 +100,21 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
                 <a
                   href={`#${f.id}`}
                   className={[
-                    "group flex items-baseline gap-2 rounded py-0.5 text-[15px] leading-snug transition-colors focus-ring",
+                    "group flex items-baseline gap-2 rounded-sm py-0.5 text-[15px] leading-snug transition-colors focus-ring",
                     isActive
-                      ? "text-brand"
+                      ? "text-ink-900"
                       : "text-ink-500 hover:text-ink-900",
                   ].join(" ")}
                   aria-current={isActive ? "true" : undefined}
                 >
+                  {/* Active indicator — 2px amber tick left of number */}
+                  <span
+                    aria-hidden
+                    className={[
+                      "inline-block h-2 w-1 transition-colors",
+                      isActive ? "bg-brand" : "bg-transparent",
+                    ].join(" ")}
+                  />
                   <span
                     className={[
                       "font-mono text-[11px] transition-colors",

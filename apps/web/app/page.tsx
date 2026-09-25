@@ -11,8 +11,11 @@ import {
   PhoneFrame,
 } from "@/components/marketing/mockups/chrome";
 import { AdminCockpitScreen } from "@/components/marketing/mockups/screens/AdminCockpitScreen";
+import { AuditLogScreen } from "@/components/marketing/mockups/screens/AuditLogScreen";
+import { CockpitChecklistScreen } from "@/components/marketing/mockups/screens/CockpitChecklistScreen";
 import { EventLandingScreen } from "@/components/marketing/mockups/screens/EventLandingScreen";
 import { FeedTopicScreen } from "@/components/marketing/mockups/screens/FeedTopicScreen";
+import { LandingBuilderScreen } from "@/components/marketing/mockups/screens/LandingBuilderScreen";
 import { PaymentScreen } from "@/components/marketing/mockups/screens/PaymentScreen";
 import { WorkspaceProfileScreen } from "@/components/marketing/mockups/screens/WorkspaceProfileScreen";
 import { Reveal } from "@/components/marketing/reveal";
@@ -42,9 +45,9 @@ const FEATURE_VISUALS: Record<string, ReactNode> = {
   ),
   "landing-builder": (
     <LaptopFrame>
-      <BrowserBar url="olaf.events/olaf-adventures/e/spring-camp-beskydy" />
+      <BrowserBar url="olaf.events/tvurce/akce/olaf-adventures/spring-camp-beskydy/edit/obsah" />
       <div className="relative flex-1">
-        <EventLandingScreen />
+        <LandingBuilderScreen />
       </div>
     </LaptopFrame>
   ),
@@ -67,7 +70,7 @@ const FEATURE_VISUALS: Record<string, ReactNode> = {
     <LaptopFrame>
       <BrowserBar url="olaf.events/tvurce/akce/olaf-adventures/spring-camp-beskydy" />
       <div className="relative flex-1">
-        <AdminCockpitScreen />
+        <CockpitChecklistScreen />
       </div>
     </LaptopFrame>
   ),
@@ -80,9 +83,9 @@ const FEATURE_VISUALS: Record<string, ReactNode> = {
   ),
   audit: (
     <LaptopFrame>
-      <BrowserBar url="olaf.events/tvurce/akce/olaf-adventures/spring-camp-beskydy" />
+      <BrowserBar url="olaf.events/tvurce/admin/audit" />
       <div className="relative flex-1">
-        <AdminCockpitScreen />
+        <AuditLogScreen />
       </div>
     </LaptopFrame>
   ),
@@ -289,6 +292,67 @@ export default function Home() {
           </a>
         </section>
 
+        {/* JAK TO FUNGUJE — 3-step horizontal timeline pod hero. Dává
+            narrative flow před feature tour, uživatel vidí „takhle to
+            celé chodí" než rozklikne detail per feature. */}
+        <section
+          aria-label="Jak olaf funguje"
+          className="border-t border-border bg-canvas"
+        >
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+            <div data-reveal className="mb-12 max-w-2xl">
+              <p className="mono-tag text-brand">Jak to funguje</p>
+              <h2
+                className="mt-3 font-semibold text-ink-900"
+                style={{
+                  fontSize: "clamp(28px, 3.2vw, 44px)",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1.1,
+                }}
+              >
+                Od nápadu k první přihlášce{" "}
+                <span className="text-amber-glow">za deset minut</span>.
+              </h2>
+            </div>
+
+            {/* 3 kroky — grid, mezi nimi dotted line connector na md+ */}
+            <div className="relative grid gap-8 md:grid-cols-3 md:gap-6">
+              {/* Connector line — jen na md+ */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-8 top-6 hidden h-px md:block"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(90deg, var(--brand) 0%, var(--brand) 50%, transparent 100%)",
+                  backgroundSize: "8px 1px",
+                  backgroundRepeat: "repeat-x",
+                  opacity: 0.35,
+                }}
+              />
+              {STEPS.map((step, i) => (
+                <div
+                  key={step.number}
+                  data-reveal
+                  style={{ ["--reveal-delay" as string]: `${i * 120}ms` }}
+                  className="relative"
+                >
+                  {/* Number circle */}
+                  <div className="relative mb-5 inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-ink-900 bg-canvas text-lg font-semibold text-ink-900">
+                    <span aria-hidden>{step.number}</span>
+                  </div>
+                  <p className="mono-tag text-brand">{step.eyebrow}</p>
+                  <h3 className="mt-2 text-lg font-semibold leading-tight text-ink-900">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-700">
+                    {step.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* STATS BAR — 4 proof-points, sharp corners, mono labels */}
         <section
           aria-label="Klíčové vlastnosti"
@@ -340,6 +404,51 @@ export default function Home() {
             <FeatureToc features={FEATURES} />
           </div>
         </div>
+
+        {/* PULL-QUOTE — emocionální těžiště landingu. Skutečný důvod, proč
+            OLAF vznikl, řečený osobně. */}
+        <Reveal>
+          <section className="relative overflow-hidden border-y border-border bg-canvas">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 topo-bg opacity-30"
+            />
+            <div
+              aria-hidden
+              className="sunrise-glow pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(255,199,25,0.28) 0%, rgba(255,199,25,0.06) 45%, transparent 70%)",
+              }}
+            />
+            <div className="relative mx-auto max-w-4xl px-4 py-20 text-center sm:py-24">
+              <span
+                aria-hidden
+                className="mono-tag inline-flex items-center gap-2 text-ink-500"
+              >
+                <span className="inline-block h-1 w-8 bg-brand" />
+                Proč olaf
+              </span>
+              <blockquote
+                className="mt-6 text-ink-900"
+                style={{
+                  fontSize: "clamp(22px, 2.8vw, 34px)",
+                  letterSpacing: "-0.015em",
+                  lineHeight: 1.25,
+                  fontWeight: 500,
+                }}
+              >
+                „Nikdy jsem nechtěl, aby účastník přišel na místo{" "}
+                <span className="text-amber-glow">a já o něm nevěděl</span>.
+                Přesně proto teď každou novou přihlášku ihned vidím v mailu,
+                aplikaci i na mobilu."
+              </blockquote>
+              <p className="mt-8 mono-tag text-ink-500">
+                — Olaf Hulín, zakladatel · Olaf Adventures
+              </p>
+            </div>
+          </section>
+        </Reveal>
 
         {/* SAMPLE community — dark section, topo-bg-amber, real link ke
             live Olaf Adventures */}
@@ -439,6 +548,32 @@ export default function Home() {
     </>
   );
 }
+
+const STEPS: {
+  number: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+}[] = [
+  {
+    number: "1",
+    eyebrow: "30 sekund",
+    title: "Založ komunitu",
+    body: "Jméno, logo, popis, veřejná URL. Instant profil se seznamem akcí, členy a nástěnkou.",
+  },
+  {
+    number: "2",
+    eyebrow: "10 minut",
+    title: "Přidej akci s obsahem",
+    body: "Skládáš landing z bloků — hero, program po dnech, mapa, cena, otázky formuláře. Publikuješ jedním klikem.",
+  },
+  {
+    number: "3",
+    eyebrow: "Průběžně",
+    title: "Přijímej přihlášky",
+    body: "Každá RSVP ti dojde mailem, do zvonečku i na mobil. Roster, platby, feedback — vše na jednom místě.",
+  },
+];
 
 const STATS: { value: string; label: string; body: string }[] = [
   {
