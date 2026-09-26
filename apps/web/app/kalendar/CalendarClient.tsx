@@ -1220,9 +1220,22 @@ function MobileRaceCard({
   const regionColor = REGION_COLOR_BY_CODE[race.region] || "#15231d";
   const regionLabel = REGION_LABEL_BY_CODE[race.region] || "";
   const regCode = REG_CODE[race.registration_status];
+  // Border tint per plan_status — subtle visual scan hint. Bez statusu
+  // = default border, s statusem = colored left border-l-4 podle status.
+  const statusBorder = race.plan_status
+    ? {
+        interested: "border-l-4 border-l-ink-300",
+        waiting_registration: "border-l-4 border-l-warning",
+        registered: "border-l-4 border-l-success",
+        waitlist: "border-l-4 border-l-brand",
+        completed: "border-l-4 border-l-ink-900",
+      }[race.plan_status]
+    : "";
 
   return (
-    <article className="relative rounded-md border border-border bg-surface p-4">
+    <article
+      className={`relative rounded-md border border-border bg-surface p-4 ${statusBorder}`}
+    >
       {/* Star — absolute top-right, touch-friendly 40×40 */}
       <button
         type="button"
@@ -1281,14 +1294,20 @@ function MobileRaceCard({
         </p>
       )}
 
-      {/* Date — big condensed */}
+      {/* Date — big condensed. TBA má vlastní pill místo raw „?". */}
       <div className="mt-3 flex items-baseline gap-2">
-        <span
-          className="font-condensed font-bold tracking-tight text-ink-900"
-          style={{ fontSize: "22px", lineHeight: 1 }}
-        >
-          {race.next_label || race.date_display || formatDateCompact(race.date_start)}
-        </span>
+        {race.next_label === "?" || race.next_label === "" ? (
+          <span className="inline-flex items-center rounded-sm bg-surface-muted px-2 py-0.5 text-[13px] font-semibold uppercase tracking-wider text-ink-500">
+            Datum TBA
+          </span>
+        ) : (
+          <span
+            className="font-condensed font-bold tracking-tight text-ink-900"
+            style={{ fontSize: "22px", lineHeight: 1 }}
+          >
+            {race.next_label || race.date_display || formatDateCompact(race.date_start)}
+          </span>
+        )}
         <span className="text-[13px] tabular-nums text-ink-500">
           {race.next_year}
         </span>
