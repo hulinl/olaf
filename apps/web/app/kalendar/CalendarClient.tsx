@@ -208,6 +208,10 @@ const STORAGE_KEY = "olaf.kalendar.filters.v1";
 
 export function CalendarClient() {
   const [user, setUser] = useState<User | null>(null);
+  // Prevent double-fetch: první loadRaces musí počkat na auth check aby
+  // response obsahoval plan_status/is_favorite pro logged-in user
+  // (jinak race calling before /me/ resolves = anon response bez favorites).
+  const [userChecked, setUserChecked] = useState(false);
   const [items, setItems] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -268,7 +272,8 @@ export function CalendarClient() {
     auth
       .me()
       .then(setUser)
-      .catch(() => setUser(null));
+      .catch(() => setUser(null))
+      .finally(() => setUserChecked(true));
   }, []);
 
   useEffect(() => {
@@ -305,8 +310,11 @@ export function CalendarClient() {
   }, [filters]);
 
   useEffect(() => {
+    // Počkat na dokončení /me/ — jinak by první response nesl anon
+    // stav (is_favorite=false, plan_status=null) i pro logged-in usera.
+    if (!userChecked) return;
     void loadRaces();
-  }, [loadRaces]);
+  }, [loadRaces, userChecked]);
 
   const sorted = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
