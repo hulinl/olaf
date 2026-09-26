@@ -165,7 +165,7 @@ class SyncAgentTests(TestCase):
         """VYPRODÁNO + „otevírá se v prosinci" = contradiction."""
         self.assertTrue(
             _detect_contradiction(
-                "sold_out", "otevírá se 12.–16. 10. 2026"
+                "sold_out", "otevírá se 12.-16. 10. 2026"
             )
         )
         self.assertTrue(

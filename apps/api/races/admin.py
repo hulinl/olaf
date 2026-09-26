@@ -1,4 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.core.management import call_command
+from django.http import HttpResponseRedirect
+from django.urls import path, reverse
 from django.utils.html import format_html
 
 from .models import Race, RaceFavorite, SyncRun
@@ -74,6 +77,59 @@ class SyncRunAdmin(admin.ModelAdmin):
     exclude = ("changes",)
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
+
+    change_list_template = "admin/races/syncrun/change_list.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "run-now/",
+                self.admin_site.admin_view(self.run_sync_now),
+                name="races_syncrun_run_now",
+            ),
+        ]
+        return custom + urls
+
+    def run_sync_now(self, request):
+        """Manual admin action — spustí sync okamžitě, redirect zpět
+        s message pokud OK / error."""
+        from io import StringIO
+
+        buf = StringIO()
+        try:
+            call_command(
+                "sync_races",
+                "--source",
+                "auto",
+                "--triggered-by",
+                f"admin:{request.user.email}",
+                stdout=buf,
+            )
+            output = buf.getvalue().strip()
+            latest = SyncRun.objects.first()
+            summary = (
+                f"+{latest.created_count} nových, "
+                f"~{latest.updated_count} updatů, "
+                f"={latest.skipped_count} beze změny, "
+                f"⚠{latest.flagged_count} flagged"
+                if latest
+                else output
+            )
+            self.message_user(
+                request,
+                f"Sync spuštěn: {summary}",
+                level=messages.SUCCESS,
+            )
+        except Exception as exc:
+            self.message_user(
+                request,
+                f"Sync selhal: {exc}",
+                level=messages.ERROR,
+            )
+        return HttpResponseRedirect(
+            reverse("admin:races_syncrun_changelist")
+        )
 
     @admin.display(description="Kdy", ordering="-created_at")
     def created_at_short(self, obj):
