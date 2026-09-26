@@ -33,7 +33,7 @@ export function AdminCockpitScreen() {
         {/* H1 + subtitle + published badge */}
         <div className="mt-1 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-ink-900">
+            <h1 className="truncate text-[12px] font-semibold leading-tight tracking-tight text-ink-900">
               Spring Camp Beskydy
             </h1>
             <p className="mt-0.5 text-[8px] text-ink-500">
@@ -153,7 +153,7 @@ function StatTile({
     >
       <p className="mono-tag text-[6px] text-ink-500">{label}</p>
       <p
-        className={`text-[14px] font-semibold leading-none tracking-tight tabular-nums ${
+        className={`text-[11px] font-semibold leading-none tracking-tight tabular-nums ${
           warning ? "text-warning" : "text-ink-900"
         }`}
       >

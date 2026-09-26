@@ -27,7 +27,7 @@ export function CockpitChecklistScreen() {
         {/* H1 + subtitle */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-[16px] font-semibold leading-tight tracking-tight text-ink-900">
+            <h1 className="text-[12px] font-semibold leading-tight tracking-tight text-ink-900">
               Spring Camp Beskydy
             </h1>
             <p className="mt-0.5 text-[8px] text-ink-500">
@@ -107,7 +107,7 @@ function MiniStat({
     >
       <p className="mono-tag text-[5px] text-ink-500">{label}</p>
       <p
-        className={`mt-0.5 text-[11px] font-semibold leading-none tracking-tight tabular-nums ${
+        className={`mt-0.5 text-[9px] font-semibold leading-none tracking-tight tabular-nums ${
           warning ? "text-warning" : "text-ink-900"
         }`}
       >

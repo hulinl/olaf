@@ -23,7 +23,7 @@ export function AuditLogScreen() {
       <div className="flex-1 overflow-hidden px-5 py-4">
         <div className="flex items-baseline justify-between">
           <div>
-            <h1 className="text-[16px] font-semibold leading-tight tracking-tight text-ink-900">
+            <h1 className="text-[12px] font-semibold leading-tight tracking-tight text-ink-900">
               Audit log
             </h1>
             <p className="mt-0.5 text-[8px] text-ink-500">

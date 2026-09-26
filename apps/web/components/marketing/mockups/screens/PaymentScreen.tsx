@@ -21,7 +21,7 @@ export function PaymentScreen() {
         <p className="mono-tag text-[6px] text-ink-500">
           SPRING CAMP BESKYDY
         </p>
-        <p className="mt-1 text-[16px] font-semibold leading-none tracking-tight text-ink-900 tabular-nums">
+        <p className="mt-1 text-[13px] font-semibold leading-none tracking-tight text-ink-900 tabular-nums">
           1 800 Kč
         </p>
         <p className="mt-1 text-[7px] text-ink-500">

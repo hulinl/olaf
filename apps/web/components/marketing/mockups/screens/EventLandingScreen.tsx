@@ -45,7 +45,7 @@ export function EventLandingScreen() {
           <span className="mono-tag inline-flex w-fit items-center rounded-sm bg-brand px-1.5 py-0.5 text-[6px] text-brand-ink">
             Posledních 6 míst
           </span>
-          <h1 className="text-[13px] font-semibold leading-[1.1] tracking-tight text-canvas text-shadow-strong">
+          <h1 className="text-[11px] font-semibold leading-[1.1] tracking-tight text-canvas text-shadow-strong">
             Spring Camp Beskydy
           </h1>
           <p className="text-[7px] leading-tight text-canvas/85">

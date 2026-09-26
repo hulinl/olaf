@@ -62,7 +62,7 @@ export function LandingBuilderScreen() {
                 <span className="mono-tag inline-flex rounded-sm bg-brand px-1.5 py-0.5 text-[6px] text-brand-ink">
                   16.–19. 5.
                 </span>
-                <p className="mt-1.5 text-[12px] font-semibold leading-tight text-canvas">
+                <p className="mt-1.5 text-[10px] font-semibold leading-tight text-canvas">
                   Spring Camp Beskydy
                 </p>
               </div>

@@ -50,7 +50,7 @@ export function WorkspaceProfileScreen() {
               <span className="text-[12px] font-bold text-ink-900">O</span>
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-[13px] font-semibold leading-tight tracking-tight text-canvas text-shadow-strong">
+              <h1 className="truncate text-[11px] font-semibold leading-tight tracking-tight text-canvas text-shadow-strong">
                 Olaf Adventures
               </h1>
               <p className="mt-0.5 text-[6.5px] text-canvas/85">

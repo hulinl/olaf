@@ -192,7 +192,6 @@ export default function Home() {
                 >
                   {[
                     "Zdarma, bez karty",
-                    "Data v EU",
                     "Bez limitů členů",
                     "PWA na mobilu",
                   ].map((label) => (
@@ -225,19 +224,11 @@ export default function Home() {
                   </LaptopFrame>
                 </div>
 
-                {/* Floating phone — overlay uvnitř pravého sloupce (bottom-
-                    left position ale v hranicích right column, aby
-                    nepřekrýval copy vlevo). Šířka lg:w-32 = 128 px,
-                    aspect 9/19.5 = ~277 px tall. Section pb-40 = 160 px
-                    dá phone room aby přeteklo bez rušení stats baru. */}
-                <div
-                  className="pointer-events-none absolute -bottom-16 left-0 hidden w-28 lg:block lg:-bottom-20 lg:left-2 lg:w-32"
-                  aria-hidden
-                >
-                  <PhoneFrame>
-                    <EventLandingScreen />
-                  </PhoneFrame>
-                </div>
+                {/* Phone overlay v hero byl vypnut 2026-09-26 — user
+                    report: „PC i mobil přes sebe se bijí, rozsekané".
+                    Laptop stačí jako hero device. Phone frame je pořád
+                    v feature sekcích (Nástěnka, Platby), tam nikoho
+                    nekřížení. */}
 
                 {/* Toast — nová přihláška (top-right, uvnitř right col) */}
                 <div
@@ -547,6 +538,83 @@ export default function Home() {
           </section>
         </Reveal>
 
+        {/* PRICING — Free vs Premium. Základ zdarma, pokročilé funkce
+            pro tvůrce za 190 Kč/rok. Vzor převzatý z family-hub, sharp
+            OA styl (žádný gradient-emerald), dvě karty side-by-side. */}
+        <Reveal>
+          <section
+            id="cena"
+            className="relative overflow-hidden border-y border-border bg-surface-muted/60"
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 topo-bg opacity-30"
+            />
+            <div
+              aria-hidden
+              className="sunrise-glow pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[560px] -translate-x-1/2 -translate-y-1/2"
+              style={{
+                background:
+                  "radial-gradient(ellipse at center, rgba(255,199,25,0.24) 0%, rgba(255,199,25,0.06) 45%, transparent 70%)",
+              }}
+            />
+            <div className="relative mx-auto max-w-5xl px-4 py-20 sm:py-24">
+              <div data-reveal className="text-center">
+                <p className="mono-tag text-brand">Férová cena</p>
+                <h2
+                  className="mt-3 font-semibold text-ink-900"
+                  style={{
+                    fontSize: "clamp(28px, 3.6vw, 48px)",
+                    letterSpacing: "-0.025em",
+                    lineHeight: 1.05,
+                  }}
+                >
+                  Free navždy.{" "}
+                  <span className="text-amber-glow">
+                    Premium za cenu oběda.
+                  </span>
+                </h2>
+                <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink-700">
+                  Základ je zdarma a bez omezení času. Premium odemče
+                  pokročilé nástroje pro pořadatele — víc integrací, víc
+                  automatizace, míň klikání.
+                </p>
+              </div>
+
+              <div className="mt-14 grid gap-5 md:grid-cols-2 md:gap-6">
+                <PriceCard
+                  name="Free"
+                  price="0 Kč"
+                  unit="navždy"
+                  desc="Pro komunity a pořadatele, kteří si vystačí s tím, co potřebují k první akci."
+                  features={FREE_FEATURES}
+                  cta="Vytvořit účet"
+                  ctaHref="/signup"
+                  highlight={false}
+                />
+                <PriceCard
+                  name="Premium"
+                  price="190 Kč"
+                  unit="ročně"
+                  desc="Pokročilé nástroje pro tvůrce — integrace, automatizace, custom brand."
+                  features={PREMIUM_FEATURES}
+                  cta="Zkusit Premium"
+                  ctaHref="/signup?tier=premium"
+                  highlight
+                />
+              </div>
+
+              <p
+                data-reveal
+                className="mt-6 text-center text-xs text-ink-500"
+              >
+                Bez smlouvy, bez skrytých poplatků. Platí se ročně,
+                kdykoliv se dá zrušit.
+              </p>
+            </div>
+          </section>
+        </Reveal>
+
         {/* FINAL CTA */}
         <Reveal>
           <section className="bg-canvas">
@@ -604,6 +672,130 @@ export default function Home() {
   );
 }
 
+const FREE_FEATURES = [
+  "Neomezené komunity a členové",
+  "Neomezené akce",
+  "Vlastní landing page akce (9+ typů bloků)",
+  "Přihlášky s vlastním formulářem + waitlist",
+  "QR Platba + PDF faktury s brandingem",
+  "Cockpit + roadmap checklist + audit log",
+  "Nástěnka + push notifikace",
+  "Notion + AI import akcí",
+  "30denní retence koše",
+];
+
+const PREMIUM_FEATURES = [
+  "Vše z Free",
+  "Vlastní doména (akce.tvojekomunita.cz)",
+  "Fio bank webhook + auto-matching plateb",
+  "iDoklad API — auto-faktury do účetnictví",
+  "Pokročilé statistiky (attribution, funnel, retention)",
+  "Vlastní e-mail brand (SPF/DKIM, custom sender)",
+  "Bulk operace nad rosterem + exports",
+  "Priority support (odpověď do 48 h)",
+];
+
+function PriceCard({
+  name,
+  price,
+  unit,
+  desc,
+  features,
+  cta,
+  ctaHref,
+  highlight,
+}: {
+  name: string;
+  price: string;
+  unit: string;
+  desc: string;
+  features: string[];
+  cta: string;
+  ctaHref: string;
+  highlight: boolean;
+}) {
+  return (
+    <div
+      data-reveal
+      className={`relative flex flex-col rounded-sm border p-6 sm:p-8 ${
+        highlight
+          ? "border-ink-900 bg-canvas"
+          : "border-border bg-canvas"
+      }`}
+      style={
+        highlight
+          ? {
+              boxShadow:
+                "0 30px 60px -22px rgb(255 199 25 / 0.35), 0 0 0 1px rgb(255 199 25 / 0.25)",
+            }
+          : undefined
+      }
+    >
+      {highlight && (
+        <span className="mono-tag absolute -top-3 right-6 rounded-sm bg-brand px-2.5 py-1 text-brand-ink">
+          Doporučeno
+        </span>
+      )}
+      <div>
+        <h3 className="text-2xl font-semibold text-ink-900">{name}</h3>
+        <div className="mt-3 flex items-baseline gap-1">
+          <span
+            className="font-semibold tracking-tight text-ink-900 tabular-nums"
+            style={{
+              fontSize: "clamp(36px, 5vw, 56px)",
+              letterSpacing: "-0.02em",
+              lineHeight: 1,
+            }}
+          >
+            {price}
+          </span>
+          <span className="text-sm text-ink-500">/ {unit}</span>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-ink-700">{desc}</p>
+      </div>
+
+      <ul className="mt-6 flex-1 space-y-2 text-sm">
+        {features.map((f) => (
+          <li key={f} className="flex items-start gap-2">
+            <span
+              className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-brand-ink ${
+                highlight ? "bg-brand" : "border border-brand bg-brand-soft"
+              }`}
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 12 12"
+                width="10"
+                height="10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={highlight ? "text-brand-ink" : "text-brand"}
+              >
+                <polyline points="2 6.5 5 9.5 10 3.5" />
+              </svg>
+            </span>
+            <span className="text-ink-900">{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <a
+        href={ctaHref}
+        className={`mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-sm px-6 text-sm font-semibold transition-colors focus-ring ${
+          highlight
+            ? "bg-brand text-brand-ink hover:bg-brand-hover btn-brand-glow"
+            : "border border-border bg-surface text-ink-900 hover:bg-surface-muted"
+        }`}
+      >
+        {cta} <span aria-hidden>→</span>
+      </a>
+    </div>
+  );
+}
+
 const STEPS: {
   number: string;
   eyebrow: string;
@@ -647,8 +839,8 @@ const STATS: { value: string; label: string; body: string }[] = [
     body: "Přidej si olaf na plochu, push notifikace o dění na akcích.",
   },
   {
-    value: "EU",
-    label: "Data v EU",
-    body: "Vše hostované v Evropě, audit log, soft-delete s 30denní retencí.",
+    value: "0",
+    label: "Cena za start",
+    body: "Vše zdarma. Premium tarif jen za pokročilé nástroje pro tvůrce.",
   },
 ];
