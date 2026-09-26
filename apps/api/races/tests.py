@@ -632,6 +632,46 @@ class CommunityAwareRaceCalendarTests(TestCase):
             slugs, {self.bob.profile_slug, dana.profile_slug}
         )
 
+    def test_plan_by_includes_email_when_visible(self) -> None:
+        """Default profile_show_email=True → email v plan_by."""
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan = rows["MIUT"]["plan_by"]
+        entry = plan[0]
+        self.assertEqual(entry["email"], self.bob.email)
+
+    def test_plan_by_hides_email_when_toggle_off(self) -> None:
+        """Když user vypne profile_show_email, plan_by dostane empty string."""
+        self.bob.profile_show_email = False
+        self.bob.save()
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        entry = rows["MIUT"]["plan_by"][0]
+        self.assertEqual(entry["email"], "")
+
+    def test_plan_by_phone_hidden_by_default(self) -> None:
+        """profile_show_phone default False → phone není v plan_by."""
+        self.bob.phone = "+420777888999"
+        self.bob.save()
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        entry = rows["MIUT"]["plan_by"][0]
+        self.assertEqual(entry["phone"], "")
+
+    def test_plan_by_phone_shown_when_opted_in(self) -> None:
+        """Když user zapne profile_show_phone, jde do plan_by."""
+        self.bob.phone = "+420777888999"
+        self.bob.profile_show_phone = True
+        self.bob.save()
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        entry = rows["MIUT"]["plan_by"][0]
+        self.assertEqual(entry["phone"], "+420777888999")
+
 
 class CommunityHierarchyPropagationTests(TestCase):
     """Slice 2 vize — nested komunity propagují membership.

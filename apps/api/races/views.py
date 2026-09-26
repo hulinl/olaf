@@ -222,6 +222,9 @@ def _plan_by_lookup(request: Request) -> dict[int, list[dict]]:
 
     # Fetch všechny RaceFavorite pro tyto users v jednom queries. Distinct
     # ne — user může mít stejný závod jen jednou (unique_together).
+    # Contact fields (email/phone) respektují profile_show_* toggles usera:
+    # když má user vypnutý profile_show_email, do plan_by nejde. Ochrana
+    # privacy — race calendar má vidět status, ne exportovat kontakty.
     result: dict[int, list[dict]] = {}
     plans = (
         RaceFavorite.objects.filter(user_id__in=shared_ws_by_user.keys())
@@ -233,6 +236,9 @@ def _plan_by_lookup(request: Request) -> dict[int, list[dict]]:
             "user__first_name",
             "user__last_name",
             "user__email",
+            "user__phone",
+            "user__profile_show_email",
+            "user__profile_show_phone",
             "status",
             "note",
         )
@@ -242,12 +248,20 @@ def _plan_by_lookup(request: Request) -> dict[int, list[dict]]:
             f"{row['user__first_name']} {row['user__last_name']}".strip()
             or row["user__email"].split("@")[0]
         )
+        contact_email = (
+            row["user__email"] if row["user__profile_show_email"] else ""
+        )
+        contact_phone = (
+            row["user__phone"] if row["user__profile_show_phone"] else ""
+        )
         result.setdefault(row["race_id"], []).append(
             {
                 "user_slug": row["user__profile_slug"],
                 "display_name": display_name,
                 "status": row["status"],
                 "note": row["note"],
+                "email": contact_email,
+                "phone": contact_phone,
                 "workspaces": shared_ws_by_user[row["user_id"]],
             }
         )

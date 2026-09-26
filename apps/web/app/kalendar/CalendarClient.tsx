@@ -1298,49 +1298,94 @@ function PlanByPill({ plan }: { plan: RacePlanByEntry[] }) {
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-30 mt-1 min-w-[260px] rounded-md border border-border bg-canvas p-2 shadow-lg"
+          className="absolute left-0 top-full z-30 mt-1 w-[300px] max-w-[calc(100vw-32px)] rounded-md border border-border bg-canvas p-2 shadow-lg"
         >
-          <p className="mono-tag mb-1.5 text-ink-500">
-            Kdo má v plánu
-          </p>
-          <ul className="grid gap-1">
-            {plan.map((entry) => (
-              <li key={entry.user_slug}>
-                <a
-                  href={`/u/${entry.user_slug}`}
-                  className="flex items-start gap-2 rounded-sm px-1.5 py-1 hover:bg-surface-muted focus-ring"
+          <p className="mono-tag mb-1.5 text-ink-500">Kdo má v plánu</p>
+          <ul className="grid gap-1.5">
+            {plan.map((entry) => {
+              // WhatsApp deep-link — čistí telefon od mezer / dashů /
+              // závorek + zaručí leading `+`. wa.me akceptuje jen
+              // digits (bez `+`), ale https://wa.me/420... funguje.
+              const cleanPhone = entry.phone.replace(/[^\d+]/g, "");
+              const waHref = cleanPhone
+                ? `https://wa.me/${cleanPhone.replace(/^\+/, "")}`
+                : null;
+              return (
+                <li
+                  key={entry.user_slug}
+                  className="rounded-sm border border-border bg-surface-muted/40 p-2"
                 >
-                  <span
-                    aria-hidden
-                    className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-900 text-[10px] font-semibold text-canvas"
+                  <a
+                    href={`/u/${entry.user_slug}`}
+                    className="flex items-start gap-2 focus-ring"
                   >
-                    {entry.display_name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate text-[13px] font-medium text-ink-900">
-                        {entry.display_name}
-                      </span>
-                      <span
-                        className={`inline-flex flex-shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${PLAN_STATUS_TONE[entry.status]}`}
-                      >
-                        {PLAN_STATUS_LABEL[entry.status]}
-                      </span>
+                    <span
+                      aria-hidden
+                      className="mt-0.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-ink-900 text-[11px] font-semibold text-canvas"
+                    >
+                      {entry.display_name.slice(0, 2).toUpperCase()}
                     </span>
-                    {entry.workspaces.length > 0 && (
-                      <span className="mt-0.5 block truncate text-[11px] text-ink-500">
-                        {entry.workspaces.map((w) => w.name).join(" · ")}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-[13.5px] font-medium text-ink-900 hover:text-brand">
+                          {entry.display_name}
+                        </span>
+                        <span
+                          className={`inline-flex flex-shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${PLAN_STATUS_TONE[entry.status]}`}
+                        >
+                          {PLAN_STATUS_LABEL[entry.status]}
+                        </span>
                       </span>
-                    )}
-                    {entry.note && (
-                      <span className="mt-0.5 block truncate text-[11px] italic text-ink-500">
-                        „{entry.note}"
-                      </span>
-                    )}
-                  </span>
-                </a>
-              </li>
-            ))}
+                      {entry.workspaces.length > 0 && (
+                        <span className="mt-0.5 block truncate text-[11px] text-ink-500">
+                          {entry.workspaces.map((w) => w.name).join(" · ")}
+                        </span>
+                      )}
+                      {entry.note && (
+                        <span className="mt-0.5 block truncate text-[11px] italic text-ink-500">
+                          „{entry.note}"
+                        </span>
+                      )}
+                    </span>
+                  </a>
+                  {(entry.email || waHref) && (
+                    <div
+                      className="mt-1.5 flex flex-wrap gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {entry.email && (
+                        <a
+                          href={`mailto:${entry.email}`}
+                          className="inline-flex items-center gap-1 rounded-sm border border-border bg-canvas px-1.5 py-0.5 text-[11px] font-medium text-ink-700 hover:text-brand focus-ring"
+                          aria-label={`Napsat email ${entry.display_name}`}
+                        >
+                          <span aria-hidden>✉</span>
+                          Email
+                        </a>
+                      )}
+                      {waHref && (
+                        <a
+                          href={waHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-sm border border-border bg-canvas px-1.5 py-0.5 text-[11px] font-medium text-ink-700 hover:text-brand focus-ring"
+                          aria-label={`WhatsApp ${entry.display_name}`}
+                        >
+                          <span aria-hidden>💬</span>
+                          WhatsApp
+                        </a>
+                      )}
+                      <a
+                        href={`/u/${entry.user_slug}`}
+                        className="inline-flex items-center gap-1 rounded-sm border border-border bg-canvas px-1.5 py-0.5 text-[11px] font-medium text-ink-700 hover:text-brand focus-ring"
+                      >
+                        Profil →
+                      </a>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

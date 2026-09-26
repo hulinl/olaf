@@ -9,6 +9,11 @@ export interface RacePlanByEntry {
   display_name: string;
   status: RacePlanStatus;
   note: string;
+  // Kontakty — empty string pokud user má vypnutý profile_show_email /
+  // _show_phone toggle. Frontend jen renderuje mailto:/wa.me když je
+  // hodnota vyplněná.
+  email: string;
+  phone: string;
   workspaces: { slug: string; name: string }[];
 }
 
