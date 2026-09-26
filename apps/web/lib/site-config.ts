@@ -245,5 +245,6 @@ export const BLOG_CATEGORIES: BlogCategory[] = [
 // neprodávám.
 export const PUBLIC_NAV = [
   { href: "/", label: "Úvod" },
+  { href: "/kalendar", label: "Kalendář závodů" },
   { href: "/manual", label: "Návody" },
 ] as const;

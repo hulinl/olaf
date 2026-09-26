@@ -295,6 +295,58 @@ export default function Home() {
           </a>
         </section>
 
+        {/* KALENDÁŘ CTA — samostatná sekce po hero. Vede na veřejný
+            /kalendar (ne OLAF-hosted, ale celá kalendáře ultra závodů).
+            Signalizuje že OLAF není jen platforma pro pořadatele, ale
+            i public discovery layer pro outdoor scénu. */}
+        <Reveal>
+          <section className="border-t border-border bg-ink-900 text-canvas">
+            <div
+              aria-hidden
+              className="pointer-events-none relative overflow-hidden"
+            >
+              <div
+                aria-hidden
+                className="absolute inset-0 topo-bg-amber opacity-35"
+              />
+            </div>
+            <div className="relative mx-auto max-w-6xl px-4 py-14 sm:py-16">
+              <div className="grid items-center gap-8 sm:grid-cols-[1fr_auto]">
+                <div>
+                  <p className="mono-tag text-brand">Novinka</p>
+                  <h2
+                    className="mt-3 font-semibold text-canvas"
+                    style={{
+                      fontSize: "clamp(24px, 3vw, 36px)",
+                      letterSpacing: "-0.02em",
+                      lineHeight: 1.15,
+                    }}
+                  >
+                    Kalendář ultra závodů —{" "}
+                    <span className="text-amber-glow">
+                      nakoukni bez registrace
+                    </span>
+                    .
+                  </h2>
+                  <p className="mt-4 max-w-xl text-base leading-relaxed text-canvas/75">
+                    Top ultramaratony a horské závody napříč Evropou i světem.
+                    Klasiky, UTMB World Series, WTM. Přihlášeným zvládne
+                    hvězdička držet vlastní bucket-list.
+                  </p>
+                </div>
+                <div>
+                  <Link
+                    href="/kalendar"
+                    className="inline-flex h-12 items-center justify-center rounded-sm bg-brand px-7 text-base font-semibold text-brand-ink transition-colors hover:bg-brand-hover btn-brand-glow"
+                  >
+                    Otevřít kalendář →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </section>
+        </Reveal>
+
         {/* JAK TO FUNGUJE — 3-step horizontal timeline pod hero. Dává
             narrative flow před feature tour, uživatel vidí „takhle to
             celé chodí" než rozklikne detail per feature. */}
