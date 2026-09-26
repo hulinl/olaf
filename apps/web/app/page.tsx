@@ -138,9 +138,7 @@ export default function Home() {
                   className="mb-6 inline-flex items-center gap-2"
                 >
                   <span aria-hidden className="inline-block h-2 w-2 bg-brand" />
-                  <span className="mono-tag text-ink-700">
-                    Live · Pro outdoor party a sport komunity
-                  </span>
+                  <span className="mono-tag text-ink-700">Pro každou partu</span>
                 </div>
 
                 {/* H1 display — clamp() sizing per OA */}
@@ -191,9 +189,9 @@ export default function Home() {
                   className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2"
                 >
                   {[
-                    "Zdarma, bez karty",
+                    "Zdarma",
                     "Bez limitů členů",
-                    "PWA na mobilu",
+                    "Funguje i na mobilu",
                   ].map((label) => (
                     <li
                       key={label}

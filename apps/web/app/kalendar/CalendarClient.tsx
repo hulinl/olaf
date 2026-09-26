@@ -39,17 +39,85 @@ const STATUS_CYCLE: RacePlanStatus[] = [
 type SortKey = "date" | "distance" | "elevation" | "steep" | "name";
 type SortDir = "asc" | "desc";
 
-const REGION_FILTERS: { value: RaceRegion; label: string; color: string }[] = [
-  { value: "CZ", label: "Česko", color: "#c8102e" },
-  { value: "SK", label: "Slovensko", color: "#1f8a4c" },
-  { value: "PL", label: "Polsko", color: "#7b3fa6" },
-  { value: "ALP", label: "Alpy", color: "#1d5fbf" },
-  { value: "IBE", label: "Ibérie", color: "#e0671b" },
-  { value: "BAL", label: "Balkán", color: "#8a5a2b" },
-  { value: "SEV", label: "Sever", color: "#0a5f8a" },
-  { value: "OST", label: "Ostrovy", color: "#e8b100" },
-  { value: "SVET", label: "Svět", color: "#15231d" },
+// Emoji flags / ikony per region — rychlý vizuální scan bez potřeby
+// vysvětlovat co znamená jaká barva. Single-country regiony dostávají
+// skutečné vlajky, multi-country regiony dostávají tematickou ikonu.
+const REGION_FILTERS: {
+  value: RaceRegion;
+  label: string;
+  emoji: string;
+}[] = [
+  { value: "CZ", label: "Česko", emoji: "🇨🇿" },
+  { value: "SK", label: "Slovensko", emoji: "🇸🇰" },
+  { value: "PL", label: "Polsko", emoji: "🇵🇱" },
+  { value: "ALP", label: "Alpy", emoji: "🏔️" },
+  { value: "IBE", label: "Ibérie", emoji: "🇪🇸" },
+  { value: "BAL", label: "Balkán", emoji: "⛰️" },
+  { value: "SEV", label: "Sever", emoji: "❄️" },
+  { value: "OST", label: "Ostrovy", emoji: "🏝️" },
+  { value: "SVET", label: "Svět", emoji: "🌍" },
 ];
+
+/**
+ * Extract country flag emoji z country stringu. Pro multi-country
+ * závody (např. „Francie / Itálie / Švýcarsko") vrací emoji z region.
+ */
+function countryFlag(country: string, region: string): string {
+  const c = country.toLowerCase();
+  // Order matters — check specific matches first.
+  if (c.includes("česk")) return "🇨🇿";
+  if (c.includes("slovensko") || c.includes("slovak")) return "🇸🇰";
+  if (c.includes("polsk") || c.includes("poland")) return "🇵🇱";
+  // Multi-country races — fallback to region emoji.
+  if (country.includes("/")) {
+    return REGION_FILTERS.find((r) => r.value === region)?.emoji || "🌍";
+  }
+  if (c.includes("franc")) return "🇫🇷";
+  if (c.includes("itáli") || c.includes("italy")) return "🇮🇹";
+  if (c.includes("švýc") || c.includes("switzerland")) return "🇨🇭";
+  if (c.includes("rakousk") || c.includes("austria")) return "🇦🇹";
+  if (c.includes("němec") || c.includes("germany")) return "🇩🇪";
+  if (c.includes("španěl") || c.includes("spain")) return "🇪🇸";
+  if (c.includes("portug")) return "🇵🇹";
+  if (c.includes("andorr")) return "🇦🇩";
+  if (c.includes("slovin") || c.includes("slovenia")) return "🇸🇮";
+  if (c.includes("chorvat") || c.includes("croatia")) return "🇭🇷";
+  if (c.includes("bulhar") || c.includes("bulgaria")) return "🇧🇬";
+  if (c.includes("rumun") || c.includes("romania")) return "🇷🇴";
+  if (c.includes("řeck") || c.includes("greece")) return "🇬🇷";
+  if (c.includes("turec") || c.includes("turkey")) return "🇹🇷";
+  if (c.includes("norsk") || c.includes("norway")) return "🇳🇴";
+  if (c.includes("švéd") || c.includes("sweden")) return "🇸🇪";
+  if (c.includes("finsk") || c.includes("finland")) return "🇫🇮";
+  if (c.includes("dánsk") || c.includes("denmark")) return "🇩🇰";
+  if (c.includes("británi") || c.includes("britain") || c.includes("uk"))
+    return "🇬🇧";
+  if (c.includes("irsk") || c.includes("ireland")) return "🇮🇪";
+  if (c.includes("island") || c.includes("iceland")) return "🇮🇸";
+  if (c.includes("réunion") || c.includes("reunion")) return "🇫🇷";
+  if (c.includes("madeira")) return "🇵🇹";
+  if (c.includes("kanár") || c.includes("canar")) return "🇪🇸";
+  if (c.includes("azor")) return "🇵🇹";
+  if (c.includes("balearic") || c.includes("mallorca")) return "🇪🇸";
+  if (c.includes("korsika") || c.includes("corsica")) return "🇫🇷";
+  if (c.includes("usa") || c.includes("united states")) return "🇺🇸";
+  if (c.includes("kanad") || c.includes("canada")) return "🇨🇦";
+  if (c.includes("japon")) return "🇯🇵";
+  if (c.includes("hongkong") || c.includes("hong kong")) return "🇭🇰";
+  if (c.includes("čín") || c.includes("china")) return "🇨🇳";
+  if (c.includes("austrál") || c.includes("australia")) return "🇦🇺";
+  if (c.includes("nový zéland") || c.includes("new zealand")) return "🇳🇿";
+  if (c.includes("nepál")) return "🇳🇵";
+  if (c.includes("argentin")) return "🇦🇷";
+  if (c.includes("chile")) return "🇨🇱";
+  if (c.includes("bolivi")) return "🇧🇴";
+  if (c.includes("mexic")) return "🇲🇽";
+  if (c.includes("brazíl") || c.includes("brazil")) return "🇧🇷";
+  if (c.includes("afric") || c.includes("jižní afrik")) return "🇿🇦";
+  if (c.includes("maroko") || c.includes("morocco")) return "🇲🇦";
+  // Fallback — region ikonu
+  return REGION_FILTERS.find((r) => r.value === region)?.emoji || "🌍";
+}
 
 const LENGTH_PRESETS = [
   { label: "40+", min: 40, max: undefined },
@@ -93,6 +161,31 @@ const REG_LABEL: Record<Race["registration_status"], string> = {
   unknown: "TBA / NEJASNÉ",
 };
 
+/**
+ * Detekce contradictions mezi registration_status a detail textem.
+ * Zdrojová data jsou často nespolehlivá — např. status=sold_out ale
+ * detail říká „registrace se otevře v prosinci". User request: raději
+ * nic nezobrazovat, když si nejsme jistí, ať člověk najde na webu.
+ *
+ * Vrací true když detail popírá deklarovaný status.
+ */
+function isStatusContradicted(race: Race): boolean {
+  const detail = (race.registration_detail || "").toLowerCase();
+  if (!detail) return false;
+  const status = race.registration_status;
+
+  // Contradictions per status: detail obsahuje slova, která popírají
+  // daný stav (např. "otevře" popírá "vyprodáno").
+  const patterns: Partial<Record<Race["registration_status"], RegExp>> = {
+    sold_out: /otevř[eí]|start\s+(registrac|přihláš)|od\s+\d/,
+    closed: /obvykle|otevř[eí]|volně|přihláš|los\b|loterie/,
+    open: /vyprodán|sold\s?out|los\b|loterie|waitlist|kvalifik/,
+    qualifier: /obvykle|otevř[eí]|volně$/,
+  };
+  const pat = patterns[status];
+  return pat ? pat.test(detail) : false;
+}
+
 const SERIES_TAG_CLASS: Record<Race["series"], string> = {
   utmb: "uk-tag uk-tag-utmb",
   wtm: "uk-tag uk-tag-wtm",
@@ -103,10 +196,6 @@ const SERIES_TAG_CLASS: Record<Race["series"], string> = {
 
 const REGION_LABEL_BY_CODE: Record<string, string> = REGION_FILTERS.reduce(
   (acc, r) => ({ ...acc, [r.value]: r.label }),
-  {},
-);
-const REGION_COLOR_BY_CODE: Record<string, string> = REGION_FILTERS.reduce(
-  (acc, r) => ({ ...acc, [r.value]: r.color }),
   {},
 );
 
@@ -216,6 +305,18 @@ export function CalendarClient() {
     () => Math.max(...items.map((r) => r.elevation_per_km ?? 0), 110),
     [items],
   );
+
+  // Date bounds z aktuálně načtených závodů — min pro `from` input,
+  // max pro `to` input. Zaručuje, že picker neposílá uživatele do
+  // historie nebo daleko do budoucnosti kde nic není.
+  const dateBounds = useMemo(() => {
+    if (items.length === 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      return { min: today, max: today };
+    }
+    const dates = items.map((r) => r.date_start).sort();
+    return { min: dates[0], max: dates[dates.length - 1] };
+  }, [items]);
 
   const stats = useMemo(
     () => ({
@@ -538,7 +639,8 @@ export function CalendarClient() {
               )}
             </div>
 
-            {/* Date range — nahrazuje month + year chips */}
+            {/* Date range — od nejdřívějšího po nejpozdější závod v datech.
+                min/max prevent user hledat v historii která tam není. */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="uk-lbl">Období</span>
               <label className="flex items-center gap-1.5 text-[13.5px] text-ink-500">
@@ -546,6 +648,8 @@ export function CalendarClient() {
                 <input
                   type="date"
                   value={filters.from ?? ""}
+                  min={dateBounds.min}
+                  max={dateBounds.max}
                   onChange={(e) => setFilter({ from: e.target.value || undefined })}
                   className="rounded-md border border-border bg-canvas px-2 py-1.5 text-sm text-ink-900 focus-ring"
                 />
@@ -555,6 +659,8 @@ export function CalendarClient() {
                 <input
                   type="date"
                   value={filters.to ?? ""}
+                  min={filters.from || dateBounds.min}
+                  max={dateBounds.max}
                   onChange={(e) => setFilter({ to: e.target.value || undefined })}
                   className="rounded-md border border-border bg-canvas px-2 py-1.5 text-sm text-ink-900 focus-ring"
                 />
@@ -583,11 +689,9 @@ export function CalendarClient() {
                     })
                   }
                 >
-                  <span
-                    className="uk-mk"
-                    style={{ ["--c" as string]: r.color }}
-                    aria-hidden
-                  />
+                  <span aria-hidden className="text-[14px] leading-none">
+                    {r.emoji}
+                  </span>
                   {r.label}
                 </button>
               ))}
@@ -914,6 +1018,60 @@ function ChipRow({
  * volbami + „Odebrat z plánu". Click-outside a Esc zavírá.
  * Compact varianta pro desktop table cell (kde je málo místa).
  */
+/**
+ * Status picker menu — produkčně-grade dropdown s ikonami, subtile
+ * animací, per-status barvou, hover states, description.
+ */
+
+// Ikonografie per status — outline SVG, nesli je konzistentní s
+// PWA / notification bell iconou stylem.
+const STATUS_ICON: Record<RacePlanStatus, React.ReactNode> = {
+  interested: (
+    <svg aria-hidden viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 3.5v5.5l3.5 2" />
+      <circle cx="10" cy="10" r="7" />
+    </svg>
+  ),
+  waiting_registration: (
+    <svg aria-hidden viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 3h6l-.5 4.5L10 10l-2.5-2.5L7 3z" />
+      <path d="M7 17h6l-.5-4.5L10 10l-2.5 2.5L7 17z" />
+    </svg>
+  ),
+  registered: (
+    <svg aria-hidden viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 10l4 4 8-8" />
+    </svg>
+  ),
+  waitlist: (
+    <svg aria-hidden viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h12M4 10h12M4 14h8" />
+    </svg>
+  ),
+  completed: (
+    <svg aria-hidden viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 10l3 3 5-6" />
+      <circle cx="10" cy="10" r="7.5" />
+    </svg>
+  ),
+};
+
+const STATUS_DESC: Record<RacePlanStatus, string> = {
+  interested: "Sleduju, možná se přihlásím",
+  waiting_registration: "Čekám až se otevřou přihlášky",
+  registered: "Přihlášku mám potvrzenou",
+  waitlist: "Jsem na waitlistu, čekám",
+  completed: "Odběhnuto, hotovo",
+};
+
+const STATUS_DOT_COLOR: Record<RacePlanStatus, string> = {
+  interested: "var(--ink-300)",
+  waiting_registration: "var(--warning)",
+  registered: "var(--success)",
+  waitlist: "var(--brand)",
+  completed: "var(--ink-900)",
+};
+
 function StatusPickerMenu({
   current,
   onChoose,
@@ -963,68 +1121,98 @@ function StatusPickerMenu({
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={`Můj status: ${PLAN_STATUS_LABEL[current]}. Klikni pro změnu.`}
-        className={`inline-flex items-center gap-1 rounded-sm font-semibold uppercase tracking-wider transition-opacity hover:opacity-80 focus-ring ${
+        className={`inline-flex items-center gap-1.5 rounded-sm font-semibold uppercase tracking-wider transition-all hover:brightness-95 focus-ring ${
           compact
             ? "px-1.5 py-0.5 text-[9px]"
-            : "px-2 py-0.5 text-[11px]"
+            : "px-2.5 py-1 text-[11px]"
         } ${PLAN_STATUS_TONE[current]}`}
       >
+        <span aria-hidden className={compact ? "hidden" : "inline-flex"}>
+          {STATUS_ICON[current]}
+        </span>
         {PLAN_STATUS_LABEL[current]}
-        <span aria-hidden className="text-[8px]">
+        <span aria-hidden className={compact ? "text-[8px]" : "text-[10px] opacity-70"}>
           ▾
         </span>
       </button>
       {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-md border border-border bg-canvas shadow-lg"
-        >
-          {options.map((s) => (
-            <button
-              key={s}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onChoose(s);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors hover:bg-surface-muted ${
-                s === current ? "bg-surface-muted" : ""
-              }`}
-            >
-              <span
-                aria-hidden
-                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-                  PLAN_STATUS_TONE[s].split(" ")[0]
-                }`}
-                style={{
-                  background:
-                    s === "interested"
-                      ? "var(--ink-300)"
-                      : s === "waiting_registration"
-                        ? "var(--warning)"
-                        : s === "registered"
-                          ? "var(--success)"
-                          : s === "waitlist"
-                            ? "var(--brand)"
-                            : "var(--ink-900)",
-                }}
-              />
-              <span
-                className={
-                  s === current ? "font-semibold text-ink-900" : "text-ink-700"
-                }
-              >
-                {PLAN_STATUS_LABEL[s]}
-              </span>
-              {s === current && (
-                <span aria-hidden className="ml-auto text-xs text-brand">
-                  ✓
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <>
+          {/* Slight fade-in via keyframe */}
+          <div
+            role="menu"
+            className="absolute right-0 top-full z-30 mt-1.5 w-64 origin-top-right overflow-hidden rounded-lg border border-border bg-canvas shadow-xl"
+            style={{
+              animation: "menuOpen 150ms cubic-bezier(0.16, 1, 0.3, 1)",
+              boxShadow:
+                "0 20px 40px -12px rgba(0,0,0,0.18), 0 8px 16px -8px rgba(0,0,0,0.08)",
+            }}
+          >
+            <div className="border-b border-border bg-surface-muted/60 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+                Nastavit status
+              </p>
+            </div>
+            <div className="py-1">
+              {options.map((s) => {
+                const active = s === current;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onChoose(s);
+                      setOpen(false);
+                    }}
+                    className={`group flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors ${
+                      active
+                        ? "bg-brand/5"
+                        : "hover:bg-surface-muted"
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                      style={{
+                        background: STATUS_DOT_COLOR[s],
+                        color:
+                          s === "interested" || s === "waitlist"
+                            ? "var(--ink-900)"
+                            : "#ffffff",
+                      }}
+                    >
+                      {STATUS_ICON[s]}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[13.5px] leading-tight ${
+                            active
+                              ? "font-semibold text-ink-900"
+                              : "font-medium text-ink-900"
+                          }`}
+                        >
+                          {PLAN_STATUS_LABEL[s]}
+                        </span>
+                        {active && (
+                          <span
+                            aria-hidden
+                            className="ml-auto text-[15px] leading-none text-brand"
+                          >
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-[12px] leading-tight text-ink-500">
+                        {STATUS_DESC[s]}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1136,7 +1324,7 @@ function DesktopRaceRow({
 }) {
   const steep = race.elevation_per_km ?? 0;
   const steepPct = maxSteep > 0 ? Math.min(100, (steep / maxSteep) * 100) : 0;
-  const regionColor = REGION_COLOR_BY_CODE[race.region] || "#15231d";
+  const flag = countryFlag(race.country || "", race.region);
   const regionLabel = REGION_LABEL_BY_CODE[race.region] || "";
   const regCode = REG_CODE[race.registration_status];
   return (
@@ -1144,11 +1332,13 @@ function DesktopRaceRow({
       <td className="uk-c-name">
         <div className="uk-name">
           <span
-            className="uk-mk"
-            style={{ ["--c" as string]: regionColor }}
-            title={regionLabel}
             aria-hidden
-          />
+            title={regionLabel}
+            className="text-lg leading-none"
+            style={{ marginRight: 4 }}
+          >
+            {flag}
+          </span>
           {race.url ? (
             <a href={race.url} target="_blank" rel="noreferrer">
               {race.name}
@@ -1180,11 +1370,41 @@ function DesktopRaceRow({
         <div className="uk-d26">{race.next_year}</div>
       </td>
       <td className="uk-entry">
-        <span className={`uk-rg uk-rg-${regCode}`}>
-          {REG_LABEL[race.registration_status]}
-        </span>
-        {race.registration_detail && (
-          <div className="mt-1 leading-snug">{race.registration_detail}</div>
+        {isStatusContradicted(race) ? (
+          // Data inconsistent (status vs. detail). Nezobrazujeme
+          // status pill — spíš pošli usera na web, ať si to ověří sám.
+          <>
+            {race.url ? (
+              <a
+                href={race.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
+              >
+                Ověř na webu →
+              </a>
+            ) : (
+              <span className="text-[12px] text-ink-500">
+                Info na webu závodu
+              </span>
+            )}
+            {race.registration_detail && (
+              <div className="mt-1 leading-snug text-ink-500">
+                {race.registration_detail}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <span className={`uk-rg uk-rg-${regCode}`}>
+              {REG_LABEL[race.registration_status]}
+            </span>
+            {race.registration_detail && (
+              <div className="mt-1 leading-snug">
+                {race.registration_detail}
+              </div>
+            )}
+          </>
         )}
       </td>
       <td className="uk-dist">
@@ -1259,7 +1479,7 @@ function MobileRaceCard({
 }) {
   const steep = race.elevation_per_km ?? 0;
   const steepPct = maxSteep > 0 ? Math.min(100, (steep / maxSteep) * 100) : 0;
-  const regionColor = REGION_COLOR_BY_CODE[race.region] || "#15231d";
+  const flag = countryFlag(race.country || "", race.region);
   const regionLabel = REGION_LABEL_BY_CODE[race.region] || "";
   const regCode = REG_CODE[race.registration_status];
   // Border tint per plan_status — subtle visual scan hint. Bez statusu
@@ -1292,15 +1512,16 @@ function MobileRaceCard({
         {race.is_favorite ? "★" : "☆"}
       </button>
 
-      {/* Header — region marker + name + TOP badge */}
+      {/* Header — flag emoji + name + TOP badge */}
       <div className="pr-12">
         <div className="flex items-start gap-2">
           <span
-            className="uk-mk uk-big shrink-0"
-            style={{ ["--c" as string]: regionColor }}
-            title={regionLabel}
             aria-hidden
-          />
+            title={regionLabel}
+            className="shrink-0 text-2xl leading-none"
+          >
+            {flag}
+          </span>
           <div className="min-w-0 flex-1">
             {race.url ? (
               <a
@@ -1398,11 +1619,30 @@ function MobileRaceCard({
         </p>
       )}
 
-      {/* Registration pill + detail + series + user's plan status */}
+      {/* Registration pill + series + user's plan status. Když je
+          status v konfliktu s detailem, nechceme lidi mást → skip
+          registration pill, ukaž jen link na web. */}
       <div className="mt-3 flex flex-wrap items-start gap-2">
-        <span className={`uk-rg uk-rg-${regCode}`}>
-          {REG_LABEL[race.registration_status]}
-        </span>
+        {isStatusContradicted(race) ? (
+          race.url ? (
+            <a
+              href={race.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-sm border border-brand bg-brand-soft/40 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-900 hover:bg-brand-soft focus-ring"
+            >
+              Ověř na webu ↗
+            </a>
+          ) : (
+            <span className="inline-flex items-center rounded-sm border border-border bg-surface-muted px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-ink-500">
+              Info na webu
+            </span>
+          )
+        ) : (
+          <span className={`uk-rg uk-rg-${regCode}`}>
+            {REG_LABEL[race.registration_status]}
+          </span>
+        )}
         <span className={SERIES_TAG_CLASS[race.series]}>
           {seriesLabel(race.series)}
         </span>
@@ -1413,7 +1653,7 @@ function MobileRaceCard({
           />
         )}
       </div>
-      {race.registration_detail && (
+      {race.registration_detail && !isStatusContradicted(race) && (
         <p className="mt-2 text-[12.5px] leading-snug text-ink-500">
           {race.registration_detail}
         </p>

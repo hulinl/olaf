@@ -312,6 +312,18 @@ select:not([multiple]):not([size]) {
   filter: drop-shadow(0 20px 30px rgb(255 199 25 / 0.15));
 }
 
+/* Menu / popover open animace — subtle fade + scale from origin. */
+@keyframes menuOpen {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Ambient blobs za hero copyem — dva drift patterny s odlišnou
  * fází, aby to nevypadalo synchronně. */
 @keyframes drift-a {

@@ -11,6 +11,7 @@ import { Logo } from "@/components/ui/logo";
 import { ApiError, type UserPublicProfile, auth } from "@/lib/api";
 
 import { RacePlanSection } from "./RacePlanSection";
+import { ShareProfileCard } from "./ShareProfileCard";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -30,8 +31,17 @@ export default function PublicProfilePage({ params }: Props) {
   const { slug } = use(params);
   const router = useRouter();
   const [profile, setProfile] = useState<UserPublicProfile | null>(null);
+  const [me, setMe] = useState<{ profile_slug?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    // Auth me — pro určení „is this MY profile?" → show share affordance
+    auth
+      .me()
+      .then((u) => setMe({ profile_slug: u.profile_slug }))
+      .catch(() => setMe(null));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +110,10 @@ export default function PublicProfilePage({ params }: Props) {
     !!profile.address_city ||
     !!profile.address_zip;
 
+  const isOwnProfile = !!(
+    me?.profile_slug && me.profile_slug === profile.profile_slug
+  );
+
   return (
     <div className="min-h-screen bg-canvas text-ink-900">
       {/* Minimální top nav — page je AllowAny, může sem přijít
@@ -135,6 +149,10 @@ export default function PublicProfilePage({ params }: Props) {
             uživatel je přihlášen na tvoji akci, takže tu vidíš i pole,
             která má schované.
           </div>
+        )}
+
+        {isOwnProfile && profile.profile_slug && (
+          <ShareProfileCard slug={profile.profile_slug} />
         )}
 
         <Card className="mt-6">

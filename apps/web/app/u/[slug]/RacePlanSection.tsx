@@ -167,15 +167,59 @@ export function RacePlanSection({ userSlug }: { userSlug: string }) {
       )}
 
       {data && data.count > 0 && (
-        <p className="mt-6 text-xs text-ink-500">
-          → Chceš si vytvořit vlastní plán?{" "}
-          <Link
-            href="/kalendar"
-            className="font-medium text-brand hover:underline"
-          >
-            Otevři kalendář závodů
-          </Link>
-        </p>
+        <div className="mt-6 rounded-md border border-border bg-surface-muted/60 p-4 sm:p-5">
+          <p className="mono-tag text-ink-500">Chceš to samé?</p>
+          <h3 className="mt-1 text-base font-semibold text-ink-900">
+            Vytvoř si vlastní race plán
+          </h3>
+          <p className="mt-1 text-sm leading-relaxed text-ink-700">
+            V kalendáři si označíš závody hvězdičkou, nastavíš status
+            (zajímá mě, přihlášen, absolvoval…) a pošleš odkaz na svůj
+            profil komukoli.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Link
+              href="/kalendar"
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink-900 px-3.5 py-2 text-sm font-semibold text-canvas transition-colors hover:brightness-110 focus-ring"
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 20 20"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10 2v6l4-4M10 8l-4-4" />
+                <rect x="3" y="8" width="14" height="10" rx="1.5" />
+              </svg>
+              Kalendář závodů
+            </Link>
+            <Link
+              href="/settings/profile"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-canvas px-3.5 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-surface-muted focus-ring"
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 20 20"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="7" r="3.5" />
+                <path d="M4 17c1-3 4-5 6-5s5 2 6 5" />
+              </svg>
+              Nastavit můj profil
+            </Link>
+          </div>
+        </div>
       )}
     </section>
   );
