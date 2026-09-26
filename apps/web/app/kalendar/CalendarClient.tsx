@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { ApiError, auth, type User } from "@/lib/api";
@@ -292,11 +292,9 @@ export function CalendarClient() {
     }
   };
 
-  /** Cyklí přes 5 statusů, updateuje backend + optimistic UI. */
-  const cycleStatus = async (race: Race) => {
-    if (!user || !race.plan_status) return;
-    const idx = STATUS_CYCLE.indexOf(race.plan_status);
-    const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+  /** Set explicit status z picker menu. */
+  const setStatus = async (race: Race, next: RacePlanStatus) => {
+    if (!user) return;
     setItems((prev) =>
       prev.map((r) =>
         r.id === race.id ? { ...r, plan_status: next } : r,
@@ -310,6 +308,19 @@ export function CalendarClient() {
           r.id === race.id ? { ...r, plan_status: race.plan_status } : r,
         ),
       );
+    }
+  };
+
+  /** Save poznámky pro race v plánu. */
+  const saveNote = async (race: Race, note: string) => {
+    if (!user) return;
+    try {
+      await races.updatePlan(race.slug, { note });
+      // Note se nedrží v items state (Race interface má jen plan_status),
+      // proto se optimisticky neupdatuje. Po refresh se v public plánu
+      // objeví. UI drží note lokálně v NoteEditor state.
+    } catch {
+      /* silently fail — UI musí ukázat error state per-component */
     }
   };
 
@@ -378,12 +389,67 @@ export function CalendarClient() {
           </div>
         </div>
 
-        {/* Filter section — collapsible on mobile */}
+        {/* Filter section — bottom sheet na mobilu (fixed overlay slide
+            up), inline card na desktopu. Prevence tělo scroll když je
+            sheet otevřený — user preference i iOS bug s viewport
+            resize při native keyboardu. */}
+        {isMobile && filtersOpen && (
+          <button
+            type="button"
+            aria-label="Zavřít filtry"
+            onClick={() => setFiltersOpen(false)}
+            className="fixed inset-0 z-40 bg-ink-900/40 backdrop-blur-sm"
+          />
+        )}
         {showFilters && (
           <section
             aria-label="Filtry"
-            className="grid gap-3 rounded-md border border-border bg-surface p-4"
+            className={
+              isMobile
+                ? "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-xl border-t border-border bg-canvas p-4 shadow-2xl"
+                : "grid gap-3 rounded-md border border-border bg-surface p-4"
+            }
           >
+            {isMobile && (
+              <>
+                {/* Grab bar handle — visual affordance na swipeable
+                    bottom sheet vypadá */}
+                <div
+                  aria-hidden
+                  className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong"
+                />
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-ink-900">
+                    Filtry
+                    {activeFilterCount > 0 && (
+                      <span className="ml-1.5 text-brand">
+                        ({activeFilterCount})
+                      </span>
+                    )}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen(false)}
+                    aria-label="Zavřít"
+                    className="rounded-md p-1 text-ink-500 hover:bg-surface-muted"
+                  >
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 20 20"
+                      width="20"
+                      height="20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <path d="M4 4l12 12M16 4L4 16" />
+                    </svg>
+                  </button>
+                </div>
+              </>
+            )}
+            <div className={isMobile ? "grid gap-3" : "contents"}>
             {/* Row: sport + view mode toggles */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="uk-mode" role="group" aria-label="Sport">
@@ -549,8 +615,9 @@ export function CalendarClient() {
               })}
             </ChipRow>
 
+            </div>
             {isMobile && (
-              <div className="flex items-center justify-between border-t border-border pt-3">
+              <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 flex items-center justify-between border-t border-border bg-canvas px-4 py-3">
                 <button
                   type="button"
                   onClick={clearFilters}
@@ -561,9 +628,9 @@ export function CalendarClient() {
                 <button
                   type="button"
                   onClick={() => setFiltersOpen(false)}
-                  className="rounded-md bg-ink-900 px-4 py-2 text-sm font-semibold text-canvas focus-ring"
+                  className="rounded-md bg-ink-900 px-5 py-2.5 text-sm font-semibold text-canvas focus-ring"
                 >
-                  Zavřít
+                  Zobrazit {sorted.length} závodů
                 </button>
               </div>
             )}
@@ -700,7 +767,8 @@ export function CalendarClient() {
                 key={r.id}
                 race={r}
                 onFavorite={() => toggleFavorite(r)}
-                onCycleStatus={() => cycleStatus(r)}
+                onSetStatus={(s) => setStatus(r, s)}
+                onSaveNote={(note) => saveNote(r, note)}
                 maxSteep={maxSteep}
               />
             ))}
@@ -757,7 +825,7 @@ export function CalendarClient() {
                     key={r.id}
                     race={r}
                     onFavorite={() => toggleFavorite(r)}
-                    onCycleStatus={() => cycleStatus(r)}
+                    onSetStatus={(s) => setStatus(r, s)}
                     maxSteep={maxSteep}
                   />
                 ))}
@@ -795,6 +863,127 @@ function ChipRow({
     <div className="flex flex-wrap items-center gap-2">
       <span className="uk-lbl">{label}</span>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Status picker menu — klik na status pill otevře popover s 5 status
+ * volbami + „Odebrat z plánu". Click-outside a Esc zavírá.
+ * Compact varianta pro desktop table cell (kde je málo místa).
+ */
+function StatusPickerMenu({
+  current,
+  onChoose,
+  compact,
+}: {
+  current: RacePlanStatus;
+  onChoose: (s: RacePlanStatus) => void;
+  compact?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  const options: RacePlanStatus[] = [
+    "interested",
+    "waiting_registration",
+    "registered",
+    "waitlist",
+    "completed",
+  ];
+
+  return (
+    <div ref={wrapperRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Můj status: ${PLAN_STATUS_LABEL[current]}. Klikni pro změnu.`}
+        className={`inline-flex items-center gap-1 rounded-sm font-semibold uppercase tracking-wider transition-opacity hover:opacity-80 focus-ring ${
+          compact
+            ? "px-1.5 py-0.5 text-[9px]"
+            : "px-2 py-0.5 text-[11px]"
+        } ${PLAN_STATUS_TONE[current]}`}
+      >
+        {PLAN_STATUS_LABEL[current]}
+        <span aria-hidden className="text-[8px]">
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-md border border-border bg-canvas shadow-lg"
+        >
+          {options.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onChoose(s);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors hover:bg-surface-muted ${
+                s === current ? "bg-surface-muted" : ""
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                  PLAN_STATUS_TONE[s].split(" ")[0]
+                }`}
+                style={{
+                  background:
+                    s === "interested"
+                      ? "var(--ink-300)"
+                      : s === "waiting_registration"
+                        ? "var(--warning)"
+                        : s === "registered"
+                          ? "var(--success)"
+                          : s === "waitlist"
+                            ? "var(--brand)"
+                            : "var(--ink-900)",
+                }}
+              />
+              <span
+                className={
+                  s === current ? "font-semibold text-ink-900" : "text-ink-700"
+                }
+              >
+                {PLAN_STATUS_LABEL[s]}
+              </span>
+              {s === current && (
+                <span aria-hidden className="ml-auto text-xs text-brand">
+                  ✓
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -895,12 +1084,12 @@ function ThSortable({
 function DesktopRaceRow({
   race,
   onFavorite,
-  onCycleStatus,
+  onSetStatus,
   maxSteep,
 }: {
   race: Race;
   onFavorite: () => void;
-  onCycleStatus: () => void;
+  onSetStatus: (s: RacePlanStatus) => void;
   maxSteep: number;
 }) {
   const steep = race.elevation_per_km ?? 0;
@@ -996,15 +1185,11 @@ function DesktopRaceRow({
             ★
           </button>
           {race.plan_status && (
-            <button
-              type="button"
-              onClick={onCycleStatus}
-              aria-label={`Status: ${PLAN_STATUS_LABEL[race.plan_status]}. Klikni pro změnu.`}
-              className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider transition-opacity hover:opacity-80 focus-ring ${PLAN_STATUS_TONE[race.plan_status]}`}
-              title="Klikni pro další status"
-            >
-              {PLAN_STATUS_LABEL[race.plan_status]}
-            </button>
+            <StatusPickerMenu
+              current={race.plan_status}
+              onChoose={onSetStatus}
+              compact
+            />
           )}
         </div>
       </td>
@@ -1020,12 +1205,14 @@ function DesktopRaceRow({
 function MobileRaceCard({
   race,
   onFavorite,
-  onCycleStatus,
+  onSetStatus,
+  onSaveNote,
   maxSteep,
 }: {
   race: Race;
   onFavorite: () => void;
-  onCycleStatus: () => void;
+  onSetStatus: (s: RacePlanStatus) => void;
+  onSaveNote: (note: string) => Promise<void>;
   maxSteep: number;
 }) {
   const steep = race.elevation_per_km ?? 0;
@@ -1159,14 +1346,10 @@ function MobileRaceCard({
           {seriesLabel(race.series)}
         </span>
         {race.plan_status && (
-          <button
-            type="button"
-            onClick={onCycleStatus}
-            aria-label={`Můj status: ${PLAN_STATUS_LABEL[race.plan_status]}. Klikni pro změnu.`}
-            className={`inline-flex items-center rounded-sm px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider transition-opacity hover:opacity-80 focus-ring ${PLAN_STATUS_TONE[race.plan_status]}`}
-          >
-            {PLAN_STATUS_LABEL[race.plan_status]}
-          </button>
+          <StatusPickerMenu
+            current={race.plan_status}
+            onChoose={onSetStatus}
+          />
         )}
       </div>
       {race.registration_detail && (
@@ -1174,7 +1357,87 @@ function MobileRaceCard({
           {race.registration_detail}
         </p>
       )}
+      {race.plan_status && (
+        <NoteEditor onSave={onSaveNote} />
+      )}
     </article>
+  );
+}
+
+/**
+ * Inline note editor pro race v plánu — collapsed default, click
+ * na „+ Poznámka" ho rozevře jako textarea s tlačítky Uložit / Zrušit.
+ * Local state — reload stránky note znovu načte z backendu (v mine/
+ * a public profile endpointech).
+ */
+function NoteEditor({
+  onSave,
+}: {
+  onSave: (note: string) => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const commit = async () => {
+    setSaving(true);
+    try {
+      await onSave(value.trim());
+      setExpanded(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="mt-2 text-[12px] font-medium text-brand hover:underline"
+      >
+        + Poznámka
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-sm border border-border bg-surface-muted p-2">
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Např. jedu s Martou, letenka koupená…"
+        rows={2}
+        maxLength={280}
+        className="w-full resize-none bg-transparent text-[13px] text-ink-900 placeholder:text-ink-500 focus:outline-none"
+      />
+      <div className="mt-1 flex items-center justify-between">
+        <span className="text-[11px] text-ink-500">
+          {value.length}/280
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setExpanded(false);
+              setValue("");
+            }}
+            className="text-[12px] text-ink-500 hover:text-ink-900"
+            disabled={saving}
+          >
+            Zrušit
+          </button>
+          <button
+            type="button"
+            onClick={commit}
+            disabled={saving}
+            className="rounded-sm bg-ink-900 px-3 py-1 text-[12px] font-semibold text-canvas disabled:opacity-50"
+          >
+            {saving ? "…" : "Uložit"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
