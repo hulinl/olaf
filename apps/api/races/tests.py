@@ -26,6 +26,10 @@ def _make_race(**overrides) -> Race:
 class RaceListTests(TestCase):
     def setUp(self) -> None:
         self.client = APIClient()
+        # Migration 0003 seed dataset se aplikuje i na test DB — pro
+        # čistý sandbox v každém testu ho tady flushneme, jinak by
+        # tests_month_filter dostal 25 races místo jednoho.
+        Race.objects.all().delete()
 
     def test_defaults_hide_past_and_invisible(self) -> None:
         past = _make_race(name="Old", date_start=date.today() - timedelta(days=10))
@@ -102,6 +106,7 @@ class RaceListTests(TestCase):
 class RaceFavoriteToggleTests(TestCase):
     def setUp(self) -> None:
         self.client = APIClient()
+        Race.objects.all().delete()
         self.user = User.objects.create_user(
             email="u@example.com",
             password="pass-abcdef-1234",

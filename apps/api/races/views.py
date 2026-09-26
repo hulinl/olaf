@@ -36,6 +36,11 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
     if request.query_params.get("past") != "1":
         qs = qs.filter(date_start__gte=date.today())
 
+    year = request.query_params.get("year")
+    if year and year.isdigit():
+        y_int = int(year)
+        qs = qs.filter(date_start__year=y_int)
+
     month = request.query_params.get("month")
     if month:
         # Formát YYYY-MM. Interpretujeme jako datum ve tvaru YYYY-MM-01 do

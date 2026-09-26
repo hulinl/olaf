@@ -132,6 +132,9 @@
   --font-display: var(--font-geist-sans);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Barlow Condensed — display font pro Ultra kalendář stránku.
+   * Používá se přes utility `.font-condensed` (uvnitř /kalendar page). */
+  --font-condensed: var(--font-condensed);
 }
 
 /* -----------------------------------------------------------------------------
@@ -609,6 +612,14 @@ select:not([multiple]):not([size]) {
   text-transform: uppercase;
   letter-spacing: 0.16em;
   line-height: 1.4;
+}
+
+/* Barlow Condensed utility — Ultra kalendář display look. Aplikuj na
+ * H1/H2 v /kalendar page, sortable table headery, číselné stat tiles. */
+.font-condensed {
+  font-family:
+    var(--font-condensed), "Barlow Condensed", "Arial Narrow", Arial,
+    sans-serif;
 }
 
 /* Card lift on hover — border shift + shadow materialize + translateY -3px.

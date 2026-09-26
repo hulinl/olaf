@@ -75,6 +75,7 @@ export const REGISTRATION_LABEL: Record<RaceRegistrationStatus, string> = {
 
 export interface RaceFilters {
   q?: string;
+  year?: number;
   month?: string; // YYYY-MM
   country?: string;
   region?: RaceRegion;
@@ -94,6 +95,7 @@ export interface RaceListResponse {
 function buildQuery(filters: RaceFilters): string {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
+  if (filters.year) params.set("year", String(filters.year));
   if (filters.month) params.set("month", filters.month);
   if (filters.country) params.set("country", filters.country);
   if (filters.region) params.set("region", filters.region);
