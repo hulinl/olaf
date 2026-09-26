@@ -120,18 +120,67 @@ def _user_fav_status(user) -> dict[int, dict[str, str]]:
 
 
 def _my_active_workspace_ids(user) -> set[int]:
-    """Set workspace IDs, kde je user active member. Prázdný set pro
-    anonymního / vůbec-nečlena → community race sharing se vypne.
+    """Set workspace IDs, kde je user effective member — přímé
+    membershipy + parent komunity těch přímých (upstream propagation
+    přes active parent link). Prázdný set pro anon / loner.
+
+    Příklad: User je v „Beskydské výběhy" (child) a child.parent =
+    „Olaf Adventures" s parent_link_status=active. Effective set =
+    {Beskydské, Olaf}. Filter `?workspace=olaf-adventures` mu proto
+    projde, i když není přímý member Olaf.
     """
-    from workspaces.models import WorkspaceMember
+    from workspaces.models import Workspace, WorkspaceMember
 
     if not user or not user.is_authenticated:
         return set()
-    return set(
+    direct = set(
         WorkspaceMember.objects.filter(
             user=user, status=WorkspaceMember.STATUS_ACTIVE
         ).values_list("workspace_id", flat=True)
     )
+    if not direct:
+        return set()
+
+    # Transitive parents (via active parent link). Max hloubka 20 pro
+    # ochranu proti poškozeným datům s cyklem.
+    all_ws = set(direct)
+    frontier = direct
+    for _ in range(20):
+        new_parents = set(
+            Workspace.objects.filter(
+                id__in=frontier,
+                parent_community_id__isnull=False,
+                parent_link_status=Workspace.PARENT_LINK_ACTIVE,
+            ).values_list("parent_community_id", flat=True)
+        ) - all_ws
+        if not new_parents:
+            break
+        all_ws |= new_parents
+        frontier = new_parents
+    return all_ws
+
+
+def _related_workspace_ids(effective_ws: set[int]) -> set[int]:
+    """K uživatelovým effective workspaces přidá i děti (jeden hop
+    downstream). Umožňuje aby parent umbrella (Olaf Adventures) viděl
+    plány members children (Beskydské výběhy atd.).
+
+    Ne-transitive — grandchildren se nepropagují dál, abychom neměli
+    „vidí všechno pod kořenem". Two-tier hierarchie je MVP scope.
+    """
+    from workspaces.models import Workspace
+
+    if not effective_ws:
+        return set()
+    result = set(effective_ws)
+    children = set(
+        Workspace.objects.filter(
+            parent_community_id__in=effective_ws,
+            parent_link_status=Workspace.PARENT_LINK_ACTIVE,
+        ).values_list("id", flat=True)
+    )
+    result |= children
+    return result
 
 
 def _plan_by_lookup(request: Request) -> dict[int, list[dict]]:
@@ -149,13 +198,17 @@ def _plan_by_lookup(request: Request) -> dict[int, list[dict]]:
     if not my_ws_ids:
         return {}
 
+    # Downstream — přidá i children mých effective workspaces, aby parent
+    # umbrella viděl plány member of children (Olaf ⇢ Beskydské výběhy).
+    all_related_ws = _related_workspace_ids(my_ws_ids)
+
     # Slovník user_id → list of {slug, name} workspaces sdílených s user.request
     # (jenom sdílené, ne všechny userovy komunity — public race plán respektuje
     # kontext, kde se dva lidi vidí).
     shared_ws_by_user: dict[int, list[dict]] = {}
     for row in (
         WorkspaceMember.objects.filter(
-            workspace_id__in=my_ws_ids,
+            workspace_id__in=all_related_ws,
             status=WorkspaceMember.STATUS_ACTIVE,
         )
         .exclude(user=request.user)
@@ -220,8 +273,9 @@ def race_list(request: Request) -> Response:
         qs = qs.filter(favorites__user=request.user)
 
     # Community filter — ukazuj jen races, které má v plánu nějaký
-    # active member té komunity. Vyžaduje, aby requesting user byl
-    # taky member (privacy: ne-člen nesmí prozřít plány cizí komunity).
+    # effective member té komunity (direct + z active-link children).
+    # Vyžaduje, aby requesting user byl effective member té komunity
+    # (privacy: ne-člen nesmí prozřít plány cizí komunity).
     workspace_slug = request.query_params.get("workspace")
     if workspace_slug:
         if not request.user.is_authenticated:
@@ -229,18 +283,30 @@ def race_list(request: Request) -> Response:
                 {"detail": "Přihlaš se pro filtr podle komunity."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        is_member = WorkspaceMember.objects.filter(
-            user=request.user,
-            workspace__slug=workspace_slug,
-            status=WorkspaceMember.STATUS_ACTIVE,
-        ).exists()
-        if not is_member:
+        from workspaces.models import Workspace
+
+        target_ws = Workspace.objects.filter(slug=workspace_slug).first()
+        if not target_ws:
+            return Response(
+                {"detail": "Komunita nenalezena."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        my_effective = _my_active_workspace_ids(request.user)
+        if target_ws.pk not in my_effective:
             return Response(
                 {"detail": "Nejsi členem této komunity."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        # Effective members target ws = direct members + members of
+        # active-link children. Include children in the filter set.
+        ws_ids = {target_ws.pk} | set(
+            Workspace.objects.filter(
+                parent_community=target_ws,
+                parent_link_status=Workspace.PARENT_LINK_ACTIVE,
+            ).values_list("id", flat=True)
+        )
         qs = qs.filter(
-            favorites__user__workspace_memberships__workspace__slug=workspace_slug,
+            favorites__user__workspace_memberships__workspace_id__in=ws_ids,
             favorites__user__workspace_memberships__status=(
                 WorkspaceMember.STATUS_ACTIVE
             ),
@@ -268,11 +334,16 @@ def race_list(request: Request) -> Response:
             # ponecháme to fungovat pro konzistenci.
             qs = qs.filter(favorites__user=person)
         else:
+            # Shared community — respektuje parent/child propagaci.
+            # Person je effective member některé mojí effective komunity,
+            # když je direct member kterékoli z mých effective ws NEBO
+            # z jejich active-link children.
+            my_effective = _my_active_workspace_ids(request.user)
+            all_related = _related_workspace_ids(my_effective)
             shared = WorkspaceMember.objects.filter(
-                user=request.user,
+                user=person,
+                workspace_id__in=all_related,
                 status=WorkspaceMember.STATUS_ACTIVE,
-                workspace__members__user=person,
-                workspace__members__status=WorkspaceMember.STATUS_ACTIVE,
             ).exists()
             if not shared:
                 return Response(
@@ -358,10 +429,13 @@ def race_my_community_people(request: Request) -> Response:
     if not my_ws_ids:
         return Response({"people": []})
 
+    # Downstream propagation — include members of active-link children.
+    all_related_ws = _related_workspace_ids(my_ws_ids)
+
     # Distinct users z těchto workspaces, mimo mě
     person_ids = set(
         WorkspaceMember.objects.filter(
-            workspace_id__in=my_ws_ids,
+            workspace_id__in=all_related_ws,
             status=WorkspaceMember.STATUS_ACTIVE,
         )
         .exclude(user=request.user)
@@ -370,12 +444,15 @@ def race_my_community_people(request: Request) -> Response:
     if not person_ids:
         return Response({"people": []})
 
-    # Předpočítej: user_id → list sdílených workspaces {slug, name}
+    # Předpočítej: user_id → list sdílených workspaces {slug, name}.
+    # Ukazujeme workspace, kde jsou přímí member — může to být můj
+    # effective ws (přímo sdílíme) NEBO child ws mého effective ws
+    # (moje umbrella umožňuje viditelnost).
     shared_ws: dict[int, list[dict]] = {}
     for row in (
         WorkspaceMember.objects.filter(
             user_id__in=person_ids,
-            workspace_id__in=my_ws_ids,
+            workspace_id__in=all_related_ws,
             status=WorkspaceMember.STATUS_ACTIVE,
         ).values("user_id", "workspace__slug", "workspace__name")
     ):

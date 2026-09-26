@@ -633,6 +633,162 @@ class CommunityAwareRaceCalendarTests(TestCase):
         )
 
 
+class CommunityHierarchyPropagationTests(TestCase):
+    """Slice 2 vize — nested komunity propagují membership.
+
+    Když je „Beskydské výběhy" child (active link) „Olaf Adventures":
+    - Alice (přímý člen Beskydské) je effective member Olaf → filter
+      `?workspace=olaf-adventures` jí projde.
+    - Bob (přímý člen Olaf) vidí Alicin plán (i když Alice není přímý
+      člen Olaf) — parent umbrella awareness.
+    - Pending link (ne active) propagaci neaktivuje.
+    """
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        Race.objects.all().delete()
+        Workspace.objects.all().delete()
+
+        self.olaf = _make_user("olaf@example.com", "Olaf", "O")
+        self.alice = _make_user("alice@example.com", "Alice", "A")
+        self.bob = _make_user("bob@example.com", "Bob", "B")
+
+        self.parent_ws = _make_workspace(
+            "olaf-adventures", "Olaf Adventures", self.olaf
+        )
+        _add_member(self.parent_ws, self.bob)
+
+        self.child_ws = _make_workspace(
+            "beskydske", "Beskydské výběhy", self.alice
+        )
+
+        self.race_miut = _make_race(name="MIUT", location="Madeira")
+        RaceFavorite.objects.create(
+            user=self.alice,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_REGISTERED,
+        )
+        RaceFavorite.objects.create(
+            user=self.bob,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_INTERESTED,
+        )
+
+    def _activate_link(self) -> None:
+        """Aktivuj parent link Beskydské → Olaf."""
+        self.child_ws.parent_community = self.parent_ws
+        self.child_ws.parent_link_status = Workspace.PARENT_LINK_ACTIVE
+        self.child_ws.save()
+
+    def _pending_link(self) -> None:
+        """Pending link — neaktivní, propagace se nesmí spustit."""
+        self.child_ws.parent_community = self.parent_ws
+        self.child_ws.parent_link_status = Workspace.PARENT_LINK_PENDING
+        self.child_ws.save()
+
+    # --- Upstream propagation (child member → parent effective) ---
+
+    def test_alice_effective_in_parent_after_active_link(self) -> None:
+        """Alice je jen v Beskydské (child), ale s active linkem je
+        effective member Olaf. Filter ?workspace=olaf-adventures jí
+        projde bez 403."""
+        self._activate_link()
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_alice_not_effective_when_link_pending(self) -> None:
+        """Bez active linku Alice není effective member Olaf → 403."""
+        self._pending_link()
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        self.assertEqual(resp.status_code, drf_status.HTTP_403_FORBIDDEN)
+
+    def test_my_communities_returns_parent_via_propagation(self) -> None:
+        """Alicin my-communities/ vrátí i parent Olaf, ne jen direct
+        Beskydské."""
+        self._activate_link()
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/my-communities/")
+        slugs = {c["slug"] for c in resp.json()["communities"]}
+        self.assertEqual(slugs, {"beskydske", "olaf-adventures"})
+
+    # --- Downstream propagation (parent sees child members) ---
+
+    def test_bob_sees_alice_plan_via_parent_umbrella(self) -> None:
+        """Bob je v Olaf (parent), Alice v Beskydské (child, active link).
+        Bob vidí Alicin MIUT plán v plan_by field."""
+        self._activate_link()
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan_slugs = {e["user_slug"] for e in rows["MIUT"]["plan_by"]}
+        self.assertIn(self.alice.profile_slug, plan_slugs)
+
+    def test_bob_does_not_see_alice_when_link_pending(self) -> None:
+        """Pending link nepropaguje — Bob nesmí vidět Alicin plán."""
+        self._pending_link()
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan_slugs = {e["user_slug"] for e in rows["MIUT"]["plan_by"]}
+        self.assertNotIn(self.alice.profile_slug, plan_slugs)
+
+    def test_bob_can_filter_person_alice_via_active_link(self) -> None:
+        """Bob ?person=alice — musí projít, protože sdílí Olaf umbrella."""
+        self._activate_link()
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get(
+            f"/api/races/?person={self.alice.profile_slug}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        names = {r["name"] for r in resp.json()["results"]}
+        self.assertEqual(names, {"MIUT"})
+
+    def test_bob_403_person_alice_without_active_link(self) -> None:
+        """Bez active linku nesdílí komunitu → 403."""
+        self._pending_link()
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get(
+            f"/api/races/?person={self.alice.profile_slug}"
+        )
+        self.assertEqual(resp.status_code, drf_status.HTTP_403_FORBIDDEN)
+
+    def test_alice_shows_up_in_bob_community_people(self) -> None:
+        """Bob's my-community-people/ vrátí Alici, i když je jen v child."""
+        self._activate_link()
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get("/api/races/my-community-people/")
+        slugs = {p["slug"] for p in resp.json()["people"]}
+        self.assertIn(self.alice.profile_slug, slugs)
+
+    def test_workspace_filter_returns_child_members_races(self) -> None:
+        """`?workspace=olaf-adventures` (parent) vrátí i races Alice (child).
+        Effective member propagation musí projít i do filter query."""
+        self._activate_link()
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        names = {r["name"] for r in resp.json()["results"]}
+        self.assertIn("MIUT", names)  # Alice (child) i Bob (direct) mají
+
+    # --- Cycle safety ---
+
+    def test_no_infinite_loop_on_corrupted_cycle(self) -> None:
+        """Pokud se do DB nasází cycle (past bug), propagace nesmí
+        zaseknout — má cap na hloubku 20."""
+        # A → B → A cycle
+        self.child_ws.parent_community = self.parent_ws
+        self.child_ws.parent_link_status = Workspace.PARENT_LINK_ACTIVE
+        self.child_ws.save()
+        self.parent_ws.parent_community = self.child_ws
+        self.parent_ws.parent_link_status = Workspace.PARENT_LINK_ACTIVE
+        self.parent_ws.save()
+        self.client.force_authenticate(self.alice)
+        # Query nesmí spadnout / timeoutovat
+        resp = self.client.get("/api/races/my-communities/")
+        self.assertEqual(resp.status_code, 200)
+
+
 class SyncAgentTests(TestCase):
     """Testy pro sync agent — contradiction detection + audit trail."""
 

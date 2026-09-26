@@ -145,4 +145,16 @@ urlpatterns = [
         views.workspace_member_reject,
         name="member-reject",
     ),
+    # Nested community hierarchy (Slice 2 vize)
+    path("<slug:slug>/parent/", views.workspace_parent, name="parent"),
+    path(
+        "<slug:slug>/children/<slug:child_slug>/approve/",
+        views.workspace_child_approve,
+        name="child-approve",
+    ),
+    path(
+        "<slug:slug>/children/<slug:child_slug>/reject/",
+        views.workspace_child_reject,
+        name="child-reject",
+    ),
 ]

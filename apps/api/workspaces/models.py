@@ -110,6 +110,54 @@ class Workspace(models.Model):
         help_text="Kdo smí do téhle komunity sdílet události.",
     )
 
+    # Nested community model (Slice 2 vize „community awareness"):
+    # každá komunita může mít jednu parent komunitu. Když je link
+    # `active`, členové této (child) komunity jsou pro účely queries
+    # („kdo je v komunitě X") považovaní za effective members parent
+    # komunity. Praktický usecase — Olaf Adventures = parent umbrella,
+    # lokální „Beskydské výběhy" atd. jako children; lokál si organizuje
+    # svoje výběhy, ale jeho členové visí i pod Olaf Adventures pro
+    # organizované kempy.
+    #
+    # Flow: child owner/admin POSTne `/parent/` → status=pending +
+    # parent_requested_by. Parent owner/admin approve/reject přes
+    # `/children/<child_slug>/approve|reject/`. Approve → status=active
+    # + propagace zapnutá. Reject → link se maže (FK=null).
+    parent_community = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="child_communities",
+        help_text=(
+            "Parent komunita v hierarchii. Když parent_link_status='active', "
+            "členové této komunity jsou effective members parent komunity."
+        ),
+    )
+    PARENT_LINK_PENDING = "pending"
+    PARENT_LINK_ACTIVE = "active"
+    PARENT_LINK_CHOICES = [
+        ("", "Bez parenta"),
+        (PARENT_LINK_PENDING, "Pending — čeká na schválení parent adminem"),
+        (PARENT_LINK_ACTIVE, "Active — link platný"),
+    ]
+    parent_link_status = models.CharField(
+        max_length=10,
+        choices=PARENT_LINK_CHOICES,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    parent_requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="User (child admin), kdo iniciovali request na parent.",
+    )
+    parent_requested_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

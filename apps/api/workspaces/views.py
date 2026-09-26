@@ -1,6 +1,7 @@
 import contextlib
 
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import (
@@ -2589,3 +2590,218 @@ def workspace_member_reject(
     )
 
     return Response(_serialize_workspace_member(member))
+
+
+# ---------------------------------------------------------------------------
+# Nested community hierarchy — Slice 2 vize „community awareness"
+# ---------------------------------------------------------------------------
+
+
+def _hierarchy_summary(workspace: Workspace) -> dict:
+    """Serialize hierarchy stav — parent (pokud je) + children."""
+    parent_data = None
+    if workspace.parent_community_id:
+        parent = workspace.parent_community
+        parent_data = {
+            "slug": parent.slug,
+            "name": parent.name,
+            "link_status": workspace.parent_link_status,
+        }
+    children = workspace.child_communities.all().order_by("name")
+    return {
+        "workspace_slug": workspace.slug,
+        "parent": parent_data,
+        "children": [
+            {
+                "slug": c.slug,
+                "name": c.name,
+                "link_status": c.parent_link_status,
+                "requested_at": (
+                    c.parent_requested_at.isoformat()
+                    if c.parent_requested_at
+                    else None
+                ),
+            }
+            for c in children
+        ],
+    }
+
+
+def _would_create_cycle(child: Workspace, proposed_parent: Workspace) -> bool:
+    """Bezpečnostní check — proposed parent nesmí být descendant child.
+    Prochází parent chain nahoru a hledá child. Max hloubka 20 abychom
+    nedostali infinite loop kvůli poškozeným datům."""
+    visited = {child.pk}
+    current = proposed_parent
+    depth = 0
+    while current is not None and depth < 20:
+        if current.pk in visited:
+            return True
+        visited.add(current.pk)
+        current = current.parent_community
+        depth += 1
+    return False
+
+
+@api_view(["GET", "POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def workspace_parent(request: Request, slug: str) -> Response:
+    """GET  — vrátí current parent info (nebo null) + status.
+    POST  — request parent link. Body: {parent_slug}.
+           - Když requesting user je owner/admin obou (child i parent) →
+             link se aktivuje okamžitě (status=active).
+           - Jinak → status=pending, parent admin musí approve.
+    DELETE — unlink (owner/admin child community).
+    """
+    from django.utils import timezone
+
+    workspace = get_object_or_404(Workspace, slug=slug)
+    if not _is_owner(request.user, workspace):
+        return Response(
+            {"detail": "Nemáš oprávnění spravovat hierarchii této komunity."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.method == "GET":
+        return Response(_hierarchy_summary(workspace))
+
+    if request.method == "DELETE":
+        if not workspace.parent_community_id:
+            return Response(
+                {"detail": "Komunita nemá žádného parenta."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        workspace.parent_community = None
+        workspace.parent_link_status = ""
+        workspace.parent_requested_by = None
+        workspace.parent_requested_at = None
+        workspace.save(
+            update_fields=[
+                "parent_community",
+                "parent_link_status",
+                "parent_requested_by",
+                "parent_requested_at",
+            ]
+        )
+        return Response(_hierarchy_summary(workspace))
+
+    # POST
+    parent_slug = request.data.get("parent_slug")
+    if not parent_slug:
+        return Response(
+            {"parent_slug": "Chybí `parent_slug` v body."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    parent = Workspace.objects.filter(slug=parent_slug).first()
+    if not parent:
+        return Response(
+            {"detail": f'Parent komunita „{parent_slug}" neexistuje.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    if parent.pk == workspace.pk:
+        return Response(
+            {"detail": "Komunita nemůže být parentem sama sobě."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if _would_create_cycle(workspace, parent):
+        return Response(
+            {
+                "detail": (
+                    "Nelze — vytvořilo by to cyklus v hierarchii. "
+                    "Proposed parent je descendant této komunity."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Když je requester owner/admin obou stran, aktivuj rovnou.
+    is_parent_admin = _is_owner(request.user, parent)
+    link_status = (
+        Workspace.PARENT_LINK_ACTIVE
+        if is_parent_admin
+        else Workspace.PARENT_LINK_PENDING
+    )
+    workspace.parent_community = parent
+    workspace.parent_link_status = link_status
+    workspace.parent_requested_by = request.user
+    workspace.parent_requested_at = timezone.now()
+    workspace.save(
+        update_fields=[
+            "parent_community",
+            "parent_link_status",
+            "parent_requested_by",
+            "parent_requested_at",
+        ]
+    )
+    return Response(_hierarchy_summary(workspace))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_child_approve(
+    request: Request, slug: str, child_slug: str
+) -> Response:
+    """Parent owner/admin schvaluje pending request child komunity.
+    Flip status pending → active."""
+    parent = get_object_or_404(Workspace, slug=slug)
+    if not _is_owner(request.user, parent):
+        return Response(
+            {"detail": "Nemáš oprávnění spravovat hierarchii této komunity."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    child = Workspace.objects.filter(
+        slug=child_slug, parent_community=parent
+    ).first()
+    if not child:
+        return Response(
+            {"detail": "Neexistuje pending request od této child komunity."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    if child.parent_link_status != Workspace.PARENT_LINK_PENDING:
+        return Response(
+            {
+                "detail": (
+                    f"Link není v pending stavu (současný: "
+                    f"'{child.parent_link_status}')."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    child.parent_link_status = Workspace.PARENT_LINK_ACTIVE
+    child.save(update_fields=["parent_link_status"])
+    return Response(_hierarchy_summary(parent))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def workspace_child_reject(
+    request: Request, slug: str, child_slug: str
+) -> Response:
+    """Parent owner/admin zamítne pending request. Unlink (parent=null)."""
+    parent = get_object_or_404(Workspace, slug=slug)
+    if not _is_owner(request.user, parent):
+        return Response(
+            {"detail": "Nemáš oprávnění spravovat hierarchii této komunity."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    child = Workspace.objects.filter(
+        slug=child_slug, parent_community=parent
+    ).first()
+    if not child:
+        return Response(
+            {"detail": "Neexistuje request od této child komunity."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    child.parent_community = None
+    child.parent_link_status = ""
+    child.parent_requested_by = None
+    child.parent_requested_at = None
+    child.save(
+        update_fields=[
+            "parent_community",
+            "parent_link_status",
+            "parent_requested_by",
+            "parent_requested_at",
+        ]
+    )
+    return Response(_hierarchy_summary(parent))
