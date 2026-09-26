@@ -391,8 +391,9 @@ class Command(BaseCommand):
         changes: list | None = None,
     ) -> None:
         duration_ms = int((time.monotonic() - start) * 1000)
+        run = None
         with contextlib.suppress(Exception):
-            SyncRun.objects.create(
+            run = SyncRun.objects.create(
                 source=source_used,
                 source_url=source_url,
                 status=status,
@@ -405,6 +406,68 @@ class Command(BaseCommand):
                 duration_ms=duration_ms,
                 triggered_by=triggered_by,
                 created_at=timezone.now(),
+            )
+
+        # Notification hooks — pošli admin email když:
+        # 1. Sync selhal (status=error)
+        # 2. Sync flagged > 20 races (spike v data quality)
+        # 3. Skipped fell to 0 zatímco updated je vysoký (potenciální regresní
+        #    breaking change v source datech)
+        if run:
+            self._maybe_notify(run)
+
+    def _maybe_notify(self, run: SyncRun) -> None:
+        from django.conf import settings
+
+        recipients = getattr(settings, "RACE_SYNC_NOTIFY_EMAILS", [])
+        if not recipients:
+            return
+
+        should_alert = False
+        reason = ""
+        if run.status == SyncRun.STATUS_ERROR:
+            should_alert = True
+            reason = f"Sync selhal: {run.error_message[:200]}"
+        elif run.flagged_count >= 20:
+            should_alert = True
+            reason = (
+                f"Vysoký flagged count: {run.flagged_count} races má "
+                "podezřelou data-status contradiction."
+            )
+        elif run.updated_count >= 50:
+            should_alert = True
+            reason = (
+                f"Velký batch update: {run.updated_count} races se změnilo — "
+                "ověř že to není regresí v source datech."
+            )
+
+        if not should_alert:
+            return
+
+        with contextlib.suppress(Exception):
+            from django.core.mail import send_mail
+
+            subject = f"[olaf] Race sync alert — {run.get_status_display()}"
+            body = (
+                f"Sync run @{run.created_at:%Y-%m-%d %H:%M} "
+                f"(source={run.source}, triggered_by={run.triggered_by})\n\n"
+                f"Reason: {reason}\n\n"
+                f"Summary:\n"
+                f"- Created: {run.created_count}\n"
+                f"- Updated: {run.updated_count}\n"
+                f"- Skipped: {run.skipped_count}\n"
+                f"- Flagged: {run.flagged_count}\n"
+                f"- Duration: {run.duration_ms} ms\n\n"
+                f"Detail: https://api.olaf.events/admin/races/syncrun/{run.pk}/change/\n"
+            )
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=getattr(
+                    settings, "DEFAULT_FROM_EMAIL", "noreply@olaf.events"
+                ),
+                recipient_list=recipients,
+                fail_silently=True,
             )
 
 

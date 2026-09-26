@@ -167,6 +167,11 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@olaf.events")
 
+# Recipients pro race sync agent alerts (chyba / spike ve flagged /
+# velký update batch). Prázdný list = notifikace vypnuté (default).
+# Konfigurace: env var `RACE_SYNC_NOTIFY_EMAILS=a@b.cz,c@d.cz`.
+RACE_SYNC_NOTIFY_EMAILS = env.list("RACE_SYNC_NOTIFY_EMAILS", default=[])
+
 # Celery — Redis broker; results disabled by default to avoid double-storing.
 CELERY_BROKER_URL = env("REDIS_URL", default="redis://redis:6379/0")
 CELERY_RESULT_BACKEND = "django-db"
