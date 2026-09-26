@@ -10,6 +10,40 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from races.management.commands.sync_races import _detect_contradiction
 from races.models import Race, RaceFavorite, SyncRun
+from workspaces.models import Workspace, WorkspaceMember
+
+
+def _make_user(email: str, first_name: str = "", last_name: str = "") -> User:
+    """Utility — vyrobí verified usera s auto profile_slug pro test."""
+    return User.objects.create_user(
+        email=email,
+        password="pass-abcdef-1234",
+        first_name=first_name or email.split("@")[0].capitalize(),
+        last_name=last_name or "X",
+        email_verified=True,
+    )
+
+
+def _make_workspace(slug: str, name: str, owner: User) -> Workspace:
+    ws = Workspace.objects.create(name=name, slug=slug)
+    WorkspaceMember.objects.create(
+        workspace=ws,
+        user=owner,
+        role=WorkspaceMember.ROLE_OWNER,
+        status=WorkspaceMember.STATUS_ACTIVE,
+    )
+    return ws
+
+
+def _add_member(
+    ws: Workspace, user: User, status: str = WorkspaceMember.STATUS_ACTIVE
+) -> WorkspaceMember:
+    return WorkspaceMember.objects.create(
+        workspace=ws,
+        user=user,
+        role=WorkspaceMember.ROLE_MEMBER,
+        status=status,
+    )
 
 
 def _make_race(**overrides) -> Race:
@@ -325,6 +359,278 @@ class RaceFavoritePersistenceTests(TestCase):
         }
         self.assertEqual(rows["MIUT"]["plan_status"], "registered")
         self.assertTrue(rows["MIUT"]["is_favorite"])
+
+
+class CommunityAwareRaceCalendarTests(TestCase):
+    """Slice 1 vize „community awareness" — race calendar zná mé komunity
+    a lidi v nich, ale nic neteče ne-členům. Přísně privacy-scoped.
+
+    Setup:
+    - alice + bob + carol jsou lidi
+    - alice & bob spolu v „Olaf Adventures"
+    - carol samotná, mimo komunity
+    - MIUT race má plán od bob + carol
+    """
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        Race.objects.all().delete()
+        Workspace.objects.all().delete()
+
+        self.alice = _make_user("alice@example.com", "Alice", "A")
+        self.bob = _make_user("bob@example.com", "Bob", "B")
+        self.carol = _make_user("carol@example.com", "Carol", "C")
+
+        self.ws_olaf = _make_workspace("olaf-adventures", "Olaf Adventures", self.alice)
+        _add_member(self.ws_olaf, self.bob)
+        # Carol není v žádné workspace.
+
+        self.race_miut = _make_race(name="MIUT", location="Madeira")
+        self.race_utmb = _make_race(name="UTMB", location="Chamonix")
+
+        # bob má MIUT v plánu jako registered, carol taky jako interested
+        RaceFavorite.objects.create(
+            user=self.bob,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_REGISTERED,
+            note="jedu s Alicí",
+        )
+        RaceFavorite.objects.create(
+            user=self.carol,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_INTERESTED,
+        )
+
+    # --- my-communities/ ---
+
+    def test_my_communities_requires_auth(self) -> None:
+        resp = self.client.get("/api/races/my-communities/")
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_my_communities_lists_active_only(self) -> None:
+        # bob je jen member — vidí svoji komunitu
+        self.client.force_authenticate(self.bob)
+        resp = self.client.get("/api/races/my-communities/")
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["communities"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["slug"], "olaf-adventures")
+        self.assertEqual(results[0]["member_count"], 2)  # alice + bob
+        self.assertEqual(results[0]["members_with_plan"], 1)  # jen bob má plán
+
+    def test_my_communities_empty_for_loner(self) -> None:
+        self.client.force_authenticate(self.carol)
+        resp = self.client.get("/api/races/my-communities/")
+        self.assertEqual(resp.json()["communities"], [])
+
+    def test_my_communities_excludes_pending_and_removed(self) -> None:
+        dana = _make_user("dana@example.com", "Dana")
+        _add_member(self.ws_olaf, dana, status=WorkspaceMember.STATUS_PENDING)
+        self.client.force_authenticate(dana)
+        resp = self.client.get("/api/races/my-communities/")
+        self.assertEqual(resp.json()["communities"], [])
+
+    # --- my-community-people/ ---
+
+    def test_my_community_people_requires_auth(self) -> None:
+        resp = self.client.get("/api/races/my-community-people/")
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_my_community_people_returns_shared_members(self) -> None:
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/my-community-people/")
+        results = resp.json()["people"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["display_name"], "Bob B")
+        self.assertEqual(results[0]["plan_count"], 1)  # bob má MIUT
+        self.assertEqual(len(results[0]["workspaces"]), 1)
+        self.assertEqual(results[0]["workspaces"][0]["slug"], "olaf-adventures")
+
+    def test_my_community_people_excludes_self(self) -> None:
+        """Alice nesmí vidět sebe v seznamu community lidí."""
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/my-community-people/")
+        slugs = {p["slug"] for p in resp.json()["people"]}
+        self.assertNotIn(self.alice.profile_slug, slugs)
+
+    def test_my_community_people_empty_for_loner(self) -> None:
+        self.client.force_authenticate(self.carol)
+        resp = self.client.get("/api/races/my-community-people/")
+        self.assertEqual(resp.json()["people"], [])
+
+    def test_my_community_people_excludes_pending_members(self) -> None:
+        dana = _make_user("dana@example.com", "Dana")
+        _add_member(self.ws_olaf, dana, status=WorkspaceMember.STATUS_PENDING)
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/my-community-people/")
+        slugs = {p["slug"] for p in resp.json()["people"]}
+        self.assertNotIn(dana.profile_slug, slugs)
+
+    # --- race_list ?workspace= filter ---
+
+    def test_workspace_filter_requires_auth(self) -> None:
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_workspace_filter_requires_membership(self) -> None:
+        """Carol není v Olaf Adventures — dostane 403 na filtr té komunity."""
+        self.client.force_authenticate(self.carol)
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        self.assertEqual(resp.status_code, drf_status.HTTP_403_FORBIDDEN)
+
+    def test_workspace_filter_returns_races_of_members(self) -> None:
+        """Alice filtruje na Olaf Adventures — vidí MIUT (bob má v plánu),
+        ne UTMB (nikdo). Nezáleží že carol taky MIUT má — není v komunitě.
+        """
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        names = {r["name"] for r in resp.json()["results"]}
+        self.assertEqual(names, {"MIUT"})
+
+    def test_workspace_filter_deduplicates(self) -> None:
+        """Když 2 členové komunity mají stejný race v plánu, řádek se
+        neopakuje (distinct)."""
+        RaceFavorite.objects.create(
+            user=self.alice,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_INTERESTED,
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/?workspace=olaf-adventures")
+        names = [r["name"] for r in resp.json()["results"]]
+        self.assertEqual(names.count("MIUT"), 1)
+
+    # --- race_list ?person= filter ---
+
+    def test_person_filter_requires_auth(self) -> None:
+        resp = self.client.get(
+            f"/api/races/?person={self.bob.profile_slug}"
+        )
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_person_filter_requires_shared_community(self) -> None:
+        """Carol chce vidět bobův plán, ale nesdílí s ním komunitu → 403."""
+        self.client.force_authenticate(self.carol)
+        resp = self.client.get(
+            f"/api/races/?person={self.bob.profile_slug}"
+        )
+        self.assertEqual(resp.status_code, drf_status.HTTP_403_FORBIDDEN)
+
+    def test_person_filter_returns_person_plan(self) -> None:
+        """Alice vidí bobův plán — bob má MIUT."""
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get(
+            f"/api/races/?person={self.bob.profile_slug}"
+        )
+        names = {r["name"] for r in resp.json()["results"]}
+        self.assertEqual(names, {"MIUT"})
+
+    def test_person_filter_404_for_unknown_slug(self) -> None:
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/?person=neexistuje")
+        self.assertEqual(resp.status_code, drf_status.HTTP_404_NOT_FOUND)
+
+    def test_person_filter_self_works(self) -> None:
+        """User může filtrovat na sebe — ne fake privacy issue.
+        Vidí svůj vlastní plán."""
+        RaceFavorite.objects.create(
+            user=self.alice,
+            race=self.race_utmb,
+            status=RaceFavorite.STATUS_INTERESTED,
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get(
+            f"/api/races/?person={self.alice.profile_slug}"
+        )
+        names = {r["name"] for r in resp.json()["results"]}
+        self.assertEqual(names, {"UTMB"})
+
+    # --- plan_by field ---
+
+    def test_plan_by_empty_for_anonymous(self) -> None:
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        self.assertEqual(rows["MIUT"]["plan_by"], [])
+        self.assertEqual(rows["UTMB"]["plan_by"], [])
+
+    def test_plan_by_empty_for_loner(self) -> None:
+        """Carol nemá komunitu → nevidí ničí plán, ani bobův."""
+        self.client.force_authenticate(self.carol)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        # Carol NEUVIDÍ bobův plán (nemá s ním komunitu). Sebe taky ne
+        # (excluded ze `plan_by` — vlastní status žije v plan_status).
+        self.assertEqual(rows["MIUT"]["plan_by"], [])
+
+    def test_plan_by_shows_shared_community_members(self) -> None:
+        """Alice vidí bobův plán MIUT — mají spolu komunitu."""
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan = rows["MIUT"]["plan_by"]
+        self.assertEqual(len(plan), 1)
+        entry = plan[0]
+        self.assertEqual(entry["user_slug"], self.bob.profile_slug)
+        self.assertEqual(entry["display_name"], "Bob B")
+        self.assertEqual(entry["status"], "registered")
+        self.assertEqual(entry["note"], "jedu s Alicí")
+        self.assertEqual(entry["workspaces"][0]["slug"], "olaf-adventures")
+
+    def test_plan_by_excludes_self(self) -> None:
+        """Alicin vlastní plán MIUT nesmí být v jejím `plan_by` (žije v
+        `plan_status` per race)."""
+        RaceFavorite.objects.create(
+            user=self.alice,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_INTERESTED,
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan = rows["MIUT"]["plan_by"]
+        slugs = {e["user_slug"] for e in plan}
+        self.assertNotIn(self.alice.profile_slug, slugs)
+        # Vlastní status vidí v plan_status
+        self.assertEqual(rows["MIUT"]["plan_status"], "interested")
+
+    def test_plan_by_excludes_non_shared_people(self) -> None:
+        """Alice nesmí vidět carolin MIUT plán — nesdílí komunitu."""
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan = rows["MIUT"]["plan_by"]
+        slugs = {e["user_slug"] for e in plan}
+        self.assertNotIn(self.carol.profile_slug, slugs)
+
+    def test_plan_by_shows_multiple_shared_communities(self) -> None:
+        """Když má user 2 sdílené komunity s planned osobou, workspaces
+        pole obsahuje obě."""
+        ws_second = _make_workspace("mtb-crew", "MTB Crew", self.alice)
+        _add_member(ws_second, self.bob)
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        entry = rows["MIUT"]["plan_by"][0]
+        slugs = {w["slug"] for w in entry["workspaces"]}
+        self.assertEqual(slugs, {"olaf-adventures", "mtb-crew"})
+
+    def test_plan_by_aggregates_multiple_members(self) -> None:
+        """Alice s 2 spolumembers oba plánujícími MIUT → oba v plan_by."""
+        dana = _make_user("dana@example.com", "Dana")
+        _add_member(self.ws_olaf, dana)
+        RaceFavorite.objects.create(
+            user=dana,
+            race=self.race_miut,
+            status=RaceFavorite.STATUS_WAITLIST,
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        plan = rows["MIUT"]["plan_by"]
+        slugs = {e["user_slug"] for e in plan}
+        self.assertEqual(
+            slugs, {self.bob.profile_slug, dana.profile_slug}
+        )
 
 
 class SyncAgentTests(TestCase):

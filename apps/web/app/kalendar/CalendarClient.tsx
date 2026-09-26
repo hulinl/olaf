@@ -10,6 +10,7 @@ import {
   races,
   type Race,
   type RaceFilters,
+  type RacePlanByEntry,
   type RacePlanStatus,
   type RaceRegion,
 } from "@/lib/races";
@@ -243,6 +244,15 @@ export function CalendarClient() {
   const [syncStatus, setSyncStatus] = useState<Awaited<
     ReturnType<typeof races.syncStatus>
   > | null>(null);
+  // Community awareness data — fetchne se jen když user je auth. Pokud
+  // vrátí prázdné listy (loner bez komunity), filter panel se skryje.
+  const [myCommunities, setMyCommunities] = useState<
+    Awaited<ReturnType<typeof races.myCommunities>>["communities"]
+  >([]);
+  const [myPeople, setMyPeople] = useState<
+    Awaited<ReturnType<typeof races.myCommunityPeople>>["people"]
+  >([]);
+  const hasCommunities = myCommunities.length > 0;
   // Local search input pro debounce — user píše rychle, nechceme
   // hitovat API na každý keystroke. Po 300 ms inactivity commit do
   // filters.q → trigger fetch.
@@ -293,6 +303,29 @@ export function CalendarClient() {
       .then(setSyncStatus)
       .catch(() => setSyncStatus(null));
   }, []);
+
+  // Community awareness — fetchne se jen když user je auth. Loner
+  // dostane prázdné listy = filter panel se sám skryje.
+  useEffect(() => {
+    if (!user) {
+      setMyCommunities([]);
+      setMyPeople([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([races.myCommunities(), races.myCommunityPeople()])
+      .then(([c, p]) => {
+        if (cancelled) return;
+        setMyCommunities(c.communities);
+        setMyPeople(p.people);
+      })
+      .catch(() => {
+        /* silent — filter panel se prostě nezobrazí */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const loadRaces = useCallback(async () => {
     setLoading(true);
@@ -375,6 +408,8 @@ export function CalendarClient() {
     if (filters.series) c += 1;
     if (regFilter) c += 1;
     if (filters.favOnly) c += 1;
+    if (filters.workspace) c += 1;
+    if (filters.person) c += 1;
     return c;
   }, [filters, regFilter]);
 
@@ -707,6 +742,53 @@ export function CalendarClient() {
                 </button>
               )}
             </div>
+
+            {/* Community awareness filter — jen když user má aspoň jednu
+                komunitu. Loner tenhle blok vůbec neuvidí (per vize:
+                „pokud nebudeš členem, neuvidíš možnosti"). */}
+            {hasCommunities && (
+              <div className="grid gap-2 rounded-md border border-border bg-surface-muted/40 p-3">
+                <p className="mono-tag text-ink-500">
+                  Kdo z komunity co plánuje
+                </p>
+                <label className="flex flex-col gap-1 text-[13px] text-ink-700">
+                  Komunita
+                  <select
+                    value={filters.workspace ?? ""}
+                    onChange={(e) =>
+                      setFilter({ workspace: e.target.value || undefined })
+                    }
+                    className="rounded-md border border-border bg-canvas px-2 py-1.5 text-sm text-ink-900 focus-ring"
+                  >
+                    <option value="">Všechny mé komunity</option>
+                    {myCommunities.map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.name} ({c.members_with_plan}/{c.member_count})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {myPeople.length > 0 && (
+                  <label className="flex flex-col gap-1 text-[13px] text-ink-700">
+                    Osoba
+                    <select
+                      value={filters.person ?? ""}
+                      onChange={(e) =>
+                        setFilter({ person: e.target.value || undefined })
+                      }
+                      className="rounded-md border border-border bg-canvas px-2 py-1.5 text-sm text-ink-900 focus-ring"
+                    >
+                      <option value="">Kdokoliv</option>
+                      {myPeople.map((p) => (
+                        <option key={p.slug} value={p.slug}>
+                          {p.display_name} · {p.plan_count} v plánu
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            )}
 
             {/* Date range — od nejdřívějšího po nejpozdější závod v datech.
                 min/max prevent user hledat v historii která tam není. */}
@@ -1179,6 +1261,93 @@ const STATUS_DOT_COLOR: Record<RacePlanStatus, string> = {
   completed: "var(--ink-900)",
 };
 
+/**
+ * PlanByPill — malý badge s countem lidí z komunity, kteří mají závod
+ * v plánu. Po kliknutí rozbalí seznam s jmény + statusy + komunitami
+ * (klik na jméno = navigace na `/u/<slug>` profile).
+ *
+ * Neukazuje se pokud plan_by je prázdný (anon / loner / žádný sdílený
+ * plán). Frontend nemá vlastní filtrování — respektuje co backend vrací
+ * (privacy scope na sdílené komunity).
+ */
+function PlanByPill({ plan }: { plan: RacePlanByEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+  if (plan.length === 0) return null;
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-surface-muted px-1.5 py-0.5 text-[11px] font-medium text-ink-700 hover:bg-brand-soft/60 focus-ring"
+      >
+        <span aria-hidden>👥</span>
+        <span>{plan.length} v plánu</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-30 mt-1 min-w-[260px] rounded-md border border-border bg-canvas p-2 shadow-lg"
+        >
+          <p className="mono-tag mb-1.5 text-ink-500">
+            Kdo má v plánu
+          </p>
+          <ul className="grid gap-1">
+            {plan.map((entry) => (
+              <li key={entry.user_slug}>
+                <a
+                  href={`/u/${entry.user_slug}`}
+                  className="flex items-start gap-2 rounded-sm px-1.5 py-1 hover:bg-surface-muted focus-ring"
+                >
+                  <span
+                    aria-hidden
+                    className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-ink-900 text-[10px] font-semibold text-canvas"
+                  >
+                    {entry.display_name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-[13px] font-medium text-ink-900">
+                        {entry.display_name}
+                      </span>
+                      <span
+                        className={`inline-flex flex-shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${PLAN_STATUS_TONE[entry.status]}`}
+                      >
+                        {PLAN_STATUS_LABEL[entry.status]}
+                      </span>
+                    </span>
+                    {entry.workspaces.length > 0 && (
+                      <span className="mt-0.5 block truncate text-[11px] text-ink-500">
+                        {entry.workspaces.map((w) => w.name).join(" · ")}
+                      </span>
+                    )}
+                    {entry.note && (
+                      <span className="mt-0.5 block truncate text-[11px] italic text-ink-500">
+                        „{entry.note}"
+                      </span>
+                    )}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatusPickerMenu({
   current,
   onChoose,
@@ -1461,6 +1630,11 @@ function DesktopRaceRow({
             termín nejistý
           </span>
         )}
+        {race.plan_by.length > 0 && (
+          <div className="mt-1.5">
+            <PlanByPill plan={race.plan_by} />
+          </div>
+        )}
       </td>
       <td>
         <div>{race.country}</div>
@@ -1663,6 +1837,12 @@ function MobileRaceCard({
         <p className="mt-2 inline-block rounded-sm bg-warning/10 px-1.5 py-0.5 text-[12px] font-medium text-warning">
           termín nejistý
         </p>
+      )}
+
+      {race.plan_by.length > 0 && (
+        <div className="mt-2">
+          <PlanByPill plan={race.plan_by} />
+        </div>
       )}
 
       {/* Date — big condensed. TBA má vlastní pill místo raw „?". */}

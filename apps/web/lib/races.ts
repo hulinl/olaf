@@ -4,6 +4,14 @@
  */
 import { apiFetch } from "@/lib/api";
 
+export interface RacePlanByEntry {
+  user_slug: string;
+  display_name: string;
+  status: RacePlanStatus;
+  note: string;
+  workspaces: { slug: string; name: string }[];
+}
+
 export interface Race {
   id: number;
   slug: string;
@@ -32,6 +40,24 @@ export interface Race {
   is_favorite: boolean;
   plan_status: RacePlanStatus | null;
   plan_note: string;
+  // Lidé ze sdílených komunit, kteří mají tento závod v plánu.
+  // Nezahrnuje aktuálního usera (ten má svůj status v plan_status).
+  // Empty pro anon nebo loner bez komunity.
+  plan_by: RacePlanByEntry[];
+}
+
+export interface MyCommunity {
+  slug: string;
+  name: string;
+  member_count: number;
+  members_with_plan: number;
+}
+
+export interface MyCommunityPerson {
+  slug: string;
+  display_name: string;
+  workspaces: { slug: string; name: string }[];
+  plan_count: number;
 }
 
 export interface RacePlanEntry {
@@ -139,6 +165,8 @@ export interface RaceFilters {
   favOnly?: boolean;
   topOnly?: boolean;
   past?: boolean;
+  workspace?: string; // slug — filtr na komunitu (auth+member required)
+  person?: string; // profile_slug — filtr na osobu (shared community required)
 }
 
 export interface RaceListResponse {
@@ -160,6 +188,8 @@ function buildQuery(filters: RaceFilters): string {
   if (filters.favOnly) params.set("fav", "1");
   if (filters.topOnly) params.set("top", "1");
   if (filters.past) params.set("past", "1");
+  if (filters.workspace) params.set("workspace", filters.workspace);
+  if (filters.person) params.set("person", filters.person);
   const s = params.toString();
   return s ? `?${s}` : "";
 }
@@ -185,6 +215,14 @@ export const races = {
     apiFetch<{ countries: string[] }>("/api/races/countries/"),
   syncStatus: (): Promise<SyncStatus> =>
     apiFetch<SyncStatus>("/api/races/sync-status/"),
+  // Community awareness (auth) — vrátí prázdné listy pokud user není
+  // v žádné komunitě. UI to použije jako signál „skryj filter panel".
+  myCommunities: (): Promise<{ communities: MyCommunity[] }> =>
+    apiFetch<{ communities: MyCommunity[] }>("/api/races/my-communities/"),
+  myCommunityPeople: (): Promise<{ people: MyCommunityPerson[] }> =>
+    apiFetch<{ people: MyCommunityPerson[] }>(
+      "/api/races/my-community-people/",
+    ),
   // Přidání do plánu (POST) — optional status/note. Bez status =
   // default "interested".
   addToPlan: (

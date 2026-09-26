@@ -24,7 +24,7 @@ from __future__ import annotations
 import contextlib
 from datetime import date
 
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -119,9 +119,95 @@ def _user_fav_status(user) -> dict[int, dict[str, str]]:
     }
 
 
+def _my_active_workspace_ids(user) -> set[int]:
+    """Set workspace IDs, kde je user active member. Prázdný set pro
+    anonymního / vůbec-nečlena → community race sharing se vypne.
+    """
+    from workspaces.models import WorkspaceMember
+
+    if not user or not user.is_authenticated:
+        return set()
+    return set(
+        WorkspaceMember.objects.filter(
+            user=user, status=WorkspaceMember.STATUS_ACTIVE
+        ).values_list("workspace_id", flat=True)
+    )
+
+
+def _plan_by_lookup(request: Request) -> dict[int, list[dict]]:
+    """Pro každý race_id vrátí list plánů (user + status + workspaces)
+    od uživatelů, kteří sdílí komunitu s requesting userem. Vylučuje
+    requesting usera samotného (jeho plán žije v is_favorite/plan_status
+    per race).
+
+    Empty dict pro anon nebo uživatele bez community → community sharing
+    je off-limits pro loners.
+    """
+    from workspaces.models import Workspace, WorkspaceMember
+
+    my_ws_ids = _my_active_workspace_ids(request.user)
+    if not my_ws_ids:
+        return {}
+
+    # Slovník user_id → list of {slug, name} workspaces sdílených s user.request
+    # (jenom sdílené, ne všechny userovy komunity — public race plán respektuje
+    # kontext, kde se dva lidi vidí).
+    shared_ws_by_user: dict[int, list[dict]] = {}
+    for row in (
+        WorkspaceMember.objects.filter(
+            workspace_id__in=my_ws_ids,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        .exclude(user=request.user)
+        .values("user_id", "workspace__slug", "workspace__name")
+    ):
+        shared_ws_by_user.setdefault(row["user_id"], []).append(
+            {"slug": row["workspace__slug"], "name": row["workspace__name"]}
+        )
+    if not shared_ws_by_user:
+        return {}
+
+    # Fetch všechny RaceFavorite pro tyto users v jednom queries. Distinct
+    # ne — user může mít stejný závod jen jednou (unique_together).
+    result: dict[int, list[dict]] = {}
+    plans = (
+        RaceFavorite.objects.filter(user_id__in=shared_ws_by_user.keys())
+        .select_related("user")
+        .values(
+            "race_id",
+            "user_id",
+            "user__profile_slug",
+            "user__first_name",
+            "user__last_name",
+            "user__email",
+            "status",
+            "note",
+        )
+    )
+    for row in plans:
+        display_name = (
+            f"{row['user__first_name']} {row['user__last_name']}".strip()
+            or row["user__email"].split("@")[0]
+        )
+        result.setdefault(row["race_id"], []).append(
+            {
+                "user_slug": row["user__profile_slug"],
+                "display_name": display_name,
+                "status": row["status"],
+                "note": row["note"],
+                "workspaces": shared_ws_by_user[row["user_id"]],
+            }
+        )
+    # Vyhoď unused workspace reference — abychom nevraceli globální fetch
+    _ = Workspace  # noqa: F841 — kept import readable
+    return result
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def race_list(request: Request) -> Response:
+    from workspaces.models import WorkspaceMember
+
     qs = Race.objects.filter(is_visible=True)
     qs = _apply_filters(qs, request)
 
@@ -133,13 +219,196 @@ def race_list(request: Request) -> Response:
             )
         qs = qs.filter(favorites__user=request.user)
 
+    # Community filter — ukazuj jen races, které má v plánu nějaký
+    # active member té komunity. Vyžaduje, aby requesting user byl
+    # taky member (privacy: ne-člen nesmí prozřít plány cizí komunity).
+    workspace_slug = request.query_params.get("workspace")
+    if workspace_slug:
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Přihlaš se pro filtr podle komunity."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        is_member = WorkspaceMember.objects.filter(
+            user=request.user,
+            workspace__slug=workspace_slug,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        ).exists()
+        if not is_member:
+            return Response(
+                {"detail": "Nejsi členem této komunity."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        qs = qs.filter(
+            favorites__user__workspace_memberships__workspace__slug=workspace_slug,
+            favorites__user__workspace_memberships__status=(
+                WorkspaceMember.STATUS_ACTIVE
+            ),
+        ).distinct()
+
+    # Person filter — races, které má v plánu konkrétní osoba. Musí
+    # sdílet aspoň jednu komunitu s requesting userem.
+    person_slug = request.query_params.get("person")
+    if person_slug:
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Přihlaš se pro filtr podle osoby."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        from accounts.models import User as UserModel
+
+        person = UserModel.objects.filter(profile_slug=person_slug).first()
+        if not person:
+            return Response(
+                {"detail": "Uživatel nenalezen."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if person.pk == request.user.pk:
+            # Self-filter → user vidí svůj plán přes is_favorite; ale
+            # ponecháme to fungovat pro konzistenci.
+            qs = qs.filter(favorites__user=person)
+        else:
+            shared = WorkspaceMember.objects.filter(
+                user=request.user,
+                status=WorkspaceMember.STATUS_ACTIVE,
+                workspace__members__user=person,
+                workspace__members__status=WorkspaceMember.STATUS_ACTIVE,
+            ).exists()
+            if not shared:
+                return Response(
+                    {"detail": "Nesdílíš s touto osobou komunitu."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            qs = qs.filter(favorites__user=person)
+
     lookup = _user_fav_status(request.user)
+    plan_by = _plan_by_lookup(request)
     serializer = RaceSerializer(
         qs,
         many=True,
-        context={"request": request, "user_favorite_status": lookup},
+        context={
+            "request": request,
+            "user_favorite_status": lookup,
+            "plan_by_lookup": plan_by,
+        },
     )
     return Response({"count": qs.count(), "results": serializer.data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def race_my_communities(request: Request) -> Response:
+    """Communities kde je requesting user active member — pro race
+    calendar community filter dropdown. Vrací i member count a
+    počet členů s aspoň jedním race favorite (pro empty-state hint).
+    """
+    from django.db.models import Count
+    from workspaces.models import Workspace, WorkspaceMember
+
+    my_ws_ids = _my_active_workspace_ids(request.user)
+    if not my_ws_ids:
+        return Response({"communities": []})
+
+    workspaces = Workspace.objects.filter(pk__in=my_ws_ids).annotate(
+        member_count=Count(
+            "members",
+            filter=Q(members__status=WorkspaceMember.STATUS_ACTIVE),
+            distinct=True,
+        ),
+    )
+
+    results = []
+    for ws in workspaces:
+        # Kolik unikátních členů má aspoň jeden race favorit
+        plan_member_count = (
+            RaceFavorite.objects.filter(
+                user__workspace_memberships__workspace=ws,
+                user__workspace_memberships__status=(
+                    WorkspaceMember.STATUS_ACTIVE
+                ),
+            )
+            .values("user")
+            .distinct()
+            .count()
+        )
+        results.append(
+            {
+                "slug": ws.slug,
+                "name": ws.name,
+                "member_count": ws.member_count,
+                "members_with_plan": plan_member_count,
+            }
+        )
+    # Řadit podle jména pro stabilní dropdown
+    results.sort(key=lambda r: r["name"].lower())
+    return Response({"communities": results})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def race_my_community_people(request: Request) -> Response:
+    """Lidi z komunit kde je requesting user active member, se sdílenými
+    komunitami a počtem races v plánu. Prohledávatelný autocomplete
+    seznam pro person filter na race calendar.
+    """
+    from accounts.models import User as UserModel
+    from workspaces.models import WorkspaceMember
+
+    my_ws_ids = _my_active_workspace_ids(request.user)
+    if not my_ws_ids:
+        return Response({"people": []})
+
+    # Distinct users z těchto workspaces, mimo mě
+    person_ids = set(
+        WorkspaceMember.objects.filter(
+            workspace_id__in=my_ws_ids,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        )
+        .exclude(user=request.user)
+        .values_list("user_id", flat=True)
+    )
+    if not person_ids:
+        return Response({"people": []})
+
+    # Předpočítej: user_id → list sdílených workspaces {slug, name}
+    shared_ws: dict[int, list[dict]] = {}
+    for row in (
+        WorkspaceMember.objects.filter(
+            user_id__in=person_ids,
+            workspace_id__in=my_ws_ids,
+            status=WorkspaceMember.STATUS_ACTIVE,
+        ).values("user_id", "workspace__slug", "workspace__name")
+    ):
+        shared_ws.setdefault(row["user_id"], []).append(
+            {"slug": row["workspace__slug"], "name": row["workspace__name"]}
+        )
+
+    # Předpočítej: user_id → plan_count
+    plan_counts: dict[int, int] = {}
+    for row in (
+        RaceFavorite.objects.filter(user_id__in=person_ids)
+        .values("user_id")
+        .annotate(cnt=Count("id"))
+    ):
+        plan_counts[row["user_id"]] = row["cnt"]
+
+    people = UserModel.objects.filter(pk__in=person_ids).order_by(
+        "first_name", "last_name", "email"
+    )
+    results = []
+    for p in people:
+        display_name = (
+            f"{p.first_name} {p.last_name}".strip() or p.email.split("@")[0]
+        )
+        results.append(
+            {
+                "slug": p.profile_slug,
+                "display_name": display_name,
+                "workspaces": shared_ws.get(p.pk, []),
+                "plan_count": plan_counts.get(p.pk, 0),
+            }
+        )
+    return Response({"people": results})
 
 
 @api_view(["POST", "PATCH", "DELETE"])

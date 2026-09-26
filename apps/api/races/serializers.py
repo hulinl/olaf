@@ -13,6 +13,7 @@ class RaceSerializer(serializers.ModelSerializer):
     is_favorite = serializers.SerializerMethodField()
     plan_status = serializers.SerializerMethodField()
     plan_note = serializers.SerializerMethodField()
+    plan_by = serializers.SerializerMethodField()
     elevation_per_km = serializers.SerializerMethodField()
 
     class Meta:
@@ -45,6 +46,7 @@ class RaceSerializer(serializers.ModelSerializer):
             "is_favorite",
             "plan_status",
             "plan_note",
+            "plan_by",
         ]
         read_only_fields = fields
 
@@ -71,6 +73,16 @@ class RaceSerializer(serializers.ModelSerializer):
     def get_plan_note(self, obj: Race) -> str:
         row = self._fav_row(obj)
         return row["note"] if row else ""
+
+    def get_plan_by(self, obj: Race) -> list[dict]:
+        """List plánů od jiných členů komunity requesting usera —
+        {user_slug, display_name, status, note, workspaces[]}. Empty
+        pro anon / loner (`plan_by_lookup` z view není nastaven / prázdný).
+        """
+        lookup = self.context.get("plan_by_lookup")
+        if not lookup:
+            return []
+        return lookup.get(obj.id, [])
 
     def get_elevation_per_km(self, obj: Race) -> float | None:
         return obj.elevation_per_km
