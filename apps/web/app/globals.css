@@ -473,6 +473,9 @@ select:not([multiple]):not([size]) {
   /* Container query context — inner scaler se stále zvětšuje /
      zmenšuje podle šířky screen bezelu, ne podle viewportu. */
   container-type: inline-size;
+  /* Scaler má logickou šířku 512 px — bez min-width: 0 by min-content
+     bezelu vyrostl na 512 px a rozbil grid col na mobile. */
+  min-width: 0;
 }
 /* Scaler — content je nakreslený v „baseline" 510×319 (16:10) a
  * transform: scale ho dopočte tak aby přesně vyplnil actual bezel
@@ -522,6 +525,7 @@ select:not([multiple]):not([size]) {
   aspect-ratio: 9 / 19.5;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
   container-type: inline-size;
+  min-width: 0;
 }
 /* Scaler — baseline 244 × 528 (9/19.5) odpovídá mobilnímu mockupu
  * na landing (max-w-260 → screen ~244 px). Na desktopu se přizpůsobí
