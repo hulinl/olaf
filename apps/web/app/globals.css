@@ -465,13 +465,26 @@ select:not([multiple]):not([size]) {
 }
 .chrome-laptop-screen {
   position: relative;
-  display: flex;
-  flex-direction: column;
   border-radius: 6px;
   background: var(--canvas);
   overflow: hidden;
   aspect-ratio: 16 / 10;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
+  /* Container query context — inner scaler se stále zvětšuje /
+     zmenšuje podle šířky screen bezelu, ne podle viewportu. */
+  container-type: inline-size;
+}
+/* Scaler — content je nakreslený v „baseline" 510×319 (16:10) a
+ * transform: scale ho dopočte tak aby přesně vyplnil actual bezel
+ * (100cqi × 62.5cqi). Na mobilu (bezel ~340 px) scale ≈ 0.67, na
+ * desktopu (bezel ~500 px) scale ≈ 0.98. Content nikdy nevyteče. */
+.chrome-laptop-scaler {
+  width: 512px;
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+  transform-origin: top left;
+  transform: scale(calc(100cqi / 512));
 }
 /* Screen shine — velmi subtilní diagonální gradient „lesk skla" */
 .chrome-laptop-screen::after {
@@ -503,13 +516,23 @@ select:not([multiple]):not([size]) {
 }
 .chrome-phone-screen {
   position: relative;
-  display: flex;
-  flex-direction: column;
   border-radius: 30px;
   background: var(--canvas);
   overflow: hidden;
   aspect-ratio: 9 / 19.5;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
+  container-type: inline-size;
+}
+/* Scaler — baseline 244 × 528 (9/19.5) odpovídá mobilnímu mockupu
+ * na landing (max-w-260 → screen ~244 px). Na desktopu se přizpůsobí
+ * pokud phone rámeček roste. */
+.chrome-phone-scaler {
+  width: 240px;
+  height: 520px;
+  display: flex;
+  flex-direction: column;
+  transform-origin: top left;
+  transform: scale(calc(100cqi / 240));
 }
 .chrome-phone-notch {
   position: absolute;

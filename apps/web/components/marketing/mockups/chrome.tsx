@@ -25,7 +25,14 @@ export function LaptopFrame({
 }) {
   return (
     <div className={`chrome-laptop ${className}`}>
-      <div className="chrome-laptop-screen">{children}</div>
+      <div className="chrome-laptop-screen">
+        {/* Scaler: content je renderované v „desktop baseline"
+            velikosti (viz .chrome-laptop-scaler v globals.css) a CSS
+            container query ho scale-uje uniformly aby seděl do
+            aktuální šířky bezelu — na mobilu se celá mockup zmenší
+            místo aby content vytékal ven z 16:10 rámečku. */}
+        <div className="chrome-laptop-scaler">{children}</div>
+      </div>
     </div>
   );
 }
@@ -41,7 +48,7 @@ export function PhoneFrame({
     <div className={`chrome-phone ${className}`}>
       <div className="chrome-phone-screen">
         <div className="chrome-phone-notch" aria-hidden />
-        {children}
+        <div className="chrome-phone-scaler">{children}</div>
       </div>
     </div>
   );
