@@ -1022,6 +1022,7 @@ export function CalendarClient() {
                   />
                   <th>Série</th>
                   <th style={{ width: 40, textAlign: "center" }}>Plán</th>
+                  <th style={{ width: 130 }}>Můj status</th>
                 </tr>
               </thead>
               <tbody>
@@ -1493,26 +1494,27 @@ function DesktopRaceRow({
         </span>
       </td>
       <td style={{ textAlign: "center" }}>
-        <div className="flex flex-col items-center gap-1">
-          <button
-            type="button"
-            className="uk-star"
-            aria-pressed={race.is_favorite}
-            aria-label={
-              race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"
-            }
-            onClick={onFavorite}
-          >
-            ★
-          </button>
-          {race.plan_status && (
-            <StatusPickerMenu
-              current={race.plan_status}
-              onChoose={onSetStatus}
-              compact
-            />
-          )}
-        </div>
+        <button
+          type="button"
+          className="uk-star"
+          aria-pressed={race.is_favorite}
+          aria-label={
+            race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"
+          }
+          onClick={onFavorite}
+        >
+          ★
+        </button>
+      </td>
+      <td>
+        {race.plan_status ? (
+          <StatusPickerMenu
+            current={race.plan_status}
+            onChoose={onSetStatus}
+          />
+        ) : (
+          <span className="text-[12px] text-ink-300">—</span>
+        )}
       </td>
     </tr>
   );
