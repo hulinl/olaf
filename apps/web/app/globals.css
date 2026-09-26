@@ -442,13 +442,6 @@ select:not([multiple]):not([size]) {
   overflow: hidden;
   aspect-ratio: 16 / 10;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
-  /* Container query s cqi jako root font-size — screen mockup fonty
-   * teď škálují proporcionálně s frame width. Na 500 px = 7.5 px base,
-   * na 340 px (mobile) = 5.1 px base, na 700 px (hero) = 10.5 px base.
-   * Children uvnitř screen mockupů používají em jednotky pro
-   * responsive text-sizing bez explicit px hodnot. */
-  container-type: inline-size;
-  font-size: 1.5cqi;
 }
 /* Screen shine — velmi subtilní diagonální gradient „lesk skla" */
 .chrome-laptop-screen::after {
@@ -487,11 +480,6 @@ select:not([multiple]):not([size]) {
   overflow: hidden;
   aspect-ratio: 9 / 19.5;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
-  /* Phone frame je 130-200 px wide, cqi vyšší (3%) aby text zůstal
-   * čitelný — na 160 px = 4.8 px base, což je minimum pro
-   * proporcionálně-vypadající UI. */
-  container-type: inline-size;
-  font-size: 3cqi;
 }
 .chrome-phone-notch {
   position: absolute;
@@ -625,6 +613,414 @@ select:not([multiple]):not([size]) {
   font-family:
     var(--font-condensed), "Barlow Condensed", "Arial Narrow", Arial,
     sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   /kalendar — Ultra kalendář 1:1 replika (jen barevný swap red → amber)
+   Referenční `/Users/hulin/Desktop/Ultra kalendář 2027.html`. Vše zde je
+   scoped pod `.uk-*` prefix, ať se neplete s globálním designem OLAFu.
+   --------------------------------------------------------------------------- */
+
+/* Trail marker stripe (KČT-style 3-band) — nastav barvu přes CSS var --c. */
+.uk-mk {
+  display: inline-block;
+  width: 18px;
+  height: 14px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: linear-gradient(
+    #fff 0 33%,
+    var(--c, var(--brand)) 33% 67%,
+    #fff 67%
+  );
+}
+.uk-mk.uk-big {
+  width: 24px;
+  height: 18px;
+}
+
+/* Mode 2/3-button toggle — 2px ink border, overflow hidden, active flips */
+.uk-mode {
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  width: max-content;
+  max-width: 100%;
+  border: 2px solid var(--ink-900);
+  border-radius: 6px;
+}
+.uk-mode button {
+  padding: 8px 16px;
+  font-family: var(--font-condensed), sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--surface);
+  color: var(--ink-900);
+  border: 0;
+  cursor: pointer;
+}
+.uk-mode button[aria-pressed="true"] {
+  background: var(--ink-900);
+  color: var(--canvas);
+}
+.uk-mode button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -4px;
+}
+
+/* Filter chips — pill s hover border */
+.uk-chip {
+  padding: 5px 10px;
+  font-size: 13.5px;
+  line-height: 1.2;
+  background: var(--canvas);
+  color: var(--ink-900);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.uk-chip:hover {
+  border-color: var(--ink-500);
+}
+.uk-chip[aria-pressed="true"] {
+  background: var(--ink-900);
+  color: var(--canvas);
+  border-color: var(--ink-900);
+}
+.uk-chip.uk-compact {
+  border-radius: 4px;
+  min-width: 40px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+.uk-chip:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Label „Oblast:", „Měsíc:" atd. — display font uppercase */
+.uk-lbl {
+  font-family: var(--font-condensed), sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+  color: var(--ink-500);
+  min-width: 78px;
+}
+
+/* Registration status pill — 5 variants (V/L/S/K/Q). Barvy sladěné s
+ * OLAF paletou: green success, danger, warning, ink, muted. */
+.uk-rg {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+.uk-rg-V {
+  background: rgb(from var(--success) r g b / 0.12);
+  color: var(--success);
+}
+.uk-rg-L {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.uk-rg-S {
+  background: rgb(from var(--warning) r g b / 0.15);
+  color: var(--warning);
+}
+.uk-rg-K {
+  background: var(--ink-900);
+  color: var(--canvas);
+}
+.uk-rg-Q {
+  background: var(--surface-strong);
+  color: var(--ink-500);
+}
+
+/* Series tag — bordered pill */
+.uk-tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  color: var(--ink-500);
+}
+.uk-tag-utmb {
+  border-color: var(--ink-900);
+  color: var(--ink-900);
+  font-weight: 600;
+}
+.uk-tag-major {
+  background: var(--ink-900);
+  color: var(--canvas);
+  border-color: var(--ink-900);
+  font-weight: 600;
+}
+.uk-tag-wtm {
+  border-color: var(--brand);
+  color: var(--ink-900);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+.uk-tag-sky {
+  border-color: var(--ink-500);
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+/* Steepness mini bar */
+.uk-steep {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.uk-bar {
+  width: 44px;
+  height: 6px;
+  background: var(--surface-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.uk-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--ink-900);
+}
+
+/* Star button */
+.uk-star {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-300);
+  padding: 0 2px;
+}
+.uk-star[aria-pressed="true"] {
+  color: var(--brand);
+}
+.uk-star:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* TOP badge — červené/amber "TOP" label vedle názvu */
+.uk-topb {
+  display: inline-block;
+  font-family: var(--font-condensed), sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: var(--brand);
+  color: var(--brand-ink);
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+
+/* Table — desktop layout matching reference přesně */
+.uk-tbl {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1180px;
+}
+.uk-tbl th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  text-align: left;
+  font-family: var(--font-condensed), sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12.5px;
+  color: var(--ink-500);
+  border-bottom: 2px solid var(--ink-900);
+  padding: 10px;
+  white-space: nowrap;
+  z-index: 1;
+}
+.uk-tbl th button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.uk-tbl th button::after {
+  content: " ↕";
+  opacity: 0.35;
+}
+.uk-tbl th button[data-dir="asc"]::after {
+  content: " ↑";
+  opacity: 1;
+  color: var(--brand);
+}
+.uk-tbl th button[data-dir="desc"]::after {
+  content: " ↓";
+  opacity: 1;
+  color: var(--brand);
+}
+.uk-tbl td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  font-size: 14px;
+}
+.uk-tbl tr:hover td {
+  background: var(--surface-muted);
+}
+.uk-tbl .uk-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.uk-tbl .uk-name {
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.uk-tbl .uk-name a {
+  text-decoration: none;
+  color: inherit;
+}
+.uk-tbl .uk-name a:hover {
+  text-decoration: underline;
+  color: var(--brand);
+}
+.uk-tbl .uk-hl {
+  color: var(--ink-500);
+  font-size: 13.5px;
+  margin-top: 3px;
+  max-width: 52ch;
+}
+.uk-tbl .uk-place {
+  color: var(--ink-300);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+.uk-tbl .uk-d27 {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.uk-tbl .uk-d26 {
+  color: var(--ink-300);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.uk-tbl .uk-d26.uk-soon {
+  color: var(--brand);
+  font-weight: 600;
+}
+.uk-tbl .uk-dist {
+  font-size: 13px;
+  color: var(--ink-500);
+  max-width: 18ch;
+}
+.uk-tbl .uk-entry {
+  font-size: 12.5px;
+  color: var(--ink-500);
+  max-width: 30ch;
+}
+.uk-tbl .uk-big {
+  font-family: var(--font-condensed), sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+}
+.uk-tbl .uk-ex {
+  font-size: 12px;
+  color: var(--ink-300);
+  margin-top: 3px;
+}
+
+/* Mobile — konvertuj tabulku na card-per-row. Header hidden, row je
+ * 3-col grid, každý td dostane label z data-l ::before. Přesně match
+ * Ultra kalendář reference. */
+@media (max-width: 760px) {
+  .uk-tblwrap {
+    overflow: visible;
+    background: none;
+    border: 0;
+  }
+  .uk-tbl {
+    min-width: 0;
+  }
+  .uk-tbl thead {
+    display: none;
+  }
+  .uk-tbl tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .uk-tbl tr:hover td {
+    background: none;
+  }
+  .uk-tbl td {
+    border: 0;
+    padding: 0;
+  }
+  .uk-tbl td.uk-c-plan {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .uk-tbl td.uk-c-name {
+    grid-column: 1 / -1;
+  }
+  .uk-tbl td.uk-c-when,
+  .uk-tbl td.uk-c-series,
+  .uk-tbl td.uk-c-entry,
+  .uk-tbl td.uk-c-dist {
+    grid-column: span 3;
+  }
+  .uk-tbl td.uk-c-country {
+    grid-column: 1 / -1;
+  }
+  .uk-tbl td.uk-num {
+    text-align: left;
+  }
+  .uk-tbl td[data-l]::before {
+    content: attr(data-l);
+    display: block;
+    font-family: var(--font-condensed), sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    color: var(--ink-300);
+    margin-bottom: 2px;
+  }
+  .uk-steep {
+    justify-content: flex-start;
+  }
+  .uk-tbl .uk-hl,
+  .uk-tbl .uk-dist,
+  .uk-tbl .uk-entry {
+    max-width: none;
+  }
 }
 
 /* Card lift on hover — border shift + shadow materialize + translateY -3px.
