@@ -87,7 +87,11 @@ class Race(models.Model):
     # frontend defaultuje na `country`. Extrahováno z Ultra kalendář
     # datasetu (CZ/ALP/SVET/SKPL/SEV/IBE/OST/BAL).
     REGION_CZ = "CZ"
+    REGION_SK = "SK"
+    REGION_PL = "PL"
     REGION_ALP = "ALP"
+    # Deprecated (kept for data migration continuity — vsechny záznamy s
+    # tímto kódem migrují na SK/PL podle country při 0006).
     REGION_SKPL = "SKPL"
     REGION_SEV = "SEV"
     REGION_IBE = "IBE"
@@ -96,8 +100,9 @@ class Race(models.Model):
     REGION_SVET = "SVET"
     REGION_CHOICES = [
         (REGION_CZ, "Česko"),
+        (REGION_SK, "Slovensko"),
+        (REGION_PL, "Polsko"),
         (REGION_ALP, "Alpy"),
-        (REGION_SKPL, "Slovensko / Polsko"),
         (REGION_SEV, "Skandinávie / sever"),
         (REGION_IBE, "Ibérie"),
         (REGION_BAL, "Balkán / Řecko"),

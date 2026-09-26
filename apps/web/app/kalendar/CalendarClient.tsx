@@ -12,38 +12,28 @@ import {
 } from "@/lib/races";
 
 /**
- * Ultra kalendář client — 1:1 replika layoutu z
- * `/Users/hulin/Desktop/Ultra kalendář 2027.html` (jen barevný swap:
- * red accent → OLAF amber). Ostatní pravidla (Barlow Condensed
- * display font, mode toggles, chip pills, sortable columns, mobile
- * card grid via data-l labels) drží přesnou strukturu.
+ * Ultra kalendář client — 1:1 replika layoutu z reference HTML.
+ * Změny 2026-09-27:
+ * - PL a SK rozdělené na dva samostatné regiony (dřív společný SKPL)
+ * - Month + year chip rows nahrazené date range pickers (od-do)
+ * - Star column přesunutý z prvního na poslední (aby lícoval s pravou
+ *   hranou — user preference)
+ * - Mobile: filter section je collapsible (defaultně sbalený), nový
+ *   RaceCard layout s velkou touch-friendly star + čistým flex
+ *   layoutem místo CSS table-row transformace přes data-l ::before
  */
 
 type SortKey = "date" | "distance" | "elevation" | "steep" | "name";
 type SortDir = "asc" | "desc";
 
-const MONTHS_CS = [
-  { key: 1, label: "led" },
-  { key: 2, label: "úno" },
-  { key: 3, label: "bře" },
-  { key: 4, label: "dub" },
-  { key: 5, label: "kvě" },
-  { key: 6, label: "čvn" },
-  { key: 7, label: "čvc" },
-  { key: 8, label: "srp" },
-  { key: 9, label: "zář" },
-  { key: 10, label: "říj" },
-  { key: 11, label: "lis" },
-  { key: 12, label: "pro" },
-];
-
 const REGION_FILTERS: { value: RaceRegion; label: string; color: string }[] = [
   { value: "CZ", label: "Česko", color: "#c8102e" },
-  { value: "SKPL", label: "SK / PL", color: "#1f8a4c" },
+  { value: "SK", label: "Slovensko", color: "#1f8a4c" },
+  { value: "PL", label: "Polsko", color: "#7b3fa6" },
   { value: "ALP", label: "Alpy", color: "#1d5fbf" },
   { value: "IBE", label: "Ibérie", color: "#e0671b" },
   { value: "BAL", label: "Balkán", color: "#8a5a2b" },
-  { value: "SEV", label: "Sever", color: "#7b3fa6" },
+  { value: "SEV", label: "Sever", color: "#0a5f8a" },
   { value: "OST", label: "Ostrovy", color: "#e8b100" },
   { value: "SVET", label: "Svět", color: "#15231d" },
 ];
@@ -68,8 +58,9 @@ const REG_FILTERS = [
   { value: "open" as const, label: "Volně", code: "V" },
   { value: "lottery" as const, label: "Losování", code: "L" },
   { value: "sold_out" as const, label: "Vyprodáno", code: "S" },
-  { value: "qualifier" as const, label: "Kvalifikace", code: "Q" },
+  { value: "qualifier" as const, label: "Kvalifikace", code: "K" },
   { value: "closed" as const, label: "Uzavřeno", code: "K" },
+  { value: "unknown" as const, label: "Nejasné", code: "Q" },
 ];
 
 const REG_CODE: Record<Race["registration_status"], string> = {
@@ -123,6 +114,8 @@ export function CalendarClient() {
     dir: "asc",
   });
   const [statsMount, setStatsMount] = useState<HTMLElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     auth
@@ -133,6 +126,11 @@ export function CalendarClient() {
 
   useEffect(() => {
     setStatsMount(document.getElementById("kalendar-stats"));
+    const mq = window.matchMedia("(max-width: 760px)");
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   const loadRaces = useCallback(async () => {
@@ -192,6 +190,18 @@ export function CalendarClient() {
     [items],
   );
 
+  const activeFilterCount = useMemo(() => {
+    let c = 0;
+    if (filters.from) c += 1;
+    if (filters.to) c += 1;
+    if (filters.region) c += 1;
+    if (filters.minKm || filters.maxKm) c += 1;
+    if (filters.series) c += 1;
+    if (regFilter) c += 1;
+    if (filters.favOnly) c += 1;
+    return c;
+  }, [filters, regFilter]);
+
   const setFilter = (patch: Partial<RaceFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
   };
@@ -227,6 +237,10 @@ export function CalendarClient() {
     }
   };
 
+  // Na mobilu se filtry defaultně zavírají; na desktopu (isMobile=false)
+  // je vždy expandováno.
+  const showFilters = isMobile ? filtersOpen : true;
+
   return (
     <>
       {statsMount &&
@@ -241,64 +255,32 @@ export function CalendarClient() {
         )}
 
       <section className="mx-auto w-full max-w-[1320px] px-4 pb-16">
-        {/* Filter section */}
-        <section
-          aria-label="Filtry"
-          className="mt-3 grid gap-3 rounded-md border border-border bg-surface p-4"
-        >
-          {/* Row 1: sport + view mode toggles */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="uk-mode" role="group" aria-label="Sport">
-              <button
-                type="button"
-                aria-pressed={filters.sport === "trail"}
-                onClick={() => setFilter({ sport: "trail" })}
-              >
-                Běh
-              </button>
-              <button
-                type="button"
-                aria-pressed={filters.sport === "skialp"}
-                onClick={() => setFilter({ sport: "skialp" })}
-              >
-                Skialp
-              </button>
-            </div>
-            <div className="uk-mode" role="group" aria-label="Rozsah">
-              <button
-                type="button"
-                aria-pressed={filters.topOnly === true}
-                onClick={() => setFilter({ topOnly: true })}
-              >
-                Top výběr
-              </button>
-              <button
-                type="button"
-                aria-pressed={filters.topOnly !== true}
-                onClick={() => setFilter({ topOnly: false })}
-              >
-                Vše
-              </button>
-            </div>
-            <span className="text-sm text-ink-500">
-              {filters.topOnly
-                ? "Vlajkové závody sezóny"
-                : filters.sport === "trail"
-                  ? "Kompletní seznam ultra a horských závodů"
-                  : "Skialpové závody a rallye"}
-            </span>
-          </div>
-
-          {/* Row 2: search + sort */}
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Sticky header — search + filter toggle. Vždy viditelný. */}
+        <div className="sticky top-14 z-10 -mx-4 mb-3 border-b border-border bg-canvas/95 px-4 py-3 backdrop-blur">
+          <div className="flex items-center gap-2">
             <input
               type="search"
-              placeholder="Hledat závod, zemi, pohoří (např. Beskydy, Dolomity)…"
+              placeholder="Hledat závod, zemi, pohoří…"
               value={filters.q ?? ""}
               onChange={(e) => setFilter({ q: e.target.value })}
-              className="min-w-[240px] flex-1 rounded-md border border-border bg-canvas px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus-ring"
+              className="min-w-0 flex-1 rounded-md border border-border bg-canvas px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus-ring"
               aria-label="Hledat"
             />
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((v) => !v)}
+                aria-expanded={filtersOpen}
+                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-ring ${
+                  filtersOpen || activeFilterCount > 0
+                    ? "border-ink-900 bg-ink-900 text-canvas"
+                    : "border-border bg-canvas text-ink-700"
+                }`}
+              >
+                Filtry
+                {activeFilterCount > 0 && ` (${activeFilterCount})`}
+              </button>
+            )}
             <select
               value={`${sort.key}:${sort.dir}`}
               onChange={(e) => {
@@ -308,136 +290,209 @@ export function CalendarClient() {
                 ];
                 setSort({ key, dir });
               }}
-              className="rounded-md border border-border bg-canvas px-3 py-2 text-sm text-ink-900 focus-ring"
+              className="rounded-md border border-border bg-canvas px-2 py-2 text-sm text-ink-900 focus-ring sm:px-3"
               aria-label="Řazení"
             >
-              <option value="date:asc">Řadit: podle termínu</option>
+              <option value="date:asc">Termín</option>
               <option value="distance:desc">Nejdelší</option>
-              <option value="elevation:desc">Největší převýšení</option>
-              <option value="steep:desc">Nejstrmější (m/km)</option>
-              <option value="name:asc">Abecedně</option>
+              <option value="elevation:desc">Nejvyšší D+</option>
+              <option value="steep:desc">Nejstrmější</option>
+              <option value="name:asc">A→Z</option>
             </select>
-            {user && (
-              <button
-                type="button"
-                className="uk-chip"
-                aria-pressed={filters.favOnly ?? false}
-                onClick={() => setFilter({ favOnly: !filters.favOnly })}
-              >
-                ★ Jen můj plán
-              </button>
-            )}
           </div>
+        </div>
 
-          {/* Chip rows */}
-          <ChipRow label="Oblast">
-            {REGION_FILTERS.map((r) => (
-              <button
-                key={r.value}
-                type="button"
-                className="uk-chip"
-                aria-pressed={filters.region === r.value}
-                onClick={() =>
-                  setFilter({
-                    region: filters.region === r.value ? undefined : r.value,
-                  })
-                }
-              >
-                <span
-                  className="uk-mk"
-                  style={{ ["--c" as string]: r.color }}
-                  aria-hidden
-                />
-                {r.label}
-              </button>
-            ))}
-          </ChipRow>
-
-          <ChipRow label="Měsíc">
-            {MONTHS_CS.map((m) => {
-              const year = filters.year ?? 2027;
-              const key = `${year}-${String(m.key).padStart(2, "0")}`;
-              const active = filters.month === key;
-              return (
+        {/* Filter section — collapsible on mobile */}
+        {showFilters && (
+          <section
+            aria-label="Filtry"
+            className="grid gap-3 rounded-md border border-border bg-surface p-4"
+          >
+            {/* Row: sport + view mode toggles */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="uk-mode" role="group" aria-label="Sport">
                 <button
-                  key={m.key}
                   type="button"
-                  className="uk-chip uk-compact"
-                  aria-pressed={active}
-                  onClick={() =>
-                    setFilter({ month: active ? undefined : key })
-                  }
+                  aria-pressed={filters.sport === "trail"}
+                  onClick={() => setFilter({ sport: "trail" })}
                 >
-                  {m.label}
+                  Běh
                 </button>
-              );
-            })}
-          </ChipRow>
-
-          <ChipRow label="Délka">
-            {LENGTH_PRESETS.map((preset) => {
-              const active =
-                filters.minKm === preset.min && filters.maxKm === preset.max;
-              return (
                 <button
-                  key={preset.label}
+                  type="button"
+                  aria-pressed={filters.sport === "skialp"}
+                  onClick={() => setFilter({ sport: "skialp" })}
+                >
+                  Skialp
+                </button>
+              </div>
+              <div className="uk-mode" role="group" aria-label="Rozsah">
+                <button
+                  type="button"
+                  aria-pressed={filters.topOnly === true}
+                  onClick={() => setFilter({ topOnly: true })}
+                >
+                  Top výběr
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={filters.topOnly !== true}
+                  onClick={() => setFilter({ topOnly: false })}
+                >
+                  Vše
+                </button>
+              </div>
+              {user && (
+                <button
                   type="button"
                   className="uk-chip"
-                  aria-pressed={active}
-                  onClick={() =>
-                    setFilter({
-                      minKm: active ? undefined : preset.min,
-                      maxKm: active ? undefined : preset.max,
-                    })
-                  }
+                  aria-pressed={filters.favOnly ?? false}
+                  onClick={() => setFilter({ favOnly: !filters.favOnly })}
                 >
-                  {preset.label} km
+                  ★ Jen můj plán
                 </button>
-              );
-            })}
-          </ChipRow>
+              )}
+            </div>
 
-          <ChipRow label="Série">
-            {SERIES_FILTERS.map((s) => (
-              <button
-                key={s.value}
-                type="button"
-                className="uk-chip"
-                aria-pressed={filters.series === s.value}
-                onClick={() =>
-                  setFilter({
-                    series: filters.series === s.value ? undefined : s.value,
-                  })
-                }
-              >
-                {s.label}
-              </button>
-            ))}
-          </ChipRow>
+            {/* Date range — nahrazuje month + year chips */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="uk-lbl">Období</span>
+              <label className="flex items-center gap-1.5 text-[13.5px] text-ink-500">
+                Od
+                <input
+                  type="date"
+                  value={filters.from ?? ""}
+                  onChange={(e) => setFilter({ from: e.target.value || undefined })}
+                  className="rounded-md border border-border bg-canvas px-2 py-1.5 text-sm text-ink-900 focus-ring"
+                />
+              </label>
+              <label className="flex items-center gap-1.5 text-[13.5px] text-ink-500">
+                Do
+                <input
+                  type="date"
+                  value={filters.to ?? ""}
+                  onChange={(e) => setFilter({ to: e.target.value || undefined })}
+                  className="rounded-md border border-border bg-canvas px-2 py-1.5 text-sm text-ink-900 focus-ring"
+                />
+              </label>
+              {(filters.from || filters.to) && (
+                <button
+                  type="button"
+                  onClick={() => setFilter({ from: undefined, to: undefined })}
+                  className="text-[13px] text-brand underline underline-offset-2 hover:no-underline"
+                >
+                  Zrušit
+                </button>
+              )}
+            </div>
 
-          <ChipRow label="Přihláška">
-            {REG_FILTERS.map((r) => {
-              const active = regFilter === r.value;
-              return (
+            <ChipRow label="Oblast">
+              {REGION_FILTERS.map((r) => (
                 <button
                   key={r.value}
                   type="button"
                   className="uk-chip"
-                  aria-pressed={active}
-                  onClick={() => setRegFilter(active ? null : r.value)}
+                  aria-pressed={filters.region === r.value}
+                  onClick={() =>
+                    setFilter({
+                      region: filters.region === r.value ? undefined : r.value,
+                    })
+                  }
                 >
                   <span
-                    className={`uk-rg uk-rg-${r.code}`}
-                    style={{ marginBottom: 0 }}
-                  >
-                    {r.code}
-                  </span>
+                    className="uk-mk"
+                    style={{ ["--c" as string]: r.color }}
+                    aria-hidden
+                  />
                   {r.label}
                 </button>
-              );
-            })}
-          </ChipRow>
-        </section>
+              ))}
+            </ChipRow>
+
+            <ChipRow label="Délka">
+              {LENGTH_PRESETS.map((preset) => {
+                const active =
+                  filters.minKm === preset.min && filters.maxKm === preset.max;
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className="uk-chip"
+                    aria-pressed={active}
+                    onClick={() =>
+                      setFilter({
+                        minKm: active ? undefined : preset.min,
+                        maxKm: active ? undefined : preset.max,
+                      })
+                    }
+                  >
+                    {preset.label} km
+                  </button>
+                );
+              })}
+            </ChipRow>
+
+            <ChipRow label="Série">
+              {SERIES_FILTERS.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  className="uk-chip"
+                  aria-pressed={filters.series === s.value}
+                  onClick={() =>
+                    setFilter({
+                      series: filters.series === s.value ? undefined : s.value,
+                    })
+                  }
+                >
+                  {s.label}
+                </button>
+              ))}
+            </ChipRow>
+
+            <ChipRow label="Přihláška">
+              {REG_FILTERS.map((r) => {
+                const active = regFilter === r.value;
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    className="uk-chip"
+                    aria-pressed={active}
+                    onClick={() => setRegFilter(active ? null : r.value)}
+                  >
+                    <span
+                      className={`uk-rg uk-rg-${r.code}`}
+                      style={{ marginBottom: 0 }}
+                    >
+                      {r.code}
+                    </span>
+                    {r.label}
+                  </button>
+                );
+              })}
+            </ChipRow>
+
+            {isMobile && (
+              <div className="flex items-center justify-between border-t border-border pt-3">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-[13.5px] font-medium text-brand underline-offset-2 hover:underline"
+                >
+                  Zrušit filtry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="rounded-md bg-ink-900 px-4 py-2 text-sm font-semibold text-canvas focus-ring"
+                >
+                  Zavřít
+                </button>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Meta bar */}
         <div className="mt-3.5 mb-2 flex items-center justify-between text-[13.5px] text-ink-500">
@@ -448,16 +503,18 @@ export function CalendarClient() {
                 ? "Chyba"
                 : `Zobrazeno ${sorted.length} závodů`}
           </span>
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="text-brand underline underline-offset-2 hover:no-underline"
-          >
-            Zrušit filtry
-          </button>
+          {!isMobile && activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-brand underline underline-offset-2 hover:no-underline"
+            >
+              Zrušit filtry
+            </button>
+          )}
         </div>
 
-        {/* Table */}
+        {/* CONTENT */}
         {error ? (
           <div className="rounded-md border border-danger/40 bg-danger-soft/40 p-4 text-sm text-danger">
             {error}
@@ -470,12 +527,24 @@ export function CalendarClient() {
           <div className="rounded-md border border-dashed border-border p-10 text-center text-sm text-ink-500">
             Žádný závod nesplňuje filtr.
           </div>
+        ) : isMobile ? (
+          // Mobile: dedikované karty (žádný table transformation hack)
+          <div className="flex flex-col gap-3">
+            {sorted.map((r) => (
+              <MobileRaceCard
+                key={r.id}
+                race={r}
+                onFavorite={() => toggleFavorite(r)}
+                maxSteep={maxSteep}
+              />
+            ))}
+          </div>
         ) : (
+          // Desktop table s star sloupcem NA KONCI
           <div className="uk-tblwrap overflow-x-auto rounded-md border border-border bg-surface">
             <table className="uk-tbl">
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}>Plán</th>
                   <ThSortable
                     label="Závod"
                     sortKey="name"
@@ -513,11 +582,12 @@ export function CalendarClient() {
                     className="uk-num"
                   />
                   <th>Série</th>
+                  <th style={{ width: 40, textAlign: "center" }}>Plán</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <RaceRow
+                  <DesktopRaceRow
                     key={r.id}
                     race={r}
                     onFavorite={() => toggleFavorite(r)}
@@ -589,7 +659,7 @@ function ThSortable({
   );
 }
 
-function RaceRow({
+function DesktopRaceRow({
   race,
   onFavorite,
   maxSteep,
@@ -605,19 +675,6 @@ function RaceRow({
   const regCode = REG_CODE[race.registration_status];
   return (
     <tr>
-      <td className="uk-c-plan">
-        <button
-          type="button"
-          className="uk-star"
-          aria-pressed={race.is_favorite}
-          aria-label={
-            race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"
-          }
-          onClick={onFavorite}
-        >
-          ★
-        </button>
-      </td>
       <td className="uk-c-name">
         <div className="uk-name">
           <span
@@ -637,14 +694,12 @@ function RaceRow({
         </div>
         {race.highlight && <div className="uk-hl">{race.highlight}</div>}
         {race.has_warning && (
-          <span
-            className="mt-1 inline-block rounded-sm bg-warning/10 px-1.5 py-0.5 text-[12px] font-medium text-warning"
-          >
+          <span className="mt-1 inline-block rounded-sm bg-warning/10 px-1.5 py-0.5 text-[12px] font-medium text-warning">
             termín nejistý
           </span>
         )}
       </td>
-      <td className="uk-c-country" data-l="Země">
+      <td>
         <div>{race.country}</div>
         {(race.location || race.terrain) && (
           <div className="uk-place">
@@ -652,13 +707,13 @@ function RaceRow({
           </div>
         )}
       </td>
-      <td className="uk-c-when" data-l="Další ročník">
+      <td>
         <div className="uk-d27">
           {race.next_label || race.date_display || formatDateCompact(race.date_start)}
         </div>
         <div className="uk-d26">{race.next_year}</div>
       </td>
-      <td className="uk-c-entry uk-entry" data-l="Přihláška">
+      <td className="uk-entry">
         <span className={`uk-rg uk-rg-${regCode}`}>
           {REG_LABEL[race.registration_status]}
         </span>
@@ -666,20 +721,20 @@ function RaceRow({
           <div className="mt-1 leading-snug">{race.registration_detail}</div>
         )}
       </td>
-      <td className="uk-c-dist uk-dist" data-l="Tratě (km)">
+      <td className="uk-dist">
         {race.distances_note || race.distance_km}
       </td>
-      <td className="uk-num" data-l="Hlavní km">
+      <td className="uk-num">
         <span className="uk-big">{race.distance_km.toLocaleString("cs-CZ")}</span>
       </td>
-      <td className="uk-num" data-l="D+ (m)">
+      <td className="uk-num">
         <span className="uk-big">
           {race.elevation_m
             ? race.elevation_m.toLocaleString("cs-CZ")
             : "–"}
         </span>
       </td>
-      <td className="uk-num" data-l="m/km">
+      <td className="uk-num">
         <div className="uk-steep">
           <span className="uk-bar">
             <i style={{ width: `${steepPct}%` }} />
@@ -687,12 +742,195 @@ function RaceRow({
           <span>{race.elevation_per_km ? Math.round(race.elevation_per_km) : "–"}</span>
         </div>
       </td>
-      <td className="uk-c-series" data-l="Série">
+      <td>
         <span className={SERIES_TAG_CLASS[race.series]}>
           {seriesLabel(race.series)}
         </span>
       </td>
+      <td style={{ textAlign: "center" }}>
+        <button
+          type="button"
+          className="uk-star"
+          aria-pressed={race.is_favorite}
+          aria-label={
+            race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"
+          }
+          onClick={onFavorite}
+        >
+          ★
+        </button>
+      </td>
     </tr>
+  );
+}
+
+/**
+ * Mobile card — nový layout od nuly, ne CSS table row transformation.
+ * Star button je fixní top-right pro touch prsty (40 × 40), zbytek
+ * karty se čte přirozeně shora dolů.
+ */
+function MobileRaceCard({
+  race,
+  onFavorite,
+  maxSteep,
+}: {
+  race: Race;
+  onFavorite: () => void;
+  maxSteep: number;
+}) {
+  const steep = race.elevation_per_km ?? 0;
+  const steepPct = maxSteep > 0 ? Math.min(100, (steep / maxSteep) * 100) : 0;
+  const regionColor = REGION_COLOR_BY_CODE[race.region] || "#15231d";
+  const regionLabel = REGION_LABEL_BY_CODE[race.region] || "";
+  const regCode = REG_CODE[race.registration_status];
+
+  return (
+    <article className="relative rounded-md border border-border bg-surface p-4">
+      {/* Star — absolute top-right, touch-friendly 40×40 */}
+      <button
+        type="button"
+        onClick={onFavorite}
+        aria-pressed={race.is_favorite}
+        aria-label={race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"}
+        className="focus-ring absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-md text-2xl leading-none"
+        style={{
+          color: race.is_favorite ? "var(--brand)" : "var(--ink-300)",
+        }}
+      >
+        {race.is_favorite ? "★" : "☆"}
+      </button>
+
+      {/* Header — region marker + name + TOP badge */}
+      <div className="pr-12">
+        <div className="flex items-start gap-2">
+          <span
+            className="uk-mk uk-big shrink-0"
+            style={{ ["--c" as string]: regionColor }}
+            title={regionLabel}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            {race.url ? (
+              <a
+                href={race.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[16px] font-semibold leading-tight text-ink-900 hover:text-brand hover:underline"
+              >
+                {race.name}
+              </a>
+            ) : (
+              <h3 className="text-[16px] font-semibold leading-tight text-ink-900">
+                {race.name}
+              </h3>
+            )}
+            {race.is_top && (
+              <span className="uk-topb inline-block" style={{ marginLeft: 0, marginTop: 4 }}>
+                TOP
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {race.highlight && (
+        <p className="mt-2 line-clamp-2 text-[13.5px] leading-snug text-ink-500">
+          {race.highlight}
+        </p>
+      )}
+      {race.has_warning && (
+        <p className="mt-2 inline-block rounded-sm bg-warning/10 px-1.5 py-0.5 text-[12px] font-medium text-warning">
+          termín nejistý
+        </p>
+      )}
+
+      {/* Date — big condensed */}
+      <div className="mt-3 flex items-baseline gap-2">
+        <span
+          className="font-condensed font-bold tracking-tight text-ink-900"
+          style={{ fontSize: "22px", lineHeight: 1 }}
+        >
+          {race.next_label || race.date_display || formatDateCompact(race.date_start)}
+        </span>
+        <span className="text-[13px] tabular-nums text-ink-500">
+          {race.next_year}
+        </span>
+      </div>
+
+      {/* Stats row — km / D+ / m/km */}
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <StatCell label="km" value={race.distance_km.toLocaleString("cs-CZ")} />
+        <StatCell
+          label="D+ (m)"
+          value={
+            race.elevation_m ? race.elevation_m.toLocaleString("cs-CZ") : "–"
+          }
+        />
+        <div>
+          <div className="uk-lbl mb-1" style={{ minWidth: 0 }}>
+            m/km
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="font-condensed text-[20px] font-semibold tabular-nums text-ink-900"
+              style={{ lineHeight: 1 }}
+            >
+              {race.elevation_per_km ? Math.round(race.elevation_per_km) : "–"}
+            </span>
+            {race.elevation_per_km && (
+              <span className="uk-bar" style={{ width: 40 }}>
+                <i style={{ width: `${steepPct}%` }} />
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Location / terrain */}
+      {(race.country || race.location || race.terrain) && (
+        <p className="mt-3 text-[13px] text-ink-500">
+          {[race.location, race.country, race.terrain].filter(Boolean).join(" · ")}
+        </p>
+      )}
+
+      {/* Distances_note */}
+      {race.distances_note && (
+        <p className="mt-1 text-[12.5px] leading-snug text-ink-500">
+          {race.distances_note}
+        </p>
+      )}
+
+      {/* Registration pill + detail + series */}
+      <div className="mt-3 flex flex-wrap items-start gap-2">
+        <span className={`uk-rg uk-rg-${regCode}`}>
+          {REG_LABEL[race.registration_status]}
+        </span>
+        <span className={SERIES_TAG_CLASS[race.series]}>
+          {seriesLabel(race.series)}
+        </span>
+      </div>
+      {race.registration_detail && (
+        <p className="mt-2 text-[12.5px] leading-snug text-ink-500">
+          {race.registration_detail}
+        </p>
+      )}
+    </article>
+  );
+}
+
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="uk-lbl mb-1" style={{ minWidth: 0 }}>
+        {label}
+      </div>
+      <div
+        className="font-condensed text-[20px] font-semibold tabular-nums text-ink-900"
+        style={{ lineHeight: 1 }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 

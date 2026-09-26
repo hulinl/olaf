@@ -35,8 +35,9 @@ export interface Race {
 export type RaceSport = "trail" | "skialp";
 export type RaceRegion =
   | "CZ"
+  | "SK"
+  | "PL"
   | "ALP"
-  | "SKPL"
   | "SEV"
   | "IBE"
   | "BAL"
@@ -45,8 +46,9 @@ export type RaceRegion =
 
 export const REGION_LABEL: Record<RaceRegion, string> = {
   CZ: "Česko",
+  SK: "Slovensko",
+  PL: "Polsko",
   ALP: "Alpy",
-  SKPL: "Slovensko / Polsko",
   SEV: "Skandinávie",
   IBE: "Ibérie",
   BAL: "Balkán / Řecko",
@@ -82,8 +84,8 @@ export const REGISTRATION_LABEL: Record<RaceRegistrationStatus, string> = {
 
 export interface RaceFilters {
   q?: string;
-  year?: number;
-  month?: string; // YYYY-MM
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
   country?: string;
   region?: RaceRegion;
   sport?: RaceSport;
@@ -103,8 +105,8 @@ export interface RaceListResponse {
 function buildQuery(filters: RaceFilters): string {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
-  if (filters.year) params.set("year", String(filters.year));
-  if (filters.month) params.set("month", filters.month);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
   if (filters.country) params.set("country", filters.country);
   if (filters.region) params.set("region", filters.region);
   if (filters.sport) params.set("sport", filters.sport);

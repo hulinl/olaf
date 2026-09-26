@@ -41,6 +41,21 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
         y_int = int(year)
         qs = qs.filter(date_start__year=y_int)
 
+    # Range filter — nahradil single month/year picker za flexibilnější
+    # „od-do" (uživatel může vybrat víc měsíců napříč roky).
+    date_from = request.query_params.get("from")
+    if date_from:
+        try:
+            qs = qs.filter(date_start__gte=date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    date_to = request.query_params.get("to")
+    if date_to:
+        try:
+            qs = qs.filter(date_start__lte=date.fromisoformat(date_to))
+        except ValueError:
+            pass
+
     month = request.query_params.get("month")
     if month:
         # Formát YYYY-MM. Interpretujeme jako datum ve tvaru YYYY-MM-01 do
