@@ -18,7 +18,7 @@ export function PaymentScreen() {
 
       {/* Body */}
       <div className="flex flex-1 flex-col items-center overflow-hidden px-4 py-4">
-        <p className="mono-tag text-[6px] text-ink-500">
+        <p className="mockup-mono text-[6px] text-ink-500">
           SPRING CAMP BESKYDY
         </p>
         <p className="mt-1 text-[13px] font-semibold leading-none tracking-tight text-ink-900 tabular-nums">
@@ -32,7 +32,7 @@ export function PaymentScreen() {
         <div className="mt-3 rounded-sm border-2 border-ink-900 bg-canvas p-2">
           <QrGrid />
         </div>
-        <p className="mono-tag text-[6px] mt-1.5 text-ink-500">Naskenuj v bance</p>
+        <p className="mockup-mono text-[6px] mt-1.5 text-ink-500">Naskenuj v bance</p>
 
         {/* Details */}
         <div className="mt-4 w-full space-y-1.5 rounded-sm border border-border bg-surface p-2">

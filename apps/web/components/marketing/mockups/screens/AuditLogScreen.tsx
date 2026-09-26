@@ -62,9 +62,9 @@ export function AuditLogScreen() {
         <div className="mt-3 overflow-hidden rounded-sm border border-border bg-surface">
           <div className="grid grid-cols-[18px_1fr_80px_50px] items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
             <span aria-hidden />
-            <span className="mono-tag text-[6px] text-ink-500">Kdo · Co · Kde</span>
-            <span className="mono-tag text-[6px] text-ink-500">Typ</span>
-            <span className="mono-tag text-[6px] text-ink-500 text-right">Kdy</span>
+            <span className="mockup-mono text-[6px] text-ink-500">Kdo · Co · Kde</span>
+            <span className="mockup-mono text-[6px] text-ink-500">Typ</span>
+            <span className="mockup-mono text-[6px] text-ink-500 text-right">Kdy</span>
           </div>
           <AuditRow
             actor="O"

@@ -75,7 +75,7 @@ export function WorkspaceProfileScreen() {
         </p>
 
         <div className="mt-3 flex items-baseline justify-between border-b border-border pb-1.5">
-          <p className="mono-tag text-[6px] text-ink-500">Nadcházející akce</p>
+          <p className="mockup-mono text-[6px] text-ink-500">Nadcházející akce</p>
           <span className="text-[6px] text-ink-500">Ukázat vše →</span>
         </div>
 
@@ -125,7 +125,7 @@ function EventCard({
             "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.85) 100%)",
         }}
       />
-      <p className="relative mono-tag text-[5px] text-canvas/85">{eyebrow}</p>
+      <p className="relative mockup-mono text-[5px] text-canvas/85">{eyebrow}</p>
       <p className="relative mt-0.5 text-[7.5px] font-semibold leading-tight text-canvas">
         {title}
       </p>

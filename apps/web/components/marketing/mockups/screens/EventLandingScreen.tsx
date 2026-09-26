@@ -34,7 +34,7 @@ export function EventLandingScreen() {
         />
         {/* Sticky-style header uvnitř coveru */}
         <div className="relative flex items-center justify-between px-3 pt-2">
-          <span className="mono-tag text-[6px] text-canvas/85">
+          <span className="mockup-mono text-[6px] text-canvas/85">
             OLAF ADVENTURES
           </span>
           <span className="text-[7px] text-canvas/85">↗</span>
@@ -42,7 +42,7 @@ export function EventLandingScreen() {
 
         {/* Content zóna dole u coveru — kompaktní stack, žádný overflow */}
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 px-3 pb-2.5">
-          <span className="mono-tag inline-flex w-fit items-center rounded-sm bg-brand px-1.5 py-0.5 text-[6px] text-brand-ink">
+          <span className="mockup-mono inline-flex w-fit items-center rounded-sm bg-brand px-1.5 py-0.5 text-[6px] text-brand-ink">
             Posledních 6 míst
           </span>
           <h1 className="text-[11px] font-semibold leading-[1.1] tracking-tight text-canvas text-shadow-strong">
@@ -59,7 +59,7 @@ export function EventLandingScreen() {
 
       {/* Prose block pod coverem — začátek popisu */}
       <div className="flex-1 overflow-hidden px-3 py-3">
-        <p className="mono-tag text-[5px] text-brand">01 · O AKCI</p>
+        <p className="mockup-mono text-[5px] text-brand">01 · O AKCI</p>
         <h2 className="mt-1 text-[9px] font-semibold leading-tight text-ink-900">
           Čtyři dny v horách, kde{" "}
           <span className="text-amber-glow">začíná dobrodružství</span>
@@ -79,7 +79,7 @@ export function EventLandingScreen() {
               key={tile.label}
               className="rounded-sm border border-border bg-surface p-1"
             >
-              <p className="mono-tag text-[4.5px] text-ink-500">{tile.label}</p>
+              <p className="mockup-mono text-[4.5px] text-ink-500">{tile.label}</p>
               <p className="mt-0.5 text-[7px] font-semibold leading-tight text-ink-900">
                 {tile.value}
               </p>

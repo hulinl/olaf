@@ -607,6 +607,18 @@ select:not([multiple]):not([size]) {
   line-height: 1.4;
 }
 
+/* Mockup mono — pro použití uvnitř .chrome-*-screen kde chceme
+ * malé fonty (6-8 px). Stejná typografie jako .mono-tag ale bez
+ * hardcoded font-size, takže children text-[Xpx] wins. Používá se v
+ * `mockups/screens/*.tsx`. */
+.mockup-mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+}
+
 /* Barlow Condensed utility — Ultra kalendář display look. Aplikuj na
  * H1/H2 v /kalendar page, sortable table headery, číselné stat tiles. */
 .font-condensed {

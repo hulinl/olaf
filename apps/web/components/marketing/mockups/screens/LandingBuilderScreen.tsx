@@ -26,7 +26,7 @@ export function LandingBuilderScreen() {
       <div className="flex flex-1 overflow-hidden">
         {/* Block list — left rail */}
         <div className="w-[38%] flex-shrink-0 overflow-hidden border-r border-border bg-surface-muted/60 p-2">
-          <p className="mono-tag mb-2 text-[6px] text-ink-500">
+          <p className="mockup-mono mb-2 text-[6px] text-ink-500">
             Bloky · přetáhni
           </p>
           <div className="flex flex-col gap-1">
@@ -59,7 +59,7 @@ export function LandingBuilderScreen() {
                 }}
               />
               <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
-                <span className="mono-tag inline-flex rounded-sm bg-brand px-1.5 py-0.5 text-[6px] text-brand-ink">
+                <span className="mockup-mono inline-flex rounded-sm bg-brand px-1.5 py-0.5 text-[6px] text-brand-ink">
                   16.–19. 5.
                 </span>
                 <p className="mt-1.5 text-[10px] font-semibold leading-tight text-canvas">
@@ -75,7 +75,7 @@ export function LandingBuilderScreen() {
 
             {/* Preview: prose block s edit chip */}
             <div className="relative border-b border-border px-3 py-3">
-              <p className="mono-tag text-[6px] text-brand">01 · O AKCI</p>
+              <p className="mockup-mono text-[6px] text-brand">01 · O AKCI</p>
               <p className="mt-1 text-[9px] font-semibold text-ink-900">
                 Čtyři dny v horách
               </p>
@@ -90,7 +90,7 @@ export function LandingBuilderScreen() {
 
             {/* Preview: program bloky (mini) */}
             <div className="relative px-3 py-2">
-              <p className="mono-tag text-[6px] text-brand">02 · PROGRAM</p>
+              <p className="mockup-mono text-[6px] text-brand">02 · PROGRAM</p>
               <div className="mt-1 space-y-1">
                 <div className="flex items-center gap-2 rounded-sm border border-border bg-surface-muted px-1.5 py-1 text-[7px]">
                   <span className="inline-flex h-3 w-3 items-center justify-center rounded-sm bg-brand-soft text-[6px] font-bold text-ink-900">

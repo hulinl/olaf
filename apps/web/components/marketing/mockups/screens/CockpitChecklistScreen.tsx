@@ -34,7 +34,7 @@ export function CockpitChecklistScreen() {
               16.–19. května 2026 · 24 dní do akce
             </p>
           </div>
-          <span className="mono-tag text-[7px] text-brand">
+          <span className="mockup-mono text-[7px] text-brand">
             85 % · připraveno
           </span>
         </div>
@@ -50,7 +50,7 @@ export function CockpitChecklistScreen() {
         {/* Roadmap checklist */}
         <div className="mt-3 rounded-sm border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border bg-surface-muted px-2 py-1">
-            <p className="mono-tag text-[6px] text-ink-500">
+            <p className="mockup-mono text-[6px] text-ink-500">
               Roadmapa akce · checklist
             </p>
             <span className="text-[6px] text-ink-500">17 z 20 hotovo</span>
@@ -105,7 +105,7 @@ function MiniStat({
           : "border-border bg-surface"
       }`}
     >
-      <p className="mono-tag text-[5px] text-ink-500">{label}</p>
+      <p className="mockup-mono text-[5px] text-ink-500">{label}</p>
       <p
         className={`mt-0.5 text-[9px] font-semibold leading-none tracking-tight tabular-nums ${
           warning ? "text-warning" : "text-ink-900"
@@ -128,7 +128,7 @@ function ChecklistCategory({
 }) {
   return (
     <div className={last ? "" : "mb-2 border-b border-border pb-2"}>
-      <p className="mono-tag mb-1 text-[6px] text-ink-500">{title}</p>
+      <p className="mockup-mono mb-1 text-[6px] text-ink-500">{title}</p>
       <ul className="space-y-0.5">
         {items.map((it, i) => (
           <li

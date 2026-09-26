@@ -18,7 +18,7 @@ export function AdminCockpitScreen() {
           </span>
         </div>
         <div className="flex flex-shrink-0 items-center gap-1.5">
-          <span className="mono-tag text-[6px] text-ink-500">TVŮRCE</span>
+          <span className="mockup-mono text-[6px] text-ink-500">TVŮRCE</span>
           <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-ink-900 text-[6px] font-semibold text-canvas">
             O
           </span>
@@ -40,7 +40,7 @@ export function AdminCockpitScreen() {
               16.–19. května 2026 · Rožnov pod Radhoštěm
             </p>
           </div>
-          <span className="mono-tag inline-flex flex-shrink-0 items-center gap-1 rounded-sm border border-border bg-surface-muted px-1.5 py-0.5 text-[6px] font-medium text-ink-700">
+          <span className="mockup-mono inline-flex flex-shrink-0 items-center gap-1 rounded-sm border border-border bg-surface-muted px-1.5 py-0.5 text-[6px] font-medium text-ink-700">
             <span className="inline-block h-1 w-1 rounded-full bg-success" />
             Publikováno
           </span>
@@ -73,7 +73,7 @@ export function AdminCockpitScreen() {
         {/* Roster preview */}
         <div className="mt-3 overflow-hidden rounded-sm border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border bg-surface-muted px-2 py-1">
-            <p className="mono-tag text-[6px] text-ink-500">
+            <p className="mockup-mono text-[6px] text-ink-500">
               Roster · 27 účastníků
             </p>
             <span className="text-[6px] text-ink-500">Nejnovější ↓</span>
@@ -140,7 +140,7 @@ function StatTile({
             : "border-border bg-surface"
       }`}
     >
-      <p className="mono-tag text-[6px] text-ink-500">{label}</p>
+      <p className="mockup-mono text-[6px] text-ink-500">{label}</p>
       <p
         className={`text-[11px] font-semibold leading-none tracking-tight tabular-nums ${
           warning ? "text-warning" : "text-ink-900"
@@ -202,7 +202,7 @@ function RosterRow({
         <p className="truncate text-[6px] text-ink-500">{email}</p>
       </div>
       <span
-        className={`mono-tag inline-flex flex-shrink-0 items-center rounded-sm border px-1 py-0.5 text-[6px] font-medium ${statusClass[status]}`}
+        className={`mockup-mono inline-flex flex-shrink-0 items-center rounded-sm border px-1 py-0.5 text-[6px] font-medium ${statusClass[status]}`}
       >
         {statusLabel[status]}
       </span>

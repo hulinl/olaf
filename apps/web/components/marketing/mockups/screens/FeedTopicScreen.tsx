@@ -91,7 +91,7 @@ function TopicCard({
               <span className="inline-block h-1 w-1 rounded-full bg-brand" />
             )}
             {isPinned && (
-              <span className="mono-tag rounded-sm bg-brand/15 px-1 py-px text-[5px] text-ink-900">
+              <span className="mockup-mono rounded-sm bg-brand/15 px-1 py-px text-[5px] text-ink-900">
                 PIN
               </span>
             )}
