@@ -236,6 +236,19 @@ export function CalendarClient() {
   const [statsMount, setStatsMount] = useState<HTMLElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Local search input pro debounce — user píše rychle, nechceme
+  // hitovat API na každý keystroke. Po 300 ms inactivity commit do
+  // filters.q → trigger fetch.
+  const [searchInput, setSearchInput] = useState<string>(filters.q ?? "");
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (searchInput !== (filters.q ?? "")) {
+        setFilters((f) => ({ ...f, q: searchInput || undefined }));
+      }
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [searchInput, filters.q]);
 
   // Persist filters change → localStorage. Debounce není potřeba,
   // setItem je synchronní a lightweight.
@@ -457,8 +470,8 @@ export function CalendarClient() {
             <input
               type="search"
               placeholder="Hledat závod, zemi, pohoří…"
-              value={filters.q ?? ""}
-              onChange={(e) => setFilter({ q: e.target.value })}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="min-w-0 flex-1 rounded-md border border-border bg-canvas px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus-ring"
               aria-label="Hledat"
             />
@@ -888,40 +901,68 @@ export function CalendarClient() {
             ))}
           </div>
         ) : sorted.length === 0 ? (
-          // Empty state — friendly hero + CTA, ne strohá jedna věta.
+          // Context-aware empty state — pokud user hledá své favority
+          // a nemá je, jiná zpráva než „filter mismatch". Když nemá
+          // aktivní filtry a přesto 0, to je vzácný edge case (server
+          // vrátil prázdno).
           <div className="rounded-md border border-dashed border-border bg-surface/60 p-12 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-muted">
-              <svg
-                aria-hidden
-                viewBox="0 0 48 48"
-                width="32"
-                height="32"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-ink-300"
-              >
-                {/* Mountain silhouette */}
-                <path d="M4 40 L18 20 L28 32 L34 24 L44 40 Z" />
-                <circle cx="34" cy="12" r="3" />
-              </svg>
+              {filters.favOnly ? (
+                <span aria-hidden className="text-3xl">★</span>
+              ) : (
+                <svg
+                  aria-hidden
+                  viewBox="0 0 48 48"
+                  width="32"
+                  height="32"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-ink-300"
+                >
+                  <path d="M4 40 L18 20 L28 32 L34 24 L44 40 Z" />
+                  <circle cx="34" cy="12" r="3" />
+                </svg>
+              )}
             </div>
-            <p className="text-base font-medium text-ink-900">
-              Žádný závod nesplňuje filtry
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-[13.5px] text-ink-500">
-              Zkus rozšířit datum nebo region, případně{" "}
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="font-medium text-brand underline underline-offset-2 hover:no-underline"
-              >
-                zruš filtry
-              </button>{" "}
-              a projdi celý kalendář.
-            </p>
+            {filters.favOnly ? (
+              <>
+                <p className="text-base font-medium text-ink-900">
+                  Prázdný plán
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-[13.5px] text-ink-500">
+                  Klikni na ★ u závodů, které tě zajímají — objeví se
+                  tady. Můžeš jim nastavit status („Zajímá mě",
+                  „Registrován", …) a sdílet plán přes profil.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFilter({ favOnly: false })}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-ink-900 px-4 py-2 text-sm font-semibold text-canvas hover:brightness-110 focus-ring"
+                >
+                  Otevřít celý kalendář
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-medium text-ink-900">
+                  Žádný závod nesplňuje filtry
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-[13.5px] text-ink-500">
+                  Zkus rozšířit datum nebo region, případně{" "}
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="font-medium text-brand underline underline-offset-2 hover:no-underline"
+                  >
+                    zruš filtry
+                  </button>{" "}
+                  a projdi celý kalendář.
+                </p>
+              </>
+            )}
           </div>
         ) : isMobile ? (
           // Mobile: dedikované karty (žádný table transformation hack)
