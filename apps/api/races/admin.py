@@ -26,6 +26,8 @@ class RaceAdmin(admin.ModelAdmin):
         "series",
         "region",
         "registration_status",
+        "has_warning",
+        "is_top",
         "country",
         "is_visible",
     )
