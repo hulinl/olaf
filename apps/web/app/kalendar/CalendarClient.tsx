@@ -342,7 +342,9 @@ export function CalendarClient() {
         )}
 
       <section className="mx-auto w-full max-w-[1320px] px-4 pb-16">
-        {/* Sticky header — search + filter toggle. Vždy viditelný. */}
+        {/* Sticky header — search + filter toggle + sort. Na mobilu
+            navíc sport toggle (běh/skialp) jako second row protože je
+            to nejčastější swap. */}
         <div className="sticky top-14 z-10 -mx-4 mb-3 border-b border-border bg-canvas/95 px-4 py-3 backdrop-blur">
           <div className="flex items-center gap-2">
             <input
@@ -387,6 +389,46 @@ export function CalendarClient() {
               <option value="name:asc">A→Z</option>
             </select>
           </div>
+          {isMobile && (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="uk-mode inline-flex" role="group" aria-label="Sport">
+                <button
+                  type="button"
+                  aria-pressed={filters.sport === "trail"}
+                  onClick={() => setFilter({ sport: "trail" })}
+                  style={{ fontSize: 13, padding: "5px 12px" }}
+                >
+                  Běh
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={filters.sport === "skialp"}
+                  onClick={() => setFilter({ sport: "skialp" })}
+                  style={{ fontSize: 13, padding: "5px 12px" }}
+                >
+                  Skialp
+                </button>
+              </div>
+              <div className="uk-mode inline-flex" role="group" aria-label="Rozsah">
+                <button
+                  type="button"
+                  aria-pressed={filters.topOnly === true}
+                  onClick={() => setFilter({ topOnly: true })}
+                  style={{ fontSize: 13, padding: "5px 12px" }}
+                >
+                  Top
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={filters.topOnly !== true}
+                  onClick={() => setFilter({ topOnly: false })}
+                  style={{ fontSize: 13, padding: "5px 12px" }}
+                >
+                  Vše
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Filter section — bottom sheet na mobilu (fixed overlay slide
