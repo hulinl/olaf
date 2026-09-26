@@ -1,32 +1,55 @@
-"""Daily agent — re-syncuje race records ze seed_data.json snapshotu.
+"""Daily sync agent — re-syncuje race records z reference datasetu.
 
-Uploadovaný snapshot je zdroj pravdy (odpovídá referenci
-`hulinl/ultra-kalendar` výstupu). Command:
-- Re-mapa registration.type + detail + top + warn + next.label/year
-- Po přidání nové entry (nový slug v seed) tu doda do DB
-- Existující entries updatuje jen když data reference se změnila
-  (nechceme přepsat admin edity typu is_visible=False nebo custom
-  highlight text)
+Data sources (priorita):
+1. `--source remote` → fetch z GitHub raw URL (živý reference dataset,
+   updatuje se když maintainer commituje). Default URL:
+   `https://raw.githubusercontent.com/hulinl/ultra-kalendar/main/data/events.json`
+2. `--source local` → static `apps/api/races/seed_data.json` snapshot.
+   Použij pro offline / dev / pokud remote je down.
+3. Default (bez `--source`) → remote s automatickým fallbackem na local
+   pokud fetch selže (HTTP error / timeout / parse error).
 
-Idempotentní. Spouštěno jednou denně přes Celery beat (viz
-`races.tasks.sync_races_task`). Ručně:
-    python manage.py sync_races
+Každý běh loguje výsledek do `SyncRun` modelu (visibility v Django
+admin): created/updated/skipped counts + changes list + duration +
+error message. Beat scheduler ho spouští denně.
+
+Idempotentní: matcha podle slug, updatuje jen změněné pole. Manuální
+admin edity (highlight, custom fields) preservuje pokud user nezvolí
+`--force`.
+
+Server-side contradiction detection: pokud registration_status je
+v konfliktu s registration_detail (např. sold_out ale detail říká
+„otevírá se v prosinci"), autoflagne `has_warning=True` + přidá
+změnu do audit trailu.
+
+Manuální spuštění:
+    python manage.py sync_races                     # auto (remote + fallback)
+    python manage.py sync_races --source local      # static seed
+    python manage.py sync_races --source remote     # remote only
     python manage.py sync_races --dry-run
-    python manage.py sync_races --force  # přepíše i admin edity
-
-Verzí V2 rozšířit o remote fetch (GitHub raw URL nebo scraper).
+    python manage.py sync_races --force             # přepíše admin edity
 """
 from __future__ import annotations
 
+import contextlib
 import json
+import re
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
+from typing import Any
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
-from races.models import Race
+from races.models import Race, SyncRun
 
 SEED_PATH = Path(__file__).resolve().parent.parent.parent / "seed_data.json"
+REMOTE_URL = (
+    "https://raw.githubusercontent.com/hulinl/ultra-kalendar/main/data/events.json"
+)
 
 TYPE_MAP = {
     "V": Race.REG_OPEN,
@@ -39,7 +62,7 @@ SPORT_MAP = {"beh": Race.SPORT_TRAIL, "skialp": Race.SPORT_SKIALP}
 REGION_MAP = {
     "CZ": Race.REGION_CZ,
     "ALP": Race.REGION_ALP,
-    "SKPL": Race.REGION_SKPL,
+    "SKPL": Race.REGION_SK,  # legacy — default na SK, real split via 0006
     "SEV": Race.REGION_SEV,
     "IBE": Race.REGION_IBE,
     "BAL": Race.REGION_BAL,
@@ -56,6 +79,37 @@ TERRAIN_MAP = {
     "z": "silniční / MTB",
 }
 
+# Server-side contradiction patterns — identical logic jako frontend
+# isStatusContradicted, aby detection byla konzistentní. Když detail
+# popírá deklarovaný status, flagne has_warning=True.
+_OPENS_SOON = re.compile(
+    r"otev[řír][eíaá]?|opens?\b|spouští"
+    r"|start\s+(registrac|přihláš)"
+    r"|(od|v)\s+\d"
+    r"|(od|v)\s+(led|úno|břez|dub|květ|červ|srp|zář|říj|list|pros)"
+    r"|(v\s+)?(listopad|prosin|led|únor)"
+    r"|nejdřív|nejpozděj|registrac[eíi]\s+(od|v)",
+    re.IGNORECASE,
+)
+_SOLD_OUT_KW = re.compile(
+    r"vyprodán|sold\s?out|los\b|loterie|waitlist|kvalifik",
+    re.IGNORECASE,
+)
+
+
+def _detect_contradiction(reg_status: str, detail: str) -> bool:
+    if not detail:
+        return False
+    d = detail.lower()
+    return (
+        (
+            reg_status
+            in {Race.REG_SOLD_OUT, Race.REG_CLOSED, Race.REG_QUALIFIER}
+            and bool(_OPENS_SOON.search(d))
+        )
+        or (reg_status == Race.REG_OPEN and bool(_SOLD_OUT_KW.search(d)))
+    )
+
 
 def _map_series(raw: str) -> str:
     if not raw:
@@ -67,6 +121,8 @@ def _map_series(raw: str) -> str:
         return Race.SERIES_WTM
     if "skyrunning" in lower or "skyrunner" in lower:
         return Race.SERIES_SKY
+    if "sky" in lower and "trail" not in lower and "skialp" not in lower:
+        return Race.SERIES_SKY
     if "la grande course" in lower or "grand course" in lower:
         return Race.SERIES_MAJOR
     if lower == "itra" or "itra pts" in lower:
@@ -74,29 +130,130 @@ def _map_series(raw: str) -> str:
     return Race.SERIES_INDEP
 
 
+def _fetch_remote(url: str, timeout: float = 10.0) -> list[dict]:
+    """HTTP GET → parse JSON → return events list. Raises on any error
+    (caller rozhodne o fallbacku)."""
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "olaf-race-sync/1.0",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8")
+    payload = json.loads(raw)
+    events = payload.get("events", [])
+    if not isinstance(events, list):
+        raise ValueError("Payload doesn't contain events list")
+    return events
+
+
+def _load_local() -> list[dict]:
+    if not SEED_PATH.exists():
+        return []
+    with open(SEED_PATH, encoding="utf-8") as f:
+        payload = json.load(f)
+    return payload.get("events", []) or []
+
+
 class Command(BaseCommand):
-    help = "Sync race records ze seed_data.json (daily agent)."
+    help = "Sync race records ze reference datasetu (remote or local)."
 
     def add_arguments(self, parser) -> None:
+        parser.add_argument(
+            "--source",
+            choices=["remote", "local", "auto"],
+            default="auto",
+            help="Data source. auto=remote s fallbackem na local (default).",
+        )
+        parser.add_argument(
+            "--remote-url",
+            default=REMOTE_URL,
+            help="Override remote URL.",
+        )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
             "--force",
             action="store_true",
-            help="Přepíše i admin edity (is_visible, custom highlight).",
+            help="Přepíše i admin edity (highlight, is_visible).",
+        )
+        parser.add_argument(
+            "--triggered-by",
+            default="manual",
+            help="Kdo tenhle běh vyvolal (beat / manual / signal).",
         )
 
     def handle(self, *args, **options) -> None:
+        start = time.monotonic()
+        source_flag = options["source"]
+        remote_url = options["remote_url"]
         dry = options["dry_run"]
         force = options["force"]
+        triggered_by = options["triggered_by"]
 
-        if not SEED_PATH.exists():
-            self.stderr.write(f"seed_data.json nenalezen: {SEED_PATH}")
+        # Fetch data
+        source_used = SyncRun.SOURCE_LOCAL
+        source_url = ""
+        events: list[dict] = []
+        error_msg = ""
+
+        if source_flag in {"remote", "auto"}:
+            try:
+                events = _fetch_remote(remote_url)
+                source_used = SyncRun.SOURCE_REMOTE
+                source_url = remote_url
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"→ Remote fetch OK: {len(events)} events z {remote_url}"
+                    )
+                )
+            except (
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                json.JSONDecodeError,
+                ValueError,
+                TimeoutError,
+            ) as exc:
+                error_msg = f"Remote fetch failed: {exc}"
+                self.stdout.write(self.style.WARNING(error_msg))
+                if source_flag == "remote":
+                    # Explicit remote → don't fallback
+                    self._log_run(
+                        source_used=SyncRun.SOURCE_REMOTE,
+                        source_url=remote_url,
+                        status=SyncRun.STATUS_ERROR,
+                        error_message=error_msg,
+                        triggered_by=triggered_by,
+                        start=start,
+                    )
+                    return
+
+        if not events:
+            events = _load_local()
+            source_used = SyncRun.SOURCE_LOCAL
+            source_url = ""
+            self.stdout.write(
+                self.style.WARNING(
+                    f"→ Local fallback: {len(events)} events z seed_data.json"
+                )
+            )
+
+        if not events:
+            self._log_run(
+                source_used=source_used,
+                source_url=source_url,
+                status=SyncRun.STATUS_ERROR,
+                error_message=error_msg or "No events available in any source.",
+                triggered_by=triggered_by,
+                start=start,
+            )
             return
 
-        with open(SEED_PATH, encoding="utf-8") as f:
-            events = json.load(f).get("events", [])
+        # Sync
+        created = updated = skipped = flagged = 0
+        changes: list[dict[str, Any]] = []
 
-        created = updated = unchanged = 0
         with transaction.atomic():
             for e in events:
                 slug = e.get("id")
@@ -104,25 +261,67 @@ class Command(BaseCommand):
                     continue
 
                 fields = self._extract_fields(e)
-                existing = Race.objects.filter(slug=slug).first()
 
+                # Server-side contradiction detection — pokud detail
+                # popírá status, flagne has_warning + zaloguje.
+                if (
+                    _detect_contradiction(
+                        fields["registration_status"],
+                        fields["registration_detail"],
+                    )
+                    and not fields["has_warning"]
+                ):
+                    fields["has_warning"] = True
+                    # Nezvyšovat flagged pro každý běh — jen když
+                    # se to fakt změnilo (viz apply_updates).
+
+                existing = Race.objects.filter(slug=slug).first()
                 if existing:
-                    changed = self._apply_updates(existing, fields, force=force)
-                    if changed:
+                    diff = self._diff_updates(existing, fields, force=force)
+                    if diff:
                         if not dry:
+                            for k, (_old, new) in diff.items():
+                                setattr(existing, k, new)
                             existing.save()
                         updated += 1
+                        for field, (old_v, new_v) in diff.items():
+                            changes.append(
+                                {
+                                    "slug": slug,
+                                    "field": field,
+                                    "old": _safe(old_v),
+                                    "new": _safe(new_v),
+                                }
+                            )
+                            if field == "has_warning" and new_v:
+                                flagged += 1
                     else:
-                        unchanged += 1
+                        skipped += 1
                 else:
                     if not dry:
                         Race.objects.create(slug=slug, **fields)
                     created += 1
+                    if fields["has_warning"]:
+                        flagged += 1
+
+        status = SyncRun.STATUS_OK
+        self._log_run(
+            source_used=source_used,
+            source_url=source_url,
+            status=status,
+            created_count=created,
+            updated_count=updated,
+            skipped_count=skipped,
+            flagged_count=flagged,
+            changes=changes[:200],  # cap
+            triggered_by=triggered_by,
+            start=start,
+        )
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"sync_races: +{created} nových, ~{updated} updatů, "
-                f"={unchanged} beze změny"
+                f"={skipped} beze změny, ⚠{flagged} flagged"
                 + (" [DRY]" if dry else "")
             )
         )
@@ -153,26 +352,66 @@ class Command(BaseCommand):
             "is_top": bool(e.get("top", False)),
             "has_warning": bool(e.get("warn", False)),
             "next_label": ((e.get("next") or {}).get("label") or "")[:100],
-            "next_year": int(
-                (e.get("next") or {}).get("year") or 2027
-            ),
+            "next_year": int((e.get("next") or {}).get("year") or 2027),
         }
 
-    def _apply_updates(self, race: Race, fields: dict, *, force: bool) -> bool:
-        """Aplikuje pole na race, vrací True pokud se něco změnilo.
-        Admin-editovatelná pole (is_visible, highlight) preservuje pokud
-        se admin dotkl (updated_at > created_at) — leda force=True."""
+    def _diff_updates(
+        self, race: Race, fields: dict, *, force: bool
+    ) -> dict[str, tuple[Any, Any]]:
+        """Vrátí dict field → (old_value, new_value) pro každou reálnou
+        změnu. Když je race admin-edited (updated_at > created_at) a
+        force=False, preservuje highlight."""
         admin_touched = race.updated_at > race.created_at
-        skip_fields = set()
+        skip_fields: set[str] = set()
         if admin_touched and not force:
-            skip_fields = {"highlight"}  # pouze uživatelské pole
+            skip_fields = {"highlight"}
 
-        changed = False
+        diff: dict[str, tuple[Any, Any]] = {}
         for key, new_val in fields.items():
             if key in skip_fields:
                 continue
             old_val = getattr(race, key)
             if old_val != new_val:
-                setattr(race, key, new_val)
-                changed = True
-        return changed
+                diff[key] = (old_val, new_val)
+        return diff
+
+    def _log_run(
+        self,
+        *,
+        source_used: str,
+        source_url: str,
+        status: str,
+        triggered_by: str,
+        start: float,
+        error_message: str = "",
+        created_count: int = 0,
+        updated_count: int = 0,
+        skipped_count: int = 0,
+        flagged_count: int = 0,
+        changes: list | None = None,
+    ) -> None:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        with contextlib.suppress(Exception):
+            SyncRun.objects.create(
+                source=source_used,
+                source_url=source_url,
+                status=status,
+                created_count=created_count,
+                updated_count=updated_count,
+                skipped_count=skipped_count,
+                flagged_count=flagged_count,
+                error_message=error_message,
+                changes=changes or [],
+                duration_ms=duration_ms,
+                triggered_by=triggered_by,
+                created_at=timezone.now(),
+            )
+
+
+def _safe(value: Any) -> Any:
+    """JSON-serializable snapshot hodnoty pro audit trail."""
+    if value is None:
+        return None
+    if isinstance(value, str | int | float | bool):
+        return value
+    return str(value)[:200]

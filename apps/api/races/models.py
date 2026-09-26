@@ -285,6 +285,76 @@ class Race(models.Model):
         return self.elevation_m / self.distance_km
 
 
+class SyncRun(models.Model):
+    """Audit trail pro daily sync agent — každé volání command `sync_races`
+    zaloguje výsledky. Admin může projít v Django adminu a vidí co se
+    kdy změnilo, kdyby došlo k regresi nebo se něco naimportovalo špatně.
+    """
+
+    SOURCE_LOCAL = "local"
+    SOURCE_REMOTE = "remote"
+    SOURCE_CHOICES = [
+        (SOURCE_LOCAL, "Local seed_data.json"),
+        (SOURCE_REMOTE, "Remote GitHub raw"),
+    ]
+
+    STATUS_OK = "ok"
+    STATUS_ERROR = "error"
+    STATUS_PARTIAL = "partial"
+    STATUS_CHOICES = [
+        (STATUS_OK, "OK"),
+        (STATUS_ERROR, "Chyba"),
+        (STATUS_PARTIAL, "Částečný úspěch"),
+    ]
+
+    source = models.CharField(
+        max_length=20, choices=SOURCE_CHOICES, default=SOURCE_LOCAL
+    )
+    source_url = models.URLField(
+        blank=True,
+        default="",
+        help_text="Přesná URL, ze které se fetchovalo (remote případy).",
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_OK
+    )
+    created_count = models.PositiveIntegerField(default=0)
+    updated_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    flagged_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Počet races které dostaly has_warning=True kvůli contradiction detection.",
+    )
+    error_message = models.TextField(blank=True, default="")
+    changes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "List of {slug, field, old, new} objects — konkrétní změny "
+            "detected. Zobrazí se v admin diff view."
+        ),
+    )
+    duration_ms = models.PositiveIntegerField(default=0)
+    triggered_by = models.CharField(
+        max_length=50,
+        default="beat",
+        help_text="`beat` (periodic task) / `manual` / `signal` (deploy hook).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "races_sync_run"
+        ordering = ["-created_at"]
+        verbose_name = "Sync běh"
+        verbose_name_plural = "Sync běhy"
+
+    def __str__(self) -> str:
+        return (
+            f"{self.created_at:%Y-%m-%d %H:%M} {self.source} "
+            f"{self.status}: +{self.created_count} ~{self.updated_count}"
+        )
+
+
 class RaceFavorite(models.Model):
     """Uživatelův race plán — soukromý bucket-list s tracking statusem.
 
