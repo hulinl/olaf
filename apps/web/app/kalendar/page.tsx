@@ -45,10 +45,10 @@ export default function KalendarPage() {
               <span className="text-amber-glow">letos i sezónu dopředu</span>.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-relaxed text-ink-700 sm:text-lg">
-              Klasiky napříč Evropou a světem — UTMB World Series, World Trail
-              Majors, skyrunning i nezávislé české a slovenské. Nakoukni bez
-              registrace, a když jsi přihlášen/a, hvězdičkou si stavíš svůj
-              bucket-list.
+              Přes 250 závodů napříč Evropou i světem — UTMB World Series,
+              World Trail Majors, skyrunning, skialpinismus, ČSUT i nezávislé
+              české a slovenské klasiky. Nakoukni bez registrace, a když jsi
+              přihlášen/a, hvězdičkou si stavíš svůj bucket-list.
             </p>
           </div>
         </div>
