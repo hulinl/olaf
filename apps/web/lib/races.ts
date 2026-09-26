@@ -164,11 +164,27 @@ function buildQuery(filters: RaceFilters): string {
   return s ? `?${s}` : "";
 }
 
+export interface SyncStatus {
+  last_success: {
+    at: string;
+    source: "local" | "remote";
+    created: number;
+    updated: number;
+    flagged: number;
+  } | null;
+  last_run: {
+    at: string;
+    status: "ok" | "error" | "partial";
+  } | null;
+}
+
 export const races = {
   list: (filters: RaceFilters = {}): Promise<RaceListResponse> =>
     apiFetch<RaceListResponse>(`/api/races/${buildQuery(filters)}`),
   countries: (): Promise<{ countries: string[] }> =>
     apiFetch<{ countries: string[] }>("/api/races/countries/"),
+  syncStatus: (): Promise<SyncStatus> =>
+    apiFetch<SyncStatus>("/api/races/sync-status/"),
   // Přidání do plánu (POST) — optional status/note. Bez status =
   // default "interested".
   addToPlan: (

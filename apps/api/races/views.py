@@ -275,6 +275,47 @@ def race_plan_public(request: Request, user_slug: str) -> Response:
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def race_sync_status(request: Request) -> Response:
+    """Vrátí info o posledním úspěšném sync běhu — pro veřejný display
+    „aktualizováno před X hodinami" na kalendáři. Buduje důvěru
+    v aktuálnost dat.
+    """
+    from .models import SyncRun
+
+    latest_ok = (
+        SyncRun.objects.filter(status=SyncRun.STATUS_OK)
+        .order_by("-created_at")
+        .first()
+    )
+    latest_any = SyncRun.objects.order_by("-created_at").first()
+
+    return Response(
+        {
+            "last_success": (
+                {
+                    "at": latest_ok.created_at.isoformat(),
+                    "source": latest_ok.source,
+                    "created": latest_ok.created_count,
+                    "updated": latest_ok.updated_count,
+                    "flagged": latest_ok.flagged_count,
+                }
+                if latest_ok
+                else None
+            ),
+            "last_run": (
+                {
+                    "at": latest_any.created_at.isoformat(),
+                    "status": latest_any.status,
+                }
+                if latest_any
+                else None
+            ),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def race_countries(request: Request) -> Response:
     countries = (
         Race.objects.filter(is_visible=True, date_start__gte=date.today())

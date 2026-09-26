@@ -236,6 +236,9 @@ export function CalendarClient() {
   const [statsMount, setStatsMount] = useState<HTMLElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<Awaited<
+    ReturnType<typeof races.syncStatus>
+  > | null>(null);
   // Local search input pro debounce — user píše rychle, nechceme
   // hitovat API na každý keystroke. Po 300 ms inactivity commit do
   // filters.q → trigger fetch.
@@ -275,6 +278,15 @@ export function CalendarClient() {
     onChange();
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // Sync status fetch — pro „aktualizováno před X" indikátor.
+  // Best-effort, silent fail.
+  useEffect(() => {
+    races
+      .syncStatus()
+      .then(setSyncStatus)
+      .catch(() => setSyncStatus(null));
   }, []);
 
   const loadRaces = useCallback(async () => {
@@ -812,6 +824,16 @@ export function CalendarClient() {
               </button>
             </div>
           </section>
+        )}
+
+        {/* Sync status — subtle „aktualizováno před X" pro user trust
+            v aktuálnost dat. Jen když je available. */}
+        {syncStatus?.last_success && (
+          <div className="mt-3 flex items-center gap-1.5 text-[12px] text-ink-500">
+            <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+            Data aktualizována {formatAgo(syncStatus.last_success.at)}
+            {syncStatus.last_success.source === "remote" && " (z živého zdroje)"}
+          </div>
         )}
 
         {/* Active filters — quick removal chips. Zobrazí se jen když
@@ -1857,6 +1879,23 @@ function StatCell({ label, value }: { label: string; value: string }) {
 function formatDateCompact(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "long" });
+}
+
+function formatAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const secs = Math.floor((now - then) / 1000);
+  if (secs < 60) return "před chvílí";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `před ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `před ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `před ${days} dny`;
+  return new Date(iso).toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function seriesLabel(s: Race["series"]): string {
