@@ -56,12 +56,13 @@ export function AuditLogScreen() {
           </span>
         </div>
 
-        {/* Audit table */}
+        {/* Audit table — 4 sloupce (actor / co · target / typ badge / kdy).
+            Předtím měl 5 sloupců s duplicitním „Objekt" column, což
+            texty šoupalo přes sebe. */}
         <div className="mt-3 overflow-hidden rounded-sm border border-border bg-surface">
-          <div className="grid grid-cols-[16px_1fr_100px_90px_60px] items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
+          <div className="grid grid-cols-[18px_1fr_80px_50px] items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
             <span aria-hidden />
-            <span className="mono-tag text-[6px] text-ink-500">Kdo · Co</span>
-            <span className="mono-tag text-[6px] text-ink-500">Objekt</span>
+            <span className="mono-tag text-[6px] text-ink-500">Kdo · Co · Kde</span>
             <span className="mono-tag text-[6px] text-ink-500">Typ</span>
             <span className="mono-tag text-[6px] text-ink-500 text-right">Kdy</span>
           </div>
@@ -167,7 +168,7 @@ function AuditRow({
   }[kindTone];
   return (
     <div
-      className={`grid grid-cols-[16px_1fr_100px_90px_60px] items-center gap-2 px-2 py-1.5 ${
+      className={`grid grid-cols-[18px_1fr_80px_50px] items-center gap-2 px-2 py-1.5 ${
         last ? "" : "border-b border-border"
       }`}
     >
@@ -176,12 +177,11 @@ function AuditRow({
       </span>
       <div className="min-w-0">
         <p className="truncate text-[7px] text-ink-900">
-          <span className="font-medium">{action}</span>{" "}
-          <span className="text-ink-500">·</span>{" "}
+          <span className="font-medium">{action}</span>
+          <span className="mx-1 text-ink-500">·</span>
           <span className="text-ink-700">{target}</span>
         </p>
       </div>
-      <p className="truncate text-[6px] text-ink-500">{target}</p>
       <span
         className={`inline-flex items-center justify-center rounded-sm border px-1 py-0.5 text-[6px] font-medium ${toneClass}`}
       >

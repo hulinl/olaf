@@ -128,7 +128,7 @@ export default function Home() {
             }}
           />
 
-          <div className="relative mx-auto max-w-6xl px-4 pt-16 pb-24 sm:pt-24 sm:pb-28 lg:pt-28">
+          <div className="relative mx-auto max-w-6xl px-4 pt-16 pb-32 sm:pt-24 sm:pb-40 lg:pt-28">
             <div className="grid items-center gap-14 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
               {/* LEVÝ SLOUPEC — copy stack */}
               <div className="max-w-xl">
@@ -225,11 +225,13 @@ export default function Home() {
                   </LaptopFrame>
                 </div>
 
-                {/* Floating phone — overlay bottom-left, jen na lg+ kde je
-                    v grid layoutu dost místa. Šířka podle system-21 přibližně
-                    175 px = w-44. */}
+                {/* Floating phone — overlay uvnitř pravého sloupce (bottom-
+                    left position ale v hranicích right column, aby
+                    nepřekrýval copy vlevo). Šířka lg:w-32 = 128 px,
+                    aspect 9/19.5 = ~277 px tall. Section pb-40 = 160 px
+                    dá phone room aby přeteklo bez rušení stats baru. */}
                 <div
-                  className="pointer-events-none absolute -bottom-10 -left-8 hidden w-40 lg:block lg:-bottom-14 lg:-left-14 lg:w-44"
+                  className="pointer-events-none absolute -bottom-16 left-0 hidden w-28 lg:block lg:-bottom-20 lg:left-2 lg:w-32"
                   aria-hidden
                 >
                   <PhoneFrame>
@@ -237,9 +239,9 @@ export default function Home() {
                   </PhoneFrame>
                 </div>
 
-                {/* Toast — nová přihláška (top-right) */}
+                {/* Toast — nová přihláška (top-right, uvnitř right col) */}
                 <div
-                  className="chrome-toast pointer-events-none absolute -top-3 -right-3 hidden max-w-[200px] lg:flex"
+                  className="chrome-toast pointer-events-none absolute -top-4 right-2 hidden max-w-[190px] lg:flex"
                   aria-hidden
                 >
                   <span
@@ -257,9 +259,10 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Toast — platba spárována (bottom-right) */}
+                {/* Toast — platba spárována (bottom-right, mimo phone
+                    aby se s ním nekřížilo) */}
                 <div
-                  className="chrome-toast pointer-events-none absolute -bottom-4 right-4 hidden max-w-[210px] lg:flex"
+                  className="chrome-toast pointer-events-none absolute -bottom-8 right-2 hidden max-w-[200px] xl:flex"
                   style={{ animationDelay: "2s" }}
                   aria-hidden
                 >
