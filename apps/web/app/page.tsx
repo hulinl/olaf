@@ -224,53 +224,12 @@ export default function Home() {
                   </LaptopFrame>
                 </div>
 
-                {/* Phone overlay v hero byl vypnut 2026-09-26 — user
-                    report: „PC i mobil přes sebe se bijí, rozsekané".
-                    Laptop stačí jako hero device. Phone frame je pořád
-                    v feature sekcích (Nástěnka, Platby), tam nikoho
-                    nekřížení. */}
-
-                {/* Toast — nová přihláška (top-right, uvnitř right col) */}
-                <div
-                  className="chrome-toast pointer-events-none absolute -top-4 right-2 hidden max-w-[190px] lg:flex"
-                  aria-hidden
-                >
-                  <span
-                    className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-sm bg-brand text-[10px] font-bold text-brand-ink"
-                  >
-                    ✓
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-ink-900 leading-tight">
-                      Nová přihláška
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-ink-500 leading-tight">
-                      Marta Nová · před 12 min
-                    </p>
-                  </div>
-                </div>
-
-                {/* Toast — platba spárována (bottom-right, mimo phone
-                    aby se s ním nekřížilo) */}
-                <div
-                  className="chrome-toast pointer-events-none absolute -bottom-8 right-2 hidden max-w-[200px] xl:flex"
-                  style={{ animationDelay: "2s" }}
-                  aria-hidden
-                >
-                  <span
-                    className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-sm border border-success/40 bg-success/10 text-[10px] font-bold text-success"
-                  >
-                    ⇢
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-ink-900 leading-tight">
-                      Platba spárována
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-ink-500 leading-tight">
-                      1 800 Kč · VS 2600018
-                    </p>
-                  </div>
-                </div>
+                {/* Toasts (2026-09-26 sweep 6): odstraněny úplně. User
+                    report: Nová přihláška toast přetékal viewport
+                    pravou hranou, Platba spárována se ztrácela pod
+                    laptopem. Hero teď = laptop-only clean composition,
+                    žádné plovoucí kartičky křížící bezel. Animovaný
+                    dojem dostane feature tour níž. */}
               </div>
             </div>
           </div>

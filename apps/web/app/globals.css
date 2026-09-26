@@ -442,12 +442,13 @@ select:not([multiple]):not([size]) {
   overflow: hidden;
   aspect-ratio: 16 / 10;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
-  /* Container query aktivní, ale font-size neseťujeme na wrapperu —
-   * children používají absolutní text-[Xpx] třídy s manuálním
-   * zmenšením. Frame velikost 500 px = feature section grid col,
-   * 640 px = hero. cqi jednotky jsou pak k dispozici, kdyby child
-   * chtěl proporcionální sizing. */
+  /* Container query s cqi jako root font-size — screen mockup fonty
+   * teď škálují proporcionálně s frame width. Na 500 px = 7.5 px base,
+   * na 340 px (mobile) = 5.1 px base, na 700 px (hero) = 10.5 px base.
+   * Children uvnitř screen mockupů používají em jednotky pro
+   * responsive text-sizing bez explicit px hodnot. */
   container-type: inline-size;
+  font-size: 1.5cqi;
 }
 /* Screen shine — velmi subtilní diagonální gradient „lesk skla" */
 .chrome-laptop-screen::after {
@@ -486,7 +487,11 @@ select:not([multiple]):not([size]) {
   overflow: hidden;
   aspect-ratio: 9 / 19.5;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08);
+  /* Phone frame je 130-200 px wide, cqi vyšší (3%) aby text zůstal
+   * čitelný — na 160 px = 4.8 px base, což je minimum pro
+   * proporcionálně-vypadající UI. */
   container-type: inline-size;
+  font-size: 3cqi;
 }
 .chrome-phone-notch {
   position: absolute;
