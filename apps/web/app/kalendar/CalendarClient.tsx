@@ -1358,31 +1358,36 @@ function MobileRaceCard({
         </p>
       )}
       {race.plan_status && (
-        <NoteEditor onSave={onSaveNote} />
+        <NoteEditor initial={race.plan_note} onSave={onSaveNote} />
       )}
     </article>
   );
 }
 
 /**
- * Inline note editor pro race v plánu — collapsed default, click
- * na „+ Poznámka" ho rozevře jako textarea s tlačítky Uložit / Zrušit.
- * Local state — reload stránky note znovu načte z backendu (v mine/
- * a public profile endpointech).
+ * Inline note editor pro race v plánu — collapsed default zobrazí
+ * note text (nebo „+ Poznámka" pokud prázdný). Klik ho rozvine jako
+ * textarea s Uložit/Zrušit. Local state se seedne z `initial` prop,
+ * po uložení se collapsne zpět. Race payload nese `plan_note` z
+ * backendu, takže po refreshi je note viditelný.
  */
 function NoteEditor({
+  initial,
   onSave,
 }: {
+  initial: string;
   onSave: (note: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initial);
+  const [saved, setSaved] = useState(initial);
   const [saving, setSaving] = useState(false);
 
   const commit = async () => {
     setSaving(true);
     try {
       await onSave(value.trim());
+      setSaved(value.trim());
       setExpanded(false);
     } finally {
       setSaving(false);
@@ -1390,7 +1395,19 @@ function NoteEditor({
   };
 
   if (!expanded) {
-    return (
+    return saved ? (
+      <div className="mt-2 flex items-start justify-between gap-2 rounded-sm border-l-2 border-brand bg-brand/5 px-2 py-1">
+        <p className="text-[13px] text-ink-700">{saved}</p>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="shrink-0 text-[11px] font-medium text-brand hover:underline"
+          aria-label="Upravit poznámku"
+        >
+          ✎
+        </button>
+      </div>
+    ) : (
       <button
         type="button"
         onClick={() => setExpanded(true)}
@@ -1409,6 +1426,7 @@ function NoteEditor({
         placeholder="Např. jedu s Martou, letenka koupená…"
         rows={2}
         maxLength={280}
+        autoFocus
         className="w-full resize-none bg-transparent text-[13px] text-ink-900 placeholder:text-ink-500 focus:outline-none"
       />
       <div className="mt-1 flex items-center justify-between">
@@ -1420,7 +1438,7 @@ function NoteEditor({
             type="button"
             onClick={() => {
               setExpanded(false);
-              setValue("");
+              setValue(saved);
             }}
             className="text-[12px] text-ink-500 hover:text-ink-900"
             disabled={saving}

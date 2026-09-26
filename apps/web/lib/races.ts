@@ -31,6 +31,7 @@ export interface Race {
   highlight: string;
   is_favorite: boolean;
   plan_status: RacePlanStatus | null;
+  plan_note: string;
 }
 
 export interface RacePlanEntry {

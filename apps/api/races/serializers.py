@@ -7,11 +7,12 @@ from .models import Race, RaceFavorite
 
 class RaceSerializer(serializers.ModelSerializer):
     """Public race payload — includes `is_favorite` bool + user's plan
-    status (nebo null) spočtený per requesting user, aby frontend
+    status + note (nebo null) spočtený per requesting user, aby frontend
     nemusel dělat druhý fetch mine/."""
 
     is_favorite = serializers.SerializerMethodField()
     plan_status = serializers.SerializerMethodField()
+    plan_note = serializers.SerializerMethodField()
     elevation_per_km = serializers.SerializerMethodField()
 
     class Meta:
@@ -43,22 +44,14 @@ class RaceSerializer(serializers.ModelSerializer):
             "highlight",
             "is_favorite",
             "plan_status",
+            "plan_note",
         ]
         read_only_fields = fields
 
-    def _fav_lookup(self) -> dict[int, str] | None:
+    def _fav_lookup(self) -> dict[int, dict[str, str]] | None:
         return self.context.get("user_favorite_status")
 
-    def get_is_favorite(self, obj: Race) -> bool:
-        lookup = self._fav_lookup()
-        if lookup is not None:
-            return obj.id in lookup
-        user = self.context.get("request").user if self.context.get("request") else None
-        if not user or not user.is_authenticated:
-            return False
-        return obj.favorites.filter(user=user).exists()
-
-    def get_plan_status(self, obj: Race) -> str | None:
+    def _fav_row(self, obj: Race) -> dict[str, str] | None:
         lookup = self._fav_lookup()
         if lookup is not None:
             return lookup.get(obj.id)
@@ -66,7 +59,18 @@ class RaceSerializer(serializers.ModelSerializer):
         if not user or not user.is_authenticated:
             return None
         fav = obj.favorites.filter(user=user).first()
-        return fav.status if fav else None
+        return {"status": fav.status, "note": fav.note} if fav else None
+
+    def get_is_favorite(self, obj: Race) -> bool:
+        return self._fav_row(obj) is not None
+
+    def get_plan_status(self, obj: Race) -> str | None:
+        row = self._fav_row(obj)
+        return row["status"] if row else None
+
+    def get_plan_note(self, obj: Race) -> str:
+        row = self._fav_row(obj)
+        return row["note"] if row else ""
 
     def get_elevation_per_km(self, obj: Race) -> float | None:
         return obj.elevation_per_km

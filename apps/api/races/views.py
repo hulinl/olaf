@@ -107,13 +107,16 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
     return qs
 
 
-def _user_fav_status(user) -> dict[int, str]:
-    """Vrátí dict race_id → status pro rychlé bulk lookup v seriálu."""
+def _user_fav_status(user) -> dict[int, dict[str, str]]:
+    """Vrátí dict race_id → {status, note} pro bulk lookup v seriálu."""
     if not user or not user.is_authenticated:
         return {}
-    return dict(
-        RaceFavorite.objects.filter(user=user).values_list("race_id", "status")
-    )
+    return {
+        row["race_id"]: {"status": row["status"], "note": row["note"]}
+        for row in RaceFavorite.objects.filter(user=user).values(
+            "race_id", "status", "note"
+        )
+    }
 
 
 @api_view(["GET"])
