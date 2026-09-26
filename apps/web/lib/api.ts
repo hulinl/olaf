@@ -1804,7 +1804,48 @@ export const workspaces = {
         body: JSON.stringify(reason ? { reason } : {}),
       },
     ),
+  // Nested community hierarchy (Slice 2 vize „community awareness")
+  hierarchy: (slug: string) =>
+    apiFetch<WorkspaceHierarchy>(`/api/workspaces/${slug}/parent/`),
+  setParent: (slug: string, parentSlug: string) =>
+    apiFetch<WorkspaceHierarchy>(`/api/workspaces/${slug}/parent/`, {
+      method: "POST",
+      body: JSON.stringify({ parent_slug: parentSlug }),
+    }),
+  unlinkParent: (slug: string) =>
+    apiFetch<WorkspaceHierarchy>(`/api/workspaces/${slug}/parent/`, {
+      method: "DELETE",
+    }),
+  approveChild: (parentSlug: string, childSlug: string) =>
+    apiFetch<WorkspaceHierarchy>(
+      `/api/workspaces/${parentSlug}/children/${childSlug}/approve/`,
+      { method: "POST" },
+    ),
+  rejectChild: (parentSlug: string, childSlug: string) =>
+    apiFetch<WorkspaceHierarchy>(
+      `/api/workspaces/${parentSlug}/children/${childSlug}/reject/`,
+      { method: "POST" },
+    ),
 };
+
+export interface WorkspaceHierarchyParent {
+  slug: string;
+  name: string;
+  link_status: "pending" | "active";
+}
+
+export interface WorkspaceHierarchyChild {
+  slug: string;
+  name: string;
+  link_status: "pending" | "active" | "";
+  requested_at: string | null;
+}
+
+export interface WorkspaceHierarchy {
+  workspace_slug: string;
+  parent: WorkspaceHierarchyParent | null;
+  children: WorkspaceHierarchyChild[];
+}
 
 export type CommunityMemberStatus =
   | "pending"

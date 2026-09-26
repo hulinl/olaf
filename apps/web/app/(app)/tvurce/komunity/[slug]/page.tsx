@@ -178,6 +178,13 @@ export default function AdminKomunitaDetailPage({ params }: Props) {
           >
             Upravit komunitu →
           </LinkButton>
+          <LinkButton
+            href={`/tvurce/komunity/${workspace.slug}/hierarchie`}
+            variant="secondary"
+            size="md"
+          >
+            Hierarchie →
+          </LinkButton>
           <a
             href={`/${workspace.slug}`}
             target="_blank"
