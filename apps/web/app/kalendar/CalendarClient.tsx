@@ -174,13 +174,18 @@ function isStatusContradicted(race: Race): boolean {
   if (!detail) return false;
   const status = race.registration_status;
 
-  // Contradictions per status: detail obsahuje slova, která popírají
-  // daný stav (např. "otevře" popírá "vyprodáno").
+  // Slova která signalizují „registrace se teprve otevře" — všechny
+  // české formy verba otevírat/otevřít + anglická opens/registration
+  // opens. Zachytává i „spustí registraci", „start přihlášek", data
+  // budoucnosti („od 12. 10.", „v prosinci").
+  const opensSoon =
+    /otev[řír][eíaá]?|opens?\b|spouští|start\s+(registrac|přihláš)|(od|v)\s+\d|(od|v)\s+(led|úno|břez|dub|květ|červ|srp|zář|říj|list|pros)|(v\s+)?(listopad|prosin|led|únor)|nejdřív|nejpozděj|registrac[eíi]\s+(od|v)/;
+
   const patterns: Partial<Record<Race["registration_status"], RegExp>> = {
-    sold_out: /otevř[eí]|start\s+(registrac|přihláš)|od\s+\d/,
-    closed: /obvykle|otevř[eí]|volně|přihláš|los\b|loterie/,
-    open: /vyprodán|sold\s?out|los\b|loterie|waitlist|kvalifik/,
-    qualifier: /obvykle|otevř[eí]|volně$/,
+    sold_out: opensSoon,
+    closed: new RegExp(`obvykle|volně|přihláš|los\\b|loterie|${opensSoon.source}`),
+    open: /vyprodán|sold\s?out|los\b|loterie|waitlist|kvalifik|čekacím\s+listě/,
+    qualifier: new RegExp(`obvykle|volně$|${opensSoon.source}`),
   };
   const pat = patterns[status];
   return pat ? pat.test(detail) : false;
@@ -425,9 +430,10 @@ export function CalendarClient() {
     }
   };
 
-  // Na mobilu se filtry defaultně zavírají; na desktopu (isMobile=false)
-  // je vždy expandováno.
-  const showFilters = isMobile ? filtersOpen : true;
+  // Filtry se defaultně schovávají všude — user preference („Líbí se
+  // mi jak jsme schovali filtry na mobilu, udělal bych to i na PC").
+  // Explicit toggle přes „Filtry" button ve sticky headeru.
+  const showFilters = filtersOpen;
 
   return (
     <>
@@ -456,21 +462,33 @@ export function CalendarClient() {
               className="min-w-0 flex-1 rounded-md border border-border bg-canvas px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus-ring"
               aria-label="Hledat"
             />
-            {isMobile && (
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((v) => !v)}
-                aria-expanded={filtersOpen}
-                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-ring ${
-                  filtersOpen || activeFilterCount > 0
-                    ? "border-ink-900 bg-ink-900 text-canvas"
-                    : "border-border bg-canvas text-ink-700"
-                }`}
+            {/* Filtry toggle — na obou platformách, drží stejnou UX */}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-ring ${
+                filtersOpen || activeFilterCount > 0
+                  ? "border-ink-900 bg-ink-900 text-canvas"
+                  : "border-border bg-canvas text-ink-700"
+              }`}
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 20 20"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                Filtry
-                {activeFilterCount > 0 && ` (${activeFilterCount})`}
-              </button>
-            )}
+                <path d="M3 5h14M5 10h10M8 15h4" />
+              </svg>
+              Filtry
+              {activeFilterCount > 0 && ` (${activeFilterCount})`}
+            </button>
             <select
               value={`${sort.key}:${sort.dir}`}
               onChange={(e) => {
@@ -532,11 +550,9 @@ export function CalendarClient() {
           )}
         </div>
 
-        {/* Filter section — bottom sheet na mobilu (fixed overlay slide
-            up), inline card na desktopu. Prevence tělo scroll když je
-            sheet otevřený — user preference i iOS bug s viewport
-            resize při native keyboardu. */}
-        {isMobile && filtersOpen && (
+        {/* Filter panel — na mobilu bottom sheet (slide up), na desktopu
+            plný right-side drawer. Obojí má overlay backdrop. */}
+        {filtersOpen && (
           <button
             type="button"
             aria-label="Zavřít filtry"
@@ -549,50 +565,53 @@ export function CalendarClient() {
             aria-label="Filtry"
             className={
               isMobile
-                ? "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-xl border-t border-border bg-canvas p-4 shadow-2xl"
-                : "grid gap-3 rounded-md border border-border bg-surface p-4"
+                ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col overflow-hidden rounded-t-xl border-t border-border bg-canvas shadow-2xl"
+                : "fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-border bg-canvas shadow-2xl"
             }
           >
-            {isMobile && (
-              <>
-                {/* Grab bar handle — visual affordance na swipeable
-                    bottom sheet vypadá */}
+            {/* Header — grab bar (mobile) / title bar (desktop) */}
+            <div
+              className={`shrink-0 ${isMobile ? "" : "border-b border-border"}`}
+            >
+              {isMobile && (
                 <div
                   aria-hidden
-                  className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong"
+                  className="mx-auto mt-2 h-1 w-10 rounded-full bg-border-strong"
                 />
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-ink-900">
-                    Filtry
-                    {activeFilterCount > 0 && (
-                      <span className="ml-1.5 text-brand">
-                        ({activeFilterCount})
-                      </span>
-                    )}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setFiltersOpen(false)}
-                    aria-label="Zavřít"
-                    className="rounded-md p-1 text-ink-500 hover:bg-surface-muted"
+              )}
+              <div className={`flex items-center justify-between px-4 ${isMobile ? "pt-3 pb-3" : "py-4"}`}>
+                <h2 className={`font-semibold text-ink-900 ${isMobile ? "text-base" : "text-lg"}`}>
+                  Filtry
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1.5 text-brand">
+                      ({activeFilterCount})
+                    </span>
+                  )}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  aria-label="Zavřít"
+                  className="rounded-md p-1 text-ink-500 hover:bg-surface-muted focus-ring"
+                >
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 20 20"
+                    width="20"
+                    height="20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
                   >
-                    <svg
-                      aria-hidden
-                      viewBox="0 0 20 20"
-                      width="20"
-                      height="20"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M4 4l12 12M16 4L4 16" />
-                    </svg>
-                  </button>
-                </div>
-              </>
-            )}
-            <div className={isMobile ? "grid gap-3" : "contents"}>
+                    <path d="M4 4l12 12M16 4L4 16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="grid flex-1 gap-3 overflow-y-auto p-4">
             {/* Row: sport + view mode toggles */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="uk-mode" role="group" aria-label="Sport">
@@ -762,24 +781,23 @@ export function CalendarClient() {
             </ChipRow>
 
             </div>
-            {isMobile && (
-              <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 flex items-center justify-between border-t border-border bg-canvas px-4 py-3">
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="text-[13.5px] font-medium text-brand underline-offset-2 hover:underline"
-                >
-                  Zrušit filtry
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  className="rounded-md bg-ink-900 px-5 py-2.5 text-sm font-semibold text-canvas focus-ring"
-                >
-                  Zobrazit {sorted.length} závodů
-                </button>
-              </div>
-            )}
+            {/* Sticky footer — action bar (obojí platforma) */}
+            <div className="flex shrink-0 items-center justify-between border-t border-border bg-canvas px-4 py-3">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-[13.5px] font-medium text-brand underline-offset-2 hover:underline"
+              >
+                Zrušit filtry
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="rounded-md bg-ink-900 px-5 py-2.5 text-sm font-semibold text-canvas hover:brightness-110 focus-ring"
+              >
+                Zobrazit {sorted.length} závodů
+              </button>
+            </div>
           </section>
         )}
 
