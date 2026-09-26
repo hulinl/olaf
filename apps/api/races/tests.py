@@ -120,7 +120,8 @@ class RaceFavoriteToggleTests(TestCase):
         self.client.force_authenticate(self.user)
         resp = self.client.post(f"/api/races/{self.race.slug}/favorite/")
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["is_favorite"])
+        # POST vrací RaceFavoriteSerializer — status default "interested"
+        self.assertEqual(resp.json()["status"], RaceFavorite.STATUS_INTERESTED)
         self.assertEqual(
             RaceFavorite.objects.filter(user=self.user, race=self.race).count(),
             1,
@@ -129,7 +130,7 @@ class RaceFavoriteToggleTests(TestCase):
         # Toggle off
         resp = self.client.delete(f"/api/races/{self.race.slug}/favorite/")
         self.assertEqual(resp.status_code, 200)
-        self.assertFalse(resp.json()["is_favorite"])
+        self.assertTrue(resp.json()["deleted"])
         self.assertEqual(
             RaceFavorite.objects.filter(user=self.user, race=self.race).count(),
             0,

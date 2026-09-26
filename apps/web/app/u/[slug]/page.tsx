@@ -10,6 +10,8 @@ import { Alert, Card, CardSection } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
 import { ApiError, type UserPublicProfile, auth } from "@/lib/api";
 
+import { RacePlanSection } from "./RacePlanSection";
+
 interface Props {
   params: Promise<{ slug: string }>;
 }
@@ -235,6 +237,11 @@ export default function PublicProfilePage({ params }: Props) {
               kontaktovat jinou cestou — třeba zprávou v komunitě.
             </p>
           )}
+
+        {/* Race plán — veřejný list závodů, které user sleduje. Zobrazuje
+            se jen když má user aspoň jeden. Klíčový user story: „pošlu
+            odkaz na profil, oni tam vidí co běžím v 2027". */}
+        <RacePlanSection userSlug={profile.profile_slug || slug} />
 
         <p className="mt-6 text-xs text-ink-500">
           <Link href="/settings/profile" className="hover:text-ink-900">

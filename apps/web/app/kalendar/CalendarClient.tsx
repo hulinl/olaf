@@ -5,11 +5,24 @@ import { createPortal } from "react-dom";
 
 import { ApiError, auth, type User } from "@/lib/api";
 import {
+  PLAN_STATUS_LABEL,
+  PLAN_STATUS_TONE,
   races,
   type Race,
   type RaceFilters,
+  type RacePlanStatus,
   type RaceRegion,
 } from "@/lib/races";
+
+// Cyklus statusů pro click-to-cycle interakci. Pořadí odpovídá
+// user journey: zájem → přípravy → potvrzeno → (waitlist / hotovo).
+const STATUS_CYCLE: RacePlanStatus[] = [
+  "interested",
+  "waiting_registration",
+  "registered",
+  "waitlist",
+  "completed",
+];
 
 /**
  * Ultra kalendář client — 1:1 replika layoutu z reference HTML.
@@ -248,14 +261,53 @@ export function CalendarClient() {
     }
     const nextOn = !race.is_favorite;
     setItems((prev) =>
-      prev.map((r) => (r.id === race.id ? { ...r, is_favorite: nextOn } : r)),
+      prev.map((r) =>
+        r.id === race.id
+          ? {
+              ...r,
+              is_favorite: nextOn,
+              plan_status: nextOn ? "interested" : null,
+            }
+          : r,
+      ),
     );
     try {
-      await races.favorite(race.slug, nextOn);
+      if (nextOn) {
+        await races.addToPlan(race.slug);
+      } else {
+        await races.removeFromPlan(race.slug);
+      }
     } catch {
       setItems((prev) =>
         prev.map((r) =>
-          r.id === race.id ? { ...r, is_favorite: !nextOn } : r,
+          r.id === race.id
+            ? {
+                ...r,
+                is_favorite: !nextOn,
+                plan_status: !nextOn ? "interested" : null,
+              }
+            : r,
+        ),
+      );
+    }
+  };
+
+  /** Cyklí přes 5 statusů, updateuje backend + optimistic UI. */
+  const cycleStatus = async (race: Race) => {
+    if (!user || !race.plan_status) return;
+    const idx = STATUS_CYCLE.indexOf(race.plan_status);
+    const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+    setItems((prev) =>
+      prev.map((r) =>
+        r.id === race.id ? { ...r, plan_status: next } : r,
+      ),
+    );
+    try {
+      await races.updatePlan(race.slug, { status: next });
+    } catch {
+      setItems((prev) =>
+        prev.map((r) =>
+          r.id === race.id ? { ...r, plan_status: race.plan_status } : r,
         ),
       );
     }
@@ -648,6 +700,7 @@ export function CalendarClient() {
                 key={r.id}
                 race={r}
                 onFavorite={() => toggleFavorite(r)}
+                onCycleStatus={() => cycleStatus(r)}
                 maxSteep={maxSteep}
               />
             ))}
@@ -704,6 +757,7 @@ export function CalendarClient() {
                     key={r.id}
                     race={r}
                     onFavorite={() => toggleFavorite(r)}
+                    onCycleStatus={() => cycleStatus(r)}
                     maxSteep={maxSteep}
                   />
                 ))}
@@ -841,10 +895,12 @@ function ThSortable({
 function DesktopRaceRow({
   race,
   onFavorite,
+  onCycleStatus,
   maxSteep,
 }: {
   race: Race;
   onFavorite: () => void;
+  onCycleStatus: () => void;
   maxSteep: number;
 }) {
   const steep = race.elevation_per_km ?? 0;
@@ -927,17 +983,30 @@ function DesktopRaceRow({
         </span>
       </td>
       <td style={{ textAlign: "center" }}>
-        <button
-          type="button"
-          className="uk-star"
-          aria-pressed={race.is_favorite}
-          aria-label={
-            race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"
-          }
-          onClick={onFavorite}
-        >
-          ★
-        </button>
+        <div className="flex flex-col items-center gap-1">
+          <button
+            type="button"
+            className="uk-star"
+            aria-pressed={race.is_favorite}
+            aria-label={
+              race.is_favorite ? "Odebrat z plánu" : "Přidat do plánu"
+            }
+            onClick={onFavorite}
+          >
+            ★
+          </button>
+          {race.plan_status && (
+            <button
+              type="button"
+              onClick={onCycleStatus}
+              aria-label={`Status: ${PLAN_STATUS_LABEL[race.plan_status]}. Klikni pro změnu.`}
+              className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider transition-opacity hover:opacity-80 focus-ring ${PLAN_STATUS_TONE[race.plan_status]}`}
+              title="Klikni pro další status"
+            >
+              {PLAN_STATUS_LABEL[race.plan_status]}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -951,10 +1020,12 @@ function DesktopRaceRow({
 function MobileRaceCard({
   race,
   onFavorite,
+  onCycleStatus,
   maxSteep,
 }: {
   race: Race;
   onFavorite: () => void;
+  onCycleStatus: () => void;
   maxSteep: number;
 }) {
   const steep = race.elevation_per_km ?? 0;
@@ -1079,7 +1150,7 @@ function MobileRaceCard({
         </p>
       )}
 
-      {/* Registration pill + detail + series */}
+      {/* Registration pill + detail + series + user's plan status */}
       <div className="mt-3 flex flex-wrap items-start gap-2">
         <span className={`uk-rg uk-rg-${regCode}`}>
           {REG_LABEL[race.registration_status]}
@@ -1087,6 +1158,16 @@ function MobileRaceCard({
         <span className={SERIES_TAG_CLASS[race.series]}>
           {seriesLabel(race.series)}
         </span>
+        {race.plan_status && (
+          <button
+            type="button"
+            onClick={onCycleStatus}
+            aria-label={`Můj status: ${PLAN_STATUS_LABEL[race.plan_status]}. Klikni pro změnu.`}
+            className={`inline-flex items-center rounded-sm px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider transition-opacity hover:opacity-80 focus-ring ${PLAN_STATUS_TONE[race.plan_status]}`}
+          >
+            {PLAN_STATUS_LABEL[race.plan_status]}
+          </button>
+        )}
       </div>
       {race.registration_detail && (
         <p className="mt-2 text-[12.5px] leading-snug text-ink-500">

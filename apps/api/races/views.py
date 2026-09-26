@@ -1,19 +1,27 @@
-"""Public race calendar API — list, favorite toggle.
+"""Public race calendar API — list, favorite toggle, user race plan.
 
 Endpoints:
-- GET  /api/races/               — list visible races (default: from today onward)
-- POST /api/races/<slug>/favorite/    — toggle ★ (auth required)
+- GET    /api/races/                          — list visible races
+- GET    /api/races/countries/                — distinct countries
+- POST   /api/races/<slug>/favorite/          — add ★, optional {status, note}
+- PATCH  /api/races/<slug>/favorite/          — update status/note
+- DELETE /api/races/<slug>/favorite/          — remove ★
+- GET    /api/races/mine/                     — my race plan (auth)
+- GET    /api/races/plan/<user_slug>/         — public race plan per user
 
-Filtry přes query params:
-- ?past=1 — include past races (default excluded)
-- ?month=YYYY-MM — jen daný měsíc
-- ?country=Česko — přesná země
-- ?series=utmb — série (utmb/wtm/sky/major/indep)
-- ?q=Beskyd — full-text v name/location/highlight
-- ?fav=1 — jen moje oblíbené (auth required)
+Filtry přes query params (list):
+- ?past=1 — include past races
+- ?from=YYYY-MM-DD&to=YYYY-MM-DD — date range
+- ?year=YYYY, ?month=YYYY-MM — legacy single-year/month picks
+- ?country=Česko, ?region=CZ, ?sport=trail
+- ?series=utmb, ?min_km=40&max_km=200
+- ?q=Beskyd — full-text
+- ?fav=1 — jen moje oblíbené (auth)
+- ?top=1 — jen top výběr
 """
 from __future__ import annotations
 
+import contextlib
 from datetime import date
 
 from django.db.models import Q, QuerySet
@@ -25,47 +33,33 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Race, RaceFavorite
-from .serializers import RaceSerializer
+from .serializers import RaceFavoriteSerializer, RaceSerializer
 
 
 def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
-    """Aplikuje query-param filtry na queryset. Extrahované, ať list/mine
-    endpointy sdílejí logiku bez duplicity."""
-
-    # Default: od dneška dál. Explicit `past=1` opt-in pro archive view.
     if request.query_params.get("past") != "1":
         qs = qs.filter(date_start__gte=date.today())
 
     year = request.query_params.get("year")
     if year and year.isdigit():
-        y_int = int(year)
-        qs = qs.filter(date_start__year=y_int)
+        qs = qs.filter(date_start__year=int(year))
 
-    # Range filter — nahradil single month/year picker za flexibilnější
-    # „od-do" (uživatel může vybrat víc měsíců napříč roky).
     date_from = request.query_params.get("from")
     if date_from:
-        try:
+        with contextlib.suppress(ValueError):
             qs = qs.filter(date_start__gte=date.fromisoformat(date_from))
-        except ValueError:
-            pass
     date_to = request.query_params.get("to")
     if date_to:
-        try:
+        with contextlib.suppress(ValueError):
             qs = qs.filter(date_start__lte=date.fromisoformat(date_to))
-        except ValueError:
-            pass
 
     month = request.query_params.get("month")
     if month:
-        # Formát YYYY-MM. Interpretujeme jako datum ve tvaru YYYY-MM-01 do
-        # last-day-of-month.
         try:
-            year, mnum = month.split("-")
-            year_i, m_i = int(year), int(mnum)
+            year_s, mnum = month.split("-")
+            year_i, m_i = int(year_s), int(mnum)
             if 1 <= m_i <= 12:
                 start = date(year_i, m_i, 1)
-                # Next month first day — přes 12 wraparound roku.
                 end = (
                     date(year_i + 1, 1, 1)
                     if m_i == 12
@@ -73,7 +67,6 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
                 )
                 qs = qs.filter(date_start__gte=start, date_start__lt=end)
         except (ValueError, TypeError):
-            # Silent no-op na malformed month — endpoint zůstává funkční.
             pass
 
     country = request.query_params.get("country")
@@ -88,12 +81,12 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
     if sport:
         qs = qs.filter(sport=sport)
 
-    if request.query_params.get("top") == "1":
-        qs = qs.filter(is_top=True)
-
     region = request.query_params.get("region")
     if region:
         qs = qs.filter(region=region)
+
+    if request.query_params.get("top") == "1":
+        qs = qs.filter(is_top=True)
 
     q = request.query_params.get("q")
     if q:
@@ -104,7 +97,6 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
             | Q(highlight__icontains=q)
         )
 
-    # Min/max distance filtr — např. ?min_km=40 pro „jen ultramaraton"
     min_km = request.query_params.get("min_km")
     if min_km and min_km.isdigit():
         qs = qs.filter(distance_km__gte=int(min_km))
@@ -115,66 +107,172 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
     return qs
 
 
+def _user_fav_status(user) -> dict[int, str]:
+    """Vrátí dict race_id → status pro rychlé bulk lookup v seriálu."""
+    if not user or not user.is_authenticated:
+        return {}
+    return dict(
+        RaceFavorite.objects.filter(user=user).values_list("race_id", "status")
+    )
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def race_list(request: Request) -> Response:
-    """Public list. Anonymní request dostane `is_favorite=false` pro
-    všechny. Autentizovaný dostane spočtené per-race.
-    """
     qs = Race.objects.filter(is_visible=True)
     qs = _apply_filters(qs, request)
 
-    # `fav=1` — jen moje oblíbené. Vyžaduje login (jinak vrací prázdno).
     if request.query_params.get("fav") == "1":
         if not request.user.is_authenticated:
-            return Response({"detail": "Login required for favorites filter."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"detail": "Login required for favorites filter."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
         qs = qs.filter(favorites__user=request.user)
 
-    # Prefetch user favorites pro batch is_favorite computation (1 SQL
-    # místo N).
-    user_favorite_ids: set[int] = set()
-    if request.user.is_authenticated:
-        user_favorite_ids = set(
-            RaceFavorite.objects.filter(user=request.user).values_list(
-                "race_id", flat=True
-            )
-        )
-
+    lookup = _user_fav_status(request.user)
     serializer = RaceSerializer(
         qs,
         many=True,
-        context={"request": request, "user_favorite_ids": user_favorite_ids},
+        context={"request": request, "user_favorite_status": lookup},
     )
     return Response({"count": qs.count(), "results": serializer.data})
 
 
-@api_view(["POST", "DELETE"])
+@api_view(["POST", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def race_favorite_toggle(request: Request, slug: str) -> Response:
-    """POST = přidat ★, DELETE = odebrat. Idempotentní — dvakrát POST
-    neselže, dvakrát DELETE taky ne."""
+    """POST — add/replace ★ s optional status/note.
+    PATCH — update pouze status/note bez re-create.
+    DELETE — remove ★.
+    """
     race = get_object_or_404(Race, slug=slug, is_visible=True)
 
-    if request.method == "POST":
-        RaceFavorite.objects.get_or_create(user=request.user, race=race)
+    valid_statuses = {v for v, _ in RaceFavorite.STATUS_CHOICES}
+
+    if request.method in {"POST", "PATCH"}:
+        payload_status = request.data.get("status")
+        payload_note = request.data.get("note")
+
+        if payload_status is not None and payload_status not in valid_statuses:
+            return Response(
+                {"status": f"Neznámý status. Povolené: {sorted(valid_statuses)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if request.method == "POST":
+            fav, created = RaceFavorite.objects.get_or_create(
+                user=request.user, race=race
+            )
+            # POST bez status → default `interested` na new, keep na existing
+            if payload_status:
+                fav.status = payload_status
+            elif created:
+                # already default from model
+                pass
+            if payload_note is not None:
+                fav.note = payload_note[:280]
+            fav.save()
+        else:
+            # PATCH — musí existovat
+            fav = RaceFavorite.objects.filter(user=request.user, race=race).first()
+            if not fav:
+                return Response(
+                    {"detail": "Race není v tvém plánu — nejdřív POST."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if payload_status is not None:
+                fav.status = payload_status
+            if payload_note is not None:
+                fav.note = payload_note[:280]
+            fav.save()
+
         return Response(
-            {"is_favorite": True, "race_id": race.id},
-            status=status.HTTP_200_OK,
+            RaceFavoriteSerializer(
+                fav, context={"request": request}
+            ).data
         )
 
     # DELETE
     RaceFavorite.objects.filter(user=request.user, race=race).delete()
+    return Response({"deleted": True}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def race_plan_mine(request: Request) -> Response:
+    """Vrátí kompletní race plán aktuálního usera. Filtry přes:
+    - ?status=interested / registered / … (single)
+    - ?year=YYYY (odpovídá race.next_year)
+    - ?sport=trail / skialp
+    """
+    qs = RaceFavorite.objects.filter(user=request.user).select_related("race")
+    st = request.query_params.get("status")
+    if st:
+        qs = qs.filter(status=st)
+    year = request.query_params.get("year")
+    if year and year.isdigit():
+        qs = qs.filter(race__next_year=int(year))
+    sport = request.query_params.get("sport")
+    if sport:
+        qs = qs.filter(race__sport=sport)
+
+    qs = qs.order_by("race__date_start")
+
+    serializer = RaceFavoriteSerializer(
+        qs, many=True, context={"request": request}
+    )
+    return Response({"count": qs.count(), "results": serializer.data})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def race_plan_public(request: Request, user_slug: str) -> Response:
+    """Public race plan per user slug — pro sdílení („mrkni na můj
+    race plán 2027"). Vrátí jen non-private records (do budoucna
+    per-entry visibility field). Zatím vše viditelné.
+
+    Filtry stejné jako mine/: ?status, ?year, ?sport.
+    """
+    from accounts.models import User
+
+    user = User.objects.filter(profile_slug=user_slug).first()
+    if not user:
+        return Response(
+            {"detail": "Profil nenalezen."}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    qs = RaceFavorite.objects.filter(user=user).select_related("race")
+    st = request.query_params.get("status")
+    if st:
+        qs = qs.filter(status=st)
+    year = request.query_params.get("year")
+    if year and year.isdigit():
+        qs = qs.filter(race__next_year=int(year))
+    sport = request.query_params.get("sport")
+    if sport:
+        qs = qs.filter(race__sport=sport)
+
+    qs = qs.order_by("race__date_start")
+
+    serializer = RaceFavoriteSerializer(
+        qs, many=True, context={"request": request}
+    )
     return Response(
-        {"is_favorite": False, "race_id": race.id},
-        status=status.HTTP_200_OK,
+        {
+            "user": {
+                "slug": user_slug,
+                "display_name": user.get_full_name() or user_slug,
+            },
+            "count": qs.count(),
+            "results": serializer.data,
+        }
     )
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def race_countries(request: Request) -> Response:
-    """Distinct list zemí, které mají alespoň jeden viditelný závod od
-    dneška dál. Frontend to používá pro country filter chip."""
     countries = (
         Race.objects.filter(is_visible=True, date_start__gte=date.today())
         .exclude(country="")

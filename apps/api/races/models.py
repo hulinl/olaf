@@ -286,8 +286,30 @@ class Race(models.Model):
 
 
 class RaceFavorite(models.Model):
-    """★ Uživatelovo „chci na tenhle závod jet" — soukromý bucket-list.
-    Nikdo jiný to nevidí, jen sám user na `/kalendar?fav=1` filtru."""
+    """Uživatelův race plán — soukromý bucket-list s tracking statusem.
+
+    Status distinguishes „mám v hledáčku" od „reálně přihlášen" — což
+    je klíčové pro sharing přes public profile: „jaké závody běžím
+    2027" (status=registered/waitlist) je jiná otázka než „co plánuju"
+    (status=interested/waiting_registration).
+
+    Public profile na `/u/<slug>` může tento plán publikovat (pokud
+    user povolí — do budoucna field visibility) — atlet pošle URL
+    kamkoli a lidi vidí jeho sezónní plán jako race resume.
+    """
+
+    STATUS_INTERESTED = "interested"
+    STATUS_WAITING = "waiting_registration"
+    STATUS_REGISTERED = "registered"
+    STATUS_WAITLIST = "waitlist"
+    STATUS_COMPLETED = "completed"
+    STATUS_CHOICES = [
+        (STATUS_INTERESTED, "Zajímá mě"),
+        (STATUS_WAITING, "Čekám na registraci"),
+        (STATUS_REGISTERED, "Registrován"),
+        (STATUS_WAITLIST, "Na waitlistu"),
+        (STATUS_COMPLETED, "Absolvoval"),
+    ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -299,14 +321,28 @@ class RaceFavorite(models.Model):
         on_delete=models.CASCADE,
         related_name="favorites",
     )
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_INTERESTED,
+        db_index=True,
+        help_text="Vztah uživatele k závodu (interested → completed).",
+    )
+    note = models.CharField(
+        max_length=280,
+        blank=True,
+        default="",
+        help_text='Osobní poznámka (např. „jedu s Martou, letenka koupená").',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "races_favorite"
         unique_together = [("user", "race")]
-        ordering = ["-created_at"]
-        verbose_name = "Oblíbený závod"
-        verbose_name_plural = "Oblíbené závody"
+        ordering = ["-updated_at"]
+        verbose_name = "Race plán"
+        verbose_name_plural = "Race plány"
 
     def __str__(self) -> str:
-        return f"{self.user_id} ★ {self.race_id}"
+        return f"{self.user_id} {self.status} {self.race_id}"
