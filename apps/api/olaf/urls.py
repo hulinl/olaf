@@ -30,6 +30,7 @@ urlpatterns = [
     ),
     path("api/audit/", include("audit.urls", namespace="audit")),
     path("api/contracts/", include("contracts.urls", namespace="contracts")),
+    path("api/races/", include("races.urls", namespace="races")),
 ]
 
 if settings.DEBUG:
