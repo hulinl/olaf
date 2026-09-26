@@ -253,3 +253,95 @@ class WorkspaceHierarchyEndpointTests(TestCase):
         self.assertEqual(
             data["children"][0]["link_status"], Workspace.PARENT_LINK_ACTIVE
         )
+
+
+class WorkspaceEventPropagationTests(TestCase):
+    """Slice 3 vize — parent workspace's events se propagují do child
+    workspace listing. Olaf Adventures kemp se zobrazí i návštěvníkům
+    lokální child komunity, aniž by musel být explicitně added do
+    shared_workspaces každé akce.
+
+    Non-active link (pending) event propagaci NEaktivuje.
+    """
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        Workspace.objects.all().delete()
+        self.olaf_admin = _mk_user("olaf@example.com")
+        self.local_admin = _mk_user("local@example.com")
+        self.parent = _mk_ws("olaf-adventures", "Olaf Adventures", self.olaf_admin)
+        self.child = _mk_ws("beskydske", "Beskydské výběhy", self.local_admin)
+
+        # Vytvoř event v parent workspace
+        from datetime import datetime, timedelta, timezone as dt_tz
+
+        from events.models import Event
+
+        self.event_parent = Event.objects.create(
+            workspace=self.parent,
+            slug="spring-camp",
+            title="Spring Camp Beskydy",
+            starts_at=datetime.now(dt_tz.utc) + timedelta(days=30),
+            ends_at=datetime.now(dt_tz.utc) + timedelta(days=33),
+            status=Event.STATUS_PUBLISHED,
+        )
+
+    def _activate_link(self) -> None:
+        self.child.parent_community = self.parent
+        self.child.parent_link_status = Workspace.PARENT_LINK_ACTIVE
+        self.child.save()
+
+    def test_parent_event_visible_in_child_listing_when_active(self) -> None:
+        """Návštěvník child workspace vidí parent's event."""
+        self._activate_link()
+        resp = self.client.get("/api/workspaces/beskydske/events/")
+        titles = {e["title"] for e in resp.json()}
+        self.assertIn("Spring Camp Beskydy", titles)
+
+    def test_parent_event_hidden_when_link_pending(self) -> None:
+        """Pending link nepropaguje events — child listing bez parent event."""
+        self.child.parent_community = self.parent
+        self.child.parent_link_status = Workspace.PARENT_LINK_PENDING
+        self.child.save()
+        resp = self.client.get("/api/workspaces/beskydske/events/")
+        titles = {e["title"] for e in resp.json()}
+        self.assertNotIn("Spring Camp Beskydy", titles)
+
+    def test_parent_event_hidden_without_link(self) -> None:
+        """Bez linku (žádný parent) — child listing prázdný."""
+        resp = self.client.get("/api/workspaces/beskydske/events/")
+        titles = {e["title"] for e in resp.json()}
+        self.assertNotIn("Spring Camp Beskydy", titles)
+
+    def test_child_events_dont_leak_upward(self) -> None:
+        """Parent listing NEsmí vidět child's events (jednosměrná propagace).
+        Umbrella se dolů dívá, ne nahoru."""
+        from datetime import datetime, timedelta, timezone as dt_tz
+
+        from events.models import Event
+
+        Event.objects.create(
+            workspace=self.child,
+            slug="local-run",
+            title="Beskydský půlmaraton",
+            starts_at=datetime.now(dt_tz.utc) + timedelta(days=14),
+            ends_at=datetime.now(dt_tz.utc) + timedelta(days=14),
+            status=Event.STATUS_PUBLISHED,
+        )
+        self._activate_link()
+        resp = self.client.get("/api/workspaces/olaf-adventures/events/")
+        titles = {e["title"] for e in resp.json()}
+        self.assertIn("Spring Camp Beskydy", titles)  # own
+        self.assertNotIn("Beskydský půlmaraton", titles)  # child ne
+
+    def test_draft_events_still_hidden_from_public(self) -> None:
+        """Propagace nesmí obejít status filter — draft z parent zůstává
+        hidden pro public návštěvníky child listu."""
+        from events.models import Event
+
+        self.event_parent.status = Event.STATUS_DRAFT
+        self.event_parent.save()
+        self._activate_link()
+        resp = self.client.get("/api/workspaces/beskydske/events/")
+        titles = {e["title"] for e in resp.json()}
+        self.assertNotIn("Spring Camp Beskydy", titles)

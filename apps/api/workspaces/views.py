@@ -464,11 +464,34 @@ def workspace_events(request: Request, slug: str) -> Response:
 
     # An event shows up in this workspace's list if it's *owned* by this
     # workspace OR has been shared into it (Slice 3 cross-workspace m2m).
+    #
+    # Nested community propagation (Slice 3 vize „community awareness"):
+    # když má tato workspace parent s active linkem, přidáme i parent's
+    # eventy — Olaf Adventures kemp se zobrazí i členům lokální komunity,
+    # aniž by museli explicitně přidat parent do shared_workspaces
+    # každé akce.
     from django.db.models import Q
+
+    lookup_workspaces = {workspace.pk}
+    parent = workspace.parent_community
+    depth = 0
+    while (
+        parent is not None
+        and workspace.parent_link_status == Workspace.PARENT_LINK_ACTIVE
+        and depth < 20
+    ):
+        lookup_workspaces.add(parent.pk)
+        # Grandparent chain — pokud budoucí verze umožní hlubší
+        # hierarchii. Prozatím two-tier, ale query je připravená.
+        if parent.parent_link_status != Workspace.PARENT_LINK_ACTIVE:
+            break
+        parent = parent.parent_community
+        depth += 1
 
     qs = (
         Event.objects.filter(
-            Q(workspace=workspace) | Q(shared_workspaces=workspace)
+            Q(workspace_id__in=lookup_workspaces)
+            | Q(shared_workspaces__in=lookup_workspaces)
         )
         .select_related("workspace")
         .distinct()

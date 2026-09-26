@@ -11,17 +11,48 @@ class WorkspaceMemberInline(admin.TabularInline):
 
 @admin.register(Workspace)
 class WorkspaceAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "visibility", "default_tz", "created_at")
-    list_filter = ("visibility",)
+    list_display = (
+        "name",
+        "slug",
+        "visibility",
+        "parent_community",
+        "parent_link_status",
+        "default_tz",
+        "created_at",
+    )
+    list_filter = ("visibility", "parent_link_status")
     search_fields = ("name", "slug")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "parent_requested_by",
+        "parent_requested_at",
+    )
     prepopulated_fields = {"slug": ("name",)}
+    autocomplete_fields = ("parent_community",)
     inlines = [WorkspaceMemberInline]
     fieldsets = (
         (None, {"fields": ("name", "slug", "visibility")}),
         ("Branding", {"fields": ("logo", "cover", "accent_color")}),
         ("Content", {"fields": ("bio", "location", "social_links")}),
         ("Defaults", {"fields": ("default_tz",)}),
+        (
+            "Nested community hierarchy (Slice 2 vize)",
+            {
+                "fields": (
+                    "parent_community",
+                    "parent_link_status",
+                    "parent_requested_by",
+                    "parent_requested_at",
+                ),
+                "description": (
+                    "Když je parent_link_status='active', členové této "
+                    "komunity jsou effective members parent komunity "
+                    "v race calendaru a parent events se zobrazí i "
+                    "návštěvníkům této komunity."
+                ),
+            },
+        ),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
 
