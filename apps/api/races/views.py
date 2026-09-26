@@ -64,6 +64,14 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
     if series:
         qs = qs.filter(series=series)
 
+    sport = request.query_params.get("sport")
+    if sport:
+        qs = qs.filter(sport=sport)
+
+    region = request.query_params.get("region")
+    if region:
+        qs = qs.filter(region=region)
+
     q = request.query_params.get("q")
     if q:
         qs = qs.filter(

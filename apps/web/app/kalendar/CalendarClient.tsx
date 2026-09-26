@@ -6,10 +6,12 @@ import { ApiError, auth, type User } from "@/lib/api";
 import {
   formatRaceDate,
   races,
+  REGION_LABEL,
   REGISTRATION_LABEL,
   SERIES_LABEL,
   type Race,
   type RaceFilters,
+  type RaceRegion,
   type RaceSeries,
 } from "@/lib/races";
 
@@ -46,10 +48,13 @@ const SERIES_FILTERS: { value: RaceSeries; label: string }[] = [
   { value: "indep", label: "Nezávislý" },
 ];
 
+const REGION_FILTERS: { value: RaceRegion; label: string }[] = (
+  Object.keys(REGION_LABEL) as RaceRegion[]
+).map((k) => ({ value: k, label: REGION_LABEL[k] }));
+
 export function CalendarClient() {
   const [user, setUser] = useState<User | null>(null);
   const [items, setItems] = useState<Race[]>([]);
-  const [countries, setCountries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RaceFilters>({});
@@ -61,14 +66,6 @@ export function CalendarClient() {
       .me()
       .then(setUser)
       .catch(() => setUser(null));
-  }, []);
-
-  // Load countries once for the country filter chip.
-  useEffect(() => {
-    races
-      .countries()
-      .then((r) => setCountries(r.countries))
-      .catch(() => setCountries([]));
   }, []);
 
   // Fetch races on filter change.
@@ -163,6 +160,32 @@ export function CalendarClient() {
             <option value="elevation">Největší převýšení</option>
             <option value="name">Abecedně</option>
           </select>
+          {/* Sport toggle — trail (běh) vs skialp. Přepnutí okamžitě
+              filtruje list. */}
+          <div className="inline-flex overflow-hidden rounded-sm border border-border">
+            {[
+              { value: undefined, label: "Vše" },
+              { value: "trail" as const, label: "Běh" },
+              { value: "skialp" as const, label: "Skialp" },
+            ].map((opt) => {
+              const active = filters.sport === opt.value;
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setFilter({ sport: opt.value })}
+                  aria-pressed={active}
+                  className={`px-3 py-2 text-sm font-medium transition-colors focus-ring ${
+                    active
+                      ? "bg-ink-900 text-canvas"
+                      : "bg-canvas text-ink-700 hover:bg-surface-muted"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           {user && (
             <button
               type="button"
@@ -239,24 +262,22 @@ export function CalendarClient() {
               );
             })}
           </ChipRow>
-          {countries.length > 0 && (
-            <ChipRow label="Země">
-              {countries.map((c) => {
-                const active = filters.country === c;
-                return (
-                  <Chip
-                    key={c}
-                    active={active}
-                    onClick={() =>
-                      setFilter({ country: active ? undefined : c })
-                    }
-                  >
-                    {c}
-                  </Chip>
-                );
-              })}
-            </ChipRow>
-          )}
+          <ChipRow label="Region">
+            {REGION_FILTERS.map((r) => {
+              const active = filters.region === r.value;
+              return (
+                <Chip
+                  key={r.value}
+                  active={active}
+                  onClick={() =>
+                    setFilter({ region: active ? undefined : r.value })
+                  }
+                >
+                  {r.label}
+                </Chip>
+              );
+            })}
+          </ChipRow>
         </div>
       </div>
 
@@ -462,7 +483,7 @@ function RaceRow({
         )}
       </td>
       <td className="whitespace-nowrap px-3 py-3 align-top text-[13px] text-ink-700">
-        {formatRaceDate(race.date_start, race.date_end)}
+        {race.date_display || formatRaceDate(race.date_start, race.date_end)}
       </td>
       <td className="px-3 py-3 align-top text-[12px] text-ink-700">
         <SeriesBadge series={race.series} />
@@ -547,7 +568,7 @@ function RaceCard({
         <div>
           <dt className="mono-tag text-ink-500">Termín</dt>
           <dd className="mt-0.5 text-[13px] font-medium text-ink-900">
-            {formatRaceDate(race.date_start, race.date_end)}
+            {race.date_display || formatRaceDate(race.date_start, race.date_end)}
           </dd>
         </div>
       </dl>

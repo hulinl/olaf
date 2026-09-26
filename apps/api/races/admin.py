@@ -11,11 +11,20 @@ class RaceAdmin(admin.ModelAdmin):
         "distance_km",
         "elevation_m",
         "country",
+        "region",
         "series",
+        "sport",
         "registration_status",
         "is_visible",
     )
-    list_filter = ("series", "registration_status", "country", "is_visible")
+    list_filter = (
+        "sport",
+        "series",
+        "region",
+        "registration_status",
+        "country",
+        "is_visible",
+    )
     search_fields = ("name", "location", "country", "highlight")
     date_hierarchy = "date_start"
     prepopulated_fields = {"slug": ("name",)}

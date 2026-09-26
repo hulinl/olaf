@@ -10,18 +10,44 @@ export interface Race {
   name: string;
   date_start: string; // ISO YYYY-MM-DD
   date_end: string | null;
+  date_display: string; // "„konec srpna (TBA)" — human string, fallback pokud non-empty
   distance_km: number;
+  distances_note: string;
   elevation_m: number | null;
   elevation_per_km: number | null;
   terrain: string;
+  sport: RaceSport;
   location: string;
   country: string;
+  region: RaceRegion | "";
   url: string;
   series: RaceSeries;
   registration_status: RaceRegistrationStatus;
   highlight: string;
   is_favorite: boolean;
 }
+
+export type RaceSport = "trail" | "skialp";
+export type RaceRegion =
+  | "CZ"
+  | "ALP"
+  | "SKPL"
+  | "SEV"
+  | "IBE"
+  | "BAL"
+  | "OST"
+  | "SVET";
+
+export const REGION_LABEL: Record<RaceRegion, string> = {
+  CZ: "Česko",
+  ALP: "Alpy",
+  SKPL: "Slovensko / Polsko",
+  SEV: "Skandinávie",
+  IBE: "Ibérie",
+  BAL: "Balkán / Řecko",
+  OST: "Ostrovy",
+  SVET: "Svět",
+};
 
 export type RaceSeries = "indep" | "utmb" | "wtm" | "sky" | "major";
 export type RaceRegistrationStatus =
@@ -51,6 +77,8 @@ export interface RaceFilters {
   q?: string;
   month?: string; // YYYY-MM
   country?: string;
+  region?: RaceRegion;
+  sport?: RaceSport;
   series?: RaceSeries;
   minKm?: number;
   maxKm?: number;
@@ -68,6 +96,8 @@ function buildQuery(filters: RaceFilters): string {
   if (filters.q) params.set("q", filters.q);
   if (filters.month) params.set("month", filters.month);
   if (filters.country) params.set("country", filters.country);
+  if (filters.region) params.set("region", filters.region);
+  if (filters.sport) params.set("sport", filters.sport);
   if (filters.series) params.set("series", filters.series);
   if (filters.minKm) params.set("min_km", String(filters.minKm));
   if (filters.maxKm) params.set("max_km", String(filters.maxKm));
@@ -91,7 +121,9 @@ export const races = {
 
 /**
  * Format YYYY-MM-DD date range → „16. – 19. května 2027" / „16. května 2027".
- * Používá se v race row / card display.
+ * Používá se v race row / card display. Když má race `date_display`
+ * (např. „konec srpna (TBA)" nebo „13.–19. 9."), volá to caller
+ * napřed a fallbackuje sem jen když `date_display` je prázdný.
  */
 export function formatRaceDate(start: string, end: string | null): string {
   const s = new Date(start);

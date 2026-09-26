@@ -74,11 +74,42 @@ class Race(models.Model):
         help_text='Místo (např. „Beskydy, Frenštát p. Radhoštěm").',
     )
     country = models.CharField(
-        max_length=100,
+        max_length=200,
         blank=True,
         default="",
         db_index=True,
-        help_text="Země (Česko, Slovensko, Francie…). Filtrujeme podle toho.",
+        help_text=(
+            "Země (Česko, Slovensko, Francie…). Multi-country povolen "
+            'pro cross-border závody: „Francie / Itálie / Švýcarsko".'
+        ),
+    )
+    # Regionální bucket pro grouping v UI. Volitelný — pokud prázdný,
+    # frontend defaultuje na `country`. Extrahováno z Ultra kalendář
+    # datasetu (CZ/ALP/SVET/SKPL/SEV/IBE/OST/BAL).
+    REGION_CZ = "CZ"
+    REGION_ALP = "ALP"
+    REGION_SKPL = "SKPL"
+    REGION_SEV = "SEV"
+    REGION_IBE = "IBE"
+    REGION_BAL = "BAL"
+    REGION_OST = "OST"
+    REGION_SVET = "SVET"
+    REGION_CHOICES = [
+        (REGION_CZ, "Česko"),
+        (REGION_ALP, "Alpy"),
+        (REGION_SKPL, "Slovensko / Polsko"),
+        (REGION_SEV, "Skandinávie / sever"),
+        (REGION_IBE, "Ibérie"),
+        (REGION_BAL, "Balkán / Řecko"),
+        (REGION_OST, "Ostrovy"),
+        (REGION_SVET, "Svět"),
+    ]
+    region = models.CharField(
+        max_length=10,
+        choices=REGION_CHOICES,
+        blank=True,
+        default="",
+        db_index=True,
     )
 
     # --- Odkaz + série ---
@@ -125,6 +156,20 @@ class Race(models.Model):
         default=REG_OPEN,
     )
 
+    # --- Sport typ ---
+    SPORT_TRAIL = "trail"
+    SPORT_SKIALP = "skialp"
+    SPORT_CHOICES = [
+        (SPORT_TRAIL, "Běh / trail"),
+        (SPORT_SKIALP, "Skialpinismus"),
+    ]
+    sport = models.CharField(
+        max_length=20,
+        choices=SPORT_CHOICES,
+        default=SPORT_TRAIL,
+        db_index=True,
+    )
+
     # --- Obsah ---
     highlight = models.CharField(
         max_length=280,
@@ -134,6 +179,24 @@ class Race(models.Model):
             '1-2 věty co je zajímavé (např. „Klasika v Beskydech, přesně '
             '100 km, 5 000 D+"). Zobrazuje se v listě pod jménem.'
         ),
+    )
+    # Secondary distances string pro multi-distance závody, kde `distance_km`
+    # drží primary (nejdelší) trať a tady visí kompletní roster.
+    # Např. „174 / 148 (TDS) / 101 (CCC) / 60 (OCC) / 40 (MCC)".
+    distances_note = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text='Vedlejší distance stringy (např. „100/50/25").',
+    )
+    # Volitelný lidský string data pro TBA / rozsahy - frontend ho
+    # ukazuje místo formátovaného date_start když je vyplněný. Př.
+    # "konec srpna (TBA)" / "13.-19. 9. 2027".
+    date_display = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Human date string, override formátovaného date_start.",
     )
 
     # --- Meta ---
