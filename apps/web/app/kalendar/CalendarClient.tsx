@@ -1443,6 +1443,10 @@ function NoteEditor({
   const [value, setValue] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [saving, setSaving] = useState(false);
+  // Success flash — po uložení 2 s zobrazí zelený checkmark next to
+  // note tag, pak zmizí. Vizualní confirmation že se uložilo bez
+  // rušivého toast.
+  const [justSaved, setJustSaved] = useState(false);
 
   const commit = async () => {
     setSaving(true);
@@ -1450,6 +1454,8 @@ function NoteEditor({
       await onSave(value.trim());
       setSaved(value.trim());
       setExpanded(false);
+      setJustSaved(true);
+      window.setTimeout(() => setJustSaved(false), 2000);
     } finally {
       setSaving(false);
     }
@@ -1457,16 +1463,27 @@ function NoteEditor({
 
   if (!expanded) {
     return saved ? (
-      <div className="mt-2 flex items-start justify-between gap-2 rounded-sm border-l-2 border-brand bg-brand/5 px-2 py-1">
+      <div
+        className={`mt-2 flex items-start justify-between gap-2 rounded-sm border-l-2 px-2 py-1 transition-colors ${
+          justSaved ? "border-success bg-success/10" : "border-brand bg-brand/5"
+        }`}
+      >
         <p className="text-[13px] text-ink-700">{saved}</p>
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="shrink-0 text-[11px] font-medium text-brand hover:underline"
-          aria-label="Upravit poznámku"
-        >
-          ✎
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {justSaved && (
+            <span aria-hidden className="text-[12px] text-success">
+              ✓
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="text-[11px] font-medium text-brand hover:underline"
+            aria-label="Upravit poznámku"
+          >
+            ✎
+          </button>
+        </div>
       </div>
     ) : (
       <button
