@@ -374,7 +374,9 @@ export function CalendarClient() {
     setFilters((f) => ({ ...f, ...patch }));
   };
   const clearFilters = () => {
-    setFilters({ sport: filters.sport, topOnly: filters.topOnly });
+    // „Zrušit vše" doslova — sport i topOnly padnou taky. Uživatel
+    // pak vidí celý dataset (běh + skialp, top i ne-top).
+    setFilters({});
     setRegFilter(null);
   };
 
@@ -538,9 +540,17 @@ export function CalendarClient() {
               <div className="uk-mode inline-flex" role="group" aria-label="Sport">
                 <button
                   type="button"
+                  aria-pressed={!filters.sport}
+                  onClick={() => setFilter({ sport: undefined })}
+                  style={{ fontSize: 13, padding: "5px 10px" }}
+                >
+                  Vše
+                </button>
+                <button
+                  type="button"
                   aria-pressed={filters.sport === "trail"}
                   onClick={() => setFilter({ sport: "trail" })}
-                  style={{ fontSize: 13, padding: "5px 12px" }}
+                  style={{ fontSize: 13, padding: "5px 10px" }}
                 >
                   Běh
                 </button>
@@ -548,7 +558,7 @@ export function CalendarClient() {
                   type="button"
                   aria-pressed={filters.sport === "skialp"}
                   onClick={() => setFilter({ sport: "skialp" })}
-                  style={{ fontSize: 13, padding: "5px 12px" }}
+                  style={{ fontSize: 13, padding: "5px 10px" }}
                 >
                   Skialp
                 </button>
@@ -640,6 +650,13 @@ export function CalendarClient() {
             {/* Row: sport + view mode toggles */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="uk-mode" role="group" aria-label="Sport">
+                <button
+                  type="button"
+                  aria-pressed={!filters.sport}
+                  onClick={() => setFilter({ sport: undefined })}
+                >
+                  Vše
+                </button>
                 <button
                   type="button"
                   aria-pressed={filters.sport === "trail"}
