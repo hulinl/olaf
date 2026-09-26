@@ -36,20 +36,32 @@ export function MarketingHeader() {
           className="hidden items-center gap-1 md:flex"
           aria-label="Marketing nav"
         >
-          {PUBLIC_NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={[
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-ring",
-                isActive(item.href)
-                  ? "text-ink-900"
-                  : "text-ink-500 hover:text-ink-900",
-              ].join(" ")}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {PUBLIC_NAV.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={[
+                  "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-ring",
+                  active
+                    ? "text-ink-900"
+                    : "text-ink-500 hover:text-ink-900",
+                ].join(" ")}
+                aria-current={active ? "page" : undefined}
+              >
+                {item.label}
+                {/* Active indicator — 2 px amber underline pod textem
+                    (per OA design DNA). Signalizuje kde uživatel je. */}
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-3 -bottom-0.5 h-[2px] bg-brand"
+                  />
+                )}
+              </Link>
+            );
+          })}
         </nav>
         <PublicAuthIndicator />
       </div>

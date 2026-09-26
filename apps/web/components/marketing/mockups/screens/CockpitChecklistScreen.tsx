@@ -97,17 +97,19 @@ function MiniStat({
   value: string;
   warning?: boolean;
 }) {
+  // Sladěno s AdminCockpit StatTile — stejné proporce, aby feature O5
+  // vypadala konzistentně s O3 (Přihlášky).
   return (
     <div
-      className={`flex flex-col rounded-sm border p-1.5 ${
+      className={`flex flex-col gap-0.5 rounded-sm border p-1.5 ${
         warning
           ? "border-warning/40 bg-warning/5"
           : "border-border bg-surface"
       }`}
     >
-      <p className="mockup-mono text-[5px] text-ink-500">{label}</p>
+      <p className="mockup-mono text-[6px] text-ink-500">{label}</p>
       <p
-        className={`mt-0.5 text-[9px] font-semibold leading-none tracking-tight tabular-nums ${
+        className={`text-[11px] font-semibold leading-none tracking-tight tabular-nums ${
           warning ? "text-warning" : "text-ink-900"
         }`}
       >
