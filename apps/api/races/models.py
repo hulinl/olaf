@@ -143,17 +143,28 @@ class Race(models.Model):
     REG_SOLD_OUT = "sold_out"
     REG_QUALIFIER = "qualifier"
     REG_CLOSED = "closed"
+    REG_UNKNOWN = "unknown"
     REG_CHOICES = [
         (REG_OPEN, "Přihlášky otevřeny"),
         (REG_LOTTERY, "Losování"),
         (REG_SOLD_OUT, "Vyprodáno"),
         (REG_QUALIFIER, "Nutná kvalifikace"),
         (REG_CLOSED, "Přihlášky uzavřeny"),
+        (REG_UNKNOWN, "Nejasné / TBA"),
     ]
     registration_status = models.CharField(
         max_length=20,
         choices=REG_CHOICES,
         default=REG_OPEN,
+    )
+    # Full explanation string z reference (např. "loterie, obvykle
+    # prosinec/leden, nutný Running Stone"). Frontend to ukazuje pod
+    # status pillem — přesná parita s reference kalendářem, kde je
+    # detail pro každý závod klíčový. Prázdné = jen status pill.
+    registration_detail = models.TextField(
+        blank=True,
+        default="",
+        help_text="Full description of how registration works.",
     )
 
     # --- Sport typ ---
@@ -204,6 +215,31 @@ class Race(models.Model):
         default=True,
         db_index=True,
         help_text="Soft-hide bez smazání (např. při chybném importu).",
+    )
+    # TOP flagship — vlajkové závody, které tvoří „Top výběr". Frontend
+    # filter „TOP / Vše" zobrazuje jen top=True v „TOP" módu, jinak vše.
+    is_top = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Flagship race — vlajkový závod pro Top výběr.",
+    )
+    # Warn flag — data uncertainty (termín se posunul, ročník zrušen,
+    # nejasné). Frontend renderuje warn banner pod row.
+    has_warning = models.BooleanField(
+        default=False,
+        help_text="Data mají neurčitost (zrušeno/nejisté/pauza).",
+    )
+    # Human-readable date label — reference používa "obvykle srpen"
+    # pro TBAs, "24.-30. 8." pro potvrzené data. Fallback pro
+    # `date_display` když je prázdný.
+    next_label = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+    next_year = models.PositiveIntegerField(
+        default=2027,
+        db_index=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

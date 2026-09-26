@@ -10,7 +10,9 @@ export interface Race {
   name: string;
   date_start: string; // ISO YYYY-MM-DD
   date_end: string | null;
-  date_display: string; // "„konec srpna (TBA)" — human string, fallback pokud non-empty
+  date_display: string; // legacy raw string
+  next_label: string; // "obvykle srpen" / "24.–30. 8." — preferred display
+  next_year: number;
   distance_km: number;
   distances_note: string;
   elevation_m: number | null;
@@ -23,6 +25,9 @@ export interface Race {
   url: string;
   series: RaceSeries;
   registration_status: RaceRegistrationStatus;
+  registration_detail: string;
+  is_top: boolean;
+  has_warning: boolean;
   highlight: string;
   is_favorite: boolean;
 }
@@ -55,7 +60,8 @@ export type RaceRegistrationStatus =
   | "lottery"
   | "sold_out"
   | "qualifier"
-  | "closed";
+  | "closed"
+  | "unknown";
 
 export const SERIES_LABEL: Record<RaceSeries, string> = {
   indep: "Nezávislý",
@@ -66,11 +72,12 @@ export const SERIES_LABEL: Record<RaceSeries, string> = {
 };
 
 export const REGISTRATION_LABEL: Record<RaceRegistrationStatus, string> = {
-  open: "Přihlášky otevřené",
+  open: "Volně",
   lottery: "Losování",
   sold_out: "Vyprodáno",
   qualifier: "Kvalifikace",
   closed: "Uzavřeno",
+  unknown: "Nejasné",
 };
 
 export interface RaceFilters {
@@ -84,6 +91,7 @@ export interface RaceFilters {
   minKm?: number;
   maxKm?: number;
   favOnly?: boolean;
+  topOnly?: boolean;
   past?: boolean;
 }
 
@@ -104,6 +112,7 @@ function buildQuery(filters: RaceFilters): string {
   if (filters.minKm) params.set("min_km", String(filters.minKm));
   if (filters.maxKm) params.set("max_km", String(filters.maxKm));
   if (filters.favOnly) params.set("fav", "1");
+  if (filters.topOnly) params.set("top", "1");
   if (filters.past) params.set("past", "1");
   const s = params.toString();
   return s ? `?${s}` : "";

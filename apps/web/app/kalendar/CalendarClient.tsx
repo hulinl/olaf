@@ -76,8 +76,9 @@ const REG_CODE: Record<Race["registration_status"], string> = {
   open: "V",
   lottery: "L",
   sold_out: "S",
-  qualifier: "Q",
+  qualifier: "K",
   closed: "K",
+  unknown: "Q",
 };
 const REG_LABEL: Record<Race["registration_status"], string> = {
   open: "VOLNĚ",
@@ -85,6 +86,7 @@ const REG_LABEL: Record<Race["registration_status"], string> = {
   sold_out: "VYPRODÁNO",
   qualifier: "KVALIFIKACE",
   closed: "UZAVŘENO",
+  unknown: "TBA / NEJASNÉ",
 };
 
 const SERIES_TAG_CLASS: Record<Race["series"], string> = {
@@ -109,7 +111,10 @@ export function CalendarClient() {
   const [items, setItems] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<RaceFilters>({ sport: "trail" });
+  const [filters, setFilters] = useState<RaceFilters>({
+    sport: "trail",
+    topOnly: true,
+  });
   const [regFilter, setRegFilter] = useState<Race["registration_status"] | null>(
     null,
   );
@@ -191,7 +196,7 @@ export function CalendarClient() {
     setFilters((f) => ({ ...f, ...patch }));
   };
   const clearFilters = () => {
-    setFilters({ sport: filters.sport });
+    setFilters({ sport: filters.sport, topOnly: filters.topOnly });
     setRegFilter(null);
   };
 
@@ -259,10 +264,28 @@ export function CalendarClient() {
                 Skialp
               </button>
             </div>
+            <div className="uk-mode" role="group" aria-label="Rozsah">
+              <button
+                type="button"
+                aria-pressed={filters.topOnly === true}
+                onClick={() => setFilter({ topOnly: true })}
+              >
+                Top výběr
+              </button>
+              <button
+                type="button"
+                aria-pressed={filters.topOnly !== true}
+                onClick={() => setFilter({ topOnly: false })}
+              >
+                Vše
+              </button>
+            </div>
             <span className="text-sm text-ink-500">
-              {filters.sport === "trail"
-                ? "Trail a ultramaratony 40 km a víc"
-                : "Skialpové závody a rallye"}
+              {filters.topOnly
+                ? "Vlajkové závody sezóny"
+                : filters.sport === "trail"
+                  ? "Kompletní seznam ultra a horských závodů"
+                  : "Skialpové závody a rallye"}
             </span>
           </div>
 
@@ -610,8 +633,16 @@ function RaceRow({
           ) : (
             <span>{race.name}</span>
           )}
+          {race.is_top && <span className="uk-topb">TOP</span>}
         </div>
         {race.highlight && <div className="uk-hl">{race.highlight}</div>}
+        {race.has_warning && (
+          <span
+            className="mt-1 inline-block rounded-sm bg-warning/10 px-1.5 py-0.5 text-[12px] font-medium text-warning"
+          >
+            termín nejistý
+          </span>
+        )}
       </td>
       <td className="uk-c-country" data-l="Země">
         <div>{race.country}</div>
@@ -621,18 +652,19 @@ function RaceRow({
           </div>
         )}
       </td>
-      <td className="uk-c-when" data-l="Termín">
+      <td className="uk-c-when" data-l="Další ročník">
         <div className="uk-d27">
-          {race.date_display || formatDateCompact(race.date_start)}
+          {race.next_label || race.date_display || formatDateCompact(race.date_start)}
         </div>
-        <div className="uk-d26">
-          {new Date(race.date_start).getUTCFullYear()}
-        </div>
+        <div className="uk-d26">{race.next_year}</div>
       </td>
       <td className="uk-c-entry uk-entry" data-l="Přihláška">
         <span className={`uk-rg uk-rg-${regCode}`}>
           {REG_LABEL[race.registration_status]}
         </span>
+        {race.registration_detail && (
+          <div className="mt-1 leading-snug">{race.registration_detail}</div>
+        )}
       </td>
       <td className="uk-c-dist uk-dist" data-l="Tratě (km)">
         {race.distances_note || race.distance_km}

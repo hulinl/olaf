@@ -73,6 +73,9 @@ def _apply_filters(qs: QuerySet[Race], request: Request) -> QuerySet[Race]:
     if sport:
         qs = qs.filter(sport=sport)
 
+    if request.query_params.get("top") == "1":
+        qs = qs.filter(is_top=True)
+
     region = request.query_params.get("region")
     if region:
         qs = qs.filter(region=region)

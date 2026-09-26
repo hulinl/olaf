@@ -21,6 +21,8 @@ class RaceSerializer(serializers.ModelSerializer):
             "date_start",
             "date_end",
             "date_display",
+            "next_label",
+            "next_year",
             "distance_km",
             "distances_note",
             "elevation_m",
@@ -33,6 +35,9 @@ class RaceSerializer(serializers.ModelSerializer):
             "url",
             "series",
             "registration_status",
+            "registration_detail",
+            "is_top",
+            "has_warning",
             "highlight",
             "is_favorite",
         ]
