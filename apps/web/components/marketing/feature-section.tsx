@@ -87,7 +87,11 @@ export function FeatureSection({
           ].join(" ")}
         >
           {copy}
-          {visualBlock}
+          {/* Visual wrapper — na hover se mockup lehce nadzvedne (-2 px)
+              + jemný amber glow shadow. Cubic-bezier per OA DNA. */}
+          <div className="feature-visual-hover transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1">
+            {visualBlock}
+          </div>
         </div>
       </div>
     </section>

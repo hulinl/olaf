@@ -494,8 +494,69 @@ export function CalendarClient() {
           </section>
         )}
 
+        {/* Active filters — quick removal chips. Zobrazí se jen když
+            jsou aktivní filtry, každý chip má × pro individual removal. */}
+        {activeFilterCount > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="uk-lbl" style={{ minWidth: 0 }}>
+              Aktivní:
+            </span>
+            {filters.from && (
+              <ActiveFilterChip
+                label={`Od ${filters.from}`}
+                onRemove={() => setFilter({ from: undefined })}
+              />
+            )}
+            {filters.to && (
+              <ActiveFilterChip
+                label={`Do ${filters.to}`}
+                onRemove={() => setFilter({ to: undefined })}
+              />
+            )}
+            {filters.region && (
+              <ActiveFilterChip
+                label={REGION_LABEL_BY_CODE[filters.region] || filters.region}
+                onRemove={() => setFilter({ region: undefined })}
+              />
+            )}
+            {(filters.minKm || filters.maxKm) && (
+              <ActiveFilterChip
+                label={`${filters.minKm ?? "?"}+ km`}
+                onRemove={() =>
+                  setFilter({ minKm: undefined, maxKm: undefined })
+                }
+              />
+            )}
+            {filters.series && (
+              <ActiveFilterChip
+                label={SERIES_FILTERS.find((s) => s.value === filters.series)?.label || filters.series}
+                onRemove={() => setFilter({ series: undefined })}
+              />
+            )}
+            {regFilter && (
+              <ActiveFilterChip
+                label={REG_LABEL[regFilter]}
+                onRemove={() => setRegFilter(null)}
+              />
+            )}
+            {filters.favOnly && (
+              <ActiveFilterChip
+                label="★ Můj plán"
+                onRemove={() => setFilter({ favOnly: false })}
+              />
+            )}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="ml-1 text-[12.5px] text-brand underline underline-offset-2 hover:no-underline"
+            >
+              zrušit vše
+            </button>
+          </div>
+        )}
+
         {/* Meta bar */}
-        <div className="mt-3.5 mb-2 flex items-center justify-between text-[13.5px] text-ink-500">
+        <div className="mt-3 mb-2 flex items-center justify-between text-[13.5px] text-ink-500">
           <span>
             {loading
               ? "Načítám…"
@@ -503,15 +564,6 @@ export function CalendarClient() {
                 ? "Chyba"
                 : `Zobrazeno ${sorted.length} závodů`}
           </span>
-          {!isMobile && activeFilterCount > 0 && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="text-brand underline underline-offset-2 hover:no-underline"
-            >
-              Zrušit filtry
-            </button>
-          )}
         </div>
 
         {/* CONTENT */}
@@ -520,12 +572,49 @@ export function CalendarClient() {
             {error}
           </div>
         ) : loading ? (
-          <div className="flex justify-center py-10">
-            <span className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-border-strong border-t-brand" />
+          // Skeleton loader — 5 placeholder karet, mírně pulzují.
+          // Lepší UX než spinner (uživatel vidí očekávaný layout,
+          // ne prázdnou obrazovku).
+          <div className="flex flex-col gap-3">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <SkeletonCard key={i} isMobile={isMobile} />
+            ))}
           </div>
         ) : sorted.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border p-10 text-center text-sm text-ink-500">
-            Žádný závod nesplňuje filtr.
+          // Empty state — friendly hero + CTA, ne strohá jedna věta.
+          <div className="rounded-md border border-dashed border-border bg-surface/60 p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-muted">
+              <svg
+                aria-hidden
+                viewBox="0 0 48 48"
+                width="32"
+                height="32"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-ink-300"
+              >
+                {/* Mountain silhouette */}
+                <path d="M4 40 L18 20 L28 32 L34 24 L44 40 Z" />
+                <circle cx="34" cy="12" r="3" />
+              </svg>
+            </div>
+            <p className="text-base font-medium text-ink-900">
+              Žádný závod nesplňuje filtry
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-[13.5px] text-ink-500">
+              Zkus rozšířit datum nebo region, případně{" "}
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="font-medium text-brand underline underline-offset-2 hover:no-underline"
+              >
+                zruš filtry
+              </button>{" "}
+              a projdi celý kalendář.
+            </p>
           </div>
         ) : isMobile ? (
           // Mobile: dedikované karty (žádný table transformation hack)
@@ -628,6 +717,72 @@ function ChipRow({
     <div className="flex flex-wrap items-center gap-2">
       <span className="uk-lbl">{label}</span>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Active filter chip s × removal — jasně signalizuje, co uživatel
+ * aktuálně filtruje, a nabízí jedním klikem removal každého jednoho.
+ */
+function ActiveFilterChip({
+  label,
+  onRemove,
+}: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className="inline-flex items-center gap-1 rounded-full border border-ink-900 bg-ink-900 px-2.5 py-0.5 text-[12.5px] text-canvas transition-opacity hover:opacity-80 focus-ring"
+      aria-label={`Odebrat filter: ${label}`}
+    >
+      <span>{label}</span>
+      <span aria-hidden className="text-[13px] leading-none">
+        ×
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Skeleton card — animated placeholder během loadu. Napodobuje layout
+ * reálné karty (header + stats grid), aby uživatel neviděl empty
+ * flash.
+ */
+function SkeletonCard({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div
+      className={`animate-pulse rounded-md border border-border bg-surface p-4 ${
+        isMobile ? "" : "grid grid-cols-[1fr_auto_auto] gap-4"
+      }`}
+      aria-hidden
+    >
+      <div className={isMobile ? "" : "min-w-0"}>
+        <div className="flex items-start gap-2">
+          <span className="h-4 w-5 shrink-0 rounded-sm bg-border" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-3/4 rounded bg-border" />
+            <div className="h-3 w-1/2 rounded bg-border" />
+          </div>
+        </div>
+        <div className="mt-3 h-3 w-full rounded bg-border" />
+        {isMobile && (
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="h-8 rounded bg-border" />
+            <div className="h-8 rounded bg-border" />
+            <div className="h-8 rounded bg-border" />
+          </div>
+        )}
+      </div>
+      {!isMobile && (
+        <>
+          <div className="h-4 w-16 rounded bg-border" />
+          <div className="h-4 w-8 rounded bg-border" />
+        </>
+      )}
     </div>
   );
 }

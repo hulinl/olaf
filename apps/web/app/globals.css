@@ -294,6 +294,24 @@ select:not([multiple]):not([size]) {
   animation: bob 5s ease-in-out infinite;
 }
 
+/* Jemnější breathing float pro hero laptop — 3px amplitude, 7s cyklus,
+ * ease-in-out. Aby hero nebylo úplně statické, ale nerušilo čtení
+ * copy vlevo. */
+@keyframes breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.animate-breathe {
+  animation: breathe 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Feature section visual — hover state s jemným amber glow, prohlubuje
+ * tactile feel per OA DNA. Kombinuje se s translate-y v Tailwindu. */
+.feature-visual-hover:hover {
+  filter: drop-shadow(0 20px 30px rgb(255 199 25 / 0.15));
+}
+
 /* Ambient blobs za hero copyem — dva drift patterny s odlišnou
  * fází, aby to nevypadalo synchronně. */
 @keyframes drift-a {

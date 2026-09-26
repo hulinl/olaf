@@ -214,8 +214,10 @@ export default function Home() {
                 style={{ ["--reveal-delay" as string]: "200ms" }}
                 className="relative mx-auto w-full max-w-[600px] lg:mx-0 lg:max-w-none"
               >
-                {/* Main laptop mockup */}
-                <div className="relative">
+                {/* Main laptop mockup — subtle breathe animace (3 px
+                    vertikálně, 7 s cyklus, ease-in-out). Dá hero
+                    jemný life bez rušení copy vlevo. */}
+                <div className="animate-breathe relative">
                   <LaptopFrame>
                     <BrowserBar url="olaf.events/tvurce/akce/olaf-adventures/spring-camp-beskydy" />
                     <div className="relative flex-1">
@@ -685,15 +687,23 @@ function PriceCard({
         highlight
           ? {
               boxShadow:
-                "0 30px 60px -22px rgb(255 199 25 / 0.35), 0 0 0 1px rgb(255 199 25 / 0.25)",
+                "0 30px 60px -22px rgb(255 199 25 / 0.4), 0 0 0 1px rgb(255 199 25 / 0.3)",
             }
           : undefined
       }
     >
       {highlight && (
-        <span className="mono-tag absolute -top-3 right-6 rounded-sm bg-brand px-2.5 py-1 text-brand-ink">
-          Doporučeno
-        </span>
+        <>
+          {/* Amber top accent stripe pro Premium card — jasné vizuální
+              odlišení od Free (per system-21 pattern). */}
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-[3px] bg-brand"
+          />
+          <span className="mono-tag absolute -top-3.5 right-6 rounded-sm bg-brand px-3 py-1.5 text-brand-ink shadow-sm">
+            Doporučeno
+          </span>
+        </>
       )}
       <div>
         <h3 className="text-2xl font-semibold text-ink-900">{name}</h3>
