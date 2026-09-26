@@ -90,7 +90,20 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
       aria-label="Prohlídka sekcí"
       aria-hidden={fadeOut}
     >
-      <div className="flex flex-col gap-1 border-l border-border pl-5">
+      <div className="relative flex flex-col gap-1 border-l border-border pl-5">
+        {/* Active section indicator — vertikální amber bar 3 px lícující
+            s ink-border. Pozice se počítá per-item podle index. Dá to
+            plynulejší dojem než jen per-item tick. */}
+        {active && (
+          <span
+            aria-hidden
+            className="absolute -left-[1.5px] w-[3px] bg-brand transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            style={{
+              top: `${features.findIndex((f) => f.id === active) * 32 + 32}px`,
+              height: "24px",
+            }}
+          />
+        )}
         <p className="mono-tag text-ink-500">Prohlídka</p>
         <ul className="mt-3 flex flex-col gap-2">
           {features.map((f) => {
@@ -107,14 +120,6 @@ export function FeatureToc({ features }: { features: FeatureEntry[] }) {
                   ].join(" ")}
                   aria-current={isActive ? "true" : undefined}
                 >
-                  {/* Active indicator — 2px amber tick left of number */}
-                  <span
-                    aria-hidden
-                    className={[
-                      "inline-block h-2 w-1 transition-colors",
-                      isActive ? "bg-brand" : "bg-transparent",
-                    ].join(" ")}
-                  />
                   <span
                     className={[
                       "font-mono text-[11px] transition-colors",

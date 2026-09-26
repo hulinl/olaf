@@ -97,14 +97,27 @@ const REGION_COLOR_BY_CODE: Record<string, string> = REGION_FILTERS.reduce(
   {},
 );
 
+const STORAGE_KEY = "olaf.kalendar.filters.v1";
+
 export function CalendarClient() {
   const [user, setUser] = useState<User | null>(null);
   const [items, setItems] = useState<Race[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<RaceFilters>({
-    sport: "trail",
-    topOnly: true,
+  // Filters persist v localStorage — uživatel po refreshi neztratí
+  // sport/region/období preference. `RaceFilters` je čistý JSON,
+  // takže serialize+parse bezpečné.
+  const [filters, setFilters] = useState<RaceFilters>(() => {
+    if (typeof window === "undefined") {
+      return { sport: "trail", topOnly: true };
+    }
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw) as RaceFilters;
+    } catch {
+      /* corrupted storage — reset */
+    }
+    return { sport: "trail", topOnly: true };
   });
   const [regFilter, setRegFilter] = useState<Race["registration_status"] | null>(
     null,
@@ -116,6 +129,17 @@ export function CalendarClient() {
   const [statsMount, setStatsMount] = useState<HTMLElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Persist filters change → localStorage. Debounce není potřeba,
+  // setItem je synchronní a lightweight.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+    } catch {
+      /* quota / private mode — fine, silent skip */
+    }
+  }, [filters]);
 
   useEffect(() => {
     auth
