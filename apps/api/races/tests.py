@@ -158,6 +158,175 @@ class RaceFavoriteToggleTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
+class RaceFavoritePersistenceTests(TestCase):
+    """Reprodukce user reportu 2026-09-26: „označil jsem další závody a dal
+    si svůj status, ale po refresh mám prázdno". Testy verifikují, že
+    RaceFavorite persistuje status + note po POST/PATCH a že /api/races/
+    list vrací plan_status + plan_note pro authenticated user (což je
+    zdroj UI stavu po refreshi).
+    """
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        Race.objects.all().delete()
+        self.user = User.objects.create_user(
+            email="p@example.com",
+            password="pass-abcdef-1234",
+            first_name="P",
+            last_name="X",
+            email_verified=True,
+        )
+        self.race = _make_race(name="MIUT")
+
+    def test_post_persists_status_in_db(self) -> None:
+        """POST /favorite/ s status=registered → DB row má status=registered."""
+        self.client.force_authenticate(self.user)
+        resp = self.client.post(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"status": "registered"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        fav = RaceFavorite.objects.get(user=self.user, race=self.race)
+        self.assertEqual(fav.status, RaceFavorite.STATUS_REGISTERED)
+
+    def test_post_persists_note_in_db(self) -> None:
+        """POST /favorite/ s note → DB row má note uloženou."""
+        self.client.force_authenticate(self.user)
+        resp = self.client.post(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"note": "jedu s Martou"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        fav = RaceFavorite.objects.get(user=self.user, race=self.race)
+        self.assertEqual(fav.note, "jedu s Martou")
+
+    def test_patch_updates_status(self) -> None:
+        """PATCH po POSTu změní status v DB."""
+        self.client.force_authenticate(self.user)
+        self.client.post(f"/api/races/{self.race.slug}/favorite/")
+        resp = self.client.patch(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"status": "waitlist"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        fav = RaceFavorite.objects.get(user=self.user, race=self.race)
+        self.assertEqual(fav.status, RaceFavorite.STATUS_WAITLIST)
+
+    def test_patch_updates_note_without_touching_status(self) -> None:
+        """PATCH note-only nesmí resetovat status."""
+        self.client.force_authenticate(self.user)
+        self.client.post(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"status": "registered"},
+            format="json",
+        )
+        self.client.patch(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"note": "koupena letenka"},
+            format="json",
+        )
+        fav = RaceFavorite.objects.get(user=self.user, race=self.race)
+        self.assertEqual(fav.status, RaceFavorite.STATUS_REGISTERED)
+        self.assertEqual(fav.note, "koupena letenka")
+
+    def test_list_returns_plan_status_for_auth_user(self) -> None:
+        """GET /api/races/ pro auth usera vrátí plan_status per race
+        s RaceFavorite. TOHLE JE ZDROJ UI STAVU PO REFRESHI —
+        pokud tady dostáváme null místo status, UI ukáže „prázdno".
+        """
+        RaceFavorite.objects.create(
+            user=self.user,
+            race=self.race,
+            status=RaceFavorite.STATUS_REGISTERED,
+            note="test note",
+        )
+        self.client.force_authenticate(self.user)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        self.assertIn("MIUT", rows)
+        self.assertEqual(rows["MIUT"]["plan_status"], "registered")
+        self.assertEqual(rows["MIUT"]["plan_note"], "test note")
+        self.assertTrue(rows["MIUT"]["is_favorite"])
+
+    def test_list_returns_null_plan_status_for_non_favorite(self) -> None:
+        """GET /api/races/ pro race bez favorite = plan_status None."""
+        self.client.force_authenticate(self.user)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        self.assertIsNone(rows["MIUT"]["plan_status"])
+        self.assertEqual(rows["MIUT"]["plan_note"], "")
+        self.assertFalse(rows["MIUT"]["is_favorite"])
+
+    def test_list_isolates_plan_between_users(self) -> None:
+        """Plan usera A nesmí uniknout do responsu usera B."""
+        other = User.objects.create_user(
+            email="other@example.com",
+            password="pass-abcdef-1234",
+            first_name="O",
+            last_name="Y",
+            email_verified=True,
+        )
+        RaceFavorite.objects.create(
+            user=self.user,
+            race=self.race,
+            status=RaceFavorite.STATUS_REGISTERED,
+        )
+        # Other user vidí race bez plan_status
+        self.client.force_authenticate(other)
+        resp = self.client.get("/api/races/")
+        rows = {r["name"]: r for r in resp.json()["results"]}
+        self.assertIsNone(rows["MIUT"]["plan_status"])
+        self.assertFalse(rows["MIUT"]["is_favorite"])
+
+    def test_mine_endpoint_returns_plan_after_post(self) -> None:
+        """GET /api/races/mine/ po POSTu vrátí entry — refresh-safe zdroj
+        pro /u/<slug> public plan a /kalendar fav filter.
+        """
+        self.client.force_authenticate(self.user)
+        self.client.post(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"status": "registered", "note": "big trip"},
+            format="json",
+        )
+        resp = self.client.get("/api/races/mine/")
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["status"], "registered")
+        self.assertEqual(results[0]["note"], "big trip")
+        self.assertEqual(results[0]["race"]["name"], "MIUT")
+
+    def test_full_round_trip_post_refresh_patch_refresh(self) -> None:
+        """End-to-end: POST → GET (status shown) → PATCH → GET (new status
+        shown). Simuluje user flow „označím + přepnu status + refresh".
+        """
+        self.client.force_authenticate(self.user)
+        # Step 1: favoritování
+        self.client.post(f"/api/races/{self.race.slug}/favorite/")
+        # Step 2: refresh landing (list) — status musí být interested
+        rows = {
+            r["name"]: r
+            for r in self.client.get("/api/races/").json()["results"]
+        }
+        self.assertEqual(rows["MIUT"]["plan_status"], "interested")
+        # Step 3: user přepne status na registered
+        self.client.patch(
+            f"/api/races/{self.race.slug}/favorite/",
+            {"status": "registered"},
+            format="json",
+        )
+        # Step 4: refresh znovu — status musí být registered
+        rows = {
+            r["name"]: r
+            for r in self.client.get("/api/races/").json()["results"]
+        }
+        self.assertEqual(rows["MIUT"]["plan_status"], "registered")
+        self.assertTrue(rows["MIUT"]["is_favorite"])
+
+
 class SyncAgentTests(TestCase):
     """Testy pro sync agent — contradiction detection + audit trail."""
 
