@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "audit",
     "contracts",
     "races",
+    "personal_calendar",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

@@ -35,3 +35,10 @@ pytest-django==4.9.0
 cryptography==44.0.0
 # Notion API client — V2.1 event-from-source ingest.
 notion-client==2.2.1
+# iCal parsing pro personal calendar overlay v „Časová osa" canvas
+# (Slice 5 vize „community awareness"). Uživatel si připojí iCal URL
+# feed (Google/Outlook/Apple), backend ho fetchne a uloží busy blocky.
+icalendar==6.1.0
+# RRULE expansion — Google/Outlook posílají recurring events s RRULE,
+# musíme expandovat sami do konkrétních dat.
+recurring-ical-events==3.5.1

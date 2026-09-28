@@ -31,6 +31,10 @@ urlpatterns = [
     path("api/audit/", include("audit.urls", namespace="audit")),
     path("api/contracts/", include("contracts.urls", namespace="contracts")),
     path("api/races/", include("races.urls", namespace="races")),
+    path(
+        "api/personal-calendar/",
+        include("personal_calendar.urls", namespace="personal_calendar"),
+    ),
 ]
 
 if settings.DEBUG:

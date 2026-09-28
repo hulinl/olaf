@@ -1828,6 +1828,57 @@ export const workspaces = {
     ),
 };
 
+// -------- Personal calendar sources (Slice 5) ----------
+export interface CalendarSource {
+  id: number;
+  name: string;
+  ical_url: string;
+  enabled: boolean;
+  color: string;
+  last_synced_at: string | null;
+  last_error: string;
+  block_count: number;
+  created_at: string;
+}
+
+export const personalCalendar = {
+  listSources: () =>
+    apiFetch<{ sources: CalendarSource[] }>(
+      "/api/personal-calendar/sources/",
+    ),
+  addSource: (payload: {
+    name: string;
+    ical_url: string;
+    color?: string;
+  }) =>
+    apiFetch<CalendarSource>("/api/personal-calendar/sources/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateSource: (
+    id: number,
+    payload: Partial<Pick<CalendarSource, "name" | "enabled" | "color">>,
+  ) =>
+    apiFetch<CalendarSource>(`/api/personal-calendar/sources/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteSource: (id: number) =>
+    apiFetch<{ deleted: boolean }>(
+      `/api/personal-calendar/sources/${id}/`,
+      { method: "DELETE" },
+    ),
+  syncSource: (id: number) =>
+    apiFetch<CalendarSource & { sync_ok: boolean; sync_message: string }>(
+      `/api/personal-calendar/sources/${id}/sync/`,
+      { method: "POST" },
+    ),
+  busyDays: (from: string, to: string) =>
+    apiFetch<{ from: string; to: string; busy_days: string[] }>(
+      `/api/personal-calendar/busy-days/?from=${from}&to=${to}`,
+    ),
+};
+
 export interface WorkspaceHierarchyParent {
   slug: string;
   name: string;

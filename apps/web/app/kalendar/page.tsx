@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import Link from "next/link";
+
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { AppFooter } from "@/components/ui/app-footer";
 import { SITE } from "@/lib/site-config";
@@ -57,11 +59,22 @@ export default function KalendarPage() {
             {/* Stats — vyplní se z klientu (initial empty pro SSR).
                 Klient dovyplní jakmile načte races. Kotvíme se přes
                 id-selektor pro čistší server/client boundary. */}
-            <div
-              id="kalendar-stats"
-              className="grid grid-cols-2 items-end gap-x-6 gap-y-2 sm:grid-cols-4 sm:gap-x-8"
-              aria-label="Statistiky kalendáře"
-            />
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-end">
+                <Link
+                  href="/kalendar/casova-osa"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-canvas px-3 py-1.5 text-sm font-medium text-ink-900 transition-colors hover:bg-surface-muted focus-ring"
+                >
+                  <span aria-hidden>📅</span>
+                  Časová osa
+                </Link>
+              </div>
+              <div
+                id="kalendar-stats"
+                className="grid grid-cols-2 items-end gap-x-6 gap-y-2 sm:grid-cols-4 sm:gap-x-8"
+                aria-label="Statistiky kalendáře"
+              />
+            </div>
           </header>
         </div>
 
