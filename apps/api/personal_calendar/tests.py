@@ -252,6 +252,28 @@ class SourcesAPITests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_post_rejects_localhost_ssrf(self) -> None:
+        """POST musí odmítnout URL na localhost — SSRF preflight."""
+        self.client.force_authenticate(self.alice)
+        resp = self.client.post(
+            "/api/personal-calendar/sources/",
+            {"name": "X", "ical_url": "http://localhost/x.ics"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Nesmí se vůbec uložit
+        self.assertEqual(UserCalendarSource.objects.count(), 0)
+
+    def test_post_rejects_private_ip_ssrf(self) -> None:
+        self.client.force_authenticate(self.alice)
+        resp = self.client.post(
+            "/api/personal-calendar/sources/",
+            {"name": "X", "ical_url": "http://192.168.1.1/x.ics"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(UserCalendarSource.objects.count(), 0)
+
     def test_post_rejects_missing_fields(self) -> None:
         self.client.force_authenticate(self.alice)
         resp = self.client.post(
@@ -289,6 +311,171 @@ class SourcesAPITests(TestCase):
         self.assertEqual(resp.status_code, 200)
         src.refresh_from_db()
         self.assertFalse(src.enabled)
+
+
+class SSRFProtectionTests(TestCase):
+    """Ochrana proti SSRF — URL nesmí míjit interní síť."""
+
+    def test_localhost_hostname_blocked(self) -> None:
+        from .services import SSRFBlockedError, fetch_and_parse
+
+        for url in [
+            "http://localhost/cal.ics",
+            "http://127.0.0.1/cal.ics",
+            "http://0.0.0.0/cal.ics",
+        ]:
+            with self.assertRaises(SSRFBlockedError):
+                fetch_and_parse(url)
+
+    def test_private_ip_blocked(self) -> None:
+        from .services import SSRFBlockedError, fetch_and_parse
+
+        for url in [
+            "http://10.0.0.1/cal.ics",
+            "http://192.168.1.1/cal.ics",
+            "http://172.16.0.1/cal.ics",
+        ]:
+            with self.assertRaises(SSRFBlockedError):
+                fetch_and_parse(url)
+
+    def test_metadata_endpoint_blocked(self) -> None:
+        """AWS/GCP metadata endpoint 169.254.169.254 = link-local."""
+        from .services import SSRFBlockedError, fetch_and_parse
+
+        with self.assertRaises(SSRFBlockedError):
+            fetch_and_parse("http://169.254.169.254/latest/meta-data/")
+
+    def test_invalid_scheme_rejected(self) -> None:
+        from .services import ICalFetchError, fetch_and_parse
+
+        with self.assertRaises(ICalFetchError):
+            fetch_and_parse("ftp://example.com/x.ics")
+        with self.assertRaises(ICalFetchError):
+            fetch_and_parse("file:///etc/passwd")
+
+    def test_public_url_passes_validation(self) -> None:
+        """Public URL (google, github) prochází — validation nesmí
+        blokovat legit sources. Neděláme skutečný fetch, jen validation."""
+        from .services import _validate_url_target
+
+        _validate_url_target("https://calendar.google.com/ical/x.ics")
+        _validate_url_target("https://outlook.office365.com/x.ics")
+
+
+class RealSyncFlowTests(TestCase):
+    """End-to-end sync flow — mock urllib, verify busy_blocks populated."""
+
+    def setUp(self) -> None:
+        self.alice = _mk_user("alice@example.com")
+
+    def test_sync_populates_busy_blocks(self) -> None:
+        from .services import sync_source
+
+        source = UserCalendarSource.objects.create(
+            user=self.alice,
+            name="Test",
+            ical_url="https://calendar.google.com/x.ics",
+        )
+        with mock.patch(
+            "personal_calendar.services._validate_url_target"
+        ), mock.patch(
+            "personal_calendar.services.urllib.request.urlopen"
+        ) as m:
+            m.return_value.__enter__.return_value.read.return_value = (
+                SAMPLE_ICAL
+            )
+            ok, msg = sync_source(source)
+        self.assertTrue(ok)
+        source.refresh_from_db()
+        self.assertIsNotNone(source.last_synced_at)
+        self.assertEqual(source.last_error, "")
+
+    def test_sync_ssrf_saves_error(self) -> None:
+        from .services import sync_source
+
+        source = UserCalendarSource.objects.create(
+            user=self.alice,
+            name="Test",
+            ical_url="http://localhost/cal.ics",
+        )
+        ok, msg = sync_source(source)
+        self.assertFalse(ok)
+        source.refresh_from_db()
+        self.assertIn("localhost", source.last_error.lower())
+
+    def test_sync_network_error_saves_error(self) -> None:
+        import urllib.error
+
+        from .services import sync_source
+
+        source = UserCalendarSource.objects.create(
+            user=self.alice,
+            name="Test",
+            ical_url="https://calendar.example.com/x.ics",
+        )
+        with mock.patch(
+            "personal_calendar.services._validate_url_target"
+        ), mock.patch(
+            "personal_calendar.services.urllib.request.urlopen",
+            side_effect=urllib.error.URLError("connection refused"),
+        ):
+            ok, _msg = sync_source(source)
+        self.assertFalse(ok)
+        source.refresh_from_db()
+        self.assertNotEqual(source.last_error, "")
+
+    def test_sync_malformed_ical_saves_error(self) -> None:
+        from .services import sync_source
+
+        source = UserCalendarSource.objects.create(
+            user=self.alice,
+            name="Test",
+            ical_url="https://calendar.example.com/x.ics",
+        )
+        with mock.patch(
+            "personal_calendar.services._validate_url_target"
+        ), mock.patch(
+            "personal_calendar.services.urllib.request.urlopen"
+        ) as m:
+            m.return_value.__enter__.return_value.read.return_value = (
+                b"not-a-valid-ical"
+            )
+            ok, _msg = sync_source(source)
+        self.assertFalse(ok)
+
+    def test_sync_oversized_rejected(self) -> None:
+        from .services import sync_source
+
+        source = UserCalendarSource.objects.create(
+            user=self.alice,
+            name="Test",
+            ical_url="https://calendar.example.com/x.ics",
+        )
+        with mock.patch(
+            "personal_calendar.services._validate_url_target"
+        ), mock.patch(
+            "personal_calendar.services.urllib.request.urlopen"
+        ) as m:
+            # 11 MB > 10 MB limit
+            m.return_value.__enter__.return_value.read.return_value = (
+                b"X" * (11 * 1024 * 1024)
+            )
+            ok, msg = sync_source(source)
+        self.assertFalse(ok)
+        self.assertIn("velký", msg.lower())
+
+    def test_cascade_delete_on_user_deletion(self) -> None:
+        """Když se smaže user, sources se smažou taky."""
+        UserCalendarSource.objects.create(
+            user=self.alice,
+            name="Test",
+            ical_url="https://calendar.example.com/x.ics",
+        )
+        user_id = self.alice.pk
+        self.alice.delete()
+        self.assertEqual(
+            UserCalendarSource.objects.filter(user_id=user_id).count(), 0
+        )
 
 
 class BusyDaysAPITests(TestCase):

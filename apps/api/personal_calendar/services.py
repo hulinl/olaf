@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import ipaddress
+import socket
+import urllib.parse
 import urllib.request
 
 import icalendar
@@ -31,13 +34,64 @@ class ICalFetchError(Exception):
     do source.last_error zpráv v CZ."""
 
 
+class SSRFBlockedError(ICalFetchError):
+    """URL míří na private / loopback / metadata IP — blokujeme, aby si
+    user nemohl (úmyslně/omylem) zesynchronovat interní síť."""
+
+
+def _validate_url_target(ical_url: str) -> None:
+    """Ochrana proti SSRF: rozparsuj URL, resolve DNS, zkontroluj že
+    žádný z resolvedovaných IP nemíří na private / loopback / link-local /
+    metadata endpoint. Voláme před fetch, aby útočník nemohl přes
+    server oslovit interní zdroje.
+
+    Raises SSRFBlockedError s CZ zprávou.
+    """
+    parsed = urllib.parse.urlparse(ical_url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ICalFetchError("URL musí mít http:// nebo https:// scheme.")
+    if not parsed.hostname:
+        raise ICalFetchError("URL nemá platný hostname.")
+    # Nedovolíme absolutně, ani numerickou reprezentaci
+    hostname = parsed.hostname.lower()
+    if hostname in {"localhost", "0.0.0.0", "::1", "::"}:
+        raise SSRFBlockedError(
+            "Localhost / loopback nejsou povolené jako calendar source."
+        )
+    # Resolve DNS — zkontroluj VŠECHNY A/AAAA odpovědi (server může
+    # posílat na rozdílné IP než browser).
+    try:
+        addr_infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror as exc:
+        raise ICalFetchError(f"Nepodařilo se resolvovat DNS: {exc}") from exc
+    for family, _type, _proto, _canon, sockaddr in addr_infos:
+        ip_str = sockaddr[0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            raise SSRFBlockedError(
+                f"Cílová IP ({ip}) je v private/loopback rozsahu — blokováno."
+            )
+
+
 def fetch_and_parse(ical_url: str) -> list[dict]:
     """Vrátí list busy blocků z iCal URL.
 
     Format: [{"starts": ISO, "ends": ISO, "all_day": bool}, ...]
 
-    Raises ICalFetchError s user-friendly zprávou v CZ.
+    Raises ICalFetchError / SSRFBlockedError s user-friendly zprávou.
     """
+    _validate_url_target(ical_url)
+
     # Fetch
     try:
         req = urllib.request.Request(
@@ -54,10 +108,12 @@ def fetch_and_parse(ical_url: str) -> list[dict]:
             f"Kalendář je moc velký (>{MAX_FETCH_BYTES // 1024 // 1024} MB)."
         )
 
-    # Parse
+    # Parse. icalendar 6.x hází `ValueError` na malformed content lines,
+    # nemá dedikovanou ParserError třídu (podle verzí se to různí),
+    # takže chytáme generickou Exception + zvlášť ValueError.
     try:
         cal = icalendar.Calendar.from_ical(raw)
-    except (ValueError, icalendar.parser.ParserError) as exc:
+    except Exception as exc:
         raise ICalFetchError(f"Neplatný iCal formát: {exc}") from exc
 
     # Expand recurring events do horizontu

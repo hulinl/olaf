@@ -21,7 +21,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import UserCalendarSource
-from .services import aggregate_busy_days, sync_source
+from .services import (
+    ICalFetchError,
+    _validate_url_target,
+    aggregate_busy_days,
+    sync_source,
+)
 
 
 def _serialize_source(source: UserCalendarSource) -> dict:
@@ -62,6 +67,14 @@ def sources_list(request: Request) -> Response:
         return Response(
             {"detail": "URL musí začínat http:// nebo https://."},
             status=status.HTTP_400_BAD_REQUEST,
+        )
+    # SSRF preflight — reject před uložením do DB, aby se v listu
+    # neobjevila URL, která by stejně nikdy neprošla fetch.
+    try:
+        _validate_url_target(ical_url)
+    except ICalFetchError as exc:
+        return Response(
+            {"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST
         )
     source = UserCalendarSource.objects.create(
         user=request.user,
