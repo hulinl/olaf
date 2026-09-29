@@ -60,7 +60,7 @@ export default function KalendarPage() {
                 Klient dovyplní jakmile načte races. Kotvíme se přes
                 id-selektor pro čistší server/client boundary. */}
             <div className="flex flex-col gap-3">
-              <div className="flex justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Link
                   href="/kalendar/casova-osa"
                   className="inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-canvas px-3 py-1.5 text-sm font-medium text-ink-900 transition-colors hover:bg-surface-muted focus-ring"
@@ -68,6 +68,22 @@ export default function KalendarPage() {
                   <span aria-hidden>📅</span>
                   Časová osa
                 </Link>
+                {/* „Chybí tu závod?" tlačítko — otevře modal
+                    v CalendarClient.tsx přes globální event.
+                    Renderovat vždy — kliknutí pošle event, klient
+                    rozhodne co s tím (auth/redirect na login). */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    document.dispatchEvent(
+                      new CustomEvent("olaf:open-race-submit"),
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-md border border-brand bg-brand-soft px-3 py-1.5 text-sm font-medium text-ink-900 transition-colors hover:bg-brand hover:text-brand-ink focus-ring"
+                >
+                  <span aria-hidden>➕</span>
+                  Chybí tu závod?
+                </button>
               </div>
               <div
                 id="kalendar-stats"

@@ -355,6 +355,73 @@ class SyncRun(models.Model):
         )
 
 
+class RaceSubmission(models.Model):
+    """User's submission of a new race — „Chybí tu závod?" flow.
+
+    User vloží URL, AI vytáhne fields (name, distance, dplus, date,
+    location…), uloží se jako pending. Admin projde, může upravit, a
+    approve → vznikne Race entity. Reject → status=rejected.
+
+    Rate limit: 5 submissions/den per user (throttle na view layer).
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending — čeká na admin review"),
+        (STATUS_APPROVED, "Approved — Race vytvořen"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="race_submissions",
+    )
+    source_url = models.URLField(max_length=1000)
+    # Extract z Claude — raw JSON dict s fieldy odpovídajícími seed_data
+    # struktuře. User i admin můžou editovat před approve. Format:
+    # {name, distance_km, elevation_m, sport, region, country, place,
+    #  month, year, series, terrain, registration_type, registration_detail,
+    #  highlight, url}
+    extracted_data = models.JSONField(default=dict, blank=True)
+    # AI response raw pro debug (co model přesně vrátil).
+    ai_response_raw = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    admin_note = models.TextField(
+        blank=True, default="", help_text="Admin poznámka při approve/reject."
+    )
+    created_race = models.ForeignKey(
+        Race,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Race vytvořený po approve (aby šlo dohledat submission).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "races_submission"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+        verbose_name = "Race submission"
+        verbose_name_plural = "Race submissions"
+
+    def __str__(self) -> str:
+        return f"{self.user_id}: {self.source_url[:60]} ({self.status})"
+
+
 class RaceFavorite(models.Model):
     """Uživatelův race plán — soukromý bucket-list s tracking statusem.
 

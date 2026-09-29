@@ -173,6 +173,14 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@olaf.events")
 # Konfigurace: env var `RACE_SYNC_NOTIFY_EMAILS=a@b.cz,c@d.cz`.
 RACE_SYNC_NOTIFY_EMAILS = env.list("RACE_SYNC_NOTIFY_EMAILS", default=[])
 
+# System-level Anthropic API key pro auto-extract z race URL („Chybí
+# tu závod?" flow). User nemusí mít vlastní key. Prázdný = extract
+# feature vypnutá, endpoint vrátí 503.
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+ANTHROPIC_INGEST_MODEL = env(
+    "ANTHROPIC_INGEST_MODEL", default="claude-haiku-4-5"
+)
+
 # Celery — Redis broker; results disabled by default to avoid double-storing.
 CELERY_BROKER_URL = env("REDIS_URL", default="redis://redis:6379/0")
 CELERY_RESULT_BACKEND = "django-db"

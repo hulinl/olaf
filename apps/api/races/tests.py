@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User
 from races.management.commands.sync_races import _detect_contradiction
-from races.models import Race, RaceFavorite, SyncRun
+from races.models import Race, RaceFavorite, RaceSubmission, SyncRun
 from workspaces.models import Workspace, WorkspaceMember
 
 
@@ -1042,3 +1042,259 @@ class SyncFieldExtractionTests(TestCase):
         self.assertTrue(race.is_top)
         import datetime as dt
         self.assertEqual(race.date_start, dt.date(2027, 6, 27))
+
+
+class RaceSubmissionTests(TestCase):
+    """„Chybí tu závod?" — user submissions + AI extract + admin approve."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.alice = User.objects.create_user(
+            email="alice@example.com",
+            password="pass-abcdef-1234",
+            first_name="Alice",
+            last_name="X",
+            email_verified=True,
+        )
+
+    # --- POST /submissions/ ---
+
+    def test_post_requires_auth(self) -> None:
+        resp = self.client.post(
+            "/api/races/submissions/",
+            {"url": "https://example.com/race"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_post_rejects_missing_url(self) -> None:
+        self.client.force_authenticate(self.alice)
+        resp = self.client.post("/api/races/submissions/", {}, format="json")
+        self.assertEqual(resp.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+    def test_post_rejects_invalid_url_scheme(self) -> None:
+        self.client.force_authenticate(self.alice)
+        resp = self.client.post(
+            "/api/races/submissions/",
+            {"url": "ftp://example.com/race"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+    def test_post_saves_submission_even_when_ai_fails(self) -> None:
+        """Když AI selže, uložíme submission s prázdným extracted_data
+        a warning v response — user vidí feedback, admin může doplnit."""
+        from unittest import mock
+
+        self.client.force_authenticate(self.alice)
+        with mock.patch(
+            "races.submission_service.extract_race_from_url",
+            side_effect=__import__(
+                "races.submission_service", fromlist=["ExtractionError"]
+            ).ExtractionError("Test error"),
+        ):
+            resp = self.client.post(
+                "/api/races/submissions/",
+                {"url": "https://example.com/race"},
+                format="json",
+            )
+        self.assertEqual(resp.status_code, drf_status.HTTP_201_CREATED)
+        self.assertIn("warning", resp.json())
+        self.assertEqual(RaceSubmission.objects.count(), 1)
+
+    def test_post_success_returns_extracted_data(self) -> None:
+        from unittest import mock
+
+        extracted = {
+            "name": "Test Race",
+            "distance_km": 42,
+            "elevation_m": 2800,
+            "sport": "trail",
+            "region": "ALP",
+            "country": "Francie",
+            "place": "Chamonix",
+            "month": 6,
+            "year": 2027,
+            "series": "indep",
+        }
+        self.client.force_authenticate(self.alice)
+        with mock.patch(
+            "races.submission_service.extract_race_from_url",
+            return_value=(extracted, "raw"),
+        ):
+            resp = self.client.post(
+                "/api/races/submissions/",
+                {"url": "https://example.com/race"},
+                format="json",
+            )
+        self.assertEqual(resp.status_code, drf_status.HTTP_201_CREATED)
+        self.assertEqual(resp.json()["extracted_data"], extracted)
+
+    def test_rate_limit_5_per_day(self) -> None:
+        """6th submission za 24 h → 429."""
+        from unittest import mock
+
+        for _ in range(5):
+            RaceSubmission.objects.create(
+                user=self.alice,
+                source_url="https://example.com/race",
+                extracted_data={},
+            )
+        self.client.force_authenticate(self.alice)
+        with mock.patch(
+            "races.submission_service.extract_race_from_url",
+            return_value=({}, ""),
+        ):
+            resp = self.client.post(
+                "/api/races/submissions/",
+                {"url": "https://example.com/race6"},
+                format="json",
+            )
+        self.assertEqual(
+            resp.status_code, drf_status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    # --- GET mine ---
+
+    def test_get_returns_own_submissions_only(self) -> None:
+        bob = User.objects.create_user(
+            email="bob@example.com",
+            password="pass-abcdef-1234",
+            first_name="Bob",
+            last_name="X",
+            email_verified=True,
+        )
+        RaceSubmission.objects.create(
+            user=self.alice, source_url="https://example.com/1"
+        )
+        RaceSubmission.objects.create(
+            user=bob, source_url="https://example.com/2"
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.get("/api/races/submissions/")
+        urls = {s["source_url"] for s in resp.json()["submissions"]}
+        self.assertEqual(urls, {"https://example.com/1"})
+
+    # --- PATCH edit ---
+
+    def test_patch_allows_user_to_edit_extracted(self) -> None:
+        sub = RaceSubmission.objects.create(
+            user=self.alice,
+            source_url="https://example.com/x",
+            extracted_data={"name": "Old", "distance_km": 42},
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.patch(
+            f"/api/races/submissions/{sub.pk}/",
+            {"extracted_data": {"name": "New"}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        sub.refresh_from_db()
+        self.assertEqual(sub.extracted_data["name"], "New")
+        # Merge — distance_km should stay
+        self.assertEqual(sub.extracted_data["distance_km"], 42)
+
+    def test_patch_blocked_when_approved(self) -> None:
+        sub = RaceSubmission.objects.create(
+            user=self.alice,
+            source_url="https://example.com/x",
+            status=RaceSubmission.STATUS_APPROVED,
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.patch(
+            f"/api/races/submissions/{sub.pk}/",
+            {"extracted_data": {"name": "New"}},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+    def test_delete_own_pending(self) -> None:
+        sub = RaceSubmission.objects.create(
+            user=self.alice, source_url="https://example.com/x"
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.delete(f"/api/races/submissions/{sub.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(RaceSubmission.objects.count(), 0)
+
+    def test_delete_others_404(self) -> None:
+        bob = User.objects.create_user(
+            email="bob@example.com",
+            password="pass-abcdef-1234",
+            first_name="Bob",
+            last_name="X",
+            email_verified=True,
+        )
+        sub = RaceSubmission.objects.create(
+            user=bob, source_url="https://example.com/x"
+        )
+        self.client.force_authenticate(self.alice)
+        resp = self.client.delete(f"/api/races/submissions/{sub.pk}/")
+        self.assertEqual(resp.status_code, drf_status.HTTP_404_NOT_FOUND)
+
+
+class RaceSubmissionServiceTests(TestCase):
+    """AI response parsing + race conversion — bez external calls."""
+
+    def test_parse_ai_response_plain_json(self) -> None:
+        from races.submission_service import parse_ai_response
+
+        result = parse_ai_response('{"name": "Test", "distance_km": 42}')
+        self.assertEqual(result["name"], "Test")
+
+    def test_parse_ai_response_markdown_wrapped(self) -> None:
+        from races.submission_service import parse_ai_response
+
+        text = '```json\n{"name": "Test", "distance_km": 42}\n```'
+        result = parse_ai_response(text)
+        self.assertEqual(result["name"], "Test")
+
+    def test_parse_ai_response_prefix_ignored(self) -> None:
+        from races.submission_service import parse_ai_response
+
+        text = 'Sure! Here you go: {"name": "Test"}'
+        result = parse_ai_response(text)
+        self.assertEqual(result["name"], "Test")
+
+    def test_parse_ai_response_empty_returns_empty_dict(self) -> None:
+        from races.submission_service import parse_ai_response
+
+        self.assertEqual(parse_ai_response(""), {})
+        self.assertEqual(parse_ai_response("junk without json"), {})
+
+    def test_race_from_submission_normalizes_fields(self) -> None:
+        from races.submission_service import race_from_submission_data
+
+        data = {
+            "name": "Test Race",
+            "distance_km": 42,
+            "elevation_m": 2800,
+            "sport": "trail",
+            "region": "ALP",
+            "country": "Francie",
+            "place": "Chamonix",
+            "month": 6,
+            "year": 2027,
+            "day": 15,
+            "series": "utmb",
+            "registration_type": "L",
+        }
+        fields = race_from_submission_data(data, "https://x.com/race")
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 6, 15))
+        self.assertEqual(fields["distance_km"], 42)
+        self.assertEqual(fields["sport"], Race.SPORT_TRAIL)
+        self.assertEqual(fields["region"], Race.REGION_ALP)
+        self.assertEqual(fields["series"], Race.SERIES_UTMB)
+        self.assertEqual(fields["registration_status"], Race.REG_LOTTERY)
+
+    def test_race_from_submission_fallback_for_invalid_data(self) -> None:
+        from races.submission_service import race_from_submission_data
+
+        # Prázdný dict → sane defaults, žádný crash
+        fields = race_from_submission_data({}, "https://x.com/y")
+        self.assertEqual(fields["name"], "Neznámý závod")
+        self.assertEqual(fields["distance_km"], 1)
+        self.assertEqual(fields["sport"], Race.SPORT_TRAIL)

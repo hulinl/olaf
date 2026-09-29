@@ -42,3 +42,6 @@ icalendar==6.1.0
 # RRULE expansion — Google/Outlook posílají recurring events s RRULE,
 # musíme expandovat sami do konkrétních dat.
 recurring-ical-events==3.5.1
+# HTTP client — Anthropic API calls pro „Chybí tu závod?" AI extractor.
+# urllib.request funguje, ale requests má lepší error handling + json.
+requests==2.32.3

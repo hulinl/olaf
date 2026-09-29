@@ -65,6 +65,18 @@ export interface MyCommunityPerson {
   plan_count: number;
 }
 
+export interface RaceSubmission {
+  id: number;
+  source_url: string;
+  extracted_data: Record<string, unknown>;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string;
+  created_race_id: number | null;
+  created_at: string;
+  updated_at: string;
+  warning?: string;
+}
+
 export interface RacePlanEntry {
   status: RacePlanStatus;
   note: string;
@@ -228,6 +240,26 @@ export const races = {
     apiFetch<{ people: MyCommunityPerson[] }>(
       "/api/races/my-community-people/",
     ),
+  // „Chybí tu závod?" — user race submission s AI extract
+  submitRace: (url: string): Promise<RaceSubmission> =>
+    apiFetch<RaceSubmission>("/api/races/submissions/", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  mySubmissions: (): Promise<{ submissions: RaceSubmission[] }> =>
+    apiFetch<{ submissions: RaceSubmission[] }>("/api/races/submissions/"),
+  updateSubmission: (
+    id: number,
+    extractedData: Record<string, unknown>,
+  ): Promise<RaceSubmission> =>
+    apiFetch<RaceSubmission>(`/api/races/submissions/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify({ extracted_data: extractedData }),
+    }),
+  deleteSubmission: (id: number): Promise<{ deleted: boolean }> =>
+    apiFetch<{ deleted: boolean }>(`/api/races/submissions/${id}/`, {
+      method: "DELETE",
+    }),
   // Přidání do plánu (POST) — optional status/note. Bez status =
   // default "interested".
   addToPlan: (

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { ApiError, auth, type User } from "@/lib/api";
+import { RaceSubmissionModal } from "./RaceSubmissionModal";
 import {
   PLAN_STATUS_LABEL,
   PLAN_STATUS_TONE,
@@ -507,6 +508,7 @@ export function CalendarClient() {
 
   return (
     <>
+      <RaceSubmissionModal />
       {statsMount &&
         createPortal(
           <>

@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from .models import Race, RaceFavorite, SyncRun
+from .models import Race, RaceFavorite, RaceSubmission, SyncRun
 
 
 @admin.register(Race)
@@ -183,3 +183,85 @@ class SyncRunAdmin(admin.ModelAdmin):
                 len(obj.changes) - 50,
             )
         return format_html("{}{}", table, note)
+
+
+@admin.register(RaceSubmission)
+class RaceSubmissionAdmin(admin.ModelAdmin):
+    """„Chybí tu závod?" user submissions — approve → creates Race."""
+
+    list_display = (
+        "id",
+        "user",
+        "extracted_name",
+        "source_url_short",
+        "status_badge",
+        "created_at",
+    )
+    list_filter = ("status", "created_at")
+    search_fields = ("source_url", "user__email", "extracted_data")
+    readonly_fields = (
+        "user",
+        "source_url",
+        "ai_response_raw",
+        "created_race",
+        "created_at",
+        "updated_at",
+    )
+    actions = ["approve_selected", "reject_selected"]
+
+    @admin.display(description="Název (AI extract)")
+    def extracted_name(self, obj):
+        return (obj.extracted_data or {}).get("name", "—")
+
+    @admin.display(description="URL")
+    def source_url_short(self, obj):
+        return obj.source_url[:60] + ("…" if len(obj.source_url) > 60 else "")
+
+    @admin.display(description="Status")
+    def status_badge(self, obj):
+        colors = {
+            "pending": "#d97706",
+            "approved": "#059669",
+            "rejected": "#dc2626",
+        }
+        return format_html(
+            '<span style="background:{}; color:white; padding:2px 8px; '
+            'border-radius:3px; font-size:11px; font-weight:600; '
+            'text-transform:uppercase;">{}</span>',
+            colors.get(obj.status, "#6b7280"),
+            obj.get_status_display(),
+        )
+
+    @admin.action(description="✓ Schválit → vytvořit Race")
+    def approve_selected(self, request, queryset):
+        from .submission_service import race_from_submission_data
+
+        created_count = 0
+        for sub in queryset.filter(status=RaceSubmission.STATUS_PENDING):
+            data = sub.extracted_data or {}
+            try:
+                fields = race_from_submission_data(data, sub.source_url)
+                # Slug generuje sám Race.save() z name
+                race = Race.objects.create(**fields)
+                sub.status = RaceSubmission.STATUS_APPROVED
+                sub.created_race = race
+                sub.admin_note = f"Approved by {request.user.email}"
+                sub.save()
+                created_count += 1
+            except Exception as exc:
+                messages.error(
+                    request, f"Submission {sub.pk} selhala: {exc}"
+                )
+        if created_count:
+            messages.success(
+                request,
+                f"✓ {created_count} race{'s' if created_count != 1 else ''} vytvořeno.",
+            )
+
+    @admin.action(description="✗ Zamítnout")
+    def reject_selected(self, request, queryset):
+        n = queryset.filter(status=RaceSubmission.STATUS_PENDING).update(
+            status=RaceSubmission.STATUS_REJECTED,
+            admin_note=f"Rejected by {request.user.email}",
+        )
+        messages.info(request, f"{n} submission{'s' if n != 1 else ''} zamítnuto.")

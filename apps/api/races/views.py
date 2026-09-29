@@ -32,7 +32,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Race, RaceFavorite
+from .models import Race, RaceFavorite, RaceSubmission
 from .serializers import RaceFavoriteSerializer, RaceSerializer
 
 
@@ -685,3 +685,123 @@ def race_countries(request: Request) -> Response:
         .order_by("country")
     )
     return Response({"countries": list(countries)})
+
+
+# ---------------------------------------------------------------------------
+# „Chybí tu závod?" — user race submissions s AI extractorem
+# ---------------------------------------------------------------------------
+
+
+def _serialize_submission(sub: RaceSubmission) -> dict:
+    return {
+        "id": sub.id,
+        "source_url": sub.source_url,
+        "extracted_data": sub.extracted_data,
+        "status": sub.status,
+        "admin_note": sub.admin_note,
+        "created_race_id": sub.created_race_id,
+        "created_at": sub.created_at.isoformat(),
+        "updated_at": sub.updated_at.isoformat(),
+    }
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def race_submission_list(request: Request) -> Response:
+    """GET  — mé submissions.
+    POST — nová submission: {url}. Backend fetche URL, AI extrahuje,
+           uloží jako pending s extracted_data.
+    """
+    if request.method == "GET":
+        rows = RaceSubmission.objects.filter(user=request.user)
+        return Response({"submissions": [_serialize_submission(s) for s in rows]})
+
+    url = (request.data.get("url") or "").strip()
+    if not url:
+        return Response(
+            {"detail": "Chybí `url` v body."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return Response(
+            {"detail": "URL musí začínat http:// nebo https://."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Throttle: 5 submissions per user za posledních 24 h
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    recent_count = RaceSubmission.objects.filter(
+        user=request.user,
+        created_at__gte=timezone.now() - timedelta(days=1),
+    ).count()
+    if recent_count >= 5:
+        return Response(
+            {
+                "detail": (
+                    "Rate limit: max 5 návrhů závodů denně. "
+                    "Zkus znovu zítra."
+                )
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    # AI extract — může selhat kvůli SSRF / network / parse. Uložíme
+    # submission s prázdným extract když AI selže, aby admin viděl v UI.
+    from .submission_service import ExtractionError, extract_race_from_url
+
+    extracted: dict = {}
+    ai_raw = ""
+    error_msg = ""
+    try:
+        extracted, ai_raw = extract_race_from_url(url)
+    except ExtractionError as exc:
+        error_msg = str(exc)
+
+    submission = RaceSubmission.objects.create(
+        user=request.user,
+        source_url=url,
+        extracted_data=extracted,
+        ai_response_raw=ai_raw,
+        admin_note=(f"AI extract selhal: {error_msg}" if error_msg else ""),
+    )
+    data = _serialize_submission(submission)
+    if error_msg:
+        data["warning"] = error_msg
+    return Response(data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def race_submission_detail(request: Request, submission_id: int) -> Response:
+    """PATCH — user může upravit extracted_data před admin review.
+    DELETE — user může smazat vlastní pending submission."""
+    submission = get_object_or_404(
+        RaceSubmission, pk=submission_id, user=request.user
+    )
+    if submission.status != RaceSubmission.STATUS_PENDING:
+        return Response(
+            {
+                "detail": (
+                    f"Submission je ve stavu '{submission.status}' — nelze upravit."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if request.method == "DELETE":
+        submission.delete()
+        return Response({"deleted": True})
+
+    # PATCH extracted_data — user může upravit fields
+    new_extracted = request.data.get("extracted_data")
+    if isinstance(new_extracted, dict):
+        # Merge — user může poslat jen některé fields
+        submission.extracted_data = {
+            **submission.extracted_data,
+            **new_extracted,
+        }
+        submission.save(update_fields=["extracted_data", "updated_at"])
+    return Response(_serialize_submission(submission))

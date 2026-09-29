@@ -16,5 +16,16 @@ urlpatterns = [
         name="my-community-people",
     ),
     path("plan/<slug:user_slug>/", views.race_plan_public, name="plan-public"),
+    # „Chybí tu závod?" submissions (auth)
+    path(
+        "submissions/",
+        views.race_submission_list,
+        name="submission-list",
+    ),
+    path(
+        "submissions/<int:submission_id>/",
+        views.race_submission_detail,
+        name="submission-detail",
+    ),
     path("<slug:slug>/favorite/", views.race_favorite_toggle, name="favorite-toggle"),
 ]
