@@ -327,11 +327,46 @@ class Command(BaseCommand):
         )
 
     def _extract_fields(self, e: dict) -> dict:
+        from datetime import date
+
         km = e.get("km") or 0
         if not km or km < 1:
             km = 1
+        # Derive date_start pro DB indexování / řazení. Source má:
+        #  - `month` (integer 1-12)
+        #  - `next.year` (integer)
+        #  - `date2027`, `date2026`, ... (human string typu „26. 6." nebo „TBA")
+        # Pro TBA / nejasné termíny defaultujeme na 1. den měsíce daného
+        # roku. Race.date_display se drží pro human render.
+        next_data = e.get("next") or {}
+        year = int(next_data.get("year") or 2027)
+        month = int(e.get("month") or 1)
+        # Zkusíme rozparsovat date2027-style string „26. 6." → den 26
+        day = 1
+        year_key = f"date{year}"
+        raw_date_str = (e.get(year_key) or "").strip()
+        if raw_date_str and raw_date_str.upper() != "TBA":
+            # Formáty: „26. 6." nebo „5.-7. 8." — vezmi první číslo
+            import re
+
+            m = re.match(r"^(\d{1,2})", raw_date_str)
+            if m:
+                day = int(m.group(1))
+        # Ošetři překročení posledního dne měsíce (např. den=31 pro únor)
+        import calendar
+
+        max_day = calendar.monthrange(year, month)[1]
+        day = min(day, max_day)
+        try:
+            date_start = date(year, month, day)
+        except ValueError:
+            # Fallback pro divné hodnoty (month=0, atd.)
+            date_start = date(year, 1, 1)
+
         return {
             "name": (e.get("name") or "").strip()[:200],
+            "date_start": date_start,
+            "date_display": raw_date_str[:80],
             "distance_km": int(round(km)),
             "distances_note": (e.get("distances") or "")[:200],
             "elevation_m": e.get("dplus") or None,
@@ -352,7 +387,7 @@ class Command(BaseCommand):
             "is_top": bool(e.get("top", False)),
             "has_warning": bool(e.get("warn", False)),
             "next_label": ((e.get("next") or {}).get("label") or "")[:100],
-            "next_year": int((e.get("next") or {}).get("year") or 2027),
+            "next_year": year,
         }
 
     def _diff_updates(

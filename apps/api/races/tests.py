@@ -882,3 +882,163 @@ class SyncAgentTests(TestCase):
         )
         self.assertIsNotNone(run.pk)
         self.assertEqual(SyncRun.objects.count(), 1)
+
+
+class SyncFieldExtractionTests(TestCase):
+    """Regresní testy pro _extract_fields — bug 2026-09-29: nové races
+    padaly s IntegrityError, protože date_start nebyl derived ze
+    source JSON. Fix: derive z month + next.year + date{year} string."""
+
+    def _cmd(self):
+        from races.management.commands.sync_races import Command
+
+        return Command()
+
+    def test_derives_date_start_from_month_and_year(self) -> None:
+        """`next.year` + `month` bez date2027 → 1. den měsíce daného roku."""
+        cmd = self._cmd()
+        fields = cmd._extract_fields(
+            {
+                "id": "test",
+                "name": "Test Race",
+                "km": 42,
+                "month": 6,
+                "next": {"year": 2027, "label": "obvykle červen"},
+            }
+        )
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 6, 1))
+
+    def test_derives_day_from_date_string(self) -> None:
+        """date2027 = „26. 6." → date_start má den 26."""
+        cmd = self._cmd()
+        fields = cmd._extract_fields(
+            {
+                "id": "test",
+                "name": "Test",
+                "km": 42,
+                "month": 6,
+                "next": {"year": 2027},
+                "date2027": "26. 6.",
+            }
+        )
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 6, 26))
+        self.assertEqual(fields["date_display"], "26. 6.")
+
+    def test_tba_date_falls_back_to_day_1(self) -> None:
+        """date2027 = „TBA" → day=1 pro řazení."""
+        cmd = self._cmd()
+        fields = cmd._extract_fields(
+            {
+                "id": "test",
+                "name": "Test",
+                "km": 42,
+                "month": 8,
+                "next": {"year": 2027},
+                "date2027": "TBA",
+            }
+        )
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 8, 1))
+
+    def test_multi_day_range_takes_start(self) -> None:
+        """date2027 = „5.-7. 8." → start = 5."""
+        cmd = self._cmd()
+        fields = cmd._extract_fields(
+            {
+                "id": "test",
+                "name": "Test",
+                "km": 100,
+                "month": 8,
+                "next": {"year": 2027},
+                "date2027": "5.-7. 8.",
+            }
+        )
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 8, 5))
+
+    def test_day_capped_to_month_length(self) -> None:
+        """day=31 pro únor → clampne na 28."""
+        cmd = self._cmd()
+        fields = cmd._extract_fields(
+            {
+                "id": "test",
+                "name": "Test",
+                "km": 42,
+                "month": 2,
+                "next": {"year": 2027},  # 2027 není přestupný
+                "date2027": "31. 2.",  # divná hodnota
+            }
+        )
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 2, 28))
+
+    def test_invalid_month_falls_back(self) -> None:
+        """month=0 → date(year, 1, 1) fallback, nevyhodí exception."""
+        cmd = self._cmd()
+        fields = cmd._extract_fields(
+            {
+                "id": "test",
+                "name": "Test",
+                "km": 42,
+                "month": 0,
+                "next": {"year": 2027},
+            }
+        )
+        import datetime as dt
+
+        self.assertEqual(fields["date_start"], dt.date(2027, 1, 1))
+
+    def test_new_race_creates_successfully(self) -> None:
+        """End-to-end: nová race se vytvoří přes sync bez IntegrityError.
+        Regression test pro bug 2026-09-29."""
+        from django.core.management import call_command
+        from io import StringIO
+        from unittest import mock
+
+        Race.objects.filter(slug="test-mont-blanc").delete()
+        events = [
+            {
+                "id": "test-mont-blanc",
+                "name": "Test 42 km du Mont-Blanc",
+                "sport": "beh",
+                "km": 42,
+                "dplus": 2800,
+                "month": 6,
+                "next": {"year": 2027, "label": "obvykle červen"},
+                "date2027": "27. 6.",
+                "top": True,
+                "region": "ALP",
+                "country": "Francie",
+                "place": "Chamonix",
+                "series": "Nezávislý",
+                "registration": {"type": "L", "detail": "loterie"},
+                "web": "https://www.marathonmontblanc.fr/",
+                "highlight": "Test race",
+                "warn": False,
+            }
+        ]
+        buf = StringIO()
+        with mock.patch(
+            "races.management.commands.sync_races._load_local",
+            return_value=events,
+        ):
+            call_command(
+                "sync_races",
+                "--source",
+                "local",
+                "--triggered-by",
+                "test",
+                stdout=buf,
+            )
+        race = Race.objects.get(slug="test-mont-blanc")
+        self.assertEqual(race.distance_km, 42)
+        self.assertTrue(race.is_top)
+        import datetime as dt
+        self.assertEqual(race.date_start, dt.date(2027, 6, 27))

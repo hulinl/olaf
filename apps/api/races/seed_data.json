@@ -1087,6 +1087,99 @@
    "warn": false
   },
   {
+   "id": "42km-du-mont-blanc",
+   "sport": "beh",
+   "top": true,
+   "region": "ALP",
+   "name": "42 km du Mont-Blanc",
+   "country": "Francie",
+   "place": "Chamonix",
+   "month": 6,
+   "next": {
+    "label": "obvykle červen",
+    "year": 2027,
+    "sortKey": 202706
+   },
+   "date2026": "27. 6.",
+   "date2027": "TBA",
+   "distances": "42",
+   "km": 42,
+   "dplus": 2800,
+   "terrain": "h",
+   "series": "Nezávislý",
+   "registration": {
+    "type": "L",
+    "detail": "loterie s preferencí za předchozí start; loni přihlášky 23.–30. 10."
+   },
+   "limitH": null,
+   "participants": null,
+   "web": "https://www.marathonmontblanc.fr/en/races/42km-du-mont-blanc",
+   "highlight": "Marquee mountain marathon v Chamonix, dřívější kvalifikace na World Mountain & Trail Running Championships.",
+   "warn": false
+  },
+  {
+   "id": "80km-du-mont-blanc",
+   "sport": "beh",
+   "top": false,
+   "region": "ALP",
+   "name": "80 km du Mont-Blanc",
+   "country": "Francie",
+   "place": "Chamonix",
+   "month": 6,
+   "next": {
+    "label": "obvykle červen",
+    "year": 2027,
+    "sortKey": 202706
+   },
+   "date2026": "26. 6.",
+   "date2027": "TBA",
+   "distances": "80",
+   "km": 80,
+   "dplus": 6000,
+   "terrain": "h",
+   "series": "Nezávislý",
+   "registration": {
+    "type": "L",
+    "detail": "loterie; kratší varianta 90km trati bez některých vrcholů"
+   },
+   "limitH": null,
+   "participants": null,
+   "web": "https://www.marathonmontblanc.fr/en/races/80km-du-mont-blanc",
+   "highlight": "Kratší sibling 90 km — vysokohorský okruh Chamonix Aiguilles Rouges.",
+   "warn": false
+  },
+  {
+   "id": "cross-du-mont-blanc",
+   "sport": "beh",
+   "top": false,
+   "region": "ALP",
+   "name": "Cross du Mont-Blanc (23 km)",
+   "country": "Francie",
+   "place": "Chamonix",
+   "month": 6,
+   "next": {
+    "label": "obvykle červen",
+    "year": 2027,
+    "sortKey": 202706
+   },
+   "date2026": "27. 6.",
+   "date2027": "TBA",
+   "distances": "23",
+   "km": 23,
+   "dplus": 1600,
+   "terrain": "h",
+   "series": "Nezávislý",
+   "registration": {
+    "type": "L",
+    "detail": "loterie; nejkratší dospělý format Marathon du Mont-Blanc weekendu"
+   },
+   "limitH": null,
+   "participants": null,
+   "web": "https://www.marathonmontblanc.fr/en/races/cross-du-mont-blanc",
+   "highlight": "Sprintová varianta v masivu — přes Aiguillette des Houches a Le Brévent.",
+   "warn": false
+  },
+  {
    "id": "90-km-du-mont-blanc",
    "sport": "beh",
    "top": false,
