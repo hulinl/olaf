@@ -756,7 +756,7 @@ def race_submission_list(request: Request) -> Response:
     ai_raw = ""
     error_msg = ""
     try:
-        extracted, ai_raw = extract_race_from_url(url)
+        extracted, ai_raw = extract_race_from_url(url, user=request.user)
     except ExtractionError as exc:
         error_msg = str(exc)
 

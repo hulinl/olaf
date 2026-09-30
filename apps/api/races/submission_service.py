@@ -115,15 +115,36 @@ def fetch_url_text(url: str) -> str:
     return text[:MAX_TEXT_CHARS]
 
 
-def call_anthropic(prompt_text: str) -> str:
-    """Zavolá Claude s prompt textem, vrátí response content string.
-    Používá system-level ANTHROPIC_API_KEY z settings.
+def resolve_anthropic_key(user) -> str:
+    """Vrátí Anthropic API key pro daného usera.
+
+    Pořadí:
+    1. User's stored key (accounts.User.anthropic_api_key_encrypted) —
+       decrypted přes Fernet. Uživatel si ho nastaví v `/settings/integrace`.
+    2. System-level `settings.ANTHROPIC_API_KEY` env var.
+
+    Empty string pokud ani jeden není dostupný — caller vrátí 503 s
+    hlaškou „připoj Anthropic v Integrace".
     """
-    api_key = getattr(settings, "ANTHROPIC_API_KEY", "")
+    if user is not None and getattr(user, "is_authenticated", False):
+        from accounts.integrations import safe_decrypt_token
+
+        cipher = getattr(user, "anthropic_api_key_encrypted", "") or ""
+        if cipher:
+            plain = safe_decrypt_token(cipher)
+            if plain:
+                return plain
+    return getattr(settings, "ANTHROPIC_API_KEY", "") or ""
+
+
+def call_anthropic(prompt_text: str, api_key: str) -> str:
+    """Zavolá Claude s prompt textem, vrátí response content string.
+    `api_key` musí být pre-resolved (viz `resolve_anthropic_key`).
+    """
     if not api_key:
         raise ExtractionError(
-            "AI extract je vypnutý na tomto serveru "
-            "(ANTHROPIC_API_KEY není nastaven)."
+            "Anthropic API key není dostupný. "
+            "Připoj svůj klíč v Nastavení → Integrace."
         )
 
     model = getattr(settings, "ANTHROPIC_INGEST_MODEL", "claude-haiku-4-5")
@@ -187,8 +208,12 @@ def parse_ai_response(text: str) -> dict:
     return {}
 
 
-def extract_race_from_url(url: str) -> tuple[dict, str]:
+def extract_race_from_url(url: str, user=None) -> tuple[dict, str]:
     """Full pipeline: fetch → text → AI → JSON parse.
+
+    `user` musí být předán pro key resolution (user's stored key má
+    prioritu před system env var). Anonymous / bez key → fallback na
+    system, nebo ExtractionError.
 
     Returns (extracted_dict, raw_ai_response).
     Raises ExtractionError s user-friendly CZ zprávou.
@@ -196,8 +221,9 @@ def extract_race_from_url(url: str) -> tuple[dict, str]:
     text = fetch_url_text(url)
     if not text:
         raise ExtractionError("Stránka je prázdná / bez textového obsahu.")
+    api_key = resolve_anthropic_key(user)
     prompt = EXTRACT_USER_TEMPLATE.format(url=url, text=text)
-    ai_raw = call_anthropic(prompt)
+    ai_raw = call_anthropic(prompt, api_key)
     parsed = parse_ai_response(ai_raw)
     return parsed, ai_raw
 

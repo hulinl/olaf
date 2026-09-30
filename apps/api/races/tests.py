@@ -1298,3 +1298,58 @@ class RaceSubmissionServiceTests(TestCase):
         self.assertEqual(fields["name"], "Neznámý závod")
         self.assertEqual(fields["distance_km"], 1)
         self.assertEqual(fields["sport"], Race.SPORT_TRAIL)
+
+    def test_resolve_anthropic_key_prefers_user_stored(self) -> None:
+        """User's stored key má přednost před system env var."""
+        from accounts.integrations import encrypt_token
+        from django.test import override_settings
+
+        from races.submission_service import resolve_anthropic_key
+
+        user = User.objects.create_user(
+            email="key@example.com",
+            password="pass-abcdef-1234",
+            first_name="K",
+            last_name="X",
+            email_verified=True,
+        )
+        user.anthropic_api_key_encrypted = encrypt_token("user-key-abc")
+        user.save()
+        with override_settings(ANTHROPIC_API_KEY="system-key-xyz"):
+            self.assertEqual(
+                resolve_anthropic_key(user), "user-key-abc"
+            )
+
+    def test_resolve_anthropic_key_falls_back_to_system(self) -> None:
+        """Bez user's key → system env var."""
+        from django.test import override_settings
+
+        from races.submission_service import resolve_anthropic_key
+
+        user = User.objects.create_user(
+            email="nokey@example.com",
+            password="pass-abcdef-1234",
+            first_name="N",
+            last_name="X",
+            email_verified=True,
+        )
+        with override_settings(ANTHROPIC_API_KEY="system-key-xyz"):
+            self.assertEqual(
+                resolve_anthropic_key(user), "system-key-xyz"
+            )
+
+    def test_resolve_anthropic_key_empty_when_neither(self) -> None:
+        """Ani user, ani system key → empty."""
+        from django.test import override_settings
+
+        from races.submission_service import resolve_anthropic_key
+
+        user = User.objects.create_user(
+            email="none@example.com",
+            password="pass-abcdef-1234",
+            first_name="N",
+            last_name="X",
+            email_verified=True,
+        )
+        with override_settings(ANTHROPIC_API_KEY=""):
+            self.assertEqual(resolve_anthropic_key(user), "")
