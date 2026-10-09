@@ -7,6 +7,7 @@ import { AppFooter } from "@/components/ui/app-footer";
 import { SITE } from "@/lib/site-config";
 
 import { CalendarClient } from "./CalendarClient";
+import { SubmitRaceButton } from "./SubmitRaceButton";
 
 export const metadata: Metadata = {
   title: `Kalendář závodů — ${SITE.name}`,
@@ -68,22 +69,7 @@ export default function KalendarPage() {
                   <span aria-hidden>📅</span>
                   Časová osa
                 </Link>
-                {/* „Chybí tu závod?" tlačítko — otevře modal
-                    v CalendarClient.tsx přes globální event.
-                    Renderovat vždy — kliknutí pošle event, klient
-                    rozhodne co s tím (auth/redirect na login). */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    document.dispatchEvent(
-                      new CustomEvent("olaf:open-race-submit"),
-                    )
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-md border border-brand bg-brand-soft px-3 py-1.5 text-sm font-medium text-ink-900 transition-colors hover:bg-brand hover:text-brand-ink focus-ring"
-                >
-                  <span aria-hidden>➕</span>
-                  Chybí tu závod?
-                </button>
+                <SubmitRaceButton />
               </div>
               <div
                 id="kalendar-stats"
