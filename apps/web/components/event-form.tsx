@@ -483,7 +483,17 @@ export function EventForm({
                 id="starts"
                 required
                 value={startsAt}
-                onChange={setStartsAt}
+                onChange={(next) => {
+                  setStartsAt(next);
+                  // Když je konec prázdný nebo leží před novým začátkem,
+                  // posuň ho na stejnou hodnotu — tvůrce pak nemusí
+                  // v end pickeru znova proklikávat kalendář zpátky
+                  // na datum začátku. (Formát "YYYY-MM-DDTHH:MM"
+                  // je lexikograficky srovnatelný.)
+                  if (next && (!endsAt || endsAt < next)) {
+                    setEndsAt(next);
+                  }
+                }}
               />
             </Field>
             <Field label="Konec *" htmlFor="ends">
