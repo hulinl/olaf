@@ -153,6 +153,28 @@ class ExtractEventDraftTests(TestCase):
                 extract_event_draft("notes", "sk-ant-fake")
         self.assertEqual(cm.exception.status_code, 502)
 
+    def test_max_tokens_truncation_detected(self) -> None:
+        # When Claude hits max_tokens, the content is a half-written
+        # JSON — don't let the parser blame the user; surface the real
+        # cause so the operator knows to bump the cap or shorten.
+        canned = {
+            "stop_reason": "max_tokens",
+            "content": [
+                {
+                    "type": "text",
+                    "text": '{"title": "Letni kemp", "blocks": [{"id": "hero", "type": "hero", "payload": {"eyebrow": "KEMP',
+                }
+            ],
+        }
+        with patch("events.notion_ingest.urllib.request.urlopen") as urlopen:
+            urlopen.return_value.__enter__.return_value.read.return_value = (
+                json.dumps(canned).encode("utf-8")
+            )
+            with self.assertRaises(IngestError) as cm:
+                extract_event_draft("notes", "sk-ant-fake")
+        self.assertEqual(cm.exception.status_code, 502)
+        self.assertIn("oříznutá", str(cm.exception))
+
 
 class IngestEndpointTests(TestCase):
     """Integration tests for POST /api/events/from-source/. Notion +

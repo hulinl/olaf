@@ -24,12 +24,15 @@ Both APIs are simple JSON-over-HTTP.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import urllib.error
 import urllib.request
 from typing import Any
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 NOTION_API_BASE = "https://api.notion.com/v1"
 NOTION_API_VERSION = "2022-06-28"
@@ -44,7 +47,11 @@ ANTHROPIC_MODEL = getattr(
 
 # Hard caps so a single malicious URL can't burn the token bill.
 MAX_INGEST_TEXT_CHARS = 25_000
-MAX_ANTHROPIC_TOKENS_OUT = 2_000
+# Stránka s hero + 7-10 landing bloky + metadata produkuje běžně 4-6k
+# output tokenů. 2k ořízl JSON uprostřed property a parser padal na
+# "Expecting property name enclosed in double quotes" — 8k dává slack
+# pro bohaté stránky a pořád limituje nejhorší případ.
+MAX_ANTHROPIC_TOKENS_OUT = 8_000
 
 
 class IngestError(Exception):
@@ -589,6 +596,18 @@ def extract_event_draft(page_text: str, anthropic_api_key: str) -> dict[str, Any
             "Anthropic odpověď neobsahuje text — zkus to znovu.",
             status_code=502,
         )
+    # Model-side truncation produces otherwise-valid JSON with the last
+    # property mid-string. Catch it before json.loads so the user sees
+    # a message that points at the real fix (shorter page / higher cap)
+    # instead of the parser's cryptic column number.
+    stop_reason = data.get("stop_reason")
+    if stop_reason == "max_tokens":
+        raise IngestError(
+            "Claude odpověď byla oříznutá kvůli délce — stránka je "
+            "moc dlouhá na jedno kolo. Zkus ji zkrátit v Notionu nebo "
+            "mi dej vědět ať zvýším limit.",
+            status_code=502,
+        )
     raw_text = blocks[0].get("text") or ""
     # Be lenient about stray markdown code fences in case the model
     # wraps the JSON despite instructions.
@@ -601,6 +620,13 @@ def extract_event_draft(page_text: str, anthropic_api_key: str) -> dict[str, Any
     try:
         parsed = json.loads(cleaned)
     except json.JSONDecodeError as e:
+        logger.warning(
+            "notion_ingest: Claude returned invalid JSON "
+            "(stop_reason=%s, text_len=%d, tail=%r)",
+            stop_reason,
+            len(raw_text),
+            raw_text[-200:],
+        )
         raise IngestError(
             "Claude nevrátil platný JSON — buď stránka neobsahuje "
             f"event metadata, nebo se model zmátl. ({e.msg})",
