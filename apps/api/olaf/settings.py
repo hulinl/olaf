@@ -173,6 +173,11 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@olaf.events")
 # Konfigurace: env var `RACE_SYNC_NOTIFY_EMAILS=a@b.cz,c@d.cz`.
 RACE_SYNC_NOTIFY_EMAILS = env.list("RACE_SYNC_NOTIFY_EMAILS", default=[])
 
+# Shared-secret token pro externí trigger daily race sync (POST
+# /api/races/sync-trigger/). V prod ho má GitHub Actions scheduled
+# workflow. Prázdná hodnota = endpoint zavřený (503).
+RACES_SYNC_TOKEN = env("RACES_SYNC_TOKEN", default="")
+
 # System-level Anthropic API key pro auto-extract z race URL („Chybí
 # tu závod?" flow). User nemusí mít vlastní key. Prázdný = extract
 # feature vypnutá, endpoint vrátí 503.

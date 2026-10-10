@@ -1353,3 +1353,52 @@ class RaceSubmissionServiceTests(TestCase):
         )
         with override_settings(ANTHROPIC_API_KEY=""):
             self.assertEqual(resolve_anthropic_key(user), "")
+
+
+class RaceSyncTriggerTests(TestCase):
+    """Shared-secret trigger endpoint — scheduled sync bez Celery beat."""
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+
+    def test_trigger_requires_token_setting(self) -> None:
+        from django.test import override_settings
+
+        with override_settings(RACES_SYNC_TOKEN=""):
+            resp = self.client.post("/api/races/sync-trigger/")
+        self.assertEqual(resp.status_code, drf_status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    def test_trigger_rejects_missing_header(self) -> None:
+        from django.test import override_settings
+
+        with override_settings(RACES_SYNC_TOKEN="secret-value"):
+            resp = self.client.post("/api/races/sync-trigger/")
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_trigger_rejects_wrong_token(self) -> None:
+        from django.test import override_settings
+
+        with override_settings(RACES_SYNC_TOKEN="secret-value"):
+            resp = self.client.post(
+                "/api/races/sync-trigger/",
+                HTTP_AUTHORIZATION="Bearer wrong-token",
+            )
+        self.assertEqual(resp.status_code, drf_status.HTTP_401_UNAUTHORIZED)
+
+    def test_trigger_runs_sync_and_logs_run(self) -> None:
+        from unittest import mock
+
+        from django.test import override_settings
+
+        before = SyncRun.objects.count()
+        with override_settings(RACES_SYNC_TOKEN="secret-value"), mock.patch(
+            "races.management.commands.sync_races._load_local",
+            return_value=[],
+        ):
+            resp = self.client.post(
+                "/api/races/sync-trigger/",
+                HTTP_AUTHORIZATION="Bearer secret-value",
+            )
+        self.assertEqual(resp.status_code, drf_status.HTTP_200_OK)
+        self.assertIn("output", resp.json())
+        self.assertEqual(SyncRun.objects.count(), before + 1)

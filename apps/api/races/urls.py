@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.race_list, name="list"),
     path("countries/", views.race_countries, name="countries"),
     path("sync-status/", views.race_sync_status, name="sync-status"),
+    path("sync-trigger/", views.race_sync_trigger, name="sync-trigger"),
     path("mine/", views.race_plan_mine, name="plan-mine"),
     path("my-communities/", views.race_my_communities, name="my-communities"),
     path(

@@ -27,7 +27,11 @@ from datetime import date
 from django.db.models import Count, Q, QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -672,6 +676,46 @@ def race_sync_status(request: Request) -> Response:
             ),
         }
     )
+
+
+@api_view(["POST"])
+@authentication_classes([])  # Vlastní Bearer check — DRF auth classy jinak sežerou „Bearer <token>" dřív než náš view
+@permission_classes([AllowAny])
+def race_sync_trigger(request: Request) -> Response:
+    """Externí trigger pro daily sync. Chráněný shared tokenem
+    (`settings.RACES_SYNC_TOKEN`). V prod volá GitHub Actions
+    scheduled workflow — Celery beat v prod nemá real worker, takže
+    PeriodicTask registrovaná přes `setup_race_beat` se nespouští
+    sama. Endpoint zajišťuje, že se label „Data aktualizována" nikdy
+    nerozsype.
+
+    Idempotent: `sync_races` sám matchuje po slug a jen updatuje
+    změněné pole. Beze změny remote dat je výsledek =0 beze změny
+    + nový SyncRun záznam (tj. refresh labelu).
+    """
+    from io import StringIO
+
+    from django.conf import settings
+    from django.core.management import call_command
+
+    expected = settings.RACES_SYNC_TOKEN
+    if not expected:
+        return Response(
+            {"detail": "RACES_SYNC_TOKEN není nastaven."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    header = request.META.get("HTTP_AUTHORIZATION", "")
+    token = header.removeprefix("Bearer ").strip() if header.startswith("Bearer ") else ""
+    if token != expected:
+        return Response(
+            {"detail": "Neplatný token."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    buf = StringIO()
+    call_command("sync_races", stdout=buf)
+    return Response({"output": buf.getvalue().strip()})
 
 
 @api_view(["GET"])
