@@ -7812,6 +7812,37 @@
    "web": "https://www.trofeoparravicini.org/",
    "highlight": "Jeden z nejstarších skialp závodů světa (od 1936) přes 4 vrcholy Orobie.",
    "warn": false
+  },
+  {
+   "id": "delicious-trail-dolomiti",
+   "sport": "beh",
+   "top": false,
+   "region": "ALP",
+   "name": "Delicious Trail Dolomiti",
+   "country": "Itálie",
+   "place": "Cortina d'Ampezzo, Dolomity",
+   "month": 9,
+   "next": {
+    "label": "obvykle konec září",
+    "year": 2027,
+    "sortKey": 202709
+   },
+   "date2026": "26. 9.",
+   "date2027": "25.–26. 9. (odh.)",
+   "distances": "43 / 35 / 23",
+   "km": 43,
+   "dplus": 3100,
+   "terrain": "h",
+   "series": "Nezávislý",
+   "registration": {
+    "type": "Q",
+    "detail": "ročník 2027 ještě nezveřejněn; 2026 proběhl 26. 9."
+   },
+   "limitH": null,
+   "participants": null,
+   "web": "https://delicioustrail.it",
+   "highlight": "Dolomitský trail s gastro refreshmenty v UNESCO lokalitách — 43 / 35 / 23 km.",
+   "warn": false
   }
  ]
 }
